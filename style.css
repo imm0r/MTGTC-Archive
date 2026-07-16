@@ -1,0 +1,99 @@
+:root{
+  --bg:#12131a; --panel:#1b1d27; --panel2:#232633; --line:#31364a;
+  --txt:#e8e9f0; --dim:#9aa0b8; --acc:#c9a227; --acc2:#e3bf4a;
+  --ok:#4caf7d; --err:#e0605e; --radius:12px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);
+     font:15px/1.5 system-ui,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+header{position:sticky;top:0;z-index:10;background:var(--panel);border-bottom:1px solid var(--line);
+       padding:10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+h1{font-size:17px;margin:0;letter-spacing:.5px;color:var(--acc)}
+nav{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;align-items:center}
+nav button{background:transparent;border:1px solid var(--line);color:var(--dim);
+           padding:7px 14px;border-radius:999px;cursor:pointer;font-size:14px}
+nav button.on{background:var(--acc);border-color:var(--acc);color:#1a1400;font-weight:600}
+#who{font-size:12px;color:var(--dim);margin-left:4px}
+main{padding:14px;max-width:1100px;margin:0 auto}
+.view{display:none} .view.on{display:block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:14px}
+button,select,input{font:inherit}
+.btn{background:var(--acc);color:#1a1400;border:0;padding:10px 16px;border-radius:8px;
+     cursor:pointer;font-weight:600}
+.btn:hover{background:var(--acc2)} .btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--txt);font-weight:400}
+.btn.ghost:hover{border-color:var(--acc)}
+.btn.sm{padding:5px 10px;font-size:13px}
+.btn.danger{background:transparent;border:1px solid var(--err);color:var(--err)}
+input[type=text],input[type=number],input[type=email],input[type=password],select{
+  background:var(--panel2);border:1px solid var(--line);
+  color:var(--txt);padding:9px 10px;border-radius:8px;width:100%}
+label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transform:uppercase;letter-spacing:.6px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.row>div{flex:1;min-width:110px}
+
+/* ---------------------------------------------------- Login / Einrichtung */
+#gate{max-width:400px;margin:8vh auto;padding:0 14px}
+#gate h2{margin:0 0 4px;color:var(--acc);font-size:19px}
+#gate .card{margin-top:16px}
+.tabs{display:flex;gap:6px;margin-bottom:12px}
+.tabs button{flex:1;background:transparent;border:1px solid var(--line);color:var(--dim);
+             padding:8px;border-radius:8px;cursor:pointer}
+.tabs button.on{background:var(--panel2);border-color:var(--acc);color:var(--txt)}
+.msg{font-size:13px;margin-top:10px;min-height:19px}
+.msg.err{color:var(--err)} .msg.ok{color:var(--ok)}
+
+/* ------------------------------------------------------------- Scannen */
+.drop{border:2px dashed var(--line);border-radius:var(--radius);padding:34px 16px;text-align:center;
+      color:var(--dim);cursor:pointer;transition:.15s}
+.drop:hover,.drop.hot{border-color:var(--acc);color:var(--txt);background:#1e2130}
+.drop b{color:var(--acc);font-size:16px;display:block;margin-bottom:6px}
+#queue{display:flex;flex-direction:column;gap:10px}
+.job{display:flex;gap:12px;background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);padding:10px}
+.job img.thumb{width:74px;height:104px;object-fit:cover;border-radius:6px;background:#000;flex:none}
+.job .body{flex:1;min-width:0}
+.job .title{font-weight:600;margin-bottom:2px}
+.job .meta{font-size:13px;color:var(--dim)}
+.bar{height:4px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:var(--acc);width:0;transition:width .25s}
+.pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--dim)}
+.pill.foil{border-color:var(--acc);color:var(--acc)}
+.pill.ok{border-color:var(--ok);color:var(--ok)}
+.pill.err{border-color:var(--err);color:var(--err)}
+
+/* ------------------------------------------------------------ Sammlung */
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);font-size:14px;vertical-align:middle}
+th{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.6px;
+   background:var(--bg);cursor:pointer;white-space:nowrap}
+td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000;display:block}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.stats{display:flex;gap:10px;flex-wrap:wrap}
+.stat{flex:1;min-width:130px;background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);padding:12px}
+.stat .v{font-size:22px;font-weight:700;color:var(--acc);font-variant-numeric:tabular-nums}
+.stat .k{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
+.empty{text-align:center;color:var(--dim);padding:36px 10px}
+.spark{display:inline-block;vertical-align:middle}
+
+/* ---------------------------------------------------------- Vorschläge */
+.sugg{position:relative}
+.sugg ul{position:absolute;z-index:20;left:0;right:0;top:100%;margin:2px 0 0;padding:0;list-style:none;
+         background:var(--panel2);border:1px solid var(--acc);border-radius:8px;max-height:220px;overflow:auto}
+.sugg li{padding:8px 10px;cursor:pointer;font-size:14px}
+.sugg li:hover,.sugg li.sel{background:var(--acc);color:#1a1400}
+
+/* ------------------------------------------------------------ Diverses */
+dialog{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:var(--radius);
+       padding:16px;max-width:440px;width:92vw}
+dialog::backdrop{background:#000a}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--panel2);
+       border:1px solid var(--acc);border-radius:8px;padding:10px 18px;z-index:99;opacity:0;
+       transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
+.toast.on{opacity:1}
+.hint{font-size:13px;color:var(--dim);margin:8px 0 0}
+code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px}
+
+@media(max-width:640px){
+  .hide-s{display:none}
+  h1{font-size:15px}
+}

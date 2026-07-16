@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MTG Sammlung</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='14'>&#9670;</text></svg>">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+</head>
+<body>
+
+<!-- ================= Einrichtung / Login ================= -->
+<div id="gate" style="display:none">
+  <h2>&#9670; MTG Sammlung</h2>
+
+  <!-- Erststart: Verbindung zur eigenen Supabase-Datenbank -->
+  <div class="pane" data-pane="setup" style="display:none">
+    <p class="hint" style="margin-top:2px">Einmalig: Verbindung zu deiner Datenbank herstellen.
+      Die Werte findest du in Supabase unter <b>Project Settings → API</b>.</p>
+    <form class="card" id="setup-form">
+      <div style="margin-bottom:10px">
+        <label>Project URL</label>
+        <input type="text" id="cfg-url" placeholder="https://xxxxxxxx.supabase.co" autocomplete="off">
+      </div>
+      <div style="margin-bottom:12px">
+        <label>Anon / Publishable Key</label>
+        <input type="text" id="cfg-key" placeholder="sb_publishable_… oder eyJ…" autocomplete="off">
+      </div>
+      <button class="btn" style="width:100%" type="submit">Verbinden</button>
+      <div class="msg err" id="setup-msg"></div>
+      <p class="hint">Diese beiden Werte sind für den Browser gedacht und dürfen öffentlich sein.
+        Das Datenbank-Passwort und den <code>service_role</code>-Key trägst du hier <b>nicht</b> ein.</p>
+    </form>
+  </div>
+
+  <!-- Anmeldung -->
+  <div class="pane" data-pane="auth" style="display:none">
+    <p class="hint" style="margin-top:2px">Melde dich an, um deine Sammlung auf allen Geräten zu sehen.</p>
+    <form class="card" id="auth-form">
+      <div class="tabs" id="auth-tabs">
+        <button type="button" class="on" data-mode="in">Anmelden</button>
+        <button type="button" data-mode="up">Konto anlegen</button>
+      </div>
+      <div style="margin-bottom:10px">
+        <label>E-Mail</label>
+        <input type="email" id="auth-email" autocomplete="username" required>
+      </div>
+      <div style="margin-bottom:12px">
+        <label>Passwort</label>
+        <input type="password" id="auth-pw" autocomplete="current-password" required>
+      </div>
+      <button class="btn" style="width:100%" type="submit" id="auth-go">Anmelden</button>
+      <div class="msg" id="auth-msg"></div>
+    </form>
+  </div>
+</div>
+
+<!-- ===================== Anwendung ====================== -->
+<div id="app" style="display:none">
+<header>
+  <h1>&#9670; MTG SAMMLUNG</h1>
+  <nav>
+    <button data-v="scan" class="on">Scannen</button>
+    <button data-v="coll">Sammlung</button>
+    <button data-v="decks">Decks</button>
+    <button data-v="more">Daten</button>
+    <span id="who"></span>
+    <button id="logout">Abmelden</button>
+  </nav>
+</header>
+
+<main>
+
+<!-- ---------------- Scannen ---------------- -->
+<section class="view on" id="v-scan">
+  <div class="card">
+    <div class="row" style="margin-bottom:12px">
+      <div><label>Sprache</label>
+        <select id="d-lang">
+          <option value="de">Deutsch</option><option value="en" selected>Englisch</option>
+          <option value="fr">Französisch</option><option value="it">Italienisch</option>
+          <option value="es">Spanisch</option><option value="ja">Japanisch</option>
+        </select></div>
+      <div><label>Zustand</label>
+        <select id="d-cond">
+          <option value="NM" selected>Near Mint</option><option value="LP">Lightly Played</option>
+          <option value="MP">Moderately Played</option><option value="HP">Heavily Played</option>
+          <option value="DMG">Damaged</option>
+        </select></div>
+      <div><label>Ausführung</label>
+        <select id="d-foil"><option value="0" selected>Normal</option><option value="1">Foil</option></select></div>
+    </div>
+    <div class="drop" id="drop">
+      <b>&#128247; Karte fotografieren</b>
+      Tippen zum Aufnehmen &middot; oder Bilder hierher ziehen &middot; mehrere gleichzeitig möglich
+    </div>
+    <input type="file" id="file" accept="image/*" capture="environment" multiple hidden>
+    <p class="hint">Die Einstellungen oben gelten für alle neu gescannten Karten und lassen sich pro Karte nachträglich ändern.</p>
+  </div>
+  <div id="queue"></div>
+</section>
+
+<!-- ---------------- Sammlung ---------------- -->
+<section class="view" id="v-coll">
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stat"><div class="v" id="s-total">0</div><div class="k">Karten gesamt</div></div>
+    <div class="stat"><div class="v" id="s-uniq">0</div><div class="k">Verschiedene</div></div>
+    <div class="stat"><div class="v" id="s-val">0 €</div><div class="k">Marktwert</div></div>
+    <div class="stat"><div class="v" id="s-foil">0</div><div class="k">Foils</div></div>
+  </div>
+  <div class="card">
+    <div class="row" style="margin-bottom:12px">
+      <div style="flex:2"><label>Suche</label><input type="text" id="q" placeholder="Name oder Set…"></div>
+      <div><label>Set</label><select id="f-set"><option value="">Alle</option></select></div>
+      <div><label>Ausführung</label><select id="f-foil">
+        <option value="">Alle</option><option value="1">Nur Foil</option><option value="0">Nur Normal</option></select></div>
+      <div style="flex:none"><button class="btn ghost" id="upd">Preise aktualisieren</button></div>
+    </div>
+    <div style="overflow-x:auto">
+      <table id="tbl">
+        <thead><tr>
+          <th class="hide-s"></th>
+          <th data-s="name">Karte</th>
+          <th data-s="set_name" class="hide-s">Set</th>
+          <th data-s="lang" class="hide-s">Spr.</th>
+          <th data-s="condition" class="hide-s">Zust.</th>
+          <th data-s="qty" class="num">Anz.</th>
+          <th data-s="price" class="num">Preis</th>
+          <th data-s="value" class="num">Wert</th>
+          <th></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="empty" id="coll-empty">Noch keine Karten. Fotografiere deine erste Karte im Tab „Scannen“.</div>
+  </div>
+</section>
+
+<!-- ---------------- Decks ---------------- -->
+<section class="view" id="v-decks">
+  <div class="card">
+    <div class="row">
+      <div><label>Neues Deck</label><input type="text" id="deck-name" placeholder="z. B. Mono Red Aggro"></div>
+      <div style="flex:none"><button class="btn" id="deck-add">Deck anlegen</button></div>
+    </div>
+  </div>
+  <div id="deck-list"></div>
+</section>
+
+<!-- ---------------- Daten ---------------- -->
+<section class="view" id="v-more">
+  <div class="card">
+    <h3 style="margin-top:0">Export &amp; Import</h3>
+    <p class="hint" style="margin-top:0">Deine Sammlung liegt in deiner Supabase-Datenbank und ist auf allen
+      Geräten dieselbe. Ein Export ist trotzdem nützlich — als Sicherung oder zum Weiterverarbeiten in Excel.</p>
+    <div class="row" style="margin-top:12px">
+      <div style="flex:none"><button class="btn" id="ex-json">Sicherung (JSON)</button></div>
+      <div style="flex:none"><button class="btn ghost" id="ex-csv">Export (CSV)</button></div>
+      <div style="flex:none"><button class="btn ghost" id="im-json">Sicherung einspielen</button></div>
+      <div style="flex:none"><button class="btn ghost" id="reset-cfg">Verbindung zurücksetzen</button></div>
+    </div>
+    <input type="file" id="im-file" accept="application/json,.json" hidden>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0">So funktioniert die Erkennung</h3>
+    <p class="hint" style="margin-top:0">
+      Aus dem Foto wird per Texterkennung der Kartenname gelesen und gegen die Scryfall-Datenbank abgeglichen —
+      von dort kommen Set, Sammlernummer, Bild und Marktpreis. Wird der Name nicht sicher erkannt, kannst du ihn
+      direkt in der Trefferzeile korrigieren; das Eingabefeld schlägt passende Kartennamen vor.
+      Für gute Trefferquoten: Karte formatfüllend, gerade von oben und ohne starke Reflexionen fotografieren.
+    </p>
+  </div>
+</section>
+
+</main>
+</div>
+
+<dialog id="dlg"><div id="dlg-body"></div>
+  <div class="row" style="margin-top:14px;justify-content:flex-end">
+    <div style="flex:none"><button class="btn ghost" id="dlg-no">Abbrechen</button></div>
+    <div style="flex:none"><button class="btn" id="dlg-yes">OK</button></div>
+  </div>
+</dialog>
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+# Lokale Notizen und Zwischenstände
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
