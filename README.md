@@ -42,9 +42,14 @@ Dann im Repository unter **Settings → Pages** als Source „Deploy from a bran
 Branch `main`, Ordner `/ (root)` wählen. Nach ein bis zwei Minuten liegt die App
 unter `https://<konto>.github.io/<repo>/`.
 
-Beim ersten Aufruf fragt die App nach Project URL und Schlüssel und merkt sie
-sich im Browser. Wer das Eintippen sparen will, trägt beide Werte fest in den
-`CONFIG`-Block oben in `app.js` ein.
+Project URL und Schlüssel stehen fest im `CONFIG`-Block oben in `app.js`. Sind
+sie dort leer, fragt die App beim ersten Aufruf danach und merkt sie sich im
+Browser.
+
+**Nach jeder Änderung an `app.js` oder `style.css`** den Versionsanhang in
+`index.html` hochzählen (`app.js?v=3`, `style.css?v=3`). Ohne das servieren
+Browser und der Cache von GitHub Pages nach dem Push weiter die alten Dateien —
+die Änderung wirkt dann scheinbar gar nicht.
 
 ### 3. Lokal testen (optional)
 

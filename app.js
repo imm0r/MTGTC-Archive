@@ -8,8 +8,8 @@
    Leer lassen: dann fragt die App beim ersten Start danach.
    ===================================================================== */
 const CONFIG = {
-  url: "",   // z. B. https://abcdefgh.supabase.co
-  key: ""    // anon / publishable key (sb_publishable_… oder eyJ…)
+  url: "https://kuhlwcifesyqmmzoivyi.supabase.co",   // MTGTC Archive, eu-central-1
+  key: "sb_publishable_MVdkzqnXTvzECbdgM3JIow_1MxFOZwd"
 };
 
 /* ---------------------------------------------------------------- Helfer */
