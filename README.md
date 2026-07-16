@@ -22,6 +22,8 @@ Kein Build-Schritt: Die Seite lädt Supabase und Tesseract per CDN.
 
 1. Auf [supabase.com](https://supabase.com) ein Projekt anlegen (Region EU).
 2. **SQL Editor** öffnen, Inhalt von `supabase-schema.sql` einfügen, **Run**.
+   Das Skript ist wiederholbar — nach jeder Schemaänderung einfach erneut
+   komplett ausführen. Vorhandene Daten bleiben dabei erhalten.
 3. **Authentication → Sign In / Providers → Email**: „Confirm email“ ausschalten,
    sonst wartest du auf eine Bestätigungsmail, die der kostenlose Tarif nur
    sehr langsam verschickt.
@@ -60,6 +62,12 @@ Python. Für den Betrieb über GitHub Pages ist beides nicht nötig.
 
 * Die App braucht Internet — für Scryfall, die Sprachdaten der Texterkennung
   und die Datenbank. Es gibt keinen Offline-Betrieb.
+* Fremdsprachige Karten: Scryfalls `/cards/named` und `/cards/autocomplete`
+  kennen nur englische Namen. Für andere Sprachen sucht die App deshalb über
+  `/cards/search` mit `include_multilingual`. Tokens gibt es bei Scryfall
+  ausschließlich auf Englisch — ein deutscher Token ist dort nicht zu finden.
+* Bei mehreren Auflagen derselben Karte nimmt die App die neueste. Ist es eine
+  andere, führt „Falsche Karte?“ zur Auswahl.
 * Preise stammen von Scryfall und sind Marktbeobachtungen, keine Verkaufspreise.
 * „Preise aktualisieren“ ruft jede Karte einzeln ab und schreibt einen
   Historienpunkt pro Tag (die letzten 60 bleiben erhalten).

@@ -10,7 +10,8 @@ create table if not exists public.cards (
   user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
   scryfall_id text not null,
   oracle_id   text,
-  name        text not null,
+  name        text not null,   -- englischer (kanonischer) Name
+  printed_name text,           -- Name wie auf der Karte gedruckt, z. B. deutsch
   set_code    text,
   set_name    text,
   cn          text,
@@ -43,6 +44,9 @@ create table if not exists public.deck_entries (
   primary key (deck_id, card_id)
 );
 
+-- Für Bestände, die vor der Mehrsprachigkeit angelegt wurden:
+alter table public.cards add column if not exists printed_name text;
+
 create index if not exists cards_user_idx        on public.cards(user_id);
 create index if not exists decks_user_idx        on public.decks(user_id);
 create index if not exists deck_entries_deck_idx on public.deck_entries(deck_id);
@@ -73,10 +77,17 @@ create policy "eigene deck-eintraege" on public.deck_entries
 -- Anlegen oder Anzahl erhöhen in einem einzigen, atomaren Schritt.
 -- Zwei Geräte, die dieselbe Karte gleichzeitig scannen, können sich so
 -- nicht gegenseitig überschreiben.
+-- Die Fassung ohne p_printed_name muss weg: ein zusätzlicher Parameter
+-- ergibt in Postgres eine zweite Funktion gleichen Namens statt eines
+-- Ersatzes, und PostgREST kann dann nicht mehr entscheiden, welche gemeint
+-- ist ("Could not choose the best candidate function").
+drop function if exists public.add_card(
+  text, text, text, text, text, text, text, text, text, boolean, numeric);
+
 create or replace function public.add_card(
-  p_scryfall_id text, p_oracle_id text, p_name text, p_set_code text,
-  p_set_name text, p_cn text, p_img text, p_lang text, p_condition text,
-  p_foil boolean, p_price numeric
+  p_scryfall_id text, p_oracle_id text, p_name text, p_printed_name text,
+  p_set_code text, p_set_name text, p_cn text, p_img text, p_lang text,
+  p_condition text, p_foil boolean, p_price numeric
 ) returns public.cards
 language plpgsql
 security invoker
@@ -85,11 +96,11 @@ as $$
 declare r public.cards;
 begin
   insert into public.cards as c
-    (scryfall_id, oracle_id, name, set_code, set_name, cn, img,
+    (scryfall_id, oracle_id, name, printed_name, set_code, set_name, cn, img,
      lang, condition, foil, qty, price, hist)
   values
-    (p_scryfall_id, p_oracle_id, p_name, p_set_code, p_set_name, p_cn, p_img,
-     p_lang, p_condition, p_foil, 1, p_price,
+    (p_scryfall_id, p_oracle_id, p_name, p_printed_name, p_set_code, p_set_name,
+     p_cn, p_img, p_lang, p_condition, p_foil, 1, p_price,
      case when p_price is null then '[]'::jsonb
           else jsonb_build_array(jsonb_build_object(
                  'd', to_char(current_date, 'YYYY-MM-DD'), 'v', p_price)) end)

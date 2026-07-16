@@ -54,6 +54,16 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .job .body{flex:1;min-width:0}
 .job .title{font-weight:600;margin-bottom:2px}
 .job .meta{font-size:13px;color:var(--dim)}
+.picks{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px}
+.pick{display:flex;align-items:center;gap:8px;text-align:left;cursor:pointer;
+      background:var(--panel);border:1px solid var(--line);border-radius:8px;
+      padding:6px 10px 6px 6px;color:var(--txt)}
+.pick:hover{border-color:var(--acc);background:#1e2130}
+.pick img{width:28px;height:39px;object-fit:cover;border-radius:3px;background:#000;flex:none}
+.pick{max-width:100%}
+.pick span{display:flex;flex-direction:column;line-height:1.3;min-width:0;overflow-wrap:anywhere}
+.pick b{font-size:14px;font-weight:600}
+.pick i{font-size:11px;color:var(--dim);font-style:normal}
 .bar{height:4px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:8px}
 .bar i{display:block;height:100%;background:var(--acc);width:0;transition:width .25s}
 .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--dim)}

@@ -80,7 +80,9 @@ async function reload() {
     sb.from("deck_entries").select("*")
   ]);
   for (const r of [c, d, e]) if (r.error) throw r.error;
-  CARDS = c.data.map(x => ({ ...x, set: x.set_code }));
+  // disp = was auf der Karte steht; name bleibt der englische Name, unter
+  // dem man die Karte überall sonst wiederfindet.
+  CARDS = c.data.map(x => ({ ...x, set: x.set_code, disp: x.printed_name || x.name }));
   DECKS = d.data.map(dk => ({ ...dk,
     entries: e.data.filter(en => en.deck_id === dk.id)
                    .map(en => ({ cardId: en.card_id, qty: en.qty })) }));
@@ -104,8 +106,76 @@ const sf = (() => {
 })();
 
 const sfNamed = name => sf("/cards/named?fuzzy=" + encodeURIComponent(name));
-const sfAuto  = q    => sf("/cards/autocomplete?q=" + encodeURIComponent(q));
 const sfById  = id   => sf("/cards/" + id);
+
+/* Volltextsuche. include_multilingual findet gedruckte Namen anderer
+   Sprachen, include_extras auch Tokens — beides ist standardmäßig aus. */
+async function sfSearch(q, max = 12) {
+  const r = await sf("/cards/search?include_multilingual=true&include_extras=true" +
+                     "&unique=prints&order=released&dir=desc&q=" + encodeURIComponent(q));
+  return r?.data ? r.data.slice(0, max) : [];
+}
+
+const norm = s => (s || "").toLowerCase()
+  .replace(/[’']/g, "").replace(/[^a-zà-ÿ0-9]+/g, " ").trim();
+
+/* Die Suche liefert jede Auflage einzeln. Für eine Auswahlliste zählt aber
+   die Karte, nicht die Auflage — sonst steht derselbe Name mehrfach da.
+   Die Reihenfolge (neueste zuerst) bleibt erhalten. */
+const byCard = hits => {
+  const seen = new Set();
+  return hits.filter(c => {
+    const k = c.oracle_id || c.name;
+    return seen.has(k) ? false : (seen.add(k), true);
+  });
+};
+
+/* Scryfalls Namenssuche (/cards/named) kennt ausschließlich englische
+   Namen und keine Tokens. Für alles andere brauchen wir /cards/search.
+   Rückgabe: eine Karte, eine Auswahlliste oder nichts. */
+async function findCard(text, lang) {
+  const t = text.trim();
+  if (!t) return { card: null, candidates: [] };
+
+  // 1. Nicht-englische Karten: gedruckten Namen in der gewählten Sprache suchen.
+  if (lang && lang !== "en") {
+    let hits = [];
+    try { hits = await sfSearch(`name:"${t.replace(/"/g, "")}" lang:${lang}`); } catch { /* weiter */ }
+    const exact = hits.find(c => norm(c.printed_name) === norm(t));
+    if (exact) return { card: exact, candidates: [] };
+    const uniq = byCard(hits);
+    if (uniq.length === 1) return { card: uniq[0], candidates: [] };
+    if (uniq.length > 1) return { card: null, candidates: uniq };
+  }
+
+  // 2. Englischer Weg: verzeiht Tippfehler, deckt aber keine Tokens ab.
+  try {
+    const hit = await sfNamed(t);
+    if (hit) return { card: hit, candidates: [] };
+  } catch { /* z. B. "Too many cards match" — unten weitersuchen */ }
+
+  // 3. Auffangnetz: Volltextsuche inkl. Tokens, egal in welcher Sprache.
+  let hits = [];
+  try { hits = await sfSearch(`name:"${t.replace(/"/g, "")}"`); } catch { /* nichts gefunden */ }
+  const exact = hits.find(c => norm(c.name) === norm(t) || norm(c.printed_name) === norm(t));
+  if (exact) return { card: exact, candidates: [] };
+  const uniq = byCard(hits);
+  return { card: uniq.length === 1 ? uniq[0] : null, candidates: uniq.length > 1 ? uniq : [] };
+}
+
+/* Für die Vorschlagsliste: autocomplete kann kein Deutsch (liefert auch mit
+   include_multilingual nichts), daher für andere Sprachen die Volltextsuche. */
+async function sfSuggest(q, lang) {
+  if (!lang || lang === "en") {
+    const r = await sf("/cards/autocomplete?q=" + encodeURIComponent(q));
+    return (r?.data || []).map(n => ({ label: n, value: n }));
+  }
+  const hits = byCard(await sfSearch(`name:${JSON.stringify(q)} lang:${lang}`, 24)).slice(0, 8);
+  return hits.map(c => ({
+    label: (c.printed_name || c.name) + (c.printed_name ? ` — ${c.name}` : ""),
+    value: c.printed_name || c.name
+  }));
+}
 
 const priceOf = (c, foil) => {
   const p = c.prices || {};
@@ -144,9 +214,9 @@ const candidates = text => text.split("\n")
   .filter(l => l.length >= 3 && /[A-Za-z]{3}/.test(l))
   .slice(0, 6);
 
-async function identify(img, onStep) {
+async function identify(img, lang, onStep) {
   const w = await ocrWorker();
-  let firstGuess = "";
+  let firstGuess = "", best = [];
   for (const topOnly of [true, false]) {
     onStep(topOnly ? "Lese Kartennamen…" : "Zweiter Versuch am ganzen Bild…");
     const { data } = await w.recognize(preprocess(img, topOnly));
@@ -154,12 +224,14 @@ async function identify(img, onStep) {
     if (topOnly) firstGuess = lines[0] || "";
     for (const line of lines) {
       onStep("Suche „" + line + "“…");
-      let hit = null;
-      try { hit = await sfNamed(line); } catch { /* nächster Kandidat */ }
-      if (hit) return { card: hit, guess: line };
+      const { card, candidates: cs } = await findCard(line, lang);
+      if (card) return { card, guess: line, candidates: [] };
+      // Mehrdeutig: merken, aber weitersuchen — vielleicht trifft eine
+      // andere Zeile eindeutig.
+      if (cs.length && !best.length) { best = cs; firstGuess = line; }
     }
   }
-  return { card: null, guess: firstGuess };
+  return { card: null, guess: firstGuess, candidates: best };
 }
 
 /* ============================ Scan-Ablauf ============================= */
@@ -184,10 +256,13 @@ async function scanFile(file) {
   try {
     const img = await loadImg(file);
     prog(35);
-    const { card, guess } = await identify(img, s => { step(s); prog(70); });
+    // Sprache jetzt festhalten: der Nutzer kann das Feld umstellen,
+    // während dieser Scan noch läuft.
+    const lang = $("#d-lang").value;
+    const { card, guess, candidates } = await identify(img, lang, s => { step(s); prog(70); });
     prog(100);
     if (card) await addToCollection(card, el);
-    else renderManual(el, guess);
+    else renderManual(el, guess, candidates);
   } catch (e) {
     el.querySelector(".body").innerHTML =
       `<div class="title">Fehlgeschlagen</div>
@@ -203,6 +278,7 @@ async function addToCollection(card, el) {
 
   const { data, error } = await sb.rpc("add_card", {
     p_scryfall_id: card.id, p_oracle_id: card.oracle_id, p_name: card.name,
+    p_printed_name: card.printed_name || null,
     p_set_code: (card.set || "").toUpperCase(), p_set_name: card.set_name,
     p_cn: card.collector_number, p_img: imgOf(card),
     p_lang: lang, p_condition: cond, p_foil: foil, p_price: price
@@ -213,7 +289,8 @@ async function addToCollection(card, el) {
   const row = Array.isArray(data) ? data[0] : data;
   el.querySelector(".thumb").src = imgOf(card) || el.querySelector(".thumb").src;
   el.querySelector(".body").innerHTML = `
-    <div class="title">${esc(card.name)}</div>
+    <div class="title">${esc(card.printed_name || card.name)}</div>
+    ${card.printed_name ? `<div class="meta">${esc(card.name)}</div>` : ""}
     <div class="meta">${esc(card.set_name)} &middot; #${esc(card.collector_number)} &middot; ${eur(price)}</div>
     <div class="meta" style="margin-top:6px">
       <span class="pill ok">${before ? "Anzahl: " + (row?.qty ?? "+1") : "Hinzugefügt"}</span>
@@ -224,14 +301,33 @@ async function addToCollection(card, el) {
   el.querySelector("[data-fix]").onclick = () => renderManual(el, card.name);
 }
 
-function renderManual(el, guess) {
+function renderManual(el, guess, candidates) {
+  const cs = candidates || [];
+  const list = cs.length ? `
+    <div class="picks">${cs.map((c, i) => `
+      <button class="pick" data-pick="${i}">
+        ${c.image_uris?.small ? `<img src="${esc(c.image_uris.small)}" alt="" loading="lazy">` : ""}
+        <span><b>${esc(c.printed_name || c.name)}</b>
+        ${c.printed_name ? `<i>${esc(c.name)}</i>` : ""}
+        <i>${esc(c.set_name)} · #${esc(c.collector_number)}</i></span>
+      </button>`).join("")}</div>` : "";
+
   el.querySelector(".body").innerHTML = `
-    <div class="title">Nicht sicher erkannt</div>
-    <div class="meta">Kartenname eingeben — Vorschläge erscheinen beim Tippen.</div>
+    <div class="title">${cs.length ? "Welche Karte ist es?" : "Nicht sicher erkannt"}</div>
+    <div class="meta">${cs.length
+      ? `Gelesen wurde „${esc(guess)}“ — das passt auf mehrere Karten.`
+      : "Kartenname eingeben — Vorschläge erscheinen beim Tippen."}</div>
+    ${list}
     <div class="row" style="margin-top:8px">
       <div class="sugg"><input type="text" data-name value="${esc(guess)}" placeholder="Kartenname"></div>
-      <div style="flex:none"><button class="btn sm" data-go>Übernehmen</button></div>
+      <div style="flex:none"><button class="btn sm" data-go>Suchen</button></div>
     </div>`;
+
+  el.querySelectorAll("[data-pick]").forEach(b => b.onclick = async () => {
+    try { await addToCollection(cs[+b.dataset.pick], el); }
+    catch (e) { toast(e.message); }
+  });
+
   const inp = el.querySelector("[data-name]");
   attachSuggest(inp);
   const go = async () => {
@@ -239,8 +335,9 @@ function renderManual(el, guess) {
     if (!v) return;
     el.querySelector(".meta").textContent = "Suche…";
     try {
-      const card = await sfNamed(v);
+      const { card, candidates: cs2 } = await findCard(v, $("#d-lang").value);
       if (card) await addToCollection(card, el);
+      else if (cs2.length) renderManual(el, v, cs2);
       else el.querySelector(".meta").innerHTML =
         '<span class="pill err">Keine Karte mit diesem Namen gefunden</span>';
     } catch (e) {
@@ -251,7 +348,7 @@ function renderManual(el, guess) {
   inp.addEventListener("keydown", e => {
     if (e.key === "Enter" && !el.querySelector(".sugg ul")) go();
   });
-  inp.focus(); inp.select();
+  if (!cs.length) { inp.focus(); inp.select(); }
 }
 
 function attachSuggest(inp) {
@@ -263,14 +360,17 @@ function attachSuggest(inp) {
     const v = inp.value.trim();
     if (v.length < 3) return close();
     timer = setTimeout(async () => {
-      let names = [];
-      try { names = (await sfAuto(v))?.data?.slice(0, 8) || []; } catch { return close(); }
+      let items = [];
+      try { items = await sfSuggest(v, $("#d-lang").value); } catch { return close(); }
       close();
-      if (!names.length) return;
+      if (!items.length) return;
       list = document.createElement("ul");
-      list.innerHTML = names.map(n => `<li>${esc(n)}</li>`).join("");
-      [...list.children].forEach(li => li.onmousedown = e => {
-        e.preventDefault(); inp.value = li.textContent; close();
+      items.forEach(it => {
+        const li = document.createElement("li");
+        li.textContent = it.label;
+        li.dataset.value = it.value;
+        li.onmousedown = e => { e.preventDefault(); inp.value = it.value; close(); };
+        list.appendChild(li);
       });
       box.appendChild(list);
     }, 220);
@@ -283,7 +383,9 @@ function attachSuggest(inp) {
       sel = (sel + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
       items.forEach((li, i) => li.classList.toggle("sel", i === sel));
     } else if (e.key === "Enter" && sel >= 0) {
-      e.preventDefault(); inp.value = items[sel].textContent; close();
+      // dataset.value, nicht textContent: die Beschriftung enthält bei
+      // fremdsprachigen Karten zusätzlich den englischen Namen.
+      e.preventDefault(); inp.value = items[sel].dataset.value; close();
     } else if (e.key === "Escape") close();
   });
   inp.addEventListener("blur", () => setTimeout(close, 150));
@@ -296,7 +398,8 @@ function filtered() {
   const q = $("#q").value.trim().toLowerCase();
   const fs = $("#f-set").value, ff = $("#f-foil").value;
   return CARDS.filter(c =>
-    (!q || c.name.toLowerCase().includes(q) || (c.set_name || "").toLowerCase().includes(q)) &&
+    (!q || c.name.toLowerCase().includes(q) || c.disp.toLowerCase().includes(q) ||
+           (c.set_name || "").toLowerCase().includes(q)) &&
     (!fs || c.set === fs) &&
     (ff === "" || String(c.foil ? 1 : 0) === ff)
   ).sort((a, b) => {
@@ -338,8 +441,9 @@ function renderCollection() {
   $("#tbl tbody").innerHTML = rows.map(c => `
     <tr data-id="${c.id}">
       <td class="hide-s">${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy">` : ""}</td>
-      <td><div>${esc(c.name)}</div>
+      <td><div>${esc(c.disp)}</div>
           <div style="font-size:12px;color:var(--dim)">
+            ${c.printed_name && c.printed_name !== c.name ? esc(c.name) + " &middot; " : ""}
             ${c.foil ? '<span class="pill foil">Foil</span> ' : ""}#${esc(c.cn)}</div></td>
       <td class="hide-s">${esc(c.set_name || c.set || "")}</td>
       <td class="hide-s">${esc((c.lang || "").toUpperCase())}</td>
@@ -403,7 +507,7 @@ function renderDecks() {
       if (!c) return "";
       const short = c.qty < e.qty;
       return `<tr>
-        <td>${esc(c.name)} ${c.foil ? '<span class="pill foil">Foil</span>' : ""}</td>
+        <td>${esc(c.disp)} ${c.foil ? '<span class="pill foil">Foil</span>' : ""}</td>
         <td class="hide-s">${esc(c.set || "")}</td>
         <td class="num">${e.qty}&times;</td>
         <td class="num">${short ? `<span class="pill err">${e.qty - c.qty} fehlen</span>`
@@ -474,12 +578,13 @@ function attachLocalSuggest(inp) {
     close();
     const v = inp.value.trim().toLowerCase();
     if (v.length < 2) return;
-    const hits = CARDS.filter(c => c.name.toLowerCase().includes(v)).slice(0, 8);
+    const hits = CARDS.filter(c => c.name.toLowerCase().includes(v) ||
+                                   c.disp.toLowerCase().includes(v)).slice(0, 8);
     if (!hits.length) return;
     list = document.createElement("ul");
     hits.forEach(c => {
       const li = document.createElement("li");
-      li.textContent = `${c.name} · ${c.set}${c.foil ? " · Foil" : ""} (${c.qty}×)`;
+      li.textContent = `${c.disp} · ${c.set}${c.foil ? " · Foil" : ""} (${c.qty}×)`;
       li.onmousedown = e => {
         e.preventDefault(); inp.value = ""; close();
         inp.dispatchEvent(new CustomEvent("deck-pick", { detail: c.id }));
@@ -501,8 +606,9 @@ function download(name, text, mime) {
 const csvCell = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
 function exportCsv() {
-  const head = ["Name", "Set", "Set-Code", "Nummer", "Sprache", "Zustand", "Foil", "Anzahl", "Preis EUR", "Wert EUR"];
-  const rows = CARDS.map(c => [c.name, c.set_name, c.set, c.cn, c.lang, c.condition,
+  const head = ["Name", "Name (englisch)", "Set", "Set-Code", "Nummer", "Sprache",
+                "Zustand", "Foil", "Anzahl", "Preis EUR", "Wert EUR"];
+  const rows = CARDS.map(c => [c.disp, c.name, c.set_name, c.set, c.cn, c.lang, c.condition,
     c.foil ? "ja" : "nein", c.qty, c.price ?? "",
     c.price == null ? "" : (c.price * c.qty).toFixed(2)]);
   download(`mtg-sammlung-${today()}.csv`,
@@ -522,6 +628,7 @@ async function importJson(file) {
     for (let i = 0; i < (c.qty || 1); i++) {
       const { error } = await sb.rpc("add_card", {
         p_scryfall_id: c.scryfall_id, p_oracle_id: c.oracle_id, p_name: c.name,
+        p_printed_name: c.printed_name || null,
         p_set_code: c.set || c.set_code, p_set_name: c.set_name, p_cn: c.cn, p_img: c.img,
         p_lang: c.lang || "en", p_condition: c.condition || "NM",
         p_foil: !!c.foil, p_price: c.price ?? null
