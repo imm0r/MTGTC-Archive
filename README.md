@@ -58,6 +58,21 @@ die Änderung wirkt dann scheinbar gar nicht.
 `start.cmd` startet einen lokalen Webserver auf Port 8000 und braucht dazu
 Python. Für den Betrieb über GitHub Pages ist beides nicht nötig.
 
+## Wie eine Karte erkannt wird
+
+1. **Setcode + Sammlernummer** aus der unteren linken Ecke (`0008/013 T` über
+   `MKM • DE`). Das bestimmt die Auflage eindeutig, sprachunabhängig und auch
+   für Tokens — der zuverlässigste Weg, wenn die Ecke scharf genug ist.
+   Das `T` hinter der Nummer ist nicht nebensächlich: `mkm/8` und `tmkm/8`
+   sind zwei völlig verschiedene Karten.
+2. **Kartenname**, sonst. Für nicht-englische Karten über `/cards/search` mit
+   `include_multilingual`, sonst über `/cards/named` (verzeiht Tippfehler).
+3. **Von Hand**: im Trefferfeld entweder den Namen oder `MKM 8` bzw. `MKM 8 T`
+   eintippen.
+
+Fürs Fotografieren heißt das: Die untere linke Ecke sollte mit aufs Bild und
+scharf sein — sie ist wertvoller als der Kartenname.
+
 ## Hinweise
 
 * Die App braucht Internet — für Scryfall, die Sprachdaten der Texterkennung
@@ -66,8 +81,12 @@ Python. Für den Betrieb über GitHub Pages ist beides nicht nötig.
   kennen nur englische Namen. Für andere Sprachen sucht die App deshalb über
   `/cards/search` mit `include_multilingual`. Tokens gibt es bei Scryfall
   ausschließlich auf Englisch — ein deutscher Token ist dort nicht zu finden.
-* Bei mehreren Auflagen derselben Karte nimmt die App die neueste. Ist es eine
-  andere, führt „Falsche Karte?“ zur Auswahl.
+* Bei mehreren Auflagen derselben Karte nimmt der Namensweg die neueste. Ist es
+  eine andere, führt „Falsche Karte?“ zur Auswahl — oder gleich der Weg über
+  Setcode und Nummer, der die Auflage exakt trifft.
+* Deutsche Auflagen haben bei Scryfall häufig keinen eigenen Preis. Dann wird
+  der Preis der englischen Auflage übernommen. Das ist eine Näherung: real
+  weichen fremdsprachige Karten im Preis ab.
 * Preise stammen von Scryfall und sind Marktbeobachtungen, keine Verkaufspreise.
 * „Preise aktualisieren“ ruft jede Karte einzeln ab und schreibt einen
   Historienpunkt pro Tag (die letzten 60 bleiben erhalten).

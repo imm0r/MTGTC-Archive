@@ -119,6 +119,44 @@ async function sfSearch(q, max = 12) {
 const norm = s => (s || "").toLowerCase()
   .replace(/[’']/g, "").replace(/[^a-zà-ÿ0-9]+/g, " ").trim();
 
+/* ------------------------------------------------- Suche über Setcode
+   Unten links steht auf jeder modernen Karte die Sammlernummer und darunter
+   Setcode und Sprache ("0008/013 T" / "MKM • DE"). Das identifiziert eine
+   Auflage eindeutig — sprachunabhängig und auch für Tokens. Verlässlicher
+   als jeder Namensabgleich, wenn die Ecke lesbar ist. */
+const sfCode = async (code, num, lang) => {
+  try {
+    return await sf(`/cards/${encodeURIComponent(code.toLowerCase())}/${encodeURIComponent(num)}` +
+                    (lang && lang !== "en" ? `/${lang}` : ""));
+  } catch { return null; }
+};
+
+/* Deutsche Auflagen haben bei Scryfall oft gar keinen eigenen Preis. Dann
+   nehmen wir den der englischen Auflage — eine Näherung, aber weit
+   brauchbarer als gar kein Wert. */
+async function withPrice(card) {
+  const p = card?.prices || {};
+  if (!card || card.lang === "en" || p.eur || p.eur_foil || p.usd || p.usd_foil) return card;
+  const en = await sfCode(card.set, card.collector_number, "en");
+  if (en?.prices) { card.prices = en.prices; card.price_from_en = true; }
+  return card;
+}
+
+async function findByCode(code, num, lang, isToken) {
+  const n = String(num).replace(/^0+/, "") || "0";   // führende Nullen ergeben 404
+  const base = code.toLowerCase();
+  // Achtung: "mkm/8" und "tmkm/8" existieren beide und sind verschiedene
+  // Karten. Das T-Zeichen auf der Karte entscheidet, welche gemeint ist.
+  const codes = [...new Set(isToken ? ["t" + base, base] : [base, "t" + base])];
+  const langs = lang && lang !== "en" ? [lang, "en"] : ["en"];
+  for (const c of codes)
+    for (const l of langs) {
+      const hit = await sfCode(c, n, l);
+      if (hit) return withPrice(hit);
+    }
+  return null;
+}
+
 /* Die Suche liefert jede Auflage einzeln. Für eine Auswahlliste zählt aber
    die Karte, nicht die Auflage — sonst steht derselbe Name mehrfach da.
    Die Reihenfolge (neueste zuerst) bleibt erhalten. */
@@ -209,6 +247,43 @@ function preprocess(img, topOnly) {
   return cv;
 }
 
+/* Ausschnitt der unteren linken Ecke. Der Aufdruck dort ist sehr klein,
+   deshalb deutlich stärker vergrößert als beim Titel. */
+function preprocessCorner(img) {
+  const sx = 0, sy = Math.round(img.height * 0.85);
+  const sw = Math.round(img.width * 0.55), sh = img.height - sy;
+  const cv = document.createElement("canvas");
+  const scale = Math.min(6, Math.max(2, 1600 / sw));
+  cv.width = Math.round(sw * scale); cv.height = Math.round(sh * scale);
+  const cx = cv.getContext("2d", { willReadFrequently: true });
+  cx.imageSmoothingQuality = "high";
+  cx.drawImage(img, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
+  const d = cx.getImageData(0, 0, cv.width, cv.height), a = d.data;
+  for (let i = 0; i < a.length; i += 4) {
+    let g = 0.299 * a[i] + 0.587 * a[i + 1] + 0.114 * a[i + 2];
+    g = (g - 120) * 3.2 + 128;                      // harter Kontrast: weiß auf schwarz
+    a[i] = a[i + 1] = a[i + 2] = g < 0 ? 0 : g > 255 ? 255 : g;
+  }
+  cx.putImageData(d, 0, 0);
+  return cv;
+}
+
+/* Erwartet zwei Zeilen wie "0008/013 T" und "MKM • DE". Der Trennpunkt wird
+   von der Erkennung gern als *, . oder ° gelesen, die Null als O. */
+function parseCorner(text) {
+  const T = text.toUpperCase().replace(/[|]/g, " ");
+  const code = T.match(/\b([A-Z0-9]{3,5})\s*[•·*.,°\-]\s*([A-Z]{2})\b/);
+  const numT = T.match(/\b(\d{1,4})\s*\/\s*\d{1,4}\s*([A-Z])?/) || T.match(/\b(\d{2,4})\b/);
+  if (!code || !numT) return null;
+  return {
+    set: code[1],
+    lang: code[2].toLowerCase(),
+    num: numT[1],
+    // Der Buchstabe hinter der Nummer ist die Seltenheit; T steht für Token.
+    token: (numT[2] || "") === "T" || /\bT\b/.test(T.split("\n")[0] || "")
+  };
+}
+
 const candidates = text => text.split("\n")
   .map(l => l.replace(/[^A-Za-zÀ-ÿ0-9',\- ]/g, " ").replace(/\s+/g, " ").trim())
   .filter(l => l.length >= 3 && /[A-Za-z]{3}/.test(l))
@@ -217,6 +292,21 @@ const candidates = text => text.split("\n")
 async function identify(img, lang, onStep) {
   const w = await ocrWorker();
   let firstGuess = "", best = [];
+
+  // 1. Setcode + Sammlernummer aus der unteren linken Ecke. Trifft das,
+  //    ist die Auflage eindeutig bestimmt — auch bei Tokens und in jeder
+  //    Sprache. Der Namensweg unten ist nur das Auffangnetz.
+  onStep("Lese Setcode und Nummer…");
+  try {
+    const { data } = await w.recognize(preprocessCorner(img));
+    const c = parseCorner(data.text);
+    if (c) {
+      onStep(`Suche ${c.set} #${c.num}${c.token ? " (Token)" : ""}…`);
+      const hit = await findByCode(c.set, c.num, lang, c.token);
+      if (hit) return { card: hit, guess: hit.printed_name || hit.name, candidates: [] };
+    }
+  } catch { /* Ecke unlesbar — weiter über den Namen */ }
+
   for (const topOnly of [true, false]) {
     onStep(topOnly ? "Lese Kartennamen…" : "Zweiter Versuch am ganzen Bild…");
     const { data } = await w.recognize(preprocess(img, topOnly));
@@ -319,9 +409,11 @@ function renderManual(el, guess, candidates) {
       : "Kartenname eingeben — Vorschläge erscheinen beim Tippen."}</div>
     ${list}
     <div class="row" style="margin-top:8px">
-      <div class="sugg"><input type="text" data-name value="${esc(guess)}" placeholder="Kartenname"></div>
+      <div class="sugg"><input type="text" data-name value="${esc(guess)}" placeholder="Kartenname oder z. B. „MKM 8 T“"></div>
       <div style="flex:none"><button class="btn sm" data-go>Suchen</button></div>
-    </div>`;
+    </div>
+    <p class="hint" style="margin-top:6px">Immer eindeutig: Setcode und Sammlernummer von unten
+      links auf der Karte, z. B. <code>MKM 8</code> — bei einem Token mit <code>T</code> dahinter.</p>`;
 
   el.querySelectorAll("[data-pick]").forEach(b => b.onclick = async () => {
     try { await addToCollection(cs[+b.dataset.pick], el); }
@@ -335,9 +427,19 @@ function renderManual(el, guess, candidates) {
     if (!v) return;
     el.querySelector(".meta").textContent = "Suche…";
     try {
-      const { card, candidates: cs2 } = await findCard(v, $("#d-lang").value);
-      if (card) await addToCollection(card, el);
-      else if (cs2.length) renderManual(el, v, cs2);
+      // "MKM 8", "mkm/8 T" oder "TMKM 8": Eingabe von Setcode und Nummer,
+      // wie sie unten links auf der Karte stehen.
+      const m = v.match(/^([a-z0-9]{3,5})[\s\-\/·•]+(\d{1,4})\s*(t)?$/i);
+      const card = m
+        ? await findByCode(m[1], m[2], $("#d-lang").value, !!m[3])
+        : null;
+      if (card) return addToCollection(card, el);
+      if (m) return el.querySelector(".meta").innerHTML =
+        `<span class="pill err">${esc(m[1].toUpperCase())} #${esc(m[2])} gibt es nicht${m[3] ? " als Token" : ""}</span>`;
+
+      const r = await findCard(v, $("#d-lang").value);
+      if (r.card) await addToCollection(r.card, el);
+      else if (r.candidates.length) renderManual(el, v, r.candidates);
       else el.querySelector(".meta").innerHTML =
         '<span class="pill err">Keine Karte mit diesem Namen gefunden</span>';
     } catch (e) {
