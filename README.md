@@ -117,11 +117,16 @@ Anmeldung, damit niemand mit der bloßen URL auf deine Rechnung scannt.
 Ohne diese Schritte läuft die App weiter — sie meldet die Bilderkennung einmal
 als nicht verfügbar und nutzt danach Tesseract.
 
-**Kosten und Modellwahl.** Oben in `index.ts` steht `const MODEL`. Voreingestellt
-ist `claude-opus-4-8`: rund **1–3 Cent pro Karte**. `claude-haiku-4-5` kostet ein
-Fünftel und genügt für das reine Ablesen zweier Zeilen wahrscheinlich völlig —
-das ist eine Kosten-gegen-Genauigkeit-Abwägung, die du treffen solltest, nicht
-ich. Die Antwort meldet unter `usage` die tatsächlich verbrauchten Tokens.
+**Kosten.** Gemessen an einer Testkarte: 2.304 Eingabe- und 63 Ausgabe-Tokens
+pro Scan.
+
+| Modell (`const MODEL` in `index.ts`) | Pro Karte | 1.000 Karten |
+|---|---|---|
+| `claude-haiku-4-5` (eingestellt) | 0,26 ct | 2,60 € |
+| `claude-opus-4-8` | 1,31 ct | 13,10 € |
+
+Jede Antwort meldet unter `usage` die tatsächlich verbrauchten Tokens — damit
+lässt sich das jederzeit nachrechnen statt schätzen.
 
 ## Hinweise
 

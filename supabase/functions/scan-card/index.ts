@@ -14,8 +14,11 @@
 import Anthropic from "npm:@anthropic-ai/sdk";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-// Modell in einer Konstante: Wechsel ist eine Zeile. Siehe README zu Kosten.
-const MODEL = "claude-opus-4-8";
+// Gemessen an einer Testkarte: 2304 Eingabe- + 63 Ausgabe-Tokens pro Scan.
+// Haiku 4.5 = 0,26 ct, Opus 4.8 = 1,31 ct. Zwei kleine Zeilen abzulesen ist
+// keine Aufgabe für das größte Modell; patzt Haiku, fängt Tesseract oder die
+// Handeingabe es ab. Wechsel ist diese eine Zeile.
+const MODEL = "claude-haiku-4-5";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
