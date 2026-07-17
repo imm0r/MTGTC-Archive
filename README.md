@@ -58,6 +58,33 @@ die Änderung wirkt dann scheinbar gar nicht.
 `start.cmd` startet einen lokalen Webserver auf Port 8000 und braucht dazu
 Python. Für den Betrieb über GitHub Pages ist beides nicht nötig.
 
+## Row Level Security richtig prüfen
+
+Der publishable key steht im Browser und im Repository — der Schutz der Daten
+hängt allein an RLS. Wer das im Browser nachprüfen will, muss aufpassen:
+`createClient` lädt eine gespeicherte Anmeldung **automatisch** aus dem
+localStorage (`sb-<projekt>-auth-token`). Ein vermeintlich anonymer Client ist
+dann in Wahrheit angemeldet und sieht selbstverständlich alles — das sieht wie
+ein Datenleck aus, ist aber nur die eigene Sitzung.
+
+Ein echter anonymer Client braucht einen leeren Speicher:
+
+```js
+const leer = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+const anon = supabase.createClient(URL, KEY, { auth: {
+  persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storage: leer } });
+await anon.from("cards").select("id");   // muss 42501 liefern
+```
+
+Erwartet wird `42501` auf Lesen, Schreiben und `add_card`. Kommen stattdessen
+Zeilen zurück, ist tatsächlich etwas offen.
+
+Und: Schreib- oder Löschproben nie mit einem Filter formulieren, der breit
+trifft. `.delete().neq("scryfall_id", "---")` trifft **jede** Zeile — bei
+funktionierender RLS bleibt das folgenlos, bei einer echten Lücke löscht es
+den ganzen Bestand. Eine Probe, deren Harmlosigkeit von der Lücke abhängt, die
+sie prüfen soll, ist keine Probe.
+
 ## Wie eine Karte erkannt wird
 
 1. **Setcode + Sammlernummer** aus der unteren linken Ecke (`0008/013 T` über
