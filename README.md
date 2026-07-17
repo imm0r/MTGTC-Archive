@@ -87,18 +87,41 @@ sie prüfen soll, ist keine Probe.
 
 ## Wie eine Karte erkannt wird
 
-1. **Setcode + Sammlernummer** aus der unteren linken Ecke (`0008/013 T` über
-   `MKM • DE`). Das bestimmt die Auflage eindeutig, sprachunabhängig und auch
-   für Tokens — der zuverlässigste Weg, wenn die Ecke scharf genug ist.
-   Das `T` hinter der Nummer ist nicht nebensächlich: `mkm/8` und `tmkm/8`
-   sind zwei völlig verschiedene Karten.
-2. **Kartenname**, sonst. Für nicht-englische Karten über `/cards/search` mit
-   `include_multilingual`, sonst über `/cards/named` (verzeiht Tippfehler).
+1. **Bildmodell** (Edge Function `scan-card`): liest Setcode, Sammlernummer,
+   Sprache sowie Token- und Foil-Zeichen in einem Zug. Robust bei Schräglage,
+   Foil und winzigem Aufdruck.
+2. **Tesseract**, wenn die Funktion nicht erreichbar ist — erst die untere
+   linke Ecke, dann der Kartenname.
 3. **Von Hand**: im Trefferfeld entweder den Namen oder `MKM 8` bzw. `MKM 8 T`
    eintippen.
 
+Aus dem Gelesenen wird die Karte immer über Scryfall bestimmt — das Bildmodell
+identifiziert nichts selbst, es liest nur ab. Das `T` hinter der Nummer ist
+dabei entscheidend: `mkm/8` und `tmkm/8` sind zwei völlig verschiedene Karten.
+
 Fürs Fotografieren heißt das: Die untere linke Ecke sollte mit aufs Bild und
 scharf sein — sie ist wertvoller als der Kartenname.
+
+### Edge Function einrichten
+
+Die Funktion existiert aus einem einzigen Grund: Der Anthropic-Schlüssel darf
+nicht in die App — auf GitHub Pages läge er offen. Sie prüft außerdem die
+Anmeldung, damit niemand mit der bloßen URL auf deine Rechnung scannt.
+
+1. Einen API-Schlüssel auf [console.anthropic.com](https://console.anthropic.com)
+   anlegen und Guthaben aufladen.
+2. Supabase → **Edge Functions** → **Deploy a new function**, Name `scan-card`,
+   Inhalt von `supabase/functions/scan-card/index.ts` einfügen.
+3. Supabase → **Edge Functions → Secrets**: `ANTHROPIC_API_KEY` setzen.
+
+Ohne diese Schritte läuft die App weiter — sie meldet die Bilderkennung einmal
+als nicht verfügbar und nutzt danach Tesseract.
+
+**Kosten und Modellwahl.** Oben in `index.ts` steht `const MODEL`. Voreingestellt
+ist `claude-opus-4-8`: rund **1–3 Cent pro Karte**. `claude-haiku-4-5` kostet ein
+Fünftel und genügt für das reine Ablesen zweier Zeilen wahrscheinlich völlig —
+das ist eine Kosten-gegen-Genauigkeit-Abwägung, die du treffen solltest, nicht
+ich. Die Antwort meldet unter `usage` die tatsächlich verbrauchten Tokens.
 
 ## Hinweise
 

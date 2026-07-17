@@ -236,6 +236,44 @@ const priceOf = (c, foil) => {
 };
 const imgOf = c => c.image_uris?.small || c.card_faces?.[0]?.image_uris?.small || "";
 
+/* ============================ Bildmodell ==============================
+   Die Edge Function hält den Anthropic-Schlüssel. Sie liest die Karte nur
+   ab; der Abgleich gegen Scryfall bleibt hier in der App. Fällt sie aus,
+   übernimmt Tesseract weiter unten. */
+
+/* Verkleinern vor dem Versand: Ein 12-Megapixel-Handyfoto kostet ein
+   Vielfaches an Tokens, ohne dass der Aufdruck dadurch lesbarer würde. */
+function toJpegBase64(img, maxEdge = 1400, quality = 0.85) {
+  const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
+  const cv = document.createElement("canvas");
+  cv.width = Math.round(img.width * scale);
+  cv.height = Math.round(img.height * scale);
+  const cx = cv.getContext("2d");
+  cx.imageSmoothingQuality = "high";
+  cx.drawImage(img, 0, 0, cv.width, cv.height);
+  return cv.toDataURL("image/jpeg", quality).split(",")[1];
+}
+
+let visionAus = false;   // nach einem harten Fehler nicht bei jeder Karte erneut versuchen
+
+async function readWithVision(img) {
+  if (visionAus) return null;
+  const { data, error } = await sb.functions.invoke("scan-card", {
+    body: { image_b64: toJpegBase64(img), media_type: "image/jpeg" },
+  });
+  if (error) {
+    // 404 = Funktion nicht ausgerollt, 500 = Schlüssel fehlt. Beides ändert
+    // sich nicht von allein, also für diese Sitzung abschalten.
+    const s = error.context?.status;
+    if (s === 404 || s === 500) {
+      visionAus = true;
+      toast("Bilderkennung nicht verfügbar — weiter mit Texterkennung");
+    }
+    return null;
+  }
+  return data?.card || null;
+}
+
 /* ================================= OCR ================================ */
 let workerP = null;
 const ocrWorker = () => (workerP = workerP || Tesseract.createWorker("eng", 1));
@@ -303,12 +341,35 @@ const candidates = text => text.split("\n")
   .slice(0, 6);
 
 async function identify(img, lang, onStep) {
-  const w = await ocrWorker();
   let firstGuess = "", best = [];
 
-  // 1. Setcode + Sammlernummer aus der unteren linken Ecke. Trifft das,
-  //    ist die Auflage eindeutig bestimmt — auch bei Tokens und in jeder
-  //    Sprache. Der Namensweg unten ist nur das Auffangnetz.
+  // 1. Bildmodell: liest Setcode, Nummer, Sprache, Token- und Foil-Zeichen
+  //    in einem Zug. Deutlich robuster bei Schräglage, Foil und winzigem
+  //    Aufdruck als eine Zeichenerkennung.
+  onStep("Karte wird gelesen…");
+  try {
+    const v = await readWithVision(img);
+    if (v) {
+      // Die vom Modell gelesene Sprache schlägt die Voreinstellung — auf
+      // der Karte steht, was sie ist.
+      const l = v.lang || lang;
+      if (v.set_code && v.collector_number) {
+        onStep(`Suche ${v.set_code} #${v.collector_number}${v.is_token ? " (Token)" : ""}…`);
+        const hit = await findByCode(v.set_code, v.collector_number, l, v.is_token);
+        if (hit) return { card: hit, guess: hit.printed_name || hit.name, candidates: [], vision: v, lang: l };
+      }
+      if (v.printed_name) {
+        onStep(`Suche „${v.printed_name}“…`);
+        const { card, candidates: cs } = await findCard(v.printed_name, l);
+        if (card) return { card, guess: v.printed_name, candidates: [], vision: v, lang: l };
+        if (cs.length) { best = cs; firstGuess = v.printed_name; }
+      }
+    }
+  } catch { /* Bildmodell nicht erreichbar — weiter mit Texterkennung */ }
+
+  const w = await ocrWorker();
+
+  // 2. Auffangnetz: Setcode + Sammlernummer per Zeichenerkennung.
   onStep("Lese Setcode und Nummer…");
   try {
     const { data } = await w.recognize(preprocessCorner(img));
@@ -362,10 +423,14 @@ async function scanFile(file) {
     // Sprache jetzt festhalten: der Nutzer kann das Feld umstellen,
     // während dieser Scan noch läuft.
     const lang = $("#d-lang").value;
-    const { card, guess, candidates } = await identify(img, lang, s => { step(s); prog(70); });
+    const r = await identify(img, lang, s => { step(s); prog(70); });
     prog(100);
-    if (card) await addToCollection(card, el);
-    else renderManual(el, guess, candidates);
+    if (r.card) {
+      // Nur übernehmen, was das Modell wirklich gesehen hat.
+      await addToCollection(r.card, el, r.vision
+        ? { lang: r.lang, is_foil: r.vision.is_foil }
+        : null);
+    } else renderManual(el, r.guess, r.candidates);
   } catch (e) {
     el.querySelector(".body").innerHTML =
       `<div class="title">Fehlgeschlagen</div>
@@ -373,8 +438,13 @@ async function scanFile(file) {
   }
 }
 
-async function addToCollection(card, el) {
-  const lang = $("#d-lang").value, cond = $("#d-cond").value, foil = $("#d-foil").value === "1";
+/* detected: was das Bildmodell auf der Karte gesehen hat. Es schlägt die
+   Dropdowns — auf der Karte steht, was sie ist. Der Zustand bleibt beim
+   Dropdown: den sieht man einem Foto nicht zuverlässig an. */
+async function addToCollection(card, el, detected) {
+  const lang = detected?.lang || $("#d-lang").value;
+  const cond = $("#d-cond").value;
+  const foil = detected?.is_foil ?? ($("#d-foil").value === "1");
   const price = priceOf(card, foil);
   const before = CARDS.find(c => c.scryfall_id === card.id && c.foil === foil &&
                                  c.lang === lang && c.condition === cond);
