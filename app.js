@@ -368,19 +368,22 @@ const candidates = text => text.split("\n")
 async function identify(img, lang, onStep) {
   let firstGuess = "", best = [];
 
-  // 1. Bildmodell: liest Setcode, Nummer, Sprache, Token- und Foil-Zeichen
-  //    in einem Zug. Deutlich robuster bei Schräglage, Foil und winzigem
-  //    Aufdruck als eine Zeichenerkennung.
+  // 1. Bildmodell: liefert eine wörtliche Abschrift der beiden Eckzeilen.
+  //    Zerlegt wird sie hier mit parseCorner — dieselbe geprüfte Regel wie
+  //    beim Tesseract-Weg. Das Modell soll lesen, nicht deuten.
   onStep("Karte wird gelesen…");
   try {
     const v = await readWithVision(img);
     if (v) {
-      // Die vom Modell gelesene Sprache schlägt die Voreinstellung — auf
-      // der Karte steht, was sie ist.
-      const l = v.lang || lang;
-      if (v.set_code && v.collector_number) {
-        onStep(`Suche ${v.set_code} #${v.collector_number}${v.is_token ? " (Token)" : ""}…`);
-        const hit = await findByCode(v.set_code, v.collector_number, l, v.is_token);
+      const c = parseCorner(`${v.corner_line_1 || ""}\n${v.corner_line_2 || ""}`);
+      // Die Sprache von der Karte schlägt die Voreinstellung.
+      const l = c?.lang || lang;
+      if (c) {
+        // Die Typzeile ist ein zweiter, unabhängiger Token-Hinweis: steht dort
+        // "Spielsteinkreatur", ist es eines, auch wenn das winzige T entging.
+        const token = c.token || /spielstein|\btoken\b|emblem/i.test(v.type_line || "");
+        onStep(`Suche ${c.set} #${c.num}${token ? " (Token)" : ""}…`);
+        const hit = await findByCode(c.set, c.num, l, token);
         if (hit) return { card: hit, guess: hit.printed_name || hit.name, candidates: [], vision: v, lang: l };
       }
       if (v.printed_name) {
@@ -522,7 +525,8 @@ function renderManual(el, guess, candidates) {
       <div style="flex:none"><button class="btn sm" data-go>Suchen</button></div>
     </div>
     <p class="hint" style="margin-top:6px">Immer eindeutig: Setcode und Sammlernummer von unten
-      links auf der Karte, z. B. <code>MKM 8</code> — bei einem Token mit <code>T</code> dahinter.</p>`;
+      links auf der Karte, z. B. <code>MKM 8</code> — bei einem Token ein <code>T</code> anhängen
+      (<code>FIN 9 T</code>). Der Setcode steht in der Zeile mit dem Sprachkürzel.</p>`;
 
   el.querySelectorAll("[data-pick]").forEach(b => b.onclick = async () => {
     try { await addToCollection(cs[+b.dataset.pick], el); }
