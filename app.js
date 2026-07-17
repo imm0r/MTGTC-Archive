@@ -1024,11 +1024,17 @@ function saeulenHtml(daten, hinweis, ans_ende) {
 const karte = (titel, inhalt) =>
   `<div class="card"><h3 style="margin:0 0 10px">${esc(titel)}</h3>${inhalt}</div>`;
 
-function renderDash(rows) {
+/* Baut das Dashboard aus einer Kartenliste, deren qty die zu ZÄHLENDE Menge
+   ist: in der Sammlung der Bestand, im Deck die Deckmenge (dort werden die
+   Karten vorher mit {...c, qty: eintrag.qty} umgehängt). So rechnet dieselbe
+   Funktion beide Ansichten richtig — ein Deck mit 4 Wäldern zeigt 4, auch
+   wenn 20 im Besitz sind.
+   ziel ist das Element, in das geschrieben wird; gefiltert steuert nur den
+   Hinweis "zeigt nur die gefilterten Karten" (im Deck immer false). */
+function renderDash(rows, ziel = $("#dash"), gefiltert = false) {
   const stueck = cs => cs.reduce((s, c) => s + c.qty, 0);
   const wert   = cs => cs.reduce((s, c) => s + (c.price || 0) * c.qty, 0);
   const n = stueck(rows), gesamtwert = wert(rows);
-  const gefiltert = rows.length !== CARDS.length;
 
   // ---- Kennzahlen
   const ohneLand = rows.filter(c => !istLand(c) && c.cmc != null);
@@ -1106,7 +1112,7 @@ function renderDash(rows) {
     text: c.qty > 1 ? `${eur(c.price)} × ${c.qty}` : eur(c.price) }));
 
   // ---- Zusammenbauen
-  $("#dash").innerHTML = `
+  ziel.innerHTML = `
     <div class="stats" style="margin-bottom:14px">
       ${kennzahlen.map(([k, v]) =>
         `<div class="stat"><div class="v">${esc(String(v))}</div><div class="k">${esc(k)}</div></div>`).join("")}
@@ -1130,12 +1136,12 @@ function renderDash(rows) {
 
   // Muss nach dem Einhängen passieren: vorher hat der Kasten keine Breite
   // und scrollLeft bliebe wirkungslos.
-  $$("#dash [data-ans-ende]").forEach(el => el.scrollLeft = el.scrollWidth);
+  ziel.querySelectorAll("[data-ans-ende]").forEach(el => el.scrollLeft = el.scrollWidth);
 }
 
 function renderCollection() {
   const rows = filtered();
-  renderDash(rows);
+  renderDash(rows, $("#dash"), rows.length !== CARDS.length);
 
   const sets = [...new Set(CARDS.map(c => c.set))].filter(Boolean).sort();
   const cur = $("#f-set").value;
@@ -1679,6 +1685,11 @@ const deckOffen = {
   },
 };
 
+/* Welche Deck-Statistik gerade aufgeklappt ist. Nur im Speicher, nicht
+   persistiert: die Statistik ist ein kurzer Blick, kein Dauerzustand wie das
+   aufgeklappte Deck. Ein neuer Seitenaufruf startet ohne offene Dashboards. */
+const deckDashOffen = new Set();
+
 /* Ein Commander muss eine legendäre Kreatur oder ein legendärer Planeswalker
    sein — legendäre Artefakte, Länder und Hexereien zählen nicht.
 
@@ -1751,6 +1762,11 @@ function renderDecks() {
     $("#deck-list").innerHTML = '<div class="card"><div class="empty">Noch keine Decks angelegt.</div></div>';
     return;
   }
+  // Für jedes Deck mit offener Statistik die Karten mit ihrer DECKMENGE als
+  // qty — damit renderDash die Deckmenge zählt, nicht den Sammlungsbestand.
+  // Nach dem Einhängen der HTML gefüllt, weil renderDash in ein reales
+  // Element schreibt.
+  const deckDashRows = new Map();
   $("#deck-list").innerHTML = DECKS.map(d => {
     // Nach Namen sortiert wie die Sammlung in ihrer Voreinstellung, bis
     // jemand eine Spaltenüberschrift dieses Decks anklickt.
@@ -1767,6 +1783,8 @@ function renderDecks() {
     const v = eintraege.reduce((s, x) => s + (x.c.price || 0) * x.e.qty, 0);
     const fehlt = eintraege.filter(x => x.e.qty > x.c.qty).length;
     const offen = deckOffen.ist(d.id);
+    const dashOffen = deckDashOffen.has(d.id);
+    if (dashOffen) deckDashRows.set(d.id, eintraege.map(({ e, c }) => ({ ...c, qty: e.qty })));
     const haupt = d.main_card_id ? CARDS.find(c => c.id === d.main_card_id) : null;
 
     return `<div class="card">
@@ -1787,7 +1805,10 @@ function renderDecks() {
         <div class="row" style="margin-top:10px">
           <div class="sugg"><input type="text" data-dadd="${d.id}" placeholder="Karte aus der Sammlung hinzufügen…"></div>
           <div style="flex:none;min-width:80px"><input type="number" min="1" value="1" data-dqty="${d.id}"></div>
+          ${rows ? `<div style="flex:none"><button class="btn ghost" data-dashtoggle="${d.id}"
+            >&#128202; Statistik ${dashOffen ? "ausblenden" : "anzeigen"}</button></div>` : ""}
         </div>
+        <div class="deck-dash" data-dash="${d.id}" style="margin-top:12px"></div>
         ${rows ? `<div style="overflow-x:auto"><table class="deck-tbl" style="margin-top:10px">
                     <thead>${cardHead(true)}</thead><tbody>${rows}</tbody></table></div>`
                : '<div class="empty">Noch keine Karten in diesem Deck.</div>'}
@@ -1808,6 +1829,20 @@ function renderDecks() {
   });
 
   $$("#deck-list .deck-tbl").forEach(t => wireCardRows(t));
+
+  // Offene Deck-Statistiken füllen. Erst jetzt, weil renderDash in ein
+  // reales, sichtbares Element schreibt — der data-ans-ende-Trick braucht
+  // die Breite des Kastens.
+  deckDashRows.forEach((rows, id) => {
+    const ziel = $(`.deck-dash[data-dash="${id}"]`);
+    if (ziel) renderDash(rows, ziel, false);
+  });
+
+  $$("[data-dashtoggle]").forEach(b => b.onclick = () => {
+    const id = b.dataset.dashtoggle;
+    deckDashOffen.has(id) ? deckDashOffen.delete(id) : deckDashOffen.add(id);
+    renderDecks();
+  });
 
   // Sortier-Handler je Deck. renderDecks() baut alles neu, aber der
   // Auf-/Zugeklappt-Zustand hängt an deckOffen und übersteht das.

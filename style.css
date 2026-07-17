@@ -117,6 +117,12 @@ td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000
 .dash-raster{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
 .dash-raster .card{margin-bottom:0}
 
+/* Im Deck sitzt das Dashboard in einer Deck-Karte. Dieselbe Panel-Farbe auf
+   Panel wirkt flach — die Diagramm-Kästen bekommen deshalb den helleren Ton,
+   damit sie sich abheben. In der Sammlung liegen sie auf dem Seitenhintergrund
+   und bleiben Panel. */
+.deck-dash .dash-raster .card{background:var(--panel2)}
+
 /* Waagerechte Balken: Beschriftung | Spur | Zahl. Die Spur nimmt den Rest. */
 .balken{display:flex;flex-direction:column;gap:7px}
 .balken-zeile{display:flex;align-items:center;gap:8px;font-size:13px}
