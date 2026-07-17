@@ -133,6 +133,20 @@ td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000
   transition:width .3s}
 .balken-wert{width:76px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 
+/* Tortendiagramm: Kreis links, Legende rechts; bei Enge untereinander.
+   Der Rand der Segmente hat die Hintergrundfarbe der Karte — so entstehen
+   saubere Trennlinien, auch zwischen zwei hellen Nachbarn. In der Sammlung
+   ist das Panel, im Deck Panel2 (siehe Override unten). */
+.torte{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.torte-svg{width:118px;height:118px;flex:none}
+.torte-svg path,.torte-svg circle{stroke:var(--panel);stroke-width:.7;stroke-linejoin:round}
+.deck-dash .torte-svg path,.deck-dash .torte-svg circle{stroke:var(--panel2)}
+.torte-legende{flex:1;min-width:150px;display:flex;flex-direction:column;gap:6px}
+.torte-leg{display:flex;align-items:center;gap:8px;font-size:13px}
+.torte-punkt{width:11px;height:11px;border-radius:3px;flex:none}
+.torte-name{flex:1;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.torte-wert{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--txt)}
+
 /* Senkrechte Säulen (Manakurve, Jahrgänge). Feste Höhe, damit die Karten im
    Raster gleich hoch bleiben; bei vielen Jahren darf waagerecht gerollt
    werden statt die Säulen unlesbar schmal zu quetschen. */

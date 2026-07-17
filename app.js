@@ -1021,6 +1021,47 @@ function saeulenHtml(daten, hinweis, ans_ende) {
     </div>`).join("")}</div>${hinweis ? `<p class="hint">${hinweis}</p>` : ""}`;
 }
 
+/* Tortendiagramm: Kreissegmente + Legende mit Wert und Prozent. Eine Torte
+   ist nur ehrlich, wenn die Kategorien ein Ganzes bilden und die Anteile sich
+   zu 100 % summieren — wer sie fuellt, muss also eine Aufteilung uebergeben,
+   in der jede Karte GENAU EINMAL zaehlt. Der Prozentwert bezieht sich immer
+   auf die Summe der Segmente.
+   Ein einzelnes Segment (100 %) wird als voller Kreis gezeichnet: ein
+   360°-Bogen ist entartet (Anfang = Ende) und bliebe unsichtbar.
+   Die Segmente tragen einen Rand in der Hintergrundfarbe der Karte (per CSS),
+   damit auch zwei helle Nachbarn (Weiß neben Farblos) getrennt bleiben. */
+function tortenHtml(daten, hinweis) {
+  const total = daten.reduce((s, d) => s + d.wert, 0);
+  if (!total) return '<div class="empty" style="padding:14px">Nichts auszuwerten.</div>';
+  const r = 16, cx = 18, cy = 18;
+  let a = -Math.PI / 2;                       // oben beginnen
+  const segmente = daten.length === 1
+    ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${daten[0].farbe}"/>`
+    : daten.map(d => {
+        const a2 = a + (d.wert / total) * 2 * Math.PI;
+        const p = (w) => `${(cx + r * Math.cos(w)).toFixed(3)},${(cy + r * Math.sin(w)).toFixed(3)}`;
+        const gross = d.wert / total > 0.5 ? 1 : 0;
+        const path = `<path d="M${cx},${cy} L${p(a)} A${r},${r} 0 ${gross} 1 ${p(a2)} Z" fill="${d.farbe}"/>`;
+        a = a2;
+        return path;
+      }).join("");
+  const legende = daten.map(d => `
+    <div class="torte-leg">
+      <span class="torte-punkt" style="background:${d.farbe}"></span>
+      <span class="torte-name">${esc(d.label)}</span>
+      <span class="torte-wert">${d.wert} &middot; ${Math.round(d.wert / total * 100)}&nbsp;%</span>
+    </div>`).join("");
+  return `<div class="torte">
+      <svg viewBox="0 0 36 36" class="torte-svg" role="img" aria-label="Tortendiagramm">${segmente}</svg>
+      <div class="torte-legende">${legende}</div>
+    </div>${hinweis ? `<p class="hint">${hinweis}</p>` : ""}`;
+}
+
+/* Farbpalette für Kategorien ohne eigene Farbe (Kartentypen). Bewusst
+   unterscheidbare Töne, in der Reihenfolge der größten Segmente vergeben. */
+const TORTE_PALETTE = ["#79c497", "#8ec7ea", "#c9a76a", "#ee8b6f", "#b58ad1",
+                       "#e6cf5a", "#9d93a3", "#6fbfb0"];
+
 const karte = (titel, inhalt) =>
   `<div class="card"><h3 style="margin:0 0 10px">${esc(titel)}</h3>${inhalt}</div>`;
 
@@ -1063,30 +1104,34 @@ function renderDash(rows, ziel = $("#dash"), gefiltert = false) {
     kurve.push({ label: String(i), wert: stueck(ohneLand.filter(c => Number(c.cmc) === i)) });
   if (maxCmc > 9) kurve.push({ label: "10+", wert: stueck(ohneLand.filter(c => Number(c.cmc) >= 10)) });
 
-  // ---- Farben. Mehrfarbige zählen bei JEDER ihrer Farben mit — die Frage
-  //      lautet "wie viel Schwarz habe ich", nicht "wie viele Karten sind
-  //      genau schwarz". Deshalb steht die Summe nicht auf 100 %.
+  // ---- Farben als Torte: jede Karte zählt GENAU EINMAL, sonst summieren die
+  //      Segmente über 100 %. Einfarbige nach ihrer Farbe, alles ab zwei Farben
+  //      in "Mehrfarbig", der Rest "Farblos". Das ist die Aufteilung nach
+  //      Farbidentität — eine andere Frage als "wie viel Schwarz steckt drin",
+  //      aber die einzige, die eine Torte ehrlich beantwortet.
   const mitFarbe = rows.filter(c => Array.isArray(c.colors));
-  const farbBalken = Object.entries(FARB_INFO).map(([k, v]) => ({
-    label: v.name, farbe: v.farbe,
-    wert: stueck(mitFarbe.filter(c => c.colors.includes(k))),
-    icon: `<img class="mana" src="https://svgs.scryfall.io/card-symbols/${k}.svg" alt="">`,
-  }));
-  farbBalken.push({ label: "Farblos", farbe: "#b9bdc9",
-    wert: stueck(mitFarbe.filter(c => c.colors.length === 0)),
-    icon: `<img class="mana" src="https://svgs.scryfall.io/card-symbols/C.svg" alt="">` });
-  farbBalken.push({ label: "Mehrfarbig", farbe: "#d9b64e",
-    wert: stueck(mitFarbe.filter(c => c.colors.length > 1)) });
+  const farbTorte = [
+    ...Object.entries(FARB_INFO).map(([k, v]) => ({
+      label: v.name, farbe: v.farbe,
+      wert: stueck(mitFarbe.filter(c => c.colors.length === 1 && c.colors[0] === k)) })),
+    { label: "Mehrfarbig", farbe: "#d9b64e", wert: stueck(mitFarbe.filter(c => c.colors.length > 1)) },
+    { label: "Farblos",    farbe: "#b9bdc9", wert: stueck(mitFarbe.filter(c => c.colors.length === 0)) },
+  ].filter(d => d.wert);
 
-  // ---- Seltenheit, Typen, Sprachen, Zustand, Sets, Jahre
+  // ---- Seltenheit: jede Karte hat genau eine — schon eine Aufteilung.
   const seltenheit = Object.entries(RARITY)
     .map(([k, v]) => ({ label: v.text, farbe: v.farbe, wert: stueck(rows.filter(c => c.rarity === k)) }))
     .filter(d => d.wert);
 
+  // ---- Kartentypen: eine Karte kann mehrere haben (Artefaktkreatur) und zählt
+  //      dann in jedem Segment. Die Torte zeigt also den Anteil an allen
+  //      Typnennungen, nicht an den Karten — steht so im Hinweis. Farben aus
+  //      der Palette, nach Größe vergeben.
   const typen = TYPEN
     .map(([en, de]) => ({ label: de,
       wert: stueck(rows.filter(c => new RegExp(`(^|//\\s*)[^/]*\\b${en}\\b`, "i").test(c.type_line || ""))) }))
-    .filter(d => d.wert).sort((a, b) => b.wert - a.wert);
+    .filter(d => d.wert).sort((a, b) => b.wert - a.wert)
+    .map((d, i) => ({ ...d, farbe: TORTE_PALETTE[i % TORTE_PALETTE.length] }));
 
   const sprachen = [...new Set(rows.map(c => c.lang))]
     .map(l => ({ label: LANG_NAMES[l] || (l || "?").toUpperCase(), icon: flaggeHtml(l, true),
@@ -1122,11 +1167,11 @@ function renderDash(rows, ziel = $("#dash"), gefiltert = false) {
     <div class="dash-raster">
       ${karte("Manakurve", saeulenHtml(kurve,
         "Ohne Länder — sie kosten nichts und würden die Null aufblähen. X zählt als 0."))}
-      ${karte("Farben", balkenHtml(farbBalken,
-        "Mehrfarbige Karten zählen bei jeder ihrer Farben mit; die Summe liegt deshalb über der Kartenzahl."))}
-      ${karte("Seltenheit", balkenHtml(seltenheit))}
-      ${karte("Kartentypen", balkenHtml(typen,
-        "Eine Karte kann mehrere Typen haben (z.&nbsp;B. Artefaktkreatur) und zählt dann mehrfach."))}
+      ${karte("Farben", tortenHtml(farbTorte,
+        "Nach Farbidentität — jede Karte zählt einmal, ab zwei Farben als „Mehrfarbig“."))}
+      ${karte("Seltenheit", tortenHtml(seltenheit))}
+      ${karte("Kartentypen", tortenHtml(typen,
+        "Anteil an allen Typnennungen: eine Karte mit mehreren Typen (z.&nbsp;B. Artefaktkreatur) zählt in jedem Segment."))}
       ${karte("Wertvollste Karten", balkenHtml(topWert))}
       ${karte("Erscheinungsjahre", saeulenHtml(proJahr, "", true))}
       ${karte("Größte Sets", balkenHtml(topSets))}
