@@ -579,7 +579,8 @@ async function addToCollection(card, el, detected) {
     p_set_code: (card.set || "").toUpperCase(), p_set_name: card.set_name,
     p_cn: card.collector_number, p_img: imgOf(card),
     p_cm_id: card.cardmarket_id ?? null,
-    p_lang: lang, p_condition: cond, p_foil: foil, p_price: price
+    p_lang: lang, p_condition: cond, p_foil: foil, p_price: price,
+    p_type_line: card.type_line ?? null
   });
   if (error) throw new Error(dbErr(error));
 
@@ -794,9 +795,13 @@ function cardRow(c, o = {}) {
         ${imDeck
           // Bearbeiten und Preis stehen im Deck in der Detailansicht — hier
           // nur, was das Deck betrifft: Hauptkarte und Zuordnung lösen.
-          ? `<button class="btn ghost sm${o.istHaupt ? " star-on" : ""}" data-main
+          // Der Stern erscheint nur bei legendären Karten; die Regel selbst
+          // erzwingt ein Trigger in der Datenbank.
+          ? (istLegendaer(c)
+            ? `<button class="btn ghost sm${o.istHaupt ? " star-on" : ""}" data-main
               title="${o.istHaupt ? "Ist die Hauptkarte — nochmal klicken zum Entfernen"
                                   : "Als Hauptkarte des Decks setzen"}">${o.istHaupt ? "&#9733;" : "&#9734;"}</button>`
+            : "")
           : `<button class="btn ghost sm" data-edit title="Sprache, Zustand oder Ausführung ändern">&#9998;</button>
         <button class="btn ghost sm" data-price title="Preis dieser Karte neu von Scryfall holen">&#8635;</button>`}
         <button class="btn ghost sm" data-del title="${imDeck
@@ -1114,6 +1119,7 @@ async function applyCardEdit(c, lang, cond, foil, neu) {
     patch.cn = fresh.collector_number;
     patch.img = imgOf(fresh);
     patch.cm_id = fresh.cardmarket_id ?? null;
+    patch.type_line = fresh.type_line ?? null;
   } else if (lang !== c.lang) {
     // Sprachwechsel: die sprachgenaue Auflage hat eine eigene Scryfall-ID,
     // eigenen gedruckten Namen und eigenes Bild. Gibt es sie nicht (viele
@@ -1187,6 +1193,11 @@ const deckOffen = {
   },
 };
 
+/* Scryfalls type_line ist immer englisch ("Legendary Creature — Alien"),
+   auch bei deutschen Auflagen — deshalb prüft das eine Wort sprachunabhängig.
+   Karten ohne bekannte Typzeile gelten nicht als legendär: nicht raten. */
+const istLegendaer = c => /legendary/i.test(c?.type_line || "");
+
 async function setMainCard(deckId, cardId) {
   const d = DECKS.find(x => x.id === deckId);
   // Nochmal auf dieselbe Karte: Hauptkarte wieder abwählen.
@@ -1196,6 +1207,11 @@ async function setMainCard(deckId, cardId) {
     // Fehlt die Spalte, ist das Schema älter als die App.
     if (error.code === "42703" || /main_card_id/.test(error.message || ""))
       return toast("Spalte fehlt — bitte supabase-schema.sql neu ausführen.");
+    // Der Trigger lehnt nicht-legendäre Karten ab; seine Meldung ist bereits
+    // für Menschen geschrieben, also unverändert durchreichen. (Sie enthält
+    // selbst einen Doppelpunkt — ein Präfix-Abschneider fräße den halben Satz.)
+    if (error.code === "23514" || /legendär|Typzeile/i.test(error.message || ""))
+      return toast(error.message);
     return toast(dbErr(error));
   }
   await reload(); renderDecks();
@@ -1350,7 +1366,8 @@ async function importJson(file) {
         p_set_code: c.set || c.set_code, p_set_name: c.set_name, p_cn: c.cn, p_img: c.img,
         p_cm_id: c.cm_id ?? null,
         p_lang: c.lang || "en", p_condition: c.condition || "NM",
-        p_foil: !!c.foil, p_price: c.price ?? null
+        p_foil: !!c.foil, p_price: c.price ?? null,
+        p_type_line: c.type_line ?? null
       });
       if (error) { bad++; break; } else ok++;
     }
@@ -1491,6 +1508,7 @@ async function importCsv(file) {
         set_code: (card.set || "").toUpperCase(), set_name: card.set_name,
         cn: card.collector_number, img: imgOf(card),
         cm_id: card.cardmarket_id ?? null,
+        type_line: card.type_line ?? null,
         lang, condition: cond, foil, qty, price,
         hist: price == null ? [] : [{ d: today(), v: price }],
       };
@@ -1612,6 +1630,7 @@ async function miImport() {
         p_cn: card.collector_number, p_img: imgOf(card),
         p_cm_id: card.cardmarket_id ?? null,
         p_lang: lang, p_condition: cond, p_foil: foil, p_price: price,
+        p_type_line: card.type_line ?? null,
       });
       if (error) { sag("✗ " + dbErr(error), "var(--err)"); fail++; continue; }
 
