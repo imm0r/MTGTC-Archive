@@ -737,6 +737,128 @@ function spark(hist) {
           stroke="${vs[vs.length - 1] >= vs[0] ? "#4caf7d" : "#e0605e"}" stroke-width="1.5"/></svg>`;
 }
 
+/* --------------------------- Gemeinsame Kartentabelle -----------------
+   Sammlung und Decks zeigen dieselben Zeilen. Drei Dinge unterscheiden
+   sich im Deck: die Anzahl ist die Deck-Menge (deck_entries.qty, nicht der
+   Sammlungsbestand), eine Spalte zeigt den Fehlbestand, und das Kreuz löst
+   nur die Zuordnung — die Karte bleibt in der Sammlung. */
+function cardHead(imDeck) {
+  const s = k => imDeck ? "" : ` data-s="${k}"`;   // sortierbar nur in der Sammlung
+  return `<tr>
+    <th class="hide-s"></th>
+    <th${s("name")}>Karte</th>
+    <th${s("set_name")} class="hide-s">Set</th>
+    <th${s("lang")} class="hide-s">Spr.</th>
+    <th${s("condition")} class="hide-s">Zust.</th>
+    <th${s("added")} class="hide-s">Hinzugefügt</th>
+    <th${s("qty")} class="num">Anz.</th>
+    ${imDeck ? '<th class="num">Bestand</th>' : ""}
+    <th${s("price")} class="num">Preis</th>
+    <th${s("value")} class="num">Wert</th>
+    <th></th><th></th>
+  </tr>`;
+}
+
+function cardRow(c, o = {}) {
+  const imDeck = !!o.deckId;
+  const qty = imDeck ? o.qty : c.qty;
+  const fehlt = imDeck ? Math.max(0, qty - c.qty) : 0;
+  return `
+    <tr data-id="${c.id}"${imDeck ? ` data-deck="${esc(o.deckId)}"` : ""}>
+      <td class="hide-s">${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy" data-view
+             style="cursor:pointer" title="Großansicht &amp; Preisverlauf">` : ""}</td>
+      <td><div data-view style="cursor:pointer" title="Großansicht &amp; Preisverlauf">${esc(c.disp)}</div>
+          <div style="font-size:12px;color:var(--dim)">
+            ${c.printed_name && c.printed_name !== c.name ? esc(c.name) + " &middot; " : ""}
+            ${c.foil ? '<span class="pill foil">Foil</span> ' : ""}#${esc(c.cn)}</div></td>
+      <td class="hide-s">${esc(c.set_name || c.set || "")}</td>
+      <td class="hide-s">${esc((c.lang || "").toUpperCase())}</td>
+      <td class="hide-s">${esc(c.condition || "")}</td>
+      <td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap">${dtShort(c.added)}</td>
+      <td class="num"><input type="number" min="0" value="${qty}" data-qty
+             style="width:62px;padding:4px 6px;text-align:right"></td>
+      ${imDeck ? `<td class="num">${fehlt
+        ? `<span class="pill err">${fehlt} fehlen</span>`
+        : '<span class="pill ok">vorhanden</span>'}</td>` : ""}
+      <td class="num">${eur(c.price)} ${spark(c.hist)}</td>
+      <td class="num">${eur(c.price == null ? null : c.price * qty)}</td>
+      <td class="num" style="white-space:nowrap">${cmLink(c.cm_id)
+        ? `<a class="cm" href="${esc(cmLink(c.cm_id))}" target="_blank" rel="noopener noreferrer"
+             title="Angebote auf Cardmarket ansehen">CM</a>` : ""}${sfLink(c)
+        ? ` <a class="cm" href="${esc(sfLink(c))}" target="_blank" rel="noopener noreferrer"
+             title="Kartentext und alle Auflagen auf Scryfall">SF</a>` : ""}</td>
+      <td class="num" style="white-space:nowrap">
+        <button class="btn ghost sm" data-edit title="Sprache, Zustand oder Ausführung ändern">&#9998;</button>
+        <button class="btn ghost sm" data-price title="Preis dieser Karte neu von Scryfall holen">&#8635;</button>
+        <button class="btn ghost sm" data-del title="${imDeck
+          ? "Aus dem Deck entfernen (Karte bleibt in der Sammlung)" : "Zeile löschen"}">&times;</button>
+      </td>
+    </tr>`;
+}
+
+function wireCardRows(root) {
+  root.querySelectorAll("tbody tr[data-id]").forEach(tr => {
+    const id = tr.dataset.id, deck = tr.dataset.deck;
+
+    tr.querySelectorAll("[data-view]").forEach(el => {
+      el.onclick = () => { hideHover(); showCardDetail(id); };
+      if (HOVER_OK) {
+        el.addEventListener("mouseenter", e => {
+          clearTimeout(hoverTimer);
+          hoverTimer = setTimeout(() => showHover(id, e.clientX, e.clientY), 300);
+        });
+        el.addEventListener("mouseleave", hideHover);
+      }
+    });
+
+    // Bearbeiten und Preis gelten immer der Karte in der Sammlung —
+    // auch wenn man sie aus einem Deck heraus anfasst.
+    tr.querySelector("[data-edit]").onclick = () => editCard(id);
+    const pb = tr.querySelector("[data-price]");
+    pb.onclick = async () => {
+      const c = CARDS.find(x => x.id === id);
+      if (!c) return;
+      pb.disabled = true;
+      try {
+        const fresh = await withPrice(await sfById(c.scryfall_id));
+        if (!fresh) throw new Error("Karte bei Scryfall nicht gefunden");
+        const p = priceOf(fresh, c.foil);
+        // set_price schreibt in die Preishistorie: ein Punkt pro Tag, 60 bleiben.
+        const { error } = await sb.rpc("set_price", { p_card_id: c.id, p_price: p });
+        if (error) throw new Error(dbErr(error));
+        await reload(); renderAll();
+        toast(p == null ? "Scryfall führt keinen Preis für diese Auflage" : "Preis aktualisiert: " + eur(p));
+      } catch (e) { pb.disabled = false; toast(e.message); }
+    };
+
+    tr.querySelector("[data-qty]").onchange = async ev => {
+      const q = Math.max(0, parseInt(ev.target.value) || 0);
+      try {
+        const { error } = deck
+          ? (q === 0
+              ? await sb.from("deck_entries").delete().eq("deck_id", deck).eq("card_id", id)
+              : await sb.from("deck_entries").update({ qty: q }).eq("deck_id", deck).eq("card_id", id))
+          : (q === 0
+              ? await sb.from("cards").delete().eq("id", id)
+              : await sb.from("cards").update({ qty: q }).eq("id", id));
+        if (error) throw error;
+        await reload(); renderAll();
+      } catch (e) { toast(dbErr(e)); }
+    };
+
+    tr.querySelector("[data-del]").onclick = async () => {
+      try {
+        const { error } = deck
+          ? await sb.from("deck_entries").delete().eq("deck_id", deck).eq("card_id", id)
+          : await sb.from("cards").delete().eq("id", id);
+        if (error) throw error;
+        await reload(); renderAll();
+        toast(deck ? "Aus dem Deck entfernt" : "Karte entfernt");
+      } catch (e) { toast(dbErr(e)); }
+    };
+  });
+}
+
 function renderCollection() {
   const rows = filtered();
   $("#s-total").textContent = CARDS.reduce((s, c) => s + c.qty, 0);
@@ -755,79 +877,15 @@ function renderCollection() {
   $("#coll-empty").style.display = rows.length ? "none" : "block";
   $("#tbl").style.display = rows.length ? "" : "none";
 
-  $("#tbl tbody").innerHTML = rows.map(c => `
-    <tr data-id="${c.id}">
-      <td class="hide-s">${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy" data-view
-             style="cursor:pointer" title="Großansicht &amp; Preisverlauf">` : ""}</td>
-      <td><div data-view style="cursor:pointer" title="Großansicht &amp; Preisverlauf">${esc(c.disp)}</div>
-          <div style="font-size:12px;color:var(--dim)">
-            ${c.printed_name && c.printed_name !== c.name ? esc(c.name) + " &middot; " : ""}
-            ${c.foil ? '<span class="pill foil">Foil</span> ' : ""}#${esc(c.cn)}</div></td>
-      <td class="hide-s">${esc(c.set_name || c.set || "")}</td>
-      <td class="hide-s">${esc((c.lang || "").toUpperCase())}</td>
-      <td class="hide-s">${esc(c.condition || "")}</td>
-      <td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap">${dtShort(c.added)}</td>
-      <td class="num"><input type="number" min="0" value="${c.qty}" data-qty
-             style="width:62px;padding:4px 6px;text-align:right"></td>
-      <td class="num">${eur(c.price)} ${spark(c.hist)}</td>
-      <td class="num">${eur(c.price == null ? null : c.price * c.qty)}</td>
-      <td class="num" style="white-space:nowrap">${cmLink(c.cm_id)
-        ? `<a class="cm" href="${esc(cmLink(c.cm_id))}" target="_blank" rel="noopener noreferrer"
-             title="Angebote auf Cardmarket ansehen">CM</a>` : ""}${sfLink(c)
-        ? ` <a class="cm" href="${esc(sfLink(c))}" target="_blank" rel="noopener noreferrer"
-             title="Kartentext und alle Auflagen auf Scryfall">SF</a>` : ""}</td>
-      <td class="num" style="white-space:nowrap">
-        <button class="btn ghost sm" data-edit title="Sprache, Zustand oder Ausführung ändern">&#9998;</button>
-        <button class="btn ghost sm" data-price title="Preis dieser Karte neu von Scryfall holen">&#8635;</button>
-        <button class="btn ghost sm" data-del title="Zeile löschen">&times;</button>
-      </td>
-    </tr>`).join("");
+  $("#tbl thead").innerHTML = cardHead(false);
+  $("#tbl tbody").innerHTML = rows.map(c => cardRow(c)).join("");
+  wireCardRows($("#tbl"));
 
-  $$("#tbl tbody [data-qty]").forEach(inp => inp.onchange = async () => {
-    const id = inp.closest("tr").dataset.id;
-    const q = Math.max(0, parseInt(inp.value) || 0);
-    try {
-      const { error } = q === 0
-        ? await sb.from("cards").delete().eq("id", id)
-        : await sb.from("cards").update({ qty: q }).eq("id", id);
-      if (error) throw error;
-      await reload(); renderAll();
-    } catch (e) { toast(dbErr(e)); }
-  });
-  $$("#tbl tbody [data-del]").forEach(b => b.onclick = async () => {
-    try {
-      const { error } = await sb.from("cards").delete().eq("id", b.closest("tr").dataset.id);
-      if (error) throw error;
-      await reload(); renderAll(); toast("Karte entfernt");
-    } catch (e) { toast(dbErr(e)); }
-  });
-  $$("#tbl tbody [data-view]").forEach(el => {
-    const id = el.closest("tr").dataset.id;
-    el.onclick = () => { hideHover(); showCardDetail(id); };
-    if (HOVER_OK) {
-      el.addEventListener("mouseenter", e => {
-        clearTimeout(hoverTimer);
-        hoverTimer = setTimeout(() => showHover(id, e.clientX, e.clientY), 300);
-      });
-      el.addEventListener("mouseleave", hideHover);
-    }
-  });
-  $$("#tbl tbody [data-edit]").forEach(b => b.onclick = () =>
-    editCard(b.closest("tr").dataset.id));
-  $$("#tbl tbody [data-price]").forEach(b => b.onclick = async () => {
-    const c = CARDS.find(x => x.id === b.closest("tr").dataset.id);
-    if (!c) return;
-    b.disabled = true;
-    try {
-      const fresh = await withPrice(await sfById(c.scryfall_id));
-      if (!fresh) throw new Error("Karte bei Scryfall nicht gefunden");
-      const p = priceOf(fresh, c.foil);
-      // set_price schreibt in die Preishistorie: ein Punkt pro Tag, 60 bleiben.
-      const { error } = await sb.rpc("set_price", { p_card_id: c.id, p_price: p });
-      if (error) throw new Error(dbErr(error));
-      await reload(); renderAll();
-      toast(p == null ? "Scryfall führt keinen Preis für diese Auflage" : "Preis aktualisiert: " + eur(p));
-    } catch (e) { b.disabled = false; toast(e.message); }
+  // Die Kopfzeile wird bei jedem Rendern neu gebaut, also auch die
+  // Sortier-Handler neu hängen.
+  $$("#tbl th[data-s]").forEach(th => th.onclick = () => {
+    sortDir = (sortKey === th.dataset.s) ? -sortDir : 1;
+    sortKey = th.dataset.s; renderCollection();
   });
 }
 
@@ -1079,36 +1137,34 @@ function renderDecks() {
     return;
   }
   $("#deck-list").innerHTML = DECKS.map(d => {
-    const rows = d.entries.map(e => {
-      const c = CARDS.find(x => x.id === e.cardId);
-      if (!c) return "";
-      const short = c.qty < e.qty;
-      return `<tr>
-        <td>${esc(c.disp)} ${c.foil ? '<span class="pill foil">Foil</span>' : ""}</td>
-        <td class="hide-s">${esc(c.set || "")}</td>
-        <td class="num">${e.qty}&times;</td>
-        <td class="num">${short ? `<span class="pill err">${e.qty - c.qty} fehlen</span>`
-                                : '<span class="pill ok">vorhanden</span>'}</td>
-        <td class="num"><button class="btn ghost sm" data-dd="${d.id}" data-cc="${c.id}">&times;</button></td>
-      </tr>`;
-    }).join("");
-    const n = d.entries.reduce((s, e) => s + e.qty, 0);
-    const v = d.entries.reduce((s, e) =>
-      s + (CARDS.find(x => x.id === e.cardId)?.price || 0) * e.qty, 0);
+    // Nach Namen sortiert wie die Sammlung in ihrer Voreinstellung.
+    const eintraege = d.entries
+      .map(e => ({ e, c: CARDS.find(x => x.id === e.cardId) }))
+      .filter(x => x.c)
+      .sort((a, b) => a.c.disp.localeCompare(b.c.disp));
+    const rows = eintraege.map(({ e, c }) => cardRow(c, { deckId: d.id, qty: e.qty })).join("");
+
+    const n = eintraege.reduce((s, x) => s + x.e.qty, 0);
+    const v = eintraege.reduce((s, x) => s + (x.c.price || 0) * x.e.qty, 0);
+    const fehlt = eintraege.filter(x => x.e.qty > x.c.qty).length;
     return `<div class="card">
       <div class="row" style="align-items:center">
         <div><h3 style="margin:0">${esc(d.name)}</h3>
-          <div class="hint" style="margin:2px 0 0">${n} Karten &middot; ${eur(v)}</div></div>
+          <div class="hint" style="margin:2px 0 0">${n} Karten &middot; ${eur(v)}${
+            fehlt ? ` &middot; <span style="color:var(--err)">${fehlt} unvollständig</span>` : ""}</div></div>
         <div style="flex:none"><button class="btn danger sm" data-dx="${d.id}">Deck löschen</button></div>
       </div>
       <div class="row" style="margin-top:10px">
         <div class="sugg"><input type="text" data-dadd="${d.id}" placeholder="Karte aus der Sammlung hinzufügen…"></div>
         <div style="flex:none;min-width:80px"><input type="number" min="1" value="1" data-dqty="${d.id}"></div>
       </div>
-      ${rows ? `<table style="margin-top:10px"><tbody>${rows}</tbody></table>`
+      ${rows ? `<div style="overflow-x:auto"><table class="deck-tbl" style="margin-top:10px">
+                  <thead>${cardHead(true)}</thead><tbody>${rows}</tbody></table></div>`
              : '<div class="empty">Noch keine Karten in diesem Deck.</div>'}
     </div>`;
   }).join("");
+
+  $$("#deck-list .deck-tbl").forEach(t => wireCardRows(t));
 
   $$("[data-dx]").forEach(b => b.onclick = async () => {
     const d = DECKS.find(x => x.id === b.dataset.dx);
@@ -1116,14 +1172,6 @@ function renderDecks() {
       <p class="hint">Die Karten selbst bleiben in deiner Sammlung.</p>`)) return;
     try {
       const { error } = await sb.from("decks").delete().eq("id", d.id);
-      if (error) throw error;
-      await reload(); renderAll();
-    } catch (e) { toast(dbErr(e)); }
-  });
-  $$("[data-dd]").forEach(b => b.onclick = async () => {
-    try {
-      const { error } = await sb.from("deck_entries").delete()
-        .eq("deck_id", b.dataset.dd).eq("card_id", b.dataset.cc);
       if (error) throw error;
       await reload(); renderAll();
     } catch (e) { toast(dbErr(e)); }
@@ -1581,10 +1629,6 @@ function wireApp() {
   $("#f-set").onchange = renderCollection;
   $("#f-foil").onchange = renderCollection;
   $("#upd").onclick = updatePrices;
-  $$("#tbl th[data-s]").forEach(th => th.onclick = () => {
-    sortDir = (sortKey === th.dataset.s) ? -sortDir : 1;
-    sortKey = th.dataset.s; renderCollection();
-  });
 
   $("#deck-add").onclick = async () => {
     const name = $("#deck-name").value.trim();
