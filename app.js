@@ -580,7 +580,7 @@ async function addToCollection(card, el, detected) {
     p_cn: card.collector_number, p_img: imgOf(card),
     p_cm_id: card.cardmarket_id ?? null,
     p_lang: lang, p_condition: cond, p_foil: foil, p_price: price,
-    p_type_line: card.type_line ?? null
+    p_type_line: card.type_line ?? null, p_rarity: card.rarity ?? null
   });
   if (error) throw new Error(dbErr(error));
 
@@ -775,7 +775,8 @@ function cardRow(c, o = {}) {
           <div style="font-size:12px;color:var(--dim)">
             ${c.printed_name && c.printed_name !== c.name ? esc(c.name) + " &middot; " : ""}
             ${c.foil ? '<span class="pill foil">Foil</span> ' : ""}#${esc(c.cn)}</div></td>
-      <td class="hide-s">${esc(c.set_name || c.set || "")}</td>
+      <td class="hide-s">${esc(c.set_name || c.set || "")}
+          ${c.rarity ? `<div style="margin-top:3px">${rarityPill(c.rarity)}</div>` : ""}</td>
       ${imDeck ? "" : `<td class="hide-s">${esc((c.lang || "").toUpperCase())}</td>
       <td class="hide-s">${esc(c.condition || "")}</td>
       <td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap">${dtShort(c.added)}</td>`}
@@ -930,6 +931,24 @@ async function updatePrices() {
   toast(failed ? `Preise aktualisiert, ${failed} nicht abrufbar` : "Preise aktualisiert");
 }
 
+/* ---------------------------------------------------- Seltenheit ----- */
+/* Scryfall kennt sechs Stufen. Die Farben folgen den Symbolen auf der Karte:
+   Silber, Gold, Orange. Unbekannte Werte (falls Wizards eine siebte Stufe
+   einführt) erscheinen neutral statt zu verschwinden. */
+const RARITY = {
+  common:   { text: "Common",   farbe: "#b9bdc9" },
+  uncommon: { text: "Uncommon", farbe: "#8fa3b8" },
+  rare:     { text: "Rare",     farbe: "#c9a227" },
+  mythic:   { text: "Mythic",   farbe: "#e0603a" },
+  special:  { text: "Special",  farbe: "#a678c4" },
+  bonus:    { text: "Bonus",    farbe: "#a678c4" },
+};
+function rarityPill(r) {
+  if (!r) return "";
+  const d = RARITY[r] || { text: r, farbe: "var(--dim)" };
+  return `<span class="pill" style="border-color:${d.farbe};color:${d.farbe}">${esc(d.text)}</span>`;
+}
+
 /* ------------------------------------------- Karten-Detailansicht ---- */
 const dtShort = iso => {
   if (!iso) return "–";
@@ -980,7 +999,9 @@ function detailHtml(c, hover) {
         <b style="font-size:17px">${esc(c.disp)}</b>
         ${c.printed_name && c.printed_name !== c.name ? `<div class="hint" style="margin:0">${esc(c.name)}</div>` : ""}
         <div class="hint" style="margin-top:2px">${esc(c.set_name || c.set)} · #${esc(c.cn)}</div>
+        ${c.type_line ? `<div class="hint" style="margin-top:2px">${esc(c.type_line)}</div>` : ""}
         <div style="margin:10px 0">
+          ${rarityPill(c.rarity)}
           ${c.foil ? '<span class="pill foil">Foil</span> ' : ""}
           <span class="pill">${esc((c.lang || "").toUpperCase())}</span>
           <span class="pill">${esc(c.condition || "")}</span>
@@ -1120,6 +1141,8 @@ async function applyCardEdit(c, lang, cond, foil, neu) {
     patch.img = imgOf(fresh);
     patch.cm_id = fresh.cardmarket_id ?? null;
     patch.type_line = fresh.type_line ?? null;
+    // Dieselbe Karte kann je Auflage anders selten sein — mitziehen.
+    patch.rarity = fresh.rarity ?? null;
   } else if (lang !== c.lang) {
     // Sprachwechsel: die sprachgenaue Auflage hat eine eigene Scryfall-ID,
     // eigenen gedruckten Namen und eigenes Bild. Gibt es sie nicht (viele
@@ -1340,9 +1363,10 @@ function download(name, text, mime) {
 const csvCell = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
 function exportCsv() {
-  const head = ["Name", "Name (englisch)", "Set", "Set-Code", "Nummer", "Sprache",
-                "Zustand", "Foil", "Anzahl", "Preis EUR", "Wert EUR"];
-  const rows = CARDS.map(c => [c.disp, c.name, c.set_name, c.set, c.cn, c.lang, c.condition,
+  const head = ["Name", "Name (englisch)", "Set", "Set-Code", "Nummer", "Seltenheit",
+                "Typzeile", "Sprache", "Zustand", "Foil", "Anzahl", "Preis EUR", "Wert EUR"];
+  const rows = CARDS.map(c => [c.disp, c.name, c.set_name, c.set, c.cn, c.rarity ?? "",
+    c.type_line ?? "", c.lang, c.condition,
     c.foil ? "ja" : "nein", c.qty, c.price ?? "",
     c.price == null ? "" : (c.price * c.qty).toFixed(2)]);
   download(`mtg-sammlung-${today()}.csv`,
@@ -1367,7 +1391,7 @@ async function importJson(file) {
         p_cm_id: c.cm_id ?? null,
         p_lang: c.lang || "en", p_condition: c.condition || "NM",
         p_foil: !!c.foil, p_price: c.price ?? null,
-        p_type_line: c.type_line ?? null
+        p_type_line: c.type_line ?? null, p_rarity: c.rarity ?? null
       });
       if (error) { bad++; break; } else ok++;
     }
@@ -1508,7 +1532,7 @@ async function importCsv(file) {
         set_code: (card.set || "").toUpperCase(), set_name: card.set_name,
         cn: card.collector_number, img: imgOf(card),
         cm_id: card.cardmarket_id ?? null,
-        type_line: card.type_line ?? null,
+        type_line: card.type_line ?? null, rarity: card.rarity ?? null,
         lang, condition: cond, foil, qty, price,
         hist: price == null ? [] : [{ d: today(), v: price }],
       };
@@ -1630,7 +1654,7 @@ async function miImport() {
         p_cn: card.collector_number, p_img: imgOf(card),
         p_cm_id: card.cardmarket_id ?? null,
         p_lang: lang, p_condition: cond, p_foil: foil, p_price: price,
-        p_type_line: card.type_line ?? null,
+        p_type_line: card.type_line ?? null, p_rarity: card.rarity ?? null,
       });
       if (error) { sag("✗ " + dbErr(error), "var(--err)"); fail++; continue; }
 
