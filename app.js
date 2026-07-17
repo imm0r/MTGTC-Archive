@@ -749,6 +749,40 @@ function attachSuggest(inp) {
 /* =========================== Sammlung-Ansicht ========================= */
 let sortKey = "name", sortDir = 1;
 
+/* Sortierung je Deck: wer eine Deck-Tabelle sortiert, meint diese eine und
+   nicht alle. Der Zustand hängt deshalb am Deck. Voreinstellung wie in der
+   Sammlung. */
+const deckSort = {};
+
+/* Der Wert, nach dem eine Spalte sortiert. Sammlung und Decks teilen sich
+   diese Regel — sonst driften zwei fast gleiche Tabellen auseinander.
+   Sie teilen sich aber NICHT die Daten: im Deck ist "Anz." die Deckmenge
+   (deck_entries.qty), nicht der Sammlungsbestand, und "Bestand" ist, wie
+   viele fehlen. Deshalb der Eintrag e als zweites Argument.
+   Sortiert wird nach dem ANGEZEIGTEN Namen (disp), nicht nach dem
+   englischen: eine sichtbare Liste nach einem unsichtbaren Schlüssel zu
+   ordnen, verwirrt nur — "Überfluss" gehört unter Ü, nicht unter A
+   (Abundance). */
+function sortWert(key, c, e) {
+  const qty = e ? e.qty : c.qty;
+  if (key === "name")  return c.disp;
+  if (key === "mana")  return c.cmc;
+  if (key === "value") return (c.price || 0) * qty;
+  if (key === "qty")   return qty;
+  if (key === "fehlt") return e ? Math.max(0, e.qty - c.qty) : 0;
+  return c[key];
+}
+
+const cmpWert = (x, y, dir) =>
+  (typeof x === "string" ? x.localeCompare(y) : (x ?? 0) - (y ?? 0)) * dir;
+
+/* Klick auf eine Spaltenüberschrift: dieselbe Spalte kehrt die Richtung um,
+   eine neue beginnt aufsteigend. */
+function sortUm(zustand, key) {
+  zustand.dir = zustand.key === key ? -zustand.dir : 1;
+  zustand.key = key;
+}
+
 function filtered() {
   const q = $("#q").value.trim().toLowerCase();
   const fs = $("#f-set").value, ff = $("#f-foil").value;
@@ -757,16 +791,7 @@ function filtered() {
            (c.set_name || "").toLowerCase().includes(q)) &&
     (!fs || c.set === fs) &&
     (ff === "" || String(c.foil ? 1 : 0) === ff)
-  ).sort((a, b) => {
-    // "Wert" wird gerechnet; "Mana" sortiert nach dem Manawert (cmc), nicht
-    // nach der Zeichenkette — sonst käme {10} vor {2}.
-    const g = c => sortKey === "value" ? (c.price || 0) * c.qty
-                 : sortKey === "mana"  ? c.cmc
-                 : c[sortKey];
-    const x = g(a), y = g(b);
-    if (typeof x === "string") return x.localeCompare(y) * sortDir;
-    return ((x ?? 0) - (y ?? 0)) * sortDir;
-  });
+  ).sort((a, b) => cmpWert(sortWert(sortKey, a), sortWert(sortKey, b), sortDir));
 }
 
 function spark(hist) {
@@ -784,21 +809,22 @@ function spark(hist) {
    sich im Deck: die Anzahl ist die Deck-Menge (deck_entries.qty, nicht der
    Sammlungsbestand), eine Spalte zeigt den Fehlbestand, und das Kreuz löst
    nur die Zuordnung — die Karte bleibt in der Sammlung. */
-/* Das Deck zeigt bewusst weniger: Sprache, Zustand, Datum, Preis und Wert
-   stehen in der Detailansicht — hier zählt, welche Karte wie oft drin ist
-   und ob sie da ist. Sortierbar ist nur die Sammlung. */
+/* Das Deck zeigt bewusst weniger: Zustand, Datum, Preis und Wert stehen in
+   der Detailansicht — hier zählt, welche Karte wie oft drin ist und ob sie
+   da ist. Bild, Name, Mana, Set und Sprache stehen dagegen an derselben
+   Stelle wie in der Sammlung, und sortierbar sind beide. */
 function cardHead(imDeck) {
-  const s = k => imDeck ? "" : ` data-s="${k}"`;
+  const s = k => ` data-s="${k}"`;
   return `<tr>
     <th class="hide-s"></th>
     <th${s("name")}>Karte</th>
     <th${s("mana")} class="num">Mana</th>
     <th${s("set_name")} class="hide-s">Set</th>
-    ${imDeck ? "" : `<th${s("lang")} class="hide-s">Spr.</th>
-    <th${s("condition")} class="hide-s">Zust.</th>
+    <th${s("lang")} class="hide-s">Spr.</th>
+    ${imDeck ? "" : `<th${s("condition")} class="hide-s">Zust.</th>
     <th${s("added")} class="hide-s">Hinzugefügt</th>`}
     <th${s("qty")} class="num">Anz.</th>
-    ${imDeck ? '<th class="num">Bestand</th>'
+    ${imDeck ? `<th${s("fehlt")} class="num">Bestand</th>`
              : `<th${s("price")} class="num">Preis</th>
     <th${s("value")} class="num">Wert</th>`}
     <th></th><th></th>
@@ -821,8 +847,8 @@ function cardRow(c, o = {}) {
         : `Manawert ${c.cmc ?? "?"}`}">${manaHtml(c.mana_cost)}</td>
       <td class="hide-s">${esc(c.set_name || c.set || "")}
           ${c.rarity ? `<div style="margin-top:3px">${rarityPill(c.rarity)}</div>` : ""}</td>
-      ${imDeck ? "" : `<td class="hide-s">${langHtml(c.lang)}</td>
-      <td class="hide-s">${esc(c.condition || "")}</td>
+      <td class="hide-s">${langHtml(c.lang)}</td>
+      ${imDeck ? "" : `<td class="hide-s">${esc(c.condition || "")}</td>
       <td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap">${dtShort(c.added)}</td>`}
       <!-- 54 px ist die schmalste Breite, bei der drei Stellen noch ganz
            hineinpassen (gemessen, inklusive Spinner-Pfeilen; ab 50 px wird
@@ -949,8 +975,10 @@ function renderCollection() {
   // Die Kopfzeile wird bei jedem Rendern neu gebaut, also auch die
   // Sortier-Handler neu hängen.
   $$("#tbl th[data-s]").forEach(th => th.onclick = () => {
-    sortDir = (sortKey === th.dataset.s) ? -sortDir : 1;
-    sortKey = th.dataset.s; renderCollection();
+    const z = { key: sortKey, dir: sortDir };
+    sortUm(z, th.dataset.s);
+    sortKey = z.key; sortDir = z.dir;
+    renderCollection();
   });
 }
 
@@ -1459,11 +1487,14 @@ function renderDecks() {
     return;
   }
   $("#deck-list").innerHTML = DECKS.map(d => {
-    // Nach Namen sortiert wie die Sammlung in ihrer Voreinstellung.
+    // Nach Namen sortiert wie die Sammlung in ihrer Voreinstellung, bis
+    // jemand eine Spaltenüberschrift dieses Decks anklickt.
+    const ds = deckSort[d.id] ||= { key: "name", dir: 1 };
     const eintraege = d.entries
       .map(e => ({ e, c: CARDS.find(x => x.id === e.cardId) }))
       .filter(x => x.c)
-      .sort((a, b) => a.c.disp.localeCompare(b.c.disp));
+      .sort((a, b) => cmpWert(sortWert(ds.key, a.c, a.e),
+                              sortWert(ds.key, b.c, b.e), ds.dir));
     const rows = eintraege.map(({ e, c }) => cardRow(c, {
       deckId: d.id, qty: e.qty, istHaupt: d.main_card_id === c.id })).join("");
 
@@ -1508,6 +1539,17 @@ function renderDecks() {
   });
 
   $$("#deck-list .deck-tbl").forEach(t => wireCardRows(t));
+
+  // Sortier-Handler je Deck. renderDecks() baut alles neu, aber der
+  // Auf-/Zugeklappt-Zustand hängt an deckOffen und übersteht das.
+  $$("#deck-list .card").forEach(karte => {
+    const deckId = karte.querySelector(".deck-kopf")?.dataset.toggle;
+    if (!deckId) return;
+    karte.querySelectorAll(".deck-tbl th[data-s]").forEach(th => th.onclick = () => {
+      sortUm(deckSort[deckId], th.dataset.s);
+      renderDecks();
+    });
+  });
 
   $$("[data-dx]").forEach(b => b.onclick = async () => {
     const d = DECKS.find(x => x.id === b.dataset.dx);
