@@ -36,6 +36,12 @@ create table if not exists public.cards (
   -- Karte mit derselben Schreibweise hätte 6. Das entscheidet die Bauart, die
   -- wir nicht speichern. numeric, nicht integer: Unhinged kennt halbe Kosten.
   cmc         numeric,
+  -- Erscheinungsdatum der Auflage: Scryfalls released_at der KARTE, nicht des
+  -- Sets. Meist identisch — von 208 Auflagen im Bestand stimmten 206 überein.
+  -- Auseinander gehen sie bei laufenden Sammlungen und Promo-Reihen: „Frozen
+  -- Aether" auf The List trägt 2020-03-13, das Set 2020-09-26. Die Karte weiß
+  -- es genauer.
+  released    date,
   lang        text not null default 'en',
   condition   text not null default 'NM',
   foil        boolean not null default false,
@@ -77,6 +83,7 @@ alter table public.cards add column if not exists type_line text;
 alter table public.cards add column if not exists rarity text;
 alter table public.cards add column if not exists mana_cost text;
 alter table public.cards add column if not exists cmc numeric;
+alter table public.cards add column if not exists released date;
 
 create index if not exists cards_user_idx        on public.cards(user_id);
 create index if not exists decks_user_idx        on public.decks(user_id);
@@ -134,13 +141,16 @@ drop function if exists public.add_card(
   text, text, text, text, text, text, text, text, integer, text, text, boolean, numeric, text, text);
 drop function if exists public.add_card(
   text, text, text, text, text, text, text, text, integer, text, text, boolean, numeric, text, text, text);
+drop function if exists public.add_card(
+  text, text, text, text, text, text, text, text, integer, text, text, boolean, numeric, text, text, text, numeric);
 
 create or replace function public.add_card(
   p_scryfall_id text, p_oracle_id text, p_name text, p_printed_name text,
   p_set_code text, p_set_name text, p_cn text, p_img text, p_cm_id integer,
   p_lang text, p_condition text, p_foil boolean, p_price numeric,
   p_type_line text default null, p_rarity text default null,
-  p_mana_cost text default null, p_cmc numeric default null
+  p_mana_cost text default null, p_cmc numeric default null,
+  p_released date default null
 ) returns public.cards
 language plpgsql
 security invoker
@@ -151,14 +161,14 @@ begin
   insert into public.cards as c
     (scryfall_id, oracle_id, name, printed_name, set_code, set_name, cn, img,
      cm_id, lang, condition, foil, qty, price, hist, type_line, rarity,
-     mana_cost, cmc)
+     mana_cost, cmc, released)
   values
     (p_scryfall_id, p_oracle_id, p_name, p_printed_name, p_set_code, p_set_name,
      p_cn, p_img, p_cm_id, p_lang, p_condition, p_foil, 1, p_price,
      case when p_price is null then '[]'::jsonb
           else jsonb_build_array(jsonb_build_object(
                  'd', to_char(current_date, 'YYYY-MM-DD'), 'v', p_price)) end,
-     p_type_line, p_rarity, p_mana_cost, p_cmc)
+     p_type_line, p_rarity, p_mana_cost, p_cmc, p_released)
   on conflict on constraint cards_unique_printing do update
     set qty       = c.qty + 1,
         price     = coalesce(excluded.price, c.price),
@@ -169,7 +179,8 @@ begin
         -- coalesce, nicht "nur wenn leer": '' bzw. 0 sind gültige Werte
         -- ("kostet nichts"), nur NULL ist eine Lücke.
         mana_cost = coalesce(excluded.mana_cost, c.mana_cost),
-        cmc       = coalesce(excluded.cmc, c.cmc)
+        cmc       = coalesce(excluded.cmc, c.cmc),
+        released  = coalesce(excluded.released, c.released)
   returning * into r;
   return r;
 end $$;

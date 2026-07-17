@@ -617,7 +617,8 @@ async function addToCollection(card, el, detected) {
     p_cm_id: card.cardmarket_id ?? null,
     p_lang: lang, p_condition: cond, p_foil: foil, p_price: price,
     p_type_line: card.type_line ?? null, p_rarity: card.rarity ?? null,
-    p_mana_cost: manaOf(card), p_cmc: card.cmc ?? null
+    p_mana_cost: manaOf(card), p_cmc: card.cmc ?? null,
+    p_released: card.released_at ?? null
   });
   if (error) throw new Error(dbErr(error));
 
@@ -1024,6 +1025,7 @@ async function nachtragen(c, fresh) {
   }
   // Auch hier "== null" und nicht "leer": Manawert 0 ist gültig (Länder).
   if (c.cmc == null && fresh.cmc != null) patch.cmc = fresh.cmc;
+  if (!c.released && fresh.released_at) patch.released = fresh.released_at;
   if (!Object.keys(patch).length) return;
   const { error } = await sb.from("cards").update(patch).eq("id", c.id);
   if (error) throw new Error(dbErr(error));
@@ -1178,6 +1180,16 @@ function manaHtml(cost) {
 }
 
 /* ------------------------------------------- Karten-Detailansicht ---- */
+/* Erscheinungsdatum ("2023-08-04" → "04.08.2023"). Bewusst per split statt
+   new Date(): "2023-08-04" gilt als UTC-Mitternacht, und toLocaleDateString
+   rechnet in die Ortszeit um — westlich von Greenwich stünde dort der 3.
+   August. Ein reines Datum hat keine Uhrzeit, also wird es auch nicht
+   umgerechnet, sondern nur umsortiert. */
+const datShort = iso => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || "");
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : "";
+};
+
 const dtShort = iso => {
   if (!iso) return "–";
   const d = new Date(iso);
@@ -1227,7 +1239,8 @@ function detailHtml(c, hover) {
         <div class="name-zeile"><b style="font-size:17px">${esc(c.disp)}</b>${c.mana_cost
           ? `<span class="mana-kosten">${manaHtml(c.mana_cost)}</span>` : ""}</div>
         ${c.printed_name && c.printed_name !== c.name ? `<div class="hint" style="margin:0">${esc(c.name)}</div>` : ""}
-        <div class="hint" style="margin-top:2px">${esc(c.set_name || c.set)} · #${esc(c.cn)}</div>
+        <div class="hint" style="margin-top:2px">${esc(c.set_name || c.set)} · #${esc(c.cn)}${
+          c.released ? ` · erschienen ${esc(datShort(c.released))}` : ""}</div>
         ${c.type_line ? `<div class="hint" style="margin-top:2px">${esc(c.type_line)}</div>` : ""}
         <div style="margin:10px 0">
           ${rarityPill(c.rarity)}
@@ -1368,6 +1381,8 @@ async function applyCardEdit(c, lang, cond, foil, neu) {
     patch.rarity = fresh.rarity ?? null;
     patch.mana_cost = manaOf(fresh);
     patch.cmc = fresh.cmc ?? null;
+    // Andere Auflage = anderes Set = anderes Erscheinungsdatum.
+    patch.released = fresh.released_at ?? null;
   } else if (lang !== c.lang) {
     // Sprachwechsel: die sprachgenaue Auflage hat eine eigene Scryfall-ID,
     // eigenen gedruckten Namen und eigenes Bild. Gibt es sie nicht (viele
@@ -1617,10 +1632,10 @@ const csvCell = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
 function exportCsv() {
   const head = ["Name", "Name (englisch)", "Set", "Set-Code", "Nummer", "Seltenheit",
-                "Typzeile", "Manakosten", "Manawert", "Sprache", "Zustand", "Foil",
-                "Anzahl", "Preis EUR", "Wert EUR"];
+                "Erschienen", "Typzeile", "Manakosten", "Manawert", "Sprache",
+                "Zustand", "Foil", "Anzahl", "Preis EUR", "Wert EUR"];
   const rows = CARDS.map(c => [c.disp, c.name, c.set_name, c.set, c.cn, c.rarity ?? "",
-    c.type_line ?? "", c.mana_cost ?? "", c.cmc ?? "", c.lang, c.condition,
+    c.released ?? "", c.type_line ?? "", c.mana_cost ?? "", c.cmc ?? "", c.lang, c.condition,
     c.foil ? "ja" : "nein", c.qty, c.price ?? "",
     c.price == null ? "" : (c.price * c.qty).toFixed(2)]);
   download(`mtg-sammlung-${today()}.csv`,
@@ -1648,7 +1663,8 @@ async function importJson(file) {
         p_type_line: c.type_line ?? null, p_rarity: c.rarity ?? null,
         // Aus der Sicherung, nicht von Scryfall: hier stehen die Werte schon
         // fertig in der Zeile — manaOf() erwartet eine Scryfall-Karte.
-        p_mana_cost: c.mana_cost ?? null, p_cmc: c.cmc ?? null
+        p_mana_cost: c.mana_cost ?? null, p_cmc: c.cmc ?? null,
+        p_released: c.released ?? null
       });
       if (error) { bad++; break; } else ok++;
     }
@@ -1791,6 +1807,7 @@ async function importCsv(file) {
         cm_id: card.cardmarket_id ?? null,
         type_line: card.type_line ?? null, rarity: card.rarity ?? null,
         mana_cost: manaOf(card), cmc: card.cmc ?? null,
+        released: card.released_at ?? null,
         lang, condition: cond, foil, qty, price,
         hist: price == null ? [] : [{ d: today(), v: price }],
       };
@@ -1914,6 +1931,7 @@ async function miImport() {
         p_lang: lang, p_condition: cond, p_foil: foil, p_price: price,
         p_type_line: card.type_line ?? null, p_rarity: card.rarity ?? null,
         p_mana_cost: manaOf(card), p_cmc: card.cmc ?? null,
+        p_released: card.released_at ?? null,
       });
       if (error) { sag("✗ " + dbErr(error), "var(--err)"); fail++; continue; }
 
