@@ -6,7 +6,7 @@
 <title>MTG Sammlung</title>
 <!-- ?v= bei jeder Änderung hochzählen: sonst servieren Browser (und der
      Cache von GitHub Pages) nach einem Push weiter die alten Dateien. -->
-<link rel="stylesheet" href="style.css?v=17">
+<link rel="stylesheet" href="style.css?v=18">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='14'>&#9670;</text></svg>">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
@@ -128,6 +128,7 @@
           <th data-s="set_name" class="hide-s">Set</th>
           <th data-s="lang" class="hide-s">Spr.</th>
           <th data-s="condition" class="hide-s">Zust.</th>
+          <th data-s="added" class="hide-s">Hinzugefügt</th>
           <th data-s="qty" class="num">Anz.</th>
           <th data-s="price" class="num">Preis</th>
           <th data-s="value" class="num">Wert</th>
@@ -220,8 +221,14 @@
     <div style="flex:none"><button class="btn" id="dlg-yes">OK</button></div>
   </div>
 </dialog>
+
+<dialog id="detail-dlg"><div id="detail-body"></div>
+  <div class="row" style="margin-top:12px;justify-content:flex-end">
+    <div style="flex:none"><button class="btn" id="detail-close">Schließen</button></div>
+  </div>
+</dialog>
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=17"></script>
+<script src="app.js?v=18"></script>
 </body>
 </html>

@@ -736,14 +736,16 @@ function renderCollection() {
 
   $("#tbl tbody").innerHTML = rows.map(c => `
     <tr data-id="${c.id}">
-      <td class="hide-s">${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy">` : ""}</td>
-      <td><div>${esc(c.disp)}</div>
+      <td class="hide-s">${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy" data-view
+             style="cursor:pointer" title="Großansicht &amp; Preisverlauf">` : ""}</td>
+      <td><div data-view style="cursor:pointer" title="Großansicht &amp; Preisverlauf">${esc(c.disp)}</div>
           <div style="font-size:12px;color:var(--dim)">
             ${c.printed_name && c.printed_name !== c.name ? esc(c.name) + " &middot; " : ""}
             ${c.foil ? '<span class="pill foil">Foil</span> ' : ""}#${esc(c.cn)}</div></td>
       <td class="hide-s">${esc(c.set_name || c.set || "")}</td>
       <td class="hide-s">${esc((c.lang || "").toUpperCase())}</td>
       <td class="hide-s">${esc(c.condition || "")}</td>
+      <td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap">${dtShort(c.added)}</td>
       <td class="num"><input type="number" min="0" value="${c.qty}" data-qty
              style="width:62px;padding:4px 6px;text-align:right"></td>
       <td class="num">${eur(c.price)} ${spark(c.hist)}</td>
@@ -776,6 +778,8 @@ function renderCollection() {
       await reload(); renderAll(); toast("Karte entfernt");
     } catch (e) { toast(dbErr(e)); }
   });
+  $$("#tbl tbody [data-view]").forEach(el => el.onclick = () =>
+    showCardDetail(el.closest("tr").dataset.id));
   $$("#tbl tbody [data-edit]").forEach(b => b.onclick = () =>
     editCard(b.closest("tr").dataset.id));
   $$("#tbl tbody [data-price]").forEach(b => b.onclick = async () => {
@@ -813,6 +817,74 @@ async function updatePrices() {
   try { await reload(); renderAll(); } catch (e) { toast(dbErr(e)); }
   btn.disabled = false; btn.textContent = "Preise aktualisieren";
   toast(failed ? `Preise aktualisiert, ${failed} nicht abrufbar` : "Preise aktualisiert");
+}
+
+/* ------------------------------------------- Karten-Detailansicht ---- */
+const dtShort = iso => {
+  if (!iso) return "–";
+  const d = new Date(iso);
+  return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" })
+    + " " + d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+};
+
+/* Preisverlauf als richtiger Graph: Gitterlinien mit Eurowerten, Datum an
+   den Enden, ein Punkt pro Tag (bis 60, so weit reicht die Historie).
+   Grün bei gestiegenem, rot bei gefallenem Kurs — wie die Mini-Kurve. */
+function priceChart(hist) {
+  const H = (hist || []).map(p => ({ d: p.d, v: Number(p.v) })).filter(p => !isNaN(p.v));
+  if (!H.length) return '<p class="hint">Noch keine Preishistorie — sie wächst mit jedem Preis-Update um einen Punkt pro Tag.</p>';
+  const w = 560, h = 200, pl = 62, pr = 14, pt = 12, pb = 26;
+  let min = Math.min(...H.map(p => p.v)), max = Math.max(...H.map(p => p.v));
+  if (min === max) { const d = Math.max(0.05, min * 0.1); min -= d; max += d; }
+  const X = i => H.length === 1 ? pl + (w - pl - pr) / 2 : pl + i * (w - pl - pr) / (H.length - 1);
+  const Y = v => pt + (h - pt - pb) * (1 - (v - min) / (max - min));
+  const fmtD = s => s ? s.slice(8, 10) + "." + s.slice(5, 7) + "." : "";
+  const farbe = H[H.length - 1].v >= H[0].v ? "var(--ok)" : "var(--err)";
+  const ticks = [min, (min + max) / 2, max];
+  return `<svg class="chart-svg" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
+    ${ticks.map(v => `<line x1="${pl}" y1="${Y(v).toFixed(1)}" x2="${w - pr}" y2="${Y(v).toFixed(1)}"
+        stroke="var(--line)" stroke-width="1"/>
+      <text x="${pl - 8}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end" font-size="11"
+        fill="var(--dim)">${eur(v)}</text>`).join("")}
+    ${H.length > 1 ? `<polyline points="${H.map((p, i) => `${X(i).toFixed(1)},${Y(p.v).toFixed(1)}`).join(" ")}"
+        fill="none" stroke="${farbe}" stroke-width="2"/>` : ""}
+    ${H.map((p, i) => `<circle cx="${X(i).toFixed(1)}" cy="${Y(p.v).toFixed(1)}"
+        r="${H.length > 30 ? 2 : 3.5}" fill="${farbe}"><title>${p.d}: ${eur(p.v)}</title></circle>`).join("")}
+    <text x="${pl}" y="${h - 6}" font-size="11" fill="var(--dim)">${fmtD(H[0].d)}</text>
+    <text x="${w - pr}" y="${h - 6}" text-anchor="end" font-size="11" fill="var(--dim)">${fmtD(H[H.length - 1].d)}</text>
+  </svg>`;
+}
+
+function showCardDetail(id) {
+  const c = CARDS.find(x => x.id === id);
+  if (!c) return;
+  // Scryfall-Bild-URLs tragen die Größe im Pfad — aus small wird normal
+  // (488×680), ohne einen weiteren API-Aufruf.
+  const gross = (c.img || "").replace("/small/", "/normal/");
+  $("#detail-body").innerHTML = `
+    <div class="detail">
+      ${gross ? `<img class="detail-img" src="${esc(gross)}" alt="">` : ""}
+      <div class="detail-info">
+        <b style="font-size:17px">${esc(c.disp)}</b>
+        ${c.printed_name && c.printed_name !== c.name ? `<div class="hint" style="margin:0">${esc(c.name)}</div>` : ""}
+        <div class="hint" style="margin-top:2px">${esc(c.set_name || c.set)} · #${esc(c.cn)}</div>
+        <div style="margin:10px 0">
+          ${c.foil ? '<span class="pill foil">Foil</span> ' : ""}
+          <span class="pill">${esc((c.lang || "").toUpperCase())}</span>
+          <span class="pill">${esc(c.condition || "")}</span>
+          <span class="pill">Anzahl ${c.qty}</span>
+        </div>
+        <div>Preis: <b>${eur(c.price)}</b>${c.qty > 1 ? ` · Wert: <b>${eur(c.price == null ? null : c.price * c.qty)}</b>` : ""}
+          ${cmLink(c.cm_id) ? ` <a class="cm" href="${esc(cmLink(c.cm_id))}" target="_blank"
+            rel="noopener noreferrer" title="Angebote auf Cardmarket">CM</a>` : ""}</div>
+        <div class="hint" style="margin-top:10px">Hinzugefügt: ${dtShort(c.added)} Uhr</div>
+      </div>
+    </div>
+    <div style="margin-top:14px">
+      <label style="margin-bottom:2px">Preisverlauf</label>
+      ${priceChart(c.hist)}
+    </div>`;
+  $("#detail-dlg").showModal();
 }
 
 /* ---------------------------------------------- Karte bearbeiten ----- */
@@ -1438,6 +1510,7 @@ function wireApp() {
     if (!f) return;
     try { await importJson(f); } catch (err) { toast("Import fehlgeschlagen: " + err.message); }
   };
+  $("#detail-close").onclick = () => $("#detail-dlg").close();
   $("#mi-toggle").onclick = () => {
     const s = $("#manual-import");
     const zeigen = s.style.display === "none";
