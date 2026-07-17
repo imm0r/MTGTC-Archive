@@ -60,6 +60,16 @@ alter table public.cards        enable row level security;
 alter table public.decks        enable row level security;
 alter table public.deck_entries enable row level security;
 
+-- "force" gilt zusätzlich für den Tabelleneigentümer, "revoke" nimmt anon
+-- alle direkt vergebenen Rechte. Ohne Anmeldung ist auf diesen Tabellen
+-- nichts zu suchen — der öffentliche Schlüssel steht im Repository.
+alter table public.cards        force row level security;
+alter table public.decks        force row level security;
+alter table public.deck_entries force row level security;
+revoke all on public.cards        from anon;
+revoke all on public.decks        from anon;
+revoke all on public.deck_entries from anon;
+
 drop policy if exists "eigene karten" on public.cards;
 create policy "eigene karten" on public.cards
   for all to authenticated
