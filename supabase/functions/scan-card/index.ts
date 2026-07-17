@@ -156,12 +156,18 @@ Deno.serve(async (req) => {
       },
     });
   } catch (e) {
+    // Die Fehler des Clients tragen die rohe API-Antwort im Text. Wer sie
+    // durchreicht, zeigt dem Nutzer einen JSON-Klumpen — also übersetzen
+    // wir die Fälle, die man tatsächlich beheben kann.
     const m = (e as Error).message ?? "Unbekannter Fehler";
-    // 401/429 vom Anthropic-Client durchreichen, damit die App sie
-    // unterscheiden kann.
-    const status = /401|authentication/i.test(m) ? 502
-                 : /429|rate.?limit/i.test(m) ? 429
-                 : 500;
-    return json({ error: m }, status);
+    if (/credit balance/i.test(m))
+      return json({ error: "Anthropic-Guthaben aufgebraucht — unter Plans & Billing aufladen.", code: "no_credit" }, 402);
+    if (/401|authentication/i.test(m))
+      return json({ error: "Anthropic-Schlüssel ungültig oder widerrufen.", code: "bad_key" }, 502);
+    if (/429|rate.?limit/i.test(m))
+      return json({ error: "Zu viele Anfragen — kurz warten.", code: "rate_limit" }, 429);
+    if (/invalid_request_error/i.test(m))
+      return json({ error: "Anfrage wurde abgelehnt: " + m.slice(0, 200), code: "bad_request" }, 400);
+    return json({ error: m.slice(0, 300), code: "unknown" }, 500);
   }
 });

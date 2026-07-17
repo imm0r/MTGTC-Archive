@@ -262,12 +262,18 @@ async function readWithVision(img) {
     body: { image_b64: toJpegBase64(img), media_type: "image/jpeg" },
   });
   if (error) {
-    // 404 = Funktion nicht ausgerollt, 500 = Schlüssel fehlt. Beides ändert
-    // sich nicht von allein, also für diese Sitzung abschalten.
     const s = error.context?.status;
-    if (s === 404 || s === 500) {
+    let msg = "";
+    try { msg = (await error.context.json()).error; } catch { /* kein JSON-Körper */ }
+    // Diese Zustände ändern sich nicht von allein — für die Sitzung
+    // abschalten, statt es bei jeder Karte erneut zu versuchen.
+    if ([402, 404, 500, 502].includes(s)) {
       visionAus = true;
-      toast("Bilderkennung nicht verfügbar — weiter mit Texterkennung");
+      toast(msg
+        ? msg + " Weiter mit Texterkennung."
+        : "Bilderkennung nicht verfügbar (Fehler " + s + ") — weiter mit Texterkennung.");
+    } else if (s === 429) {
+      toast(msg || "Zu viele Anfragen — diese Karte über Texterkennung.");
     }
     return null;
   }
