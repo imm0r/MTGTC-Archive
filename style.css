@@ -78,6 +78,10 @@ th{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.6px;
    background:var(--bg);cursor:pointer;white-space:nowrap}
 td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000;display:block}
 .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cm{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.5px;
+    padding:3px 7px;border-radius:5px;text-decoration:none;
+    border:1px solid var(--line);color:var(--dim)}
+.cm:hover{border-color:var(--acc);color:var(--acc)}
 .stats{display:flex;gap:10px;flex-wrap:wrap}
 .stat{flex:1;min-width:130px;background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);padding:12px}
 .stat .v{font-size:22px;font-weight:700;color:var(--acc);font-variant-numeric:tabular-nums}

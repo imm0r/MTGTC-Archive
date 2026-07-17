@@ -131,16 +131,26 @@ const sfCode = async (code, num, lang) => {
   } catch { return null; }
 };
 
-/* Deutsche Auflagen haben bei Scryfall oft gar keinen eigenen Preis. Dann
-   nehmen wir den der englischen Auflage — eine Näherung, aber weit
-   brauchbarer als gar kein Wert. */
+/* Scryfalls eur-Preise stammen von Cardmarket. Fremdsprachige Auflagen tragen
+   dort weder Preis noch cardmarket_id, weil Cardmarket pro Auflage nur EIN
+   Produkt führt und die Sprache lediglich einzelne Angebote filtert. Der Wert
+   der englischen Auflage ist deshalb der Produktpreis dieser Karte — keine
+   Schätzung. Von dort holen wir auch die ID für den Cardmarket-Link. */
 async function withPrice(card) {
-  const p = card?.prices || {};
-  if (!card || card.lang === "en" || p.eur || p.eur_foil || p.usd || p.usd_foil) return card;
+  if (!card) return card;
+  const p = card.prices || {};
+  const hatPreis = p.eur || p.eur_foil || p.usd || p.usd_foil;
+  if (card.lang === "en" || (hatPreis && card.cardmarket_id)) return card;
   const en = await sfCode(card.set, card.collector_number, "en");
-  if (en?.prices) { card.prices = en.prices; card.price_from_en = true; }
+  if (!en) return card;
+  if (!hatPreis && en.prices) card.prices = en.prices;
+  if (!card.cardmarket_id && en.cardmarket_id) card.cardmarket_id = en.cardmarket_id;
   return card;
 }
+
+const cmLink = id => id
+  ? `https://www.cardmarket.com/de/Magic/Products?idProduct=${id}`
+  : null;
 
 async function findByCode(code, num, lang, isToken) {
   const n = String(num).replace(/^0+/, "") || "0";   // führende Nullen ergeben 404
@@ -174,31 +184,34 @@ const byCard = hits => {
 async function findCard(text, lang) {
   const t = text.trim();
   if (!t) return { card: null, candidates: [] };
+  // Auch der Namensweg braucht Preis und Cardmarket-ID nachgeladen.
+  const ok = async c => ({ card: await withPrice(c), candidates: [] });
 
   // 1. Nicht-englische Karten: gedruckten Namen in der gewählten Sprache suchen.
   if (lang && lang !== "en") {
     let hits = [];
     try { hits = await sfSearch(`name:"${t.replace(/"/g, "")}" lang:${lang}`); } catch { /* weiter */ }
     const exact = hits.find(c => norm(c.printed_name) === norm(t));
-    if (exact) return { card: exact, candidates: [] };
+    if (exact) return ok(exact);
     const uniq = byCard(hits);
-    if (uniq.length === 1) return { card: uniq[0], candidates: [] };
+    if (uniq.length === 1) return ok(uniq[0]);
     if (uniq.length > 1) return { card: null, candidates: uniq };
   }
 
   // 2. Englischer Weg: verzeiht Tippfehler, deckt aber keine Tokens ab.
   try {
     const hit = await sfNamed(t);
-    if (hit) return { card: hit, candidates: [] };
+    if (hit) return ok(hit);
   } catch { /* z. B. "Too many cards match" — unten weitersuchen */ }
 
   // 3. Auffangnetz: Volltextsuche inkl. Tokens, egal in welcher Sprache.
   let hits = [];
   try { hits = await sfSearch(`name:"${t.replace(/"/g, "")}"`); } catch { /* nichts gefunden */ }
   const exact = hits.find(c => norm(c.name) === norm(t) || norm(c.printed_name) === norm(t));
-  if (exact) return { card: exact, candidates: [] };
+  if (exact) return ok(exact);
   const uniq = byCard(hits);
-  return { card: uniq.length === 1 ? uniq[0] : null, candidates: uniq.length > 1 ? uniq : [] };
+  if (uniq.length === 1) return ok(uniq[0]);
+  return { card: null, candidates: uniq.length > 1 ? uniq : [] };
 }
 
 /* Für die Vorschlagsliste: autocomplete kann kein Deutsch (liefert auch mit
@@ -371,6 +384,7 @@ async function addToCollection(card, el) {
     p_printed_name: card.printed_name || null,
     p_set_code: (card.set || "").toUpperCase(), p_set_name: card.set_name,
     p_cn: card.collector_number, p_img: imgOf(card),
+    p_cm_id: card.cardmarket_id ?? null,
     p_lang: lang, p_condition: cond, p_foil: foil, p_price: price
   });
   if (error) throw new Error(dbErr(error));
@@ -554,6 +568,9 @@ function renderCollection() {
              style="width:62px;padding:4px 6px;text-align:right"></td>
       <td class="num">${eur(c.price)} ${spark(c.hist)}</td>
       <td class="num">${eur(c.price == null ? null : c.price * c.qty)}</td>
+      <td class="num">${cmLink(c.cm_id)
+        ? `<a class="cm" href="${esc(cmLink(c.cm_id))}" target="_blank" rel="noopener noreferrer"
+             title="Angebote auf Cardmarket ansehen">CM</a>` : ""}</td>
       <td class="num"><button class="btn ghost sm" data-del>&times;</button></td>
     </tr>`).join("");
 
@@ -732,6 +749,7 @@ async function importJson(file) {
         p_scryfall_id: c.scryfall_id, p_oracle_id: c.oracle_id, p_name: c.name,
         p_printed_name: c.printed_name || null,
         p_set_code: c.set || c.set_code, p_set_name: c.set_name, p_cn: c.cn, p_img: c.img,
+        p_cm_id: c.cm_id ?? null,
         p_lang: c.lang || "en", p_condition: c.condition || "NM",
         p_foil: !!c.foil, p_price: c.price ?? null
       });

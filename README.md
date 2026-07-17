@@ -84,9 +84,30 @@ scharf sein — sie ist wertvoller als der Kartenname.
 * Bei mehreren Auflagen derselben Karte nimmt der Namensweg die neueste. Ist es
   eine andere, führt „Falsche Karte?“ zur Auswahl — oder gleich der Weg über
   Setcode und Nummer, der die Auflage exakt trifft.
-* Deutsche Auflagen haben bei Scryfall häufig keinen eigenen Preis. Dann wird
-  der Preis der englischen Auflage übernommen. Das ist eine Näherung: real
-  weichen fremdsprachige Karten im Preis ab.
+* Deutsche Auflagen haben bei Scryfall häufig keinen eigenen Preis und keine
+  `cardmarket_id`. Beides wird dann von der englischen Auflage geholt. Das ist
+  keine Schätzung: Cardmarket führt pro Auflage nur **ein** Produkt, die
+  Sprache filtert dort lediglich einzelne Angebote.
 * Preise stammen von Scryfall und sind Marktbeobachtungen, keine Verkaufspreise.
+
+### Warum Scryfall und nicht Cardmarket
+
+Weil beides dasselbe ist: Scryfalls `eur`-Preise **sind** Cardmarket-Preise.
+Jede Karte trägt eine `cardmarket_id`; gegengeprüft am Ooze-Token aus MKM —
+Scryfall meldet 0,30 €, Cardmarket zeigt als Preis-Trend 0,30 €.
+
+Die Cardmarket-API selbst kommt nicht in Frage:
+
+* Cardmarket nimmt derzeit **keine Anträge auf API-Zugang** mehr an; die alte
+  Doku antwortet mit `410 Gone`.
+* Sie verlangt OAuth-1.0a-Signaturen mit einem geheimen Schlüssel. In einer
+  reinen Browser-App auf GitHub Pages wäre der öffentlich — es bräuchte einen
+  Server dazwischen.
+* Kein CORS; Auslesen der Webseite verbietet Cardmarket.
+* Für die *Erkennung* ist Scryfall ohnehin besser: den Zugriff über Setcode und
+  Sammlernummer gibt es bei Cardmarket nicht.
+
+Was Cardmarket besser kann, sind die konkreten Angebote. Dorthin führt der
+`CM`-Link je Kartenzeile.
 * „Preise aktualisieren“ ruft jede Karte einzeln ab und schreibt einen
   Historienpunkt pro Tag (die letzten 60 bleiben erhalten).

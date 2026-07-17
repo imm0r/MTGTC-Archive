@@ -16,6 +16,7 @@ create table if not exists public.cards (
   set_name    text,
   cn          text,
   img         text,
+  cm_id       integer,       -- Cardmarket-Produkt-ID für den Direktlink
   lang        text not null default 'en',
   condition   text not null default 'NM',
   foil        boolean not null default false,
@@ -44,8 +45,9 @@ create table if not exists public.deck_entries (
   primary key (deck_id, card_id)
 );
 
--- Für Bestände, die vor der Mehrsprachigkeit angelegt wurden:
+-- Für Bestände, die vor diesen Spalten angelegt wurden:
 alter table public.cards add column if not exists printed_name text;
+alter table public.cards add column if not exists cm_id integer;
 
 create index if not exists cards_user_idx        on public.cards(user_id);
 create index if not exists decks_user_idx        on public.decks(user_id);
@@ -83,11 +85,13 @@ create policy "eigene deck-eintraege" on public.deck_entries
 -- ist ("Could not choose the best candidate function").
 drop function if exists public.add_card(
   text, text, text, text, text, text, text, text, text, boolean, numeric);
+drop function if exists public.add_card(
+  text, text, text, text, text, text, text, text, text, text, boolean, numeric);
 
 create or replace function public.add_card(
   p_scryfall_id text, p_oracle_id text, p_name text, p_printed_name text,
-  p_set_code text, p_set_name text, p_cn text, p_img text, p_lang text,
-  p_condition text, p_foil boolean, p_price numeric
+  p_set_code text, p_set_name text, p_cn text, p_img text, p_cm_id integer,
+  p_lang text, p_condition text, p_foil boolean, p_price numeric
 ) returns public.cards
 language plpgsql
 security invoker
@@ -97,16 +101,17 @@ declare r public.cards;
 begin
   insert into public.cards as c
     (scryfall_id, oracle_id, name, printed_name, set_code, set_name, cn, img,
-     lang, condition, foil, qty, price, hist)
+     cm_id, lang, condition, foil, qty, price, hist)
   values
     (p_scryfall_id, p_oracle_id, p_name, p_printed_name, p_set_code, p_set_name,
-     p_cn, p_img, p_lang, p_condition, p_foil, 1, p_price,
+     p_cn, p_img, p_cm_id, p_lang, p_condition, p_foil, 1, p_price,
      case when p_price is null then '[]'::jsonb
           else jsonb_build_array(jsonb_build_object(
                  'd', to_char(current_date, 'YYYY-MM-DD'), 'v', p_price)) end)
   on conflict on constraint cards_unique_printing do update
     set qty   = c.qty + 1,
-        price = coalesce(excluded.price, c.price)
+        price = coalesce(excluded.price, c.price),
+        cm_id = coalesce(excluded.cm_id, c.cm_id)
   returning * into r;
   return r;
 end $$;
