@@ -768,9 +768,14 @@ function sortWert(key, c, e) {
   const qty = e ? e.qty : c.qty;
   if (key === "name")  return c.disp;
   if (key === "mana")  return c.cmc;
-  if (key === "value") return (c.price || 0) * qty;
   if (key === "qty")   return qty;
   if (key === "fehlt") return e ? Math.max(0, e.qty - c.qty) : 0;
+  // Erscheinungsdatum liegt als "2024-07-05" vor. Da sortiert die
+  // Zeichenkette schon chronologisch — Jahr, Monat, Tag stehen in genau der
+  // Reihenfolge und mit fester Stellenzahl. Kein Date-Objekt nötig.
+  // Das || "" hält den Typ stabil: mischten sich null und Zeichenkette,
+  // liefen die beiden Zweige von cmpWert durcheinander.
+  if (key === "released") return c.released || "";
   return c[key];
 }
 
@@ -810,10 +815,13 @@ function spark(hist) {
    sich im Deck: die Anzahl ist die Deck-Menge (deck_entries.qty, nicht der
    Sammlungsbestand), eine Spalte zeigt den Fehlbestand, und das Kreuz löst
    nur die Zuordnung — die Karte bleibt in der Sammlung. */
-/* Das Deck zeigt bewusst weniger: Zustand, Datum, Preis und Wert stehen in
-   der Detailansicht — hier zählt, welche Karte wie oft drin ist und ob sie
-   da ist. Bild, Name, Mana, Set und Sprache stehen dagegen an derselben
-   Stelle wie in der Sammlung, und sortierbar sind beide. */
+/* Das Deck zeigt bewusst weniger: Zustand, Erscheinungsdatum, Hinzugefügt
+   und Preis stehen in der Detailansicht — hier zählt, welche Karte wie oft
+   drin ist und ob sie da ist. Bild, Name, Mana, Set und Sprache stehen
+   dagegen an derselben Stelle wie in der Sammlung, und sortierbar sind beide.
+   Eine Spalte "Wert" (Preis × Anzahl) gibt es nicht mehr: sie wiederholte je
+   Zeile eine Multiplikation, die man im Kopf macht. Summiert wird weiterhin —
+   oben als Marktwert der Sammlung und je Deck im Deckkopf. */
 function cardHead(imDeck) {
   const s = k => ` data-s="${k}"`;
   return `<tr>
@@ -823,11 +831,11 @@ function cardHead(imDeck) {
     <th${s("set_name")} class="hide-s">Set</th>
     <th${s("lang")} class="hide-s">Spr.</th>
     ${imDeck ? "" : `<th${s("condition")} class="hide-s">Zust.</th>
+    <th${s("released")} class="hide-s">Erschienen</th>
     <th${s("added")} class="hide-s">Hinzugefügt</th>`}
     <th${s("qty")} class="num">Anz.</th>
     ${imDeck ? `<th${s("fehlt")} class="num">Bestand</th>`
-             : `<th${s("price")} class="num">Preis</th>
-    <th${s("value")} class="num">Wert</th>`}
+             : `<th${s("price")} class="num">Preis</th>`}
     <th></th><th></th>
   </tr>`;
 }
@@ -850,6 +858,7 @@ function cardRow(c, o = {}) {
           ${c.rarity ? `<div style="margin-top:3px">${rarityPill(c.rarity)}</div>` : ""}</td>
       <td class="hide-s">${langHtml(c.lang)}</td>
       ${imDeck ? "" : `<td class="hide-s">${esc(c.condition || "")}</td>
+      <td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap">${esc(datShort(c.released))}</td>
       <td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap">${dtShort(c.added)}</td>`}
       <!-- 54 px ist die schmalste Breite, bei der drei Stellen noch ganz
            hineinpassen (gemessen, inklusive Spinner-Pfeilen; ab 50 px wird
@@ -860,8 +869,7 @@ function cardRow(c, o = {}) {
       ${imDeck ? `<td class="num">${fehlt
         ? `<span class="pill err">${fehlt} fehlen</span>`
         : '<span class="pill ok">vorhanden</span>'}</td>`
-      : `<td class="num">${eur(c.price)} ${spark(c.hist)}</td>
-      <td class="num">${eur(c.price == null ? null : c.price * qty)}</td>`}
+      : `<td class="num">${eur(c.price)} ${spark(c.hist)}</td>`}
       <td class="num" style="white-space:nowrap">${cmLink(c.cm_id)
         ? `<a class="cm" href="${esc(cmLink(c.cm_id))}" target="_blank" rel="noopener noreferrer"
              title="Angebote auf Cardmarket ansehen">CM</a>` : ""}${sfLink(c)
@@ -1250,7 +1258,7 @@ function detailHtml(c, hover) {
           <span class="pill">${esc(c.condition || "")}</span>
           <span class="pill">Anzahl ${c.qty}</span>
         </div>
-        <div>Preis: <b>${eur(c.price)}</b>${c.qty > 1 ? ` · Wert: <b>${eur(c.price == null ? null : c.price * c.qty)}</b>` : ""}</div>
+        <div>Preis: <b>${eur(c.price)}</b></div>
         ${!hover ? `<div style="margin-top:8px">
           ${cmLink(c.cm_id) ? `<a class="cm" href="${esc(cmLink(c.cm_id))}" target="_blank"
             rel="noopener noreferrer" title="Angebote auf Cardmarket">CM</a> ` : ""}
