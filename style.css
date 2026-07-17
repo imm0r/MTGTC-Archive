@@ -36,24 +36,15 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 #gate{max-width:400px;margin:8vh auto;padding:0 14px}
 #gate .card{margin-top:16px}
 
-/* Marke „Arcanum Archive". Benjamins Original-Logos liegen als freigestellte
-   PNGs im Repo (dunkler Hintergrund herausgestellt, also nahtlos auf Panel und
-   Seite): das Wappen-Icon `logo-emblem.png` in der Kopfzeile, die komplette
-   Sperrung `logo-lockup.png` (Emblem + Schriftzug + Tagline) im Login. */
-.brand{display:flex;align-items:center;gap:10px;margin:0}
-/* Kopf: Icon (Bild) + Wortmarke als TEXT — Text bleibt bei 18 px scharf und
-   fließt mit. Fette Versal-Sans, damit sie zum Sans-Schriftzug der Logo-
-   Sperrung passt statt dagegen zu beißen; „Arcanum" im Goldakzent, „Archive"
-   gedämpft. */
-.brand-emblem{display:block;flex:none;height:30px;width:auto}
-.brand-word{font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
-  text-transform:uppercase;letter-spacing:.03em;line-height:1}
-.brand-word.inline{font-size:18px;font-weight:800}
-.brand-word.inline b{color:var(--acc);font-weight:800}
-.brand-word.inline em{color:var(--dim);font-style:normal;font-weight:600}
-/* Login/Start: die komplette Logo-Sperrung als ein Bild, mittig. */
+/* Marke „Arcanum Archive" — Benjamins gelieferte Logos als PNG, ihr dunkler
+   Hintergrund exakt auf die App-Fläche umgefärbt (Kern auf Zielfarbe geschnappt,
+   Kanten überblendet), also nahtlos. Oben links die horizontale Sperrung Logo2
+   (Emblem + Schriftzug in EINEM Bild — keine Live-Textmarke mehr), im Login das
+   große Wappen Logo1. */
+.brand{display:flex;align-items:center;margin:0}
+.brand-logo{display:block;height:46px;width:auto}
 .brand-hero{text-align:center;margin-bottom:6px}
-.brand-lockup{display:inline-block;max-width:320px;width:100%;height:auto}
+.brand-hero-img{display:inline-block;max-height:290px;max-width:100%;height:auto;width:auto}
 .tabs{display:flex;gap:6px;margin-bottom:12px}
 .tabs button{flex:1;background:transparent;border:1px solid var(--line);color:var(--dim);
              padding:8px;border-radius:8px;cursor:pointer}
