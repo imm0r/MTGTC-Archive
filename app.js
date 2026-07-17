@@ -964,7 +964,7 @@ function renderCollection() {
 
   $("#coll-empty").textContent = CARDS.length
     ? "Keine Karte passt zu diesem Filter."
-    : "Noch keine Karten. Fotografiere deine erste Karte im Tab „Scannen“.";
+    : "Noch keine Karten. Fotografiere deine erste Karte unter „Card Management“.";
   $("#coll-empty").style.display = rows.length ? "none" : "block";
   $("#tbl").style.display = rows.length ? "" : "none";
 

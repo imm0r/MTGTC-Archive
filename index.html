@@ -6,7 +6,7 @@
 <title>MTG Sammlung</title>
 <!-- ?v= bei jeder Änderung hochzählen: sonst servieren Browser (und der
      Cache von GitHub Pages) nach einem Push weiter die alten Dateien. -->
-<link rel="stylesheet" href="style.css?v=41">
+<link rel="stylesheet" href="style.css?v=42">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='14'>&#9670;</text></svg>">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
@@ -64,10 +64,9 @@
 <header>
   <h1>&#9670; MTG SAMMLUNG</h1>
   <nav>
-    <button data-v="scan" class="on">Scannen</button>
-    <button data-v="coll">Sammlung</button>
+    <button data-v="coll" class="on">Sammlung</button>
     <button data-v="decks">Decks</button>
-    <button data-v="more">Daten</button>
+    <button data-v="more">Card Management</button>
     <span id="who"></span>
     <button id="logout">Abmelden</button>
   </nav>
@@ -75,9 +74,48 @@
 
 <main>
 
-<!-- ---------------- Scannen ---------------- -->
-<section class="view on" id="v-scan">
+<!-- ---------------- Sammlung ---------------- -->
+<section class="view on" id="v-coll">
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stat"><div class="v" id="s-total">0</div><div class="k">Karten gesamt</div></div>
+    <div class="stat"><div class="v" id="s-uniq">0</div><div class="k">Verschiedene</div></div>
+    <div class="stat"><div class="v" id="s-val">0 €</div><div class="k">Marktwert</div></div>
+    <div class="stat"><div class="v" id="s-foil">0</div><div class="k">Foils</div></div>
+  </div>
   <div class="card">
+    <div class="row" style="margin-bottom:12px">
+      <div style="flex:2"><label>Suche</label><input type="text" id="q" placeholder="Name oder Set…"></div>
+      <div><label>Set</label><select id="f-set"><option value="">Alle</option></select></div>
+      <div><label>Ausführung</label><select id="f-foil">
+        <option value="">Alle</option><option value="1">Nur Foil</option><option value="0">Nur Normal</option></select></div>
+      <div style="flex:none"><button class="btn ghost" id="upd">Preise aktualisieren</button></div>
+    </div>
+    <div style="overflow-x:auto">
+      <!-- Kopf- und Datenzeilen erzeugt cardHead()/cardRow() in app.js —
+           dieselben Funktionen bedienen die Deck-Tabellen. -->
+      <table id="tbl"><thead></thead><tbody></tbody></table>
+    </div>
+    <div class="empty" id="coll-empty">Noch keine Karten. Fotografiere deine erste Karte unter „Card Management“.</div>
+  </div>
+</section>
+
+<!-- ---------------- Decks ---------------- -->
+<section class="view" id="v-decks">
+  <div class="card">
+    <div class="row">
+      <div><label>Neues Deck</label><input type="text" id="deck-name" placeholder="z. B. Mono Red Aggro"></div>
+      <div style="flex:none"><button class="btn" id="deck-add">Deck anlegen</button></div>
+    </div>
+  </div>
+  <div id="deck-list"></div>
+</section>
+
+<!-- ------------- Card Management (Scannen, Import, Export) ------------- -->
+<section class="view" id="v-more">
+
+  <!-- Scannen: der Hauptweg, Karten anzulegen — deshalb ganz oben. -->
+  <div class="card">
+    <h3 style="margin-top:0">Karten scannen</h3>
     <div class="row" style="margin-bottom:12px">
       <div><label>Sprache</label>
         <select id="d-lang">
@@ -102,46 +140,7 @@
     <p class="hint">Die Einstellungen oben gelten für alle neu gescannten Karten und lassen sich pro Karte nachträglich ändern.</p>
   </div>
   <div id="queue"></div>
-</section>
 
-<!-- ---------------- Sammlung ---------------- -->
-<section class="view" id="v-coll">
-  <div class="stats" style="margin-bottom:14px">
-    <div class="stat"><div class="v" id="s-total">0</div><div class="k">Karten gesamt</div></div>
-    <div class="stat"><div class="v" id="s-uniq">0</div><div class="k">Verschiedene</div></div>
-    <div class="stat"><div class="v" id="s-val">0 €</div><div class="k">Marktwert</div></div>
-    <div class="stat"><div class="v" id="s-foil">0</div><div class="k">Foils</div></div>
-  </div>
-  <div class="card">
-    <div class="row" style="margin-bottom:12px">
-      <div style="flex:2"><label>Suche</label><input type="text" id="q" placeholder="Name oder Set…"></div>
-      <div><label>Set</label><select id="f-set"><option value="">Alle</option></select></div>
-      <div><label>Ausführung</label><select id="f-foil">
-        <option value="">Alle</option><option value="1">Nur Foil</option><option value="0">Nur Normal</option></select></div>
-      <div style="flex:none"><button class="btn ghost" id="upd">Preise aktualisieren</button></div>
-    </div>
-    <div style="overflow-x:auto">
-      <!-- Kopf- und Datenzeilen erzeugt cardHead()/cardRow() in app.js —
-           dieselben Funktionen bedienen die Deck-Tabellen. -->
-      <table id="tbl"><thead></thead><tbody></tbody></table>
-    </div>
-    <div class="empty" id="coll-empty">Noch keine Karten. Fotografiere deine erste Karte im Tab „Scannen“.</div>
-  </div>
-</section>
-
-<!-- ---------------- Decks ---------------- -->
-<section class="view" id="v-decks">
-  <div class="card">
-    <div class="row">
-      <div><label>Neues Deck</label><input type="text" id="deck-name" placeholder="z. B. Mono Red Aggro"></div>
-      <div style="flex:none"><button class="btn" id="deck-add">Deck anlegen</button></div>
-    </div>
-  </div>
-  <div id="deck-list"></div>
-</section>
-
-<!-- ---------------- Daten ---------------- -->
-<section class="view" id="v-more">
   <div class="card">
     <h3 style="margin-top:0">Export &amp; Import</h3>
     <p class="hint" style="margin-top:0">Deine Sammlung liegt in deiner Supabase-Datenbank und ist auf allen
@@ -219,6 +218,6 @@
 <div id="hovercard"></div>
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=41"></script>
+<script src="app.js?v=42"></script>
 </body>
 </html>
