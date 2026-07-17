@@ -241,33 +241,109 @@ const imgOf = c => c.image_uris?.small || c.card_faces?.[0]?.image_uris?.small |
    ab; der Abgleich gegen Scryfall bleibt hier in der App. Fällt sie aus,
    übernimmt Tesseract weiter unten. */
 
-/* Verkleinern vor dem Versand: Ein 12-Megapixel-Handyfoto kostet ein
-   Vielfaches an Tokens, ohne dass der Aufdruck dadurch lesbarer würde. */
-function toJpegBase64(img, maxEdge = 1400, quality = 0.85) {
-  const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
+/* Ausschnitt in ein JPEG umrechnen. Ohne Ausschnittsangabe das ganze Bild. */
+function toJpegBase64(img, box, maxEdge = 1100, quality = 0.85) {
+  const b = box || { x: 0, y: 0, w: img.width, h: img.height };
+  const scale = Math.min(3, maxEdge / Math.max(b.w, b.h));   // kleine Ausschnitte dürfen hochskaliert werden
   const cv = document.createElement("canvas");
-  cv.width = Math.round(img.width * scale);
-  cv.height = Math.round(img.height * scale);
+  cv.width = Math.round(b.w * scale);
+  cv.height = Math.round(b.h * scale);
   const cx = cv.getContext("2d");
   cx.imageSmoothingQuality = "high";
-  cx.drawImage(img, 0, 0, cv.width, cv.height);
+  cx.drawImage(img, b.x, b.y, b.w, b.h, 0, 0, cv.width, cv.height);
   return cv.toDataURL("image/jpeg", quality).split(",")[1];
+}
+
+/* Die Karte im Foto finden. Auf Benjamins Bild liegt sie mittig auf hellem
+   Grund und füllt den Rahmen nicht — verkleinert man das ganze Foto, bleiben
+   vom Eckaufdruck 11 Pixel übrig und er wird unlesbar. Also erst die Karte
+   freistellen, dann hat der Ausschnitt die Auflösung, auf die es ankommt.
+
+   Verfahren: Randfarbe als Hintergrund annehmen, alle abweichenden Pixel
+   markieren, deren Bereich über Zeilen- und Spaltenprojektionen eingrenzen.
+   Schlägt es fehl (Karte füllt den Rahmen schon, oder Hintergrund ähnelt der
+   Karte), gibt es null zurück und wir nehmen das ganze Bild. */
+function findCardBounds(img) {
+  const W = 160, H = Math.max(1, Math.round(img.height * (W / img.width)));
+  const cv = document.createElement("canvas");
+  cv.width = W; cv.height = H;
+  const cx = cv.getContext("2d", { willReadFrequently: true });
+  cx.drawImage(img, 0, 0, W, H);
+  const d = cx.getImageData(0, 0, W, H).data;
+  const lum = (i) => 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+
+  // Hintergrund = Median der Randpixel
+  const rand = [];
+  for (let x = 0; x < W; x++) { rand.push(lum((0 * W + x) * 4)); rand.push(lum(((H - 1) * W + x) * 4)); }
+  for (let y = 0; y < H; y++) { rand.push(lum((y * W + 0) * 4)); rand.push(lum((y * W + W - 1) * 4)); }
+  rand.sort((a, b) => a - b);
+  const bg = rand[rand.length >> 1];
+
+  const spalte = new Array(W).fill(0), zeile = new Array(H).fill(0);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++)
+      if (Math.abs(lum((y * W + x) * 4) - bg) > 40) { spalte[x]++; zeile[y]++; }
+
+  // Grenze: eine Spalte/Zeile zählt, wenn 25 % ihrer Pixel abweichen
+  const grenze = (arr, len) => {
+    const min = len * 0.25;
+    let a = arr.findIndex(v => v >= min);
+    let b = arr.length - 1 - [...arr].reverse().findIndex(v => v >= min);
+    return a < 0 ? null : [a, b];
+  };
+  const gx = grenze(spalte, H), gy = grenze(zeile, W);
+  if (!gx || !gy) return null;
+
+  const f = img.width / W;
+  const box = {
+    x: Math.max(0, Math.round(gx[0] * f)),
+    y: Math.max(0, Math.round(gy[0] * f)),
+    w: Math.min(img.width, Math.round((gx[1] - gx[0] + 1) * f)),
+    h: Math.min(img.height, Math.round((gy[1] - gy[0] + 1) * f)),
+  };
+
+  // Plausibel? Magic-Karten sind hochkant, Seitenverhältnis ~0,72. Passt es
+  // nicht, war die Erkennung Unsinn — lieber das ganze Bild nehmen.
+  const anteil = (box.w * box.h) / (img.width * img.height);
+  const verhaeltnis = box.w / box.h;
+  if (anteil < 0.15 || verhaeltnis < 0.55 || verhaeltnis > 0.95) return null;
+  return box;
 }
 
 let visionAus = false;   // nach einem harten Fehler nicht bei jeder Karte erneut versuchen
 
 async function readWithVision(img) {
   if (visionAus) return null;
+
+  // Karte freistellen, wenn sie den Rahmen nicht füllt.
+  const karte = findCardBounds(img) || { x: 0, y: 0, w: img.width, h: img.height };
+
+  // Zweites Bild: die untere linke Ecke der Karte, kräftig vergrößert. Dort
+  // stehen Setcode und Nummer, und nur darauf kommt es an.
+  const ecke = {
+    x: karte.x,
+    y: karte.y + Math.round(karte.h * 0.86),
+    w: Math.round(karte.w * 0.62),
+    h: Math.round(karte.h * 0.14),
+  };
+
   const { data, error } = await sb.functions.invoke("scan-card", {
-    body: { image_b64: toJpegBase64(img), media_type: "image/jpeg" },
+    body: {
+      images: [
+        { b64: toJpegBase64(img, karte, 1100), media_type: "image/jpeg" },
+        { b64: toJpegBase64(img, ecke, 1100), media_type: "image/jpeg" },
+      ],
+    },
   });
   if (error) {
     const s = error.context?.status;
     let msg = "";
     try { msg = (await error.context.json()).error; } catch { /* kein JSON-Körper */ }
     // Diese Zustände ändern sich nicht von allein — für die Sitzung
-    // abschalten, statt es bei jeder Karte erneut zu versuchen.
-    if ([402, 404, 500, 502].includes(s)) {
+    // abschalten, statt es bei jeder Karte erneut zu versuchen. 400 gehört
+    // dazu: Es bedeutet, dass die ausgerollte Funktion älter ist als die App
+    // und das Format nicht kennt.
+    if ([400, 402, 404, 500, 502].includes(s)) {
       visionAus = true;
       toast(msg
         ? msg + " Weiter mit Texterkennung."

@@ -121,14 +121,23 @@ Deno.serve(async (req) => {
   const key = Deno.env.get("ANTHROPIC_API_KEY");
   if (!key) return json({ error: "ANTHROPIC_API_KEY ist nicht gesetzt" }, 500);
 
-  let image_b64: string, media_type: string;
+  const ERLAUBT = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+  let images: { b64: string; media_type: string }[];
   try {
     const body = await req.json();
-    image_b64 = body.image_b64;
-    media_type = body.media_type ?? "image/jpeg";
-    if (!image_b64) throw new Error("image_b64 fehlt");
-    if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(media_type))
-      throw new Error("Bildformat nicht unterstützt: " + media_type);
+    // Neu: images[] (Karte + Eckausschnitt). Alt: image_b64 — bleibt
+    // erlaubt, damit eine ältere App-Fassung nicht bricht.
+    images = Array.isArray(body.images) && body.images.length
+      ? body.images
+      : body.image_b64
+        ? [{ b64: body.image_b64, media_type: body.media_type ?? "image/jpeg" }]
+        : [];
+    if (!images.length) throw new Error("Kein Bild übergeben");
+    if (images.length > 2) throw new Error("Höchstens zwei Bilder");
+    for (const im of images) {
+      if (!im.b64) throw new Error("Bild ohne Daten");
+      if (!ERLAUBT.includes(im.media_type)) throw new Error("Bildformat nicht unterstützt: " + im.media_type);
+    }
   } catch (e) {
     return json({ error: (e as Error).message }, 400);
   }
@@ -143,8 +152,13 @@ Deno.serve(async (req) => {
       messages: [{
         role: "user",
         content: [
-          { type: "image", source: { type: "base64", media_type, data: image_b64 } },
-          { type: "text", text: "Lies diese Karte ab." },
+          ...images.map((im, i) => ([
+            { type: "text" as const, text: i === 0
+              ? "Bild 1 — die ganze Karte:"
+              : "Bild 2 — die untere linke Ecke derselben Karte, stark vergrößert. Lies die beiden Eckzeilen aus DIESEM Bild ab, es zeigt sie deutlich größer:" },
+            { type: "image" as const, source: { type: "base64" as const, media_type: im.media_type, data: im.b64 } },
+          ])).flat(),
+          { type: "text", text: "Schreib ab, was du siehst." },
         ],
       }],
     });
