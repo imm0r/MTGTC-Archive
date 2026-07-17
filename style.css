@@ -91,11 +91,13 @@ td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000
    oben stellt Kartenbilder auf display:block, und sie trifft auch diese
    Symbole — ohne Gegensteuer stünde jedes Manasymbol auf einer eigenen Zeile. */
 .mana{width:1em;height:1em;display:inline-block;vertical-align:-0.1em;margin-left:1px}
-/* Direkt hinter dem Namen, nicht an den rechten Rand der Spalte: dort stünden
-   sie an der Set-Spalte und läsen sich, als gehörten sie zu ihr. Auf der Karte
-   ist "oben rechts" eindeutig, in einer Tabelle ist es das nicht.
-   Kein flex: so bleibt der Name normaler Textfluss und darf umbrechen. */
+/* In der Detailansicht stehen die Kosten hinter dem Namen (kein flex: so bleibt
+   der Name normaler Textfluss und darf umbrechen). In den Tabellen haben sie
+   eine eigene, rechtsbündige Spalte — dort sortiert man nach ihnen. */
 .mana-kosten{margin-left:8px;white-space:nowrap}
+/* Die Spalte soll nur so breit sein wie ihr Inhalt, aber nicht bei jeder
+   Sortierung springen: 1% zwingt die Tabelle, sie auf den Inhalt zu schrumpfen. */
+.mana-spalte{width:1%}
 
 .stats{display:flex;gap:10px;flex-wrap:wrap}
 .stat{flex:1;min-width:130px;background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);padding:12px}

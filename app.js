@@ -581,7 +581,7 @@ async function addToCollection(card, el, detected) {
     p_cm_id: card.cardmarket_id ?? null,
     p_lang: lang, p_condition: cond, p_foil: foil, p_price: price,
     p_type_line: card.type_line ?? null, p_rarity: card.rarity ?? null,
-    p_mana_cost: manaOf(card)
+    p_mana_cost: manaOf(card), p_cmc: card.cmc ?? null
   });
   if (error) throw new Error(dbErr(error));
 
@@ -722,7 +722,11 @@ function filtered() {
     (!fs || c.set === fs) &&
     (ff === "" || String(c.foil ? 1 : 0) === ff)
   ).sort((a, b) => {
-    const g = c => sortKey === "value" ? (c.price || 0) * c.qty : c[sortKey];
+    // "Wert" wird gerechnet; "Mana" sortiert nach dem Manawert (cmc), nicht
+    // nach der Zeichenkette — sonst käme {10} vor {2}.
+    const g = c => sortKey === "value" ? (c.price || 0) * c.qty
+                 : sortKey === "mana"  ? c.cmc
+                 : c[sortKey];
     const x = g(a), y = g(b);
     if (typeof x === "string") return x.localeCompare(y) * sortDir;
     return ((x ?? 0) - (y ?? 0)) * sortDir;
@@ -752,6 +756,7 @@ function cardHead(imDeck) {
   return `<tr>
     <th class="hide-s"></th>
     <th${s("name")}>Karte</th>
+    <th${s("mana")} class="num">Mana</th>
     <th${s("set_name")} class="hide-s">Set</th>
     ${imDeck ? "" : `<th${s("lang")} class="hide-s">Spr.</th>
     <th${s("condition")} class="hide-s">Zust.</th>
@@ -772,12 +777,12 @@ function cardRow(c, o = {}) {
     <tr data-id="${c.id}"${imDeck ? ` data-deck="${esc(o.deckId)}"` : ""}>
       <td class="hide-s">${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy" data-view
              style="cursor:pointer" title="Großansicht &amp; Preisverlauf">` : ""}</td>
-      <td><div data-view class="name-zeile" style="cursor:pointer" title="Großansicht &amp; Preisverlauf"
-               >${esc(c.disp)}${c.mana_cost
-            ? `<span class="mana-kosten">${manaHtml(c.mana_cost)}</span>` : ""}</div>
+      <td><div data-view style="cursor:pointer" title="Großansicht &amp; Preisverlauf">${esc(c.disp)}</div>
           <div style="font-size:12px;color:var(--dim)">
             ${c.printed_name && c.printed_name !== c.name ? esc(c.name) + " &middot; " : ""}
             ${c.foil ? '<span class="pill foil">Foil</span> ' : ""}#${esc(c.cn)}</div></td>
+      <td class="num mana-spalte" title="${c.mana_cost == null ? "Manakosten nicht erfasst"
+        : `Manawert ${c.cmc ?? "?"}`}">${manaHtml(c.mana_cost)}</td>
       <td class="hide-s">${esc(c.set_name || c.set || "")}
           ${c.rarity ? `<div style="margin-top:3px">${rarityPill(c.rarity)}</div>` : ""}</td>
       ${imDeck ? "" : `<td class="hide-s">${esc((c.lang || "").toUpperCase())}</td>
@@ -949,6 +954,8 @@ async function nachtragen(c, fresh) {
     const m = manaOf(fresh);
     if (m != null) patch.mana_cost = m;
   }
+  // Auch hier "== null" und nicht "leer": Manawert 0 ist gültig (Länder).
+  if (c.cmc == null && fresh.cmc != null) patch.cmc = fresh.cmc;
   if (!Object.keys(patch).length) return;
   const { error } = await sb.from("cards").update(patch).eq("id", c.id);
   if (error) throw new Error(dbErr(error));
@@ -1223,6 +1230,7 @@ async function applyCardEdit(c, lang, cond, foil, neu) {
     // Dieselbe Karte kann je Auflage anders selten sein — mitziehen.
     patch.rarity = fresh.rarity ?? null;
     patch.mana_cost = manaOf(fresh);
+    patch.cmc = fresh.cmc ?? null;
   } else if (lang !== c.lang) {
     // Sprachwechsel: die sprachgenaue Auflage hat eine eigene Scryfall-ID,
     // eigenen gedruckten Namen und eigenes Bild. Gibt es sie nicht (viele
@@ -1458,10 +1466,10 @@ const csvCell = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
 function exportCsv() {
   const head = ["Name", "Name (englisch)", "Set", "Set-Code", "Nummer", "Seltenheit",
-                "Typzeile", "Manakosten", "Sprache", "Zustand", "Foil", "Anzahl",
-                "Preis EUR", "Wert EUR"];
+                "Typzeile", "Manakosten", "Manawert", "Sprache", "Zustand", "Foil",
+                "Anzahl", "Preis EUR", "Wert EUR"];
   const rows = CARDS.map(c => [c.disp, c.name, c.set_name, c.set, c.cn, c.rarity ?? "",
-    c.type_line ?? "", c.mana_cost ?? "", c.lang, c.condition,
+    c.type_line ?? "", c.mana_cost ?? "", c.cmc ?? "", c.lang, c.condition,
     c.foil ? "ja" : "nein", c.qty, c.price ?? "",
     c.price == null ? "" : (c.price * c.qty).toFixed(2)]);
   download(`mtg-sammlung-${today()}.csv`,
@@ -1487,9 +1495,9 @@ async function importJson(file) {
         p_lang: c.lang || "en", p_condition: c.condition || "NM",
         p_foil: !!c.foil, p_price: c.price ?? null,
         p_type_line: c.type_line ?? null, p_rarity: c.rarity ?? null,
-        // Aus der Sicherung, nicht von Scryfall: hier steht der Wert schon
+        // Aus der Sicherung, nicht von Scryfall: hier stehen die Werte schon
         // fertig in der Zeile — manaOf() erwartet eine Scryfall-Karte.
-        p_mana_cost: c.mana_cost ?? null
+        p_mana_cost: c.mana_cost ?? null, p_cmc: c.cmc ?? null
       });
       if (error) { bad++; break; } else ok++;
     }
@@ -1631,7 +1639,7 @@ async function importCsv(file) {
         cn: card.collector_number, img: imgOf(card),
         cm_id: card.cardmarket_id ?? null,
         type_line: card.type_line ?? null, rarity: card.rarity ?? null,
-        mana_cost: manaOf(card),
+        mana_cost: manaOf(card), cmc: card.cmc ?? null,
         lang, condition: cond, foil, qty, price,
         hist: price == null ? [] : [{ d: today(), v: price }],
       };
@@ -1754,7 +1762,7 @@ async function miImport() {
         p_cm_id: card.cardmarket_id ?? null,
         p_lang: lang, p_condition: cond, p_foil: foil, p_price: price,
         p_type_line: card.type_line ?? null, p_rarity: card.rarity ?? null,
-        p_mana_cost: manaOf(card),
+        p_mana_cost: manaOf(card), p_cmc: card.cmc ?? null,
       });
       if (error) { sag("✗ " + dbErr(error), "var(--err)"); fail++; continue; }
 
