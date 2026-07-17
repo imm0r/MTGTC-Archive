@@ -2660,21 +2660,20 @@ async function nameSpeichern() {
   } catch (e) { toast(dbErr(e)); }
 }
 
-/* Avatar clientseitig auf 256px quadratisch verkleinern (spart Speicher, lädt
-   schnell), in den eigenen Ordner hochladen (fester Pfad + upsert). Die
-   gespeicherte URL trägt einen Zeitstempel gegen den Browser-Cache. */
+/* Avatar clientseitig auf 256px quadratisch verkleinern und als Data-URI DIREKT
+   in profiles.avatar_url ablegen — bewusst NICHT über Supabase Storage. Dessen
+   Upload kam mit dem publishable-Key (sb_…) unauthentifiziert an (auth.uid()
+   null → RLS „new row violates…"), während der Tabellen-Weg über dieselbe
+   funktionierende Anmeldung läuft wie der ganze Rest der App. Ein 256er-JPEG
+   ist mit ~20–30 KB klein genug für die Spalte. */
 async function avatarHochladen(file) {
   if (!file.type.startsWith("image/")) return toast("Bitte ein Bild wählen.");
-  if (file.size > 8 * 1024 * 1024) return toast("Bild ist zu groß (max. 8 MB).");
+  if (file.size > 12 * 1024 * 1024) return toast("Bild ist zu groß (max. 12 MB).");
   try {
-    const blob = await bildQuadratisch(file, 256);
-    const pfad = `${USER.id}/avatar`;
-    const up = await sb.storage.from("avatars").upload(pfad, blob, { upsert: true, contentType: "image/png" });
-    if (up.error) throw up.error;
-    const url = sb.storage.from("avatars").getPublicUrl(pfad).data.publicUrl + "?t=" + Date.now();
-    const { error } = await sb.from("profiles").update({ avatar_url: url }).eq("id", USER.id);
+    const dataUrl = await bildDataUrl(file, 256);
+    const { error } = await sb.from("profiles").update({ avatar_url: dataUrl }).eq("id", USER.id);
     if (error) throw error;
-    PROFILE.avatar_url = url;
+    PROFILE.avatar_url = dataUrl;
     renderWho(); renderProfile();
     toast("Avatar aktualisiert");
   } catch (e) { toast(dbErr(e)); }
@@ -2682,7 +2681,6 @@ async function avatarHochladen(file) {
 
 async function avatarEntfernen() {
   try {
-    await sb.storage.from("avatars").remove([`${USER.id}/avatar`]);
     const { error } = await sb.from("profiles").update({ avatar_url: null }).eq("id", USER.id);
     if (error) throw error;
     PROFILE.avatar_url = null;
@@ -2691,8 +2689,10 @@ async function avatarEntfernen() {
   } catch (e) { toast(dbErr(e)); }
 }
 
-/* Bild mittig quadratisch beschneiden und auf kante×kante zeichnen → PNG-Blob. */
-function bildQuadratisch(file, kante) {
+/* Bild mittig quadratisch beschneiden, auf kante×kante zeichnen und als
+   JPEG-Data-URI zurückgeben. Das mittige Beschneiden füllt das Quadrat ganz,
+   daher entsteht keine Transparenz, die JPEG schwärzen würde. */
+function bildDataUrl(file, kante) {
   return new Promise((res, rej) => {
     const img = new Image();
     img.onload = () => {
@@ -2701,7 +2701,7 @@ function bildQuadratisch(file, kante) {
       const cv = document.createElement("canvas");
       cv.width = cv.height = kante;
       cv.getContext("2d").drawImage(img, sx, sy, seite, seite, 0, 0, kante, kante);
-      cv.toBlob(b => b ? res(b) : rej(new Error("Bild konnte nicht verarbeitet werden.")), "image/png");
+      res(cv.toDataURL("image/jpeg", 0.85));
     };
     img.onerror = () => rej(new Error("Bild konnte nicht gelesen werden."));
     img.src = URL.createObjectURL(file);
