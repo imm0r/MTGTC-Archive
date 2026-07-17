@@ -150,17 +150,26 @@ begin
   return r;
 end $$;
 
--- ------------------------------- Hauptkarte muss legendär sein
+-- ------------- Hauptkarte muss legendäre Kreatur oder Planeswalker sein
 -- Die Regel steht in der Datenbank, nicht in der App: eine Regel in der
 -- Datenbank ist prüfbar, dieselbe Regel im Client ist eine Bitte. Kein
 -- Import und kein direkter Zugriff kann sie umgehen.
+--
+-- Geprüft wird nur die VORDERSEITE (alles vor "//"): Mit ihr startet der
+-- Commander. "Legendary Enchantment — Aura // Legendary Land" ist deshalb
+-- keiner, obwohl die Rückseite legendär ist.
+--
+-- "Legendary Artifact Creature — Wizard" (Memnarch) besteht dagegen: er ist
+-- eine Kreatur. Deshalb ilike '%creature%' statt eines Präfix-Vergleichs.
 create or replace function public.check_main_card_legendary()
 returns trigger
 language plpgsql
 security invoker
 set search_path = public
 as $$
-declare tl text;
+declare
+  tl text;
+  vorderseite text;
 begin
   if new.main_card_id is null then return new; end if;
 
@@ -172,8 +181,15 @@ begin
       using errcode = 'check_violation';
   end if;
 
-  if tl not ilike '%legendary%' then
+  vorderseite := split_part(tl, '//', 1);
+
+  if vorderseite not ilike '%legendary%' then
     raise exception 'Nur legendäre Karten können Hauptkarte sein (diese ist: %)', tl
+      using errcode = 'check_violation';
+  end if;
+
+  if vorderseite not ilike '%creature%' and vorderseite not ilike '%planeswalker%' then
+    raise exception 'Eine Hauptkarte muss eine legendäre Kreatur oder ein legendärer Planeswalker sein (diese ist: %)', tl
       using errcode = 'check_violation';
   end if;
 

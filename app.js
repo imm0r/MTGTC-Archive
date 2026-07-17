@@ -796,9 +796,9 @@ function cardRow(c, o = {}) {
         ${imDeck
           // Bearbeiten und Preis stehen im Deck in der Detailansicht — hier
           // nur, was das Deck betrifft: Hauptkarte und Zuordnung lösen.
-          // Der Stern erscheint nur bei legendären Karten; die Regel selbst
+          // Der Stern erscheint nur bei möglichen Commandern; die Regel selbst
           // erzwingt ein Trigger in der Datenbank.
-          ? (istLegendaer(c)
+          ? (istCommanderFaehig(c)
             ? `<button class="btn ghost sm${o.istHaupt ? " star-on" : ""}" data-main
               title="${o.istHaupt ? "Ist die Hauptkarte — nochmal klicken zum Entfernen"
                                   : "Als Hauptkarte des Decks setzen"}">${o.istHaupt ? "&#9733;" : "&#9734;"}</button>`
@@ -1216,10 +1216,24 @@ const deckOffen = {
   },
 };
 
-/* Scryfalls type_line ist immer englisch ("Legendary Creature — Alien"),
-   auch bei deutschen Auflagen — deshalb prüft das eine Wort sprachunabhängig.
-   Karten ohne bekannte Typzeile gelten nicht als legendär: nicht raten. */
-const istLegendaer = c => /legendary/i.test(c?.type_line || "");
+/* Ein Commander muss eine legendäre Kreatur oder ein legendärer Planeswalker
+   sein — legendäre Artefakte, Länder und Hexereien zählen nicht.
+
+   Geprüft wird nur die Vorderseite (alles vor "//"): mit ihr startet der
+   Commander. "Legendary Enchantment — Aura // Legendary Land" ist deshalb
+   keiner, "Legendary Artifact Creature — Wizard" (Memnarch) dagegen schon.
+
+   Scryfalls type_line ist immer englisch, auch bei deutschen Auflagen —
+   deshalb prüfen diese Wörter sprachunabhängig. Karten ohne bekannte
+   Typzeile fallen durch: nicht raten.
+
+   Dieselbe Regel erzwingt ein Trigger in der Datenbank; hier steuert sie
+   nur, ob der Stern überhaupt erscheint. */
+const istCommanderFaehig = c => {
+  const vorderseite = (c?.type_line || "").split("//")[0];
+  return /legendary/i.test(vorderseite) &&
+         /creature|planeswalker/i.test(vorderseite);
+};
 
 async function setMainCard(deckId, cardId) {
   const d = DECKS.find(x => x.id === deckId);
@@ -1230,10 +1244,10 @@ async function setMainCard(deckId, cardId) {
     // Fehlt die Spalte, ist das Schema älter als die App.
     if (error.code === "42703" || /main_card_id/.test(error.message || ""))
       return toast("Spalte fehlt — bitte supabase-schema.sql neu ausführen.");
-    // Der Trigger lehnt nicht-legendäre Karten ab; seine Meldung ist bereits
+    // Der Trigger lehnt ungeeignete Karten ab; seine Meldung ist bereits
     // für Menschen geschrieben, also unverändert durchreichen. (Sie enthält
     // selbst einen Doppelpunkt — ein Präfix-Abschneider fräße den halben Satz.)
-    if (error.code === "23514" || /legendär|Typzeile/i.test(error.message || ""))
+    if (error.code === "23514" || /legendär|Typzeile|Hauptkarte/i.test(error.message || ""))
       return toast(error.message);
     return toast(dbErr(error));
   }
