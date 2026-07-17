@@ -422,9 +422,16 @@ function preprocessCorner(img) {
 /* Die Sprachen, die die App führt. Der Schlüssel ist IMMER der
    Scryfall-Code, nicht der auf der Karte gedruckte — die beiden gehen
    auseinander, siehe unten. Steht hier oben, weil parseCorner es braucht:
-   const wird nicht hochgezogen, ein Zugriff vor der Deklaration stürzt ab. */
+   const wird nicht hochgezogen, ein Zugriff vor der Deklaration stürzt ab.
+   Diese Liste ist die einzige Quelle dafür, welche Sprache wir kennen: sie
+   speist die Namen, die Auswahl beim Bearbeiten und die Prüfung in
+   sprachCode(). */
 const LANG_NAMES = { de: "Deutsch", en: "Englisch", fr: "Französisch", it: "Italienisch",
-  es: "Spanisch", ja: "Japanisch", pt: "Portugiesisch", ru: "Russisch", ko: "Koreanisch" };
+  es: "Spanisch", ja: "Japanisch", pt: "Portugiesisch", ru: "Russisch", ko: "Koreanisch",
+  zhs: "Chinesisch (vereinfacht)", zht: "Chinesisch (traditionell)",
+  // Phyrexianisch gibt es wirklich — 49 Karten bei Scryfall, gedruckt "PH".
+  // Eine Flagge bekommt es nicht: Phyrexia ist eine Ebene, kein Land.
+  ph: "Phyrexianisch" };
 
 /* Der auf die Karte GEDRUCKTE Sprachcode ist nicht immer Scryfalls Code.
    Belegt an Scryfall selbst: "lang:jp" und "lang:ja" liefern dieselben 30049
@@ -439,12 +446,12 @@ const LANG_NAMES = { de: "Deutsch", en: "Englisch", fr: "Französisch", it: "Ita
    Scryfall identisch. */
 const GEDRUCKT_ZU_SCRYFALL = { jp: "ja", cs: "zhs", ct: "zht" };
 
-/* Die Sprachen, die wir zu deuten wagen. Liest die Erkennung etwas anderes
-   aus der Ecke — verwackelt, verkratzt, oder eine Sprache, die wir nicht
-   führen (Hebräisch, Phyrexianisch) —, kommt null zurück und identify()
-   nimmt die im Dropdown gewählte Sprache. Lieber die Angabe des Nutzers als
-   ein erfundener Code in der Datenbank. */
-const SCRYFALL_LANGS = new Set([...Object.keys(LANG_NAMES), "zhs", "zht"]);
+/* Die Sprachen, die wir zu deuten wagen — genau die aus LANG_NAMES, keine
+   zweite Liste daneben. Liest die Erkennung etwas anderes aus der Ecke
+   (verwackelt, verkratzt, oder eine Sprache, die wir nicht führen), kommt
+   null zurück und identify() nimmt die im Dropdown gewählte Sprache. Lieber
+   die Angabe des Nutzers als ein erfundener Code in der Datenbank. */
+const SCRYFALL_LANGS = new Set(Object.keys(LANG_NAMES));
 
 function sprachCode(gedruckt) {
   const l = (gedruckt || "").toLowerCase();
@@ -1151,15 +1158,24 @@ function flaggeHtml(lang, dekorativ = false) {
                aria-label="${esc(name)}"><title>${esc(name)}</title>${f}</svg>`;
 }
 
-/* Die Sprache für die Tabellenspalte. Unbekannte Codes bekommen KEINE
-   Flagge, sondern den Code im Klartext: eine geratene Flagge würde einen
-   Datenfehler in eine scheinbar saubere Angabe verwandeln. So bleibt
-   sichtbar, dass da etwas nicht stimmt — z. B. das ungültige "JP". */
+/* Die Sprache für die Tabellenspalte. Drei Fälle, und sie auseinanderzuhalten
+   ist der Punkt:
+   1. Sprache mit Flagge → Flagge.
+   2. Sprache OHNE Flagge (Phyrexianisch — eine Ebene, kein Land; Chinesisch,
+      dessen Flaggen noch keiner gebraucht hat) → neutrale Pille mit dem Code.
+      Die Angabe ist richtig, uns fehlt nur das Bild. Eine geratene Flagge
+      wäre hier falsch, eine rote Fehlerpille eine Lüge über die Daten.
+   3. Kein Scryfall-Code (z. B. das ungültige "JP") → rote Pille. Hier stimmt
+      wirklich etwas nicht, und das soll man sehen. */
 function langHtml(lang) {
   const l = (lang || "").toLowerCase();
-  return flaggeHtml(l) ||
-    `<span class="pill err" title="Kein Scryfall-Sprachcode: ${esc(l.toUpperCase())}"
-           >${esc(l.toUpperCase() || "?")}</span>`;
+  const flagge = flaggeHtml(l);
+  if (flagge) return flagge;
+  const name = LANG_NAMES[l];
+  if (name) return `<span class="pill" title="${esc(name)} — dafür haben wir keine Flagge"
+                          >${esc(l.toUpperCase())}</span>`;
+  return `<span class="pill err" title="Kein Scryfall-Sprachcode: ${esc(l.toUpperCase())}"
+                >${esc(l.toUpperCase() || "?")}</span>`;
 }
 
 /* --------------------------------------------------- Manakosten ------ */
