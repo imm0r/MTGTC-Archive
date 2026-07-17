@@ -6,7 +6,7 @@
 <title>MTG Sammlung</title>
 <!-- ?v= bei jeder Änderung hochzählen: sonst servieren Browser (und der
      Cache von GitHub Pages) nach einem Push weiter die alten Dateien. -->
-<link rel="stylesheet" href="style.css?v=46">
+<link rel="stylesheet" href="style.css?v=50">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='14'>&#9670;</text></svg>">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
@@ -76,12 +76,9 @@
 
 <!-- ---------------- Sammlung ---------------- -->
 <section class="view on" id="v-coll">
-  <div class="stats" style="margin-bottom:14px">
-    <div class="stat"><div class="v" id="s-total">0</div><div class="k">Karten gesamt</div></div>
-    <div class="stat"><div class="v" id="s-uniq">0</div><div class="k">Verschiedene</div></div>
-    <div class="stat"><div class="v" id="s-val">0 €</div><div class="k">Marktwert</div></div>
-    <div class="stat"><div class="v" id="s-foil">0</div><div class="k">Foils</div></div>
-  </div>
+  <!-- Kennzahlen und Diagramme baut renderDash() in app.js — sie folgen dem
+       Filter der Tabelle darunter. -->
+  <div id="dash"></div>
   <div class="card">
     <div class="row" style="margin-bottom:12px">
       <div style="flex:2"><label>Suche</label><input type="text" id="q" placeholder="Name oder Set…"></div>
@@ -218,6 +215,6 @@
 <div id="hovercard"></div>
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=46"></script>
+<script src="app.js?v=50"></script>
 </body>
 </html>

@@ -625,7 +625,7 @@ async function addToCollection(card, el, detected) {
     p_lang: lang, p_condition: cond, p_foil: foil, p_price: price,
     p_type_line: card.type_line ?? null, p_rarity: card.rarity ?? null,
     p_mana_cost: manaOf(card), p_cmc: card.cmc ?? null,
-    p_released: card.released_at ?? null
+    p_released: card.released_at ?? null, p_colors: farbenOf(card)
   });
   if (error) throw new Error(dbErr(error));
 
@@ -966,12 +966,176 @@ function wireCardRows(root) {
   });
 }
 
+/* ============================== Dashboard ============================= */
+/* Alle Auswertungen folgen dem Filter der Tabelle darunter. Ohne Filter ist
+   das die ganze Sammlung; mit Filter sieht man die Statistik genau der
+   Karten, die man gerade betrachtet ("Manakurve meiner grünen Karten").
+   Damit niemand über eine gesunkene Summe erschrickt, sagt eine Zeile
+   ausdrücklich, wenn gefiltert wird.
+   Gezählt werden STÜCK (qty), nicht Zeilen: vier Wälder sind vier Karten. */
+
+const FARB_INFO = {
+  W: { name: "Weiß",    farbe: "#f7e7b8" },
+  U: { name: "Blau",    farbe: "#8ec7ea" },
+  B: { name: "Schwarz", farbe: "#9d93a3" },
+  R: { name: "Rot",     farbe: "#ee8b6f" },
+  G: { name: "Grün",    farbe: "#79c497" },
+};
+
+/* Die Kartentypen, die auf der Vorderseite stehen können. Eine Karte kann
+   mehrere haben ("Legendary Artifact Creature") und zählt dann überall mit —
+   die Summe ist deshalb größer als die Kartenzahl, was am Diagramm steht.
+   type_line ist immer englisch, die Prüfung also sprachunabhängig. */
+const TYPEN = [
+  ["Creature", "Kreaturen"], ["Land", "Länder"], ["Instant", "Spontanzauber"],
+  ["Sorcery", "Hexereien"], ["Artifact", "Artefakte"], ["Enchantment", "Verzauberungen"],
+  ["Planeswalker", "Planeswalker"], ["Battle", "Schlachten"],
+];
+
+const istLand = c => /(^|\/\/\s*)[^/]*\bland\b/i.test(c.type_line || "");
+
+function balkenHtml(daten, hinweis) {
+  if (!daten.length) return '<div class="empty" style="padding:14px">Nichts auszuwerten.</div>';
+  const max = Math.max(1, ...daten.map(d => d.wert));
+  return `<div class="balken">${daten.map(d => `
+    <div class="balken-zeile" title="${esc(d.label)}: ${esc(String(d.text ?? d.wert))}">
+      <div class="balken-label">${d.icon || ""}<span>${esc(d.label)}</span></div>
+      <div class="balken-spur"><i style="width:${(d.wert / max * 100).toFixed(1)}%${
+        d.farbe ? `;background:${d.farbe}` : ""}"></i></div>
+      <div class="balken-wert">${esc(String(d.text ?? d.wert))}</div>
+    </div>`).join("")}</div>${hinweis ? `<p class="hint">${hinweis}</p>` : ""}`;
+}
+
+/* ans_ende: bei vielen Säulen rollt der Kasten waagerecht. Die Jahrgänge
+   sollen dann beim NEUESTEN stehen — dort liegt fast die ganze Sammlung,
+   und links stünden sonst 1994 bis 2004 mit je ein paar Karten im Bild,
+   während der volle Teil unsichtbar bleibt. */
+function saeulenHtml(daten, hinweis, ans_ende) {
+  if (!daten.length) return '<div class="empty" style="padding:14px">Nichts auszuwerten.</div>';
+  const max = Math.max(1, ...daten.map(d => d.wert));
+  return `<div class="saeulen"${ans_ende ? " data-ans-ende" : ""}>${daten.map(d => `
+    <div class="saeule" title="${esc(d.label)}: ${d.wert}">
+      <div class="saeule-zahl">${d.wert || ""}</div>
+      <div class="saeule-spur"><i style="height:${d.wert ? Math.max(2, d.wert / max * 100) : 0}%"></i></div>
+      <div class="saeule-label">${esc(d.label)}</div>
+    </div>`).join("")}</div>${hinweis ? `<p class="hint">${hinweis}</p>` : ""}`;
+}
+
+const karte = (titel, inhalt) =>
+  `<div class="card"><h3 style="margin:0 0 10px">${esc(titel)}</h3>${inhalt}</div>`;
+
+function renderDash(rows) {
+  const stueck = cs => cs.reduce((s, c) => s + c.qty, 0);
+  const wert   = cs => cs.reduce((s, c) => s + (c.price || 0) * c.qty, 0);
+  const n = stueck(rows), gesamtwert = wert(rows);
+  const gefiltert = rows.length !== CARDS.length;
+
+  // ---- Kennzahlen
+  const ohneLand = rows.filter(c => !istLand(c) && c.cmc != null);
+  const mwSumme = ohneLand.reduce((s, c) => s + Number(c.cmc) * c.qty, 0);
+  const mwAnzahl = stueck(ohneLand);
+  const jahre = rows.map(c => c.released && c.released.slice(0, 4)).filter(Boolean).sort();
+  const teuerste = [...rows].filter(c => c.price != null).sort((a, b) => b.price - a.price);
+
+  const kennzahlen = [
+    ["Karten gesamt", n],
+    ["Verschiedene", new Set(rows.map(c => c.oracle_id)).size],
+    ["Marktwert", eur(gesamtwert)],
+    ["Ø je Karte", eur(n ? gesamtwert / n : 0)],
+    ["Foils", stueck(rows.filter(c => c.foil))],
+    ["Sets", new Set(rows.map(c => c.set)).size],
+    // toFixed gibt "3.64" — im Deutschen gehört da ein Komma hin.
+    ["Ø Manawert", mwAnzahl ? (mwSumme / mwAnzahl).toFixed(2).replace(".", ",") : "–"],
+    ["Jahrgänge", jahre.length ? `${jahre[0]}–${jahre[jahre.length - 1]}` : "–"],
+  ];
+
+  // ---- Manakurve: ohne Länder, denn die kosten nichts und würden die
+  //      Kurve bei 0 aufblähen. So macht man es in Magic überall.
+  const maxCmc = Math.max(0, ...ohneLand.map(c => Number(c.cmc)));
+  const kurve = [];
+  for (let i = 0; i <= Math.min(maxCmc, 9); i++)
+    kurve.push({ label: String(i), wert: stueck(ohneLand.filter(c => Number(c.cmc) === i)) });
+  if (maxCmc > 9) kurve.push({ label: "10+", wert: stueck(ohneLand.filter(c => Number(c.cmc) >= 10)) });
+
+  // ---- Farben. Mehrfarbige zählen bei JEDER ihrer Farben mit — die Frage
+  //      lautet "wie viel Schwarz habe ich", nicht "wie viele Karten sind
+  //      genau schwarz". Deshalb steht die Summe nicht auf 100 %.
+  const mitFarbe = rows.filter(c => Array.isArray(c.colors));
+  const farbBalken = Object.entries(FARB_INFO).map(([k, v]) => ({
+    label: v.name, farbe: v.farbe,
+    wert: stueck(mitFarbe.filter(c => c.colors.includes(k))),
+    icon: `<img class="mana" src="https://svgs.scryfall.io/card-symbols/${k}.svg" alt="">`,
+  }));
+  farbBalken.push({ label: "Farblos", farbe: "#b9bdc9",
+    wert: stueck(mitFarbe.filter(c => c.colors.length === 0)),
+    icon: `<img class="mana" src="https://svgs.scryfall.io/card-symbols/C.svg" alt="">` });
+  farbBalken.push({ label: "Mehrfarbig", farbe: "#d9b64e",
+    wert: stueck(mitFarbe.filter(c => c.colors.length > 1)) });
+
+  // ---- Seltenheit, Typen, Sprachen, Zustand, Sets, Jahre
+  const seltenheit = Object.entries(RARITY)
+    .map(([k, v]) => ({ label: v.text, farbe: v.farbe, wert: stueck(rows.filter(c => c.rarity === k)) }))
+    .filter(d => d.wert);
+
+  const typen = TYPEN
+    .map(([en, de]) => ({ label: de,
+      wert: stueck(rows.filter(c => new RegExp(`(^|//\\s*)[^/]*\\b${en}\\b`, "i").test(c.type_line || ""))) }))
+    .filter(d => d.wert).sort((a, b) => b.wert - a.wert);
+
+  const sprachen = [...new Set(rows.map(c => c.lang))]
+    .map(l => ({ label: LANG_NAMES[l] || (l || "?").toUpperCase(), icon: flaggeHtml(l, true),
+                 wert: stueck(rows.filter(c => c.lang === l)) }))
+    .sort((a, b) => b.wert - a.wert);
+
+  const zustand = ["NM", "LP", "MP", "HP", "DMG"]
+    .map(z => ({ label: z, wert: stueck(rows.filter(c => c.condition === z)) })).filter(d => d.wert);
+
+  const topSets = Object.entries(rows.reduce((m, c) => {
+      const k = c.set_name || c.set || "?"; m[k] = (m[k] || 0) + c.qty; return m;
+    }, {})).sort((a, b) => b[1] - a[1]).slice(0, 8)
+    .map(([label, wert]) => ({ label, wert }));
+
+  const proJahr = Object.entries(rows.reduce((m, c) => {
+      if (!c.released) return m;
+      const j = c.released.slice(0, 4); m[j] = (m[j] || 0) + c.qty; return m;
+    }, {})).sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([label, wert]) => ({ label, wert }));
+
+  const topWert = teuerste.slice(0, 10).map(c => ({
+    label: c.disp, wert: c.price * c.qty,
+    text: c.qty > 1 ? `${eur(c.price)} × ${c.qty}` : eur(c.price) }));
+
+  // ---- Zusammenbauen
+  $("#dash").innerHTML = `
+    <div class="stats" style="margin-bottom:14px">
+      ${kennzahlen.map(([k, v]) =>
+        `<div class="stat"><div class="v">${esc(String(v))}</div><div class="k">${esc(k)}</div></div>`).join("")}
+    </div>
+    ${gefiltert ? `<p class="hint" style="margin:-6px 0 12px">
+      &#9432; Alle Auswertungen zeigen nur die ${n} gefilterten Karten — Filter leeren für die ganze Sammlung.</p>` : ""}
+    <div class="dash-raster">
+      ${karte("Manakurve", saeulenHtml(kurve,
+        "Ohne Länder — sie kosten nichts und würden die Null aufblähen. X zählt als 0."))}
+      ${karte("Farben", balkenHtml(farbBalken,
+        "Mehrfarbige Karten zählen bei jeder ihrer Farben mit; die Summe liegt deshalb über der Kartenzahl."))}
+      ${karte("Seltenheit", balkenHtml(seltenheit))}
+      ${karte("Kartentypen", balkenHtml(typen,
+        "Eine Karte kann mehrere Typen haben (z.&nbsp;B. Artefaktkreatur) und zählt dann mehrfach."))}
+      ${karte("Wertvollste Karten", balkenHtml(topWert))}
+      ${karte("Erscheinungsjahre", saeulenHtml(proJahr, "", true))}
+      ${karte("Größte Sets", balkenHtml(topSets))}
+      ${karte("Sprachen", balkenHtml(sprachen))}
+      ${karte("Zustand", balkenHtml(zustand))}
+    </div>`;
+
+  // Muss nach dem Einhängen passieren: vorher hat der Kasten keine Breite
+  // und scrollLeft bliebe wirkungslos.
+  $$("#dash [data-ans-ende]").forEach(el => el.scrollLeft = el.scrollWidth);
+}
+
 function renderCollection() {
   const rows = filtered();
-  $("#s-total").textContent = CARDS.reduce((s, c) => s + c.qty, 0);
-  $("#s-uniq").textContent  = new Set(CARDS.map(c => c.oracle_id)).size;
-  $("#s-val").textContent   = eur(CARDS.reduce((s, c) => s + (c.price || 0) * c.qty, 0));
-  $("#s-foil").textContent  = CARDS.filter(c => c.foil).reduce((s, c) => s + c.qty, 0);
+  renderDash(rows);
 
   const sets = [...new Set(CARDS.map(c => c.set))].filter(Boolean).sort();
   const cur = $("#f-set").value;
@@ -1020,6 +1184,24 @@ const manaOf = card => {
   return echte.length ? echte.join(" // ") : "";       // alle Seiten frei = kostet nichts
 };
 
+/* Farben einer Scryfall-Karte. Wie bei manaOf: einseitige Karten tragen
+   colors oben, doppelseitige je Seite. [] heißt farblos (eine Aussage),
+   null heißt "wissen wir nicht".
+   Bei mehreren Seiten wird VEREINIGT: "Westvale Abbey // Ormendahl" ist vorn
+   ein farbloses Land und hinten eine schwarze Kreatur. Für die Frage "wie
+   viel Schwarz habe ich?" zählt sie als schwarz — sie kann Schwarz auf den
+   Tisch bringen.
+   Abgeleitet wird hier nichts: die Farbe folgt nicht aus den Manakosten
+   (Devoid, Tokens, Abenteuer), das steht in add_colors ausführlich. */
+const farbenOf = card => {
+  if (Array.isArray(card?.colors)) return [...card.colors].sort();
+  const seiten = card?.card_faces;
+  if (!Array.isArray(seiten) || !seiten.length) return null;
+  const angaben = seiten.map(f => f.colors).filter(Array.isArray);
+  if (!angaben.length) return null;
+  return [...new Set(angaben.flat())].sort();
+};
+
 /* Trägt nach, was der Karte fehlt. Bestände aus der Zeit vor den Spalten
    type_line/rarity/mana_cost haben sie leer — und ohne Typzeile lehnt der
    Trigger die Karte als Hauptkarte ab und verweist dafür genau hierher
@@ -1041,6 +1223,11 @@ async function nachtragen(c, fresh) {
   // Auch hier "== null" und nicht "leer": Manawert 0 ist gültig (Länder).
   if (c.cmc == null && fresh.cmc != null) patch.cmc = fresh.cmc;
   if (!c.released && fresh.released_at) patch.released = fresh.released_at;
+  // Wieder "== null" und nicht "leer": [] ist gültig (farblose Karte).
+  if (c.colors == null) {
+    const f = farbenOf(fresh);
+    if (f != null) patch.colors = f;
+  }
   if (!Object.keys(patch).length) return;
   const { error } = await sb.from("cards").update(patch).eq("id", c.id);
   if (error) throw new Error(dbErr(error));
@@ -1407,6 +1594,7 @@ async function applyCardEdit(c, lang, cond, foil, neu) {
     patch.cmc = fresh.cmc ?? null;
     // Andere Auflage = anderes Set = anderes Erscheinungsdatum.
     patch.released = fresh.released_at ?? null;
+    patch.colors = farbenOf(fresh);
   } else if (lang !== c.lang) {
     // Sprachwechsel: die sprachgenaue Auflage hat eine eigene Scryfall-ID,
     // eigenen gedruckten Namen und eigenes Bild. Gibt es sie nicht (viele
@@ -1721,7 +1909,7 @@ async function importJson(file) {
         // Aus der Sicherung, nicht von Scryfall: hier stehen die Werte schon
         // fertig in der Zeile — manaOf() erwartet eine Scryfall-Karte.
         p_mana_cost: c.mana_cost ?? null, p_cmc: c.cmc ?? null,
-        p_released: c.released ?? null
+        p_released: c.released ?? null, p_colors: c.colors ?? null
       });
       if (error) { bad++; break; } else ok++;
     }
@@ -1864,7 +2052,7 @@ async function importCsv(file) {
         cm_id: card.cardmarket_id ?? null,
         type_line: card.type_line ?? null, rarity: card.rarity ?? null,
         mana_cost: manaOf(card), cmc: card.cmc ?? null,
-        released: card.released_at ?? null,
+        released: card.released_at ?? null, colors: farbenOf(card),
         lang, condition: cond, foil, qty, price,
         hist: price == null ? [] : [{ d: today(), v: price }],
       };
@@ -1988,7 +2176,7 @@ async function miImport() {
         p_lang: lang, p_condition: cond, p_foil: foil, p_price: price,
         p_type_line: card.type_line ?? null, p_rarity: card.rarity ?? null,
         p_mana_cost: manaOf(card), p_cmc: card.cmc ?? null,
-        p_released: card.released_at ?? null,
+        p_released: card.released_at ?? null, p_colors: farbenOf(card),
       });
       if (error) { sag("✗ " + dbErr(error), "var(--err)"); fail++; continue; }
 

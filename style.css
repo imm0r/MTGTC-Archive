@@ -110,6 +110,33 @@ td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000
 .stat{flex:1;min-width:130px;background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);padding:12px}
 .stat .v{font-size:22px;font-weight:700;color:var(--acc);font-variant-numeric:tabular-nums}
 .stat .k{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
+
+/* ----------------------------------------------------- Dashboard ----- */
+/* Zwei Spalten, sobald Platz ist. auto-fit statt fester Spaltenzahl: auf dem
+   Handy wird von selbst eine daraus, ohne zweiten Umbruchpunkt im CSS. */
+.dash-raster{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.dash-raster .card{margin-bottom:0}
+
+/* Waagerechte Balken: Beschriftung | Spur | Zahl. Die Spur nimmt den Rest. */
+.balken{display:flex;flex-direction:column;gap:7px}
+.balken-zeile{display:flex;align-items:center;gap:8px;font-size:13px}
+.balken-label{display:flex;align-items:center;gap:5px;width:38%;min-width:0;color:var(--dim)}
+.balken-label span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.balken-spur{flex:1;height:9px;background:var(--panel2);border-radius:5px;overflow:hidden}
+.balken-spur i{display:block;height:100%;background:var(--acc);border-radius:5px;
+  transition:width .3s}
+.balken-wert{width:76px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* Senkrechte Säulen (Manakurve, Jahrgänge). Feste Höhe, damit die Karten im
+   Raster gleich hoch bleiben; bei vielen Jahren darf waagerecht gerollt
+   werden statt die Säulen unlesbar schmal zu quetschen. */
+.saeulen{display:flex;align-items:flex-end;gap:5px;height:150px;overflow-x:auto;padding-bottom:2px}
+.saeule{flex:1;min-width:26px;display:flex;flex-direction:column;align-items:center;height:100%}
+.saeule-zahl{font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums;height:14px}
+.saeule-spur{flex:1;width:100%;display:flex;align-items:flex-end}
+.saeule-spur i{display:block;width:100%;background:var(--acc);border-radius:3px 3px 0 0;
+  transition:height .3s}
+.saeule-label{font-size:11px;color:var(--dim);padding-top:4px;white-space:nowrap}
 .empty{text-align:center;color:var(--dim);padding:36px 10px}
 .spark{display:inline-block;vertical-align:middle}
 
