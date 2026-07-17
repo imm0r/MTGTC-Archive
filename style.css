@@ -13,7 +13,10 @@ nav{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;align-items:center}
 nav button{background:transparent;border:1px solid var(--line);color:var(--dim);
            padding:7px 14px;border-radius:999px;cursor:pointer;font-size:14px}
 nav button.on{background:var(--acc);border-color:var(--acc);color:#1a1400;font-weight:600}
-#who{font-size:12px;color:var(--dim);margin-left:4px}
+#who{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--dim);
+     margin-left:4px;cursor:pointer;max-width:190px}
+#who:hover{color:var(--txt)}
+#who>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 main{padding:14px;max-width:1100px;margin:0 auto}
 .view{display:none} .view.on{display:block}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:14px}
@@ -45,6 +48,20 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .brand-logo{display:block;height:46px;width:auto}
 .brand-hero{text-align:center;margin-bottom:6px}
 .brand-hero-img{display:inline-block;max-height:290px;max-width:100%;height:auto;width:auto}
+
+/* Avatar: hochgeladenes Bild rund beschnitten, sonst Initialen-Kreis im
+   Goldakzent. Größe kommt per style-Attribut aus avatarHtml(). */
+.avatar{border-radius:50%;object-fit:cover;flex:none;vertical-align:middle;
+  background:var(--panel2);border:1px solid var(--line)}
+.avatar-init{display:inline-flex;align-items:center;justify-content:center;
+  border-radius:50%;background:var(--acc);color:#1a1400;font-weight:700;flex:none;
+  text-transform:uppercase;line-height:1;vertical-align:middle}
+
+/* Profil-Seite: Kopf (Avatar links, Identität rechts), darunter Statistik und
+   Konto als eigene Karten. */
+.profil-kopf{display:flex;gap:22px;align-items:center;flex-wrap:wrap}
+.profil-avatar{display:flex;flex-direction:column;align-items:center;gap:10px;flex:none}
+.profil-ident{flex:1;min-width:220px}
 .tabs{display:flex;gap:6px;margin-bottom:12px}
 .tabs button{flex:1;background:transparent;border:1px solid var(--line);color:var(--dim);
              padding:8px;border-radius:8px;cursor:pointer}

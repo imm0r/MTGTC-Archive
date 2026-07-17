@@ -42,7 +42,7 @@ function confirmDlg(html) {
 }
 
 /* ============================== Supabase ============================== */
-let sb = null, USER = null;
+let sb = null, USER = null, PROFILE = null;
 
 function cfg() {
   if (CONFIG.url && CONFIG.key) return CONFIG;
@@ -2488,11 +2488,14 @@ function showGate(mode) {
 function showApp() {
   $("#gate").style.display = "none";
   $("#app").style.display = "block";
-  $("#who").textContent = USER?.email || "";
+  renderWho();
 }
 
 async function afterLogin(user) {
   USER = user;
+  // Profil laden (bei Erstanmeldung anlegen). Nicht kritisch: schlägt es fehl
+  // (z. B. Tabelle noch nicht angelegt), zeigt die App die E-Mail und läuft weiter.
+  try { await ladeProfile(); } catch (e) { PROFILE = null; }
   showApp();
   try { await reload(); renderAll(); }
   catch (e) { toast(dbErr(e)); }
@@ -2549,10 +2552,182 @@ function wireSetup() {
   };
 }
 
+/* ============================== Profil ===============================
+   Ein Profil je Konto (Tabelle public.profiles, RLS: nur das eigene). Fehlt es
+   bei der Erstanmeldung, wird es einmal angelegt. Der Avatar liegt im
+   öffentlichen Storage-Bucket "avatars" unter {uid}/avatar — schreiben darf man
+   nur den eigenen Ordner. */
+async function ladeProfile() {
+  const { data, error } = await sb.from("profiles").select("*").eq("id", USER.id).maybeSingle();
+  if (error) throw error;
+  if (data) { PROFILE = data; return; }
+  const ins = await sb.from("profiles").insert({ id: USER.id }).select("*").single();
+  if (ins.error) throw ins.error;
+  PROFILE = ins.data;
+}
+
+const profilName = () => PROFILE?.display_name?.trim() || USER?.email || "";
+
+/* Initialen aus dem Namen: erster + letzter Wortanfang, sonst der erste Buchstabe. */
+function initialen(name) {
+  const p = (name || "").trim().split(/\s+/).filter(Boolean);
+  if (!p.length) return "?";
+  return ((p[0][0] || "") + (p.length > 1 ? p[p.length - 1][0] : "")).toUpperCase();
+}
+
+/* Avatar als Bild (falls hochgeladen) oder als Initialen-Kreis. */
+function avatarHtml(size, name = profilName()) {
+  const s = `width:${size}px;height:${size}px`;
+  if (PROFILE?.avatar_url)
+    return `<img class="avatar" src="${esc(PROFILE.avatar_url)}" alt="" style="${s}">`;
+  return `<span class="avatar avatar-init" style="${s};font-size:${Math.round(size * 0.4)}px">${esc(initialen(name))}</span>`;
+}
+
+/* Kopfzeile rechts: Avatar + Name (oder E-Mail), klickbar zum Profil. */
+function renderWho() {
+  const el = $("#who");
+  if (!el) return;
+  el.innerHTML = `${avatarHtml(26)}<span>${esc(profilName())}</span>`;
+  el.title = "Profil öffnen";
+  el.onclick = () => { const b = $('nav button[data-v="profile"]'); if (b) b.click(); };
+}
+
+function renderProfile() {
+  const el = $("#v-profile");
+  if (!el) return;
+  const seit = PROFILE?.created ? datShort(PROFILE.created) : "–";
+  const decks = DECKS.length;
+  el.innerHTML = `
+    <div class="card profil-kopf">
+      <div class="profil-avatar">
+        ${avatarHtml(96)}
+        <div class="row" style="justify-content:center">
+          <div style="flex:none"><button class="btn ghost sm" id="pf-avatar-btn">Bild ändern</button></div>
+          ${PROFILE?.avatar_url ? '<div style="flex:none"><button class="btn ghost sm" id="pf-avatar-del">Entfernen</button></div>' : ""}
+        </div>
+        <input type="file" id="pf-avatar-file" accept="image/*" hidden>
+      </div>
+      <div class="profil-ident">
+        <label>Anzeigename</label>
+        <div class="row" style="margin-bottom:8px">
+          <div style="flex:1"><input type="text" id="pf-name" maxlength="40"
+            value="${esc(PROFILE?.display_name || "")}" placeholder="z. B. Benjamin"></div>
+          <div style="flex:none"><button class="btn" id="pf-name-save">Speichern</button></div>
+        </div>
+        <p class="hint" style="margin:0">Angemeldet als <b>${esc(USER?.email || "")}</b> &middot; Mitglied seit ${esc(seit)}</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">Deine Sammlung</h3>
+      <p class="hint" style="margin-top:-4px">${decks} ${decks === 1 ? "Deck" : "Decks"} &middot; Statistik über den gesamten Bestand.</p>
+      <div id="profile-dash" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">Konto</h3>
+      <label>Neues Passwort</label>
+      <div class="row" style="margin-bottom:6px">
+        <div><input type="password" id="pf-pw1" autocomplete="new-password" placeholder="mind. 8 Zeichen"></div>
+        <div><input type="password" id="pf-pw2" autocomplete="new-password" placeholder="wiederholen"></div>
+        <div style="flex:none"><button class="btn ghost" id="pf-pw-save">Passwort ändern</button></div>
+      </div>
+      <div class="msg" id="pf-pw-msg"></div>
+      <div style="margin-top:14px"><button class="btn danger" id="pf-logout">Abmelden</button></div>
+    </div>`;
+
+  // Statistik über den GESAMTEN Bestand — dieselbe Funktion wie das
+  // Sammlungs-Dashboard, nur ungefiltert und in ein eigenes Ziel.
+  renderDash(CARDS, $("#profile-dash"), false);
+
+  $("#pf-avatar-btn").onclick = () => $("#pf-avatar-file").click();
+  $("#pf-avatar-file").onchange = e => { const f = e.target.files[0]; e.target.value = ""; if (f) avatarHochladen(f); };
+  const del = $("#pf-avatar-del"); if (del) del.onclick = avatarEntfernen;
+  $("#pf-name-save").onclick = nameSpeichern;
+  $("#pf-name").addEventListener("keydown", e => { if (e.key === "Enter") nameSpeichern(); });
+  $("#pf-pw-save").onclick = passwortAendern;
+  $("#pf-logout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+}
+
+async function nameSpeichern() {
+  const name = $("#pf-name").value.trim();
+  try {
+    const { error } = await sb.from("profiles").update({ display_name: name || null }).eq("id", USER.id);
+    if (error) throw error;
+    PROFILE.display_name = name || null;
+    renderWho();
+    toast("Name gespeichert");
+  } catch (e) { toast(dbErr(e)); }
+}
+
+/* Avatar clientseitig auf 256px quadratisch verkleinern (spart Speicher, lädt
+   schnell), in den eigenen Ordner hochladen (fester Pfad + upsert). Die
+   gespeicherte URL trägt einen Zeitstempel gegen den Browser-Cache. */
+async function avatarHochladen(file) {
+  if (!file.type.startsWith("image/")) return toast("Bitte ein Bild wählen.");
+  if (file.size > 8 * 1024 * 1024) return toast("Bild ist zu groß (max. 8 MB).");
+  try {
+    const blob = await bildQuadratisch(file, 256);
+    const pfad = `${USER.id}/avatar`;
+    const up = await sb.storage.from("avatars").upload(pfad, blob, { upsert: true, contentType: "image/png" });
+    if (up.error) throw up.error;
+    const url = sb.storage.from("avatars").getPublicUrl(pfad).data.publicUrl + "?t=" + Date.now();
+    const { error } = await sb.from("profiles").update({ avatar_url: url }).eq("id", USER.id);
+    if (error) throw error;
+    PROFILE.avatar_url = url;
+    renderWho(); renderProfile();
+    toast("Avatar aktualisiert");
+  } catch (e) { toast(dbErr(e)); }
+}
+
+async function avatarEntfernen() {
+  try {
+    await sb.storage.from("avatars").remove([`${USER.id}/avatar`]);
+    const { error } = await sb.from("profiles").update({ avatar_url: null }).eq("id", USER.id);
+    if (error) throw error;
+    PROFILE.avatar_url = null;
+    renderWho(); renderProfile();
+    toast("Avatar entfernt");
+  } catch (e) { toast(dbErr(e)); }
+}
+
+/* Bild mittig quadratisch beschneiden und auf kante×kante zeichnen → PNG-Blob. */
+function bildQuadratisch(file, kante) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => {
+      const seite = Math.min(img.width, img.height);
+      const sx = (img.width - seite) / 2, sy = (img.height - seite) / 2;
+      const cv = document.createElement("canvas");
+      cv.width = cv.height = kante;
+      cv.getContext("2d").drawImage(img, sx, sy, seite, seite, 0, 0, kante, kante);
+      cv.toBlob(b => b ? res(b) : rej(new Error("Bild konnte nicht verarbeitet werden.")), "image/png");
+    };
+    img.onerror = () => rej(new Error("Bild konnte nicht gelesen werden."));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+async function passwortAendern() {
+  const msg = (t, cls) => { const m = $("#pf-pw-msg"); m.textContent = t; m.className = "msg " + (cls || ""); };
+  const a = $("#pf-pw1").value, b = $("#pf-pw2").value;
+  if (a.length < 8) return msg("Das Passwort braucht mindestens 8 Zeichen.", "err");
+  if (a !== b) return msg("Die Passwörter stimmen nicht überein.", "err");
+  $("#pf-pw-save").disabled = true; msg("Moment…");
+  try {
+    const { error } = await sb.auth.updateUser({ password: a });
+    if (error) throw error;
+    $("#pf-pw1").value = ""; $("#pf-pw2").value = "";
+    msg("Passwort geändert.", "ok");
+  } catch (e) { msg(e.message || "Änderung fehlgeschlagen.", "err"); }
+  finally { $("#pf-pw-save").disabled = false; }
+}
+
 function wireApp() {
   $$("nav button[data-v]").forEach(b => b.onclick = () => {
     $$("nav button[data-v]").forEach(x => x.classList.toggle("on", x === b));
     $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + b.dataset.v));
+    if (b.dataset.v === "profile") renderProfile();
   });
 
   $("#drop").onclick = () => $("#file").click();
