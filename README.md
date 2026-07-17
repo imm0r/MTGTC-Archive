@@ -96,7 +96,14 @@ sie prüfen soll, ist keine Probe.
    eintippen.
 
 Aus dem Gelesenen wird die Karte immer über Scryfall bestimmt — das Bildmodell
-identifiziert nichts selbst, es liest nur ab. Das `T` hinter der Nummer ist
+identifiziert nichts selbst, es liest nur ab.
+
+**Was vom Foto kommt und was nicht.** Die Sprache liest die App von der Karte:
+sie ist aufgedruckt und eindeutig, deshalb schlägt sie das Dropdown. **Foil und
+Zustand kommen ausschließlich aus den Dropdowns** — beides sind physische
+Eigenschaften, die ein Foto nicht verrät. Glanz entsteht auch, wenn eine Lampe
+über einer normalen Karte steht; ein Fehlurteil legt eine eigene Zeile mit
+falschem Preis an. Das `T` hinter der Nummer ist
 dabei entscheidend: `mkm/8` und `tmkm/8` sind zwei völlig verschiedene Karten.
 
 Fürs Fotografieren heißt das: Die untere linke Ecke sollte mit aufs Bild und

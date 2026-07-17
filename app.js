@@ -532,10 +532,9 @@ async function scanFile(file) {
     const r = await identify(img, lang, s => { step(s); prog(70); });
     prog(100);
     if (r.card) {
-      // Nur übernehmen, was das Modell wirklich gesehen hat.
-      await addToCollection(r.card, el, r.vision
-        ? { lang: r.lang, is_foil: r.vision.is_foil }
-        : null);
+      // Nur die Sprache übernehmen — sie steht auf der Karte. Foil und
+      // Zustand bleiben beim Nutzer.
+      await addToCollection(r.card, el, r.vision ? { lang: r.lang } : null);
     } else renderManual(el, r.guess, r.candidates);
   } catch (e) {
     el.querySelector(".body").innerHTML =
@@ -544,13 +543,17 @@ async function scanFile(file) {
   }
 }
 
-/* detected: was das Bildmodell auf der Karte gesehen hat. Es schlägt die
-   Dropdowns — auf der Karte steht, was sie ist. Der Zustand bleibt beim
-   Dropdown: den sieht man einem Foto nicht zuverlässig an. */
+/* detected.lang schlägt das Dropdown: Die Sprache ist auf die Karte gedruckt,
+   eindeutig und ablesbar.
+   Foil und Zustand kommen dagegen IMMER aus den Dropdowns. Beides sind
+   physische Eigenschaften, die man einem Foto nicht ansieht: Glanz erzeugt
+   auch jede Lampe über einer normalen Karte, und ein Fehlurteil legt eine
+   eigene Zeile mit falschem Preis an. Wer scannt, weiß, was er in der Hand
+   hält — eine ausdrückliche Auswahl überstimmt man nicht. */
 async function addToCollection(card, el, detected) {
   const lang = detected?.lang || $("#d-lang").value;
   const cond = $("#d-cond").value;
-  const foil = detected?.is_foil ?? ($("#d-foil").value === "1");
+  const foil = $("#d-foil").value === "1";
   const price = priceOf(card, foil);
   const before = CARDS.find(c => c.scryfall_id === card.id && c.foil === foil &&
                                  c.lang === lang && c.condition === cond);

@@ -62,20 +62,16 @@ const SCHEMA = {
       type: "string",
       description: "Die Typzeile in der Mitte der Karte, z. B. 'Spielsteinkreatur — Held'. Leer, wenn unlesbar.",
     },
-    is_foil: {
-      type: "boolean",
-      description: "true, wenn die Karte sichtbar glänzt oder Regenbogenreflexionen zeigt.",
-    },
     confidence: {
       type: "string",
       enum: ["high", "medium", "low"],
       description: "high nur, wenn beide Eckzeilen sicher lesbar sind.",
     },
   },
-  required: [
-    "printed_name", "corner_line_1", "corner_line_2",
-    "type_line", "is_foil", "confidence",
-  ],
+  // Kein is_foil: Glanz auf einem Foto beweist kein Foil — jede Lampe über
+  // einer normalen Karte erzeugt denselben Eindruck. Ein Fehlurteil legt eine
+  // eigene Zeile mit falschem Preis an. Diese Angabe macht der Nutzer.
+  required: ["printed_name", "corner_line_1", "corner_line_2", "type_line", "confidence"],
   additionalProperties: false,
 } as const;
 
