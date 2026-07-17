@@ -24,6 +24,11 @@ create table if not exists public.cards (
   -- common, uncommon, rare, mythic, special, bonus. Bewusst ohne CHECK:
   -- käme eine siebte Stufe dazu, soll das Einbuchen nicht scheitern.
   rarity      text,
+  -- Manakosten wie aufgedruckt, in Scryfall-Schreibweise: "{2}{G}{G}",
+  -- "{1}{G/W}", "{X}{R}". Bei geteilten Karten beide Hälften: "{1}{R} // {1}{U}".
+  -- WICHTIG: '' heißt "kostet nichts" (Länder, Tokens) und ist ein gültiger
+  -- Wert — nur NULL bedeutet "noch nicht erfasst".
+  mana_cost   text,
   lang        text not null default 'en',
   condition   text not null default 'NM',
   foil        boolean not null default false,
@@ -63,6 +68,7 @@ alter table public.decks add column if not exists main_card_id uuid
   references public.cards(id) on delete set null;
 alter table public.cards add column if not exists type_line text;
 alter table public.cards add column if not exists rarity text;
+alter table public.cards add column if not exists mana_cost text;
 
 create index if not exists cards_user_idx        on public.cards(user_id);
 create index if not exists decks_user_idx        on public.decks(user_id);
@@ -116,12 +122,15 @@ drop function if exists public.add_card(
   text, text, text, text, text, text, text, text, integer, text, text, boolean, numeric);
 drop function if exists public.add_card(
   text, text, text, text, text, text, text, text, integer, text, text, boolean, numeric, text);
+drop function if exists public.add_card(
+  text, text, text, text, text, text, text, text, integer, text, text, boolean, numeric, text, text);
 
 create or replace function public.add_card(
   p_scryfall_id text, p_oracle_id text, p_name text, p_printed_name text,
   p_set_code text, p_set_name text, p_cn text, p_img text, p_cm_id integer,
   p_lang text, p_condition text, p_foil boolean, p_price numeric,
-  p_type_line text default null, p_rarity text default null
+  p_type_line text default null, p_rarity text default null,
+  p_mana_cost text default null
 ) returns public.cards
 language plpgsql
 security invoker
@@ -131,21 +140,24 @@ declare r public.cards;
 begin
   insert into public.cards as c
     (scryfall_id, oracle_id, name, printed_name, set_code, set_name, cn, img,
-     cm_id, lang, condition, foil, qty, price, hist, type_line, rarity)
+     cm_id, lang, condition, foil, qty, price, hist, type_line, rarity, mana_cost)
   values
     (p_scryfall_id, p_oracle_id, p_name, p_printed_name, p_set_code, p_set_name,
      p_cn, p_img, p_cm_id, p_lang, p_condition, p_foil, 1, p_price,
      case when p_price is null then '[]'::jsonb
           else jsonb_build_array(jsonb_build_object(
                  'd', to_char(current_date, 'YYYY-MM-DD'), 'v', p_price)) end,
-     p_type_line, p_rarity)
+     p_type_line, p_rarity, p_mana_cost)
   on conflict on constraint cards_unique_printing do update
     set qty       = c.qty + 1,
         price     = coalesce(excluded.price, c.price),
         cm_id     = coalesce(excluded.cm_id, c.cm_id),
         -- Bestandskarten ohne diese Angaben bekommen sie beim nächsten Scan mit.
         type_line = coalesce(excluded.type_line, c.type_line),
-        rarity    = coalesce(excluded.rarity, c.rarity)
+        rarity    = coalesce(excluded.rarity, c.rarity),
+        -- coalesce, nicht "nur wenn leer": '' ist bei den Manakosten ein
+        -- gültiger Wert ("kostet nichts"), nur NULL ist eine Lücke.
+        mana_cost = coalesce(excluded.mana_cost, c.mana_cost)
   returning * into r;
   return r;
 end $$;

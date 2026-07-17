@@ -580,7 +580,8 @@ async function addToCollection(card, el, detected) {
     p_cn: card.collector_number, p_img: imgOf(card),
     p_cm_id: card.cardmarket_id ?? null,
     p_lang: lang, p_condition: cond, p_foil: foil, p_price: price,
-    p_type_line: card.type_line ?? null, p_rarity: card.rarity ?? null
+    p_type_line: card.type_line ?? null, p_rarity: card.rarity ?? null,
+    p_mana_cost: manaOf(card)
   });
   if (error) throw new Error(dbErr(error));
 
@@ -771,7 +772,9 @@ function cardRow(c, o = {}) {
     <tr data-id="${c.id}"${imDeck ? ` data-deck="${esc(o.deckId)}"` : ""}>
       <td class="hide-s">${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy" data-view
              style="cursor:pointer" title="Großansicht &amp; Preisverlauf">` : ""}</td>
-      <td><div data-view style="cursor:pointer" title="Großansicht &amp; Preisverlauf">${esc(c.disp)}</div>
+      <td><div data-view class="name-zeile" style="cursor:pointer" title="Großansicht &amp; Preisverlauf"
+               >${esc(c.disp)}${c.mana_cost
+            ? `<span class="mana-kosten">${manaHtml(c.mana_cost)}</span>` : ""}</div>
           <div style="font-size:12px;color:var(--dim)">
             ${c.printed_name && c.printed_name !== c.name ? esc(c.name) + " &middot; " : ""}
             ${c.foil ? '<span class="pill foil">Foil</span> ' : ""}#${esc(c.cn)}</div></td>
@@ -906,17 +909,46 @@ function renderCollection() {
   });
 }
 
+/* Manakosten einer Scryfall-Karte, oben rechts auf der Karte aufgedruckt.
+   Zwei Fallen:
+   * Bei doppelseitigen und geteilten Karten fehlt mana_cost OBEN ganz — die
+     Kosten stehen je Seite in card_faces. "Journey to Eternity" ergibt so
+     "{1}{B}{G}" (die Rückseite kostet nichts), "Fire // Ice" beide Hälften.
+   * "" ist kein leerer Wert, sondern die Aussage "kostet nichts" (Länder,
+     Tokens). Nur wenn wir gar nichts wissen, kommt null zurück — sonst
+     behaupteten wir von jedem Land, es sei unerfasst.
+   Beides trifft zusammen bei doppelseitigen Tokens ("Snake // Zombie"): dort
+   ist mana_cost oben nicht da UND beide Seiten kosten "". Deshalb wird auf
+   "ist eine Zeichenkette" geprüft und nicht auf "ist nicht leer" — sonst
+   fielen beide Seiten weg und die Karte gälte fälschlich als unerfasst. */
+const manaOf = card => {
+  if (typeof card?.mana_cost === "string") return card.mana_cost;
+  const seiten = card?.card_faces;
+  if (!Array.isArray(seiten) || !seiten.length) return null;
+  const angaben = seiten.map(f => f.mana_cost).filter(x => typeof x === "string");
+  if (!angaben.length) return null;                    // keine Seite sagt etwas
+  const echte = angaben.filter(x => x !== "");
+  return echte.length ? echte.join(" // ") : "";       // alle Seiten frei = kostet nichts
+};
+
 /* Trägt nach, was der Karte fehlt. Bestände aus der Zeit vor den Spalten
-   type_line/rarity haben sie leer — und ohne Typzeile lehnt der Trigger die
-   Karte als Hauptkarte ab und verweist dafür genau hierher ("Preis neu
-   ziehen"). Dieser Weg muss sie also wirklich füllen, sonst schickt die App
-   in eine Sackgasse.
+   type_line/rarity/mana_cost haben sie leer — und ohne Typzeile lehnt der
+   Trigger die Karte als Hauptkarte ab und verweist dafür genau hierher
+   ("Preis neu ziehen"). Dieser Weg muss sie also wirklich füllen, sonst
+   schickt die App in eine Sackgasse.
    Nur LEERE Felder werden gesetzt: eine bereits erfasste Auflage behält ihre
-   Angaben. Der Preis ist tagesaktuell, die Typzeile ist es nicht. */
+   Angaben. Der Preis ist tagesaktuell, die Typzeile ist es nicht.
+   Bei den Manakosten wird auf null geprüft statt auf "leer": "" ist ein
+   gültiger Wert, und !"" wäre wahr — jedes Land würde bei jedem Preisabruf
+   erneut geschrieben. */
 async function nachtragen(c, fresh) {
   const patch = {};
   if (!c.type_line && fresh.type_line) patch.type_line = fresh.type_line;
   if (!c.rarity && fresh.rarity) patch.rarity = fresh.rarity;
+  if (c.mana_cost == null) {
+    const m = manaOf(fresh);
+    if (m != null) patch.mana_cost = m;
+  }
   if (!Object.keys(patch).length) return;
   const { error } = await sb.from("cards").update(patch).eq("id", c.id);
   if (error) throw new Error(dbErr(error));
@@ -974,6 +1006,31 @@ function rarityPill(r) {
   return `<span class="pill" style="border-color:${d.farbe};color:${d.farbe}">${esc(d.text)}</span>`;
 }
 
+/* --------------------------------------------------- Manakosten ------ */
+/* Scryfall liefert die Kosten als Zeichenkette ("{2}{G/W}{X}") und hostet zu
+   jedem Symbol ein SVG. Im Dateinamen entfallen Klammern und Schrägstrich:
+   {G/W} → GW, {2} → 2, {G/P} → GP.
+   Warum nicht selbst in CSS zeichnen: Hybrid- und Phyrexia-Mana sind geteilte
+   Kreise mit zwei Zeichen darin — das SVG ist die richtige Darstellung und
+   kommt von derselben CDN wie die Kartenbilder. Fällt sie aus, bleibt das
+   alt-Attribut ("{G}") lesbar stehen.
+   Alles ausserhalb der Klammern (bei geteilten Karten das " // ") wird
+   escaped durchgereicht, nicht als HTML. */
+function manaHtml(cost) {
+  if (!cost) return "";        // "" = kostet nichts, null = unbekannt: beides zeigt nichts
+  const re = /\{([^}]+)\}/g;
+  let out = "", last = 0, m;
+  while ((m = re.exec(cost))) {
+    out += esc(cost.slice(last, m.index));
+    const datei = encodeURIComponent(m[1].replace(/\//g, "").toUpperCase());
+    const roh = `{${m[1]}}`;
+    out += `<img class="mana" src="https://svgs.scryfall.io/card-symbols/${datei}.svg"
+                 alt="${esc(roh)}" title="${esc(roh)}" loading="lazy">`;
+    last = m.index + m[0].length;
+  }
+  return out + esc(cost.slice(last));
+}
+
 /* ------------------------------------------- Karten-Detailansicht ---- */
 const dtShort = iso => {
   if (!iso) return "–";
@@ -1021,7 +1078,8 @@ function detailHtml(c, hover) {
     <div class="detail">
       ${gross ? `<img class="detail-img" src="${esc(gross)}" alt="">` : ""}
       <div class="detail-info">
-        <b style="font-size:17px">${esc(c.disp)}</b>
+        <div class="name-zeile"><b style="font-size:17px">${esc(c.disp)}</b>${c.mana_cost
+          ? `<span class="mana-kosten">${manaHtml(c.mana_cost)}</span>` : ""}</div>
         ${c.printed_name && c.printed_name !== c.name ? `<div class="hint" style="margin:0">${esc(c.name)}</div>` : ""}
         <div class="hint" style="margin-top:2px">${esc(c.set_name || c.set)} · #${esc(c.cn)}</div>
         ${c.type_line ? `<div class="hint" style="margin-top:2px">${esc(c.type_line)}</div>` : ""}
@@ -1164,6 +1222,7 @@ async function applyCardEdit(c, lang, cond, foil, neu) {
     patch.type_line = fresh.type_line ?? null;
     // Dieselbe Karte kann je Auflage anders selten sein — mitziehen.
     patch.rarity = fresh.rarity ?? null;
+    patch.mana_cost = manaOf(fresh);
   } else if (lang !== c.lang) {
     // Sprachwechsel: die sprachgenaue Auflage hat eine eigene Scryfall-ID,
     // eigenen gedruckten Namen und eigenes Bild. Gibt es sie nicht (viele
@@ -1399,9 +1458,10 @@ const csvCell = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
 function exportCsv() {
   const head = ["Name", "Name (englisch)", "Set", "Set-Code", "Nummer", "Seltenheit",
-                "Typzeile", "Sprache", "Zustand", "Foil", "Anzahl", "Preis EUR", "Wert EUR"];
+                "Typzeile", "Manakosten", "Sprache", "Zustand", "Foil", "Anzahl",
+                "Preis EUR", "Wert EUR"];
   const rows = CARDS.map(c => [c.disp, c.name, c.set_name, c.set, c.cn, c.rarity ?? "",
-    c.type_line ?? "", c.lang, c.condition,
+    c.type_line ?? "", c.mana_cost ?? "", c.lang, c.condition,
     c.foil ? "ja" : "nein", c.qty, c.price ?? "",
     c.price == null ? "" : (c.price * c.qty).toFixed(2)]);
   download(`mtg-sammlung-${today()}.csv`,
@@ -1426,7 +1486,10 @@ async function importJson(file) {
         p_cm_id: c.cm_id ?? null,
         p_lang: c.lang || "en", p_condition: c.condition || "NM",
         p_foil: !!c.foil, p_price: c.price ?? null,
-        p_type_line: c.type_line ?? null, p_rarity: c.rarity ?? null
+        p_type_line: c.type_line ?? null, p_rarity: c.rarity ?? null,
+        // Aus der Sicherung, nicht von Scryfall: hier steht der Wert schon
+        // fertig in der Zeile — manaOf() erwartet eine Scryfall-Karte.
+        p_mana_cost: c.mana_cost ?? null
       });
       if (error) { bad++; break; } else ok++;
     }
@@ -1568,6 +1631,7 @@ async function importCsv(file) {
         cn: card.collector_number, img: imgOf(card),
         cm_id: card.cardmarket_id ?? null,
         type_line: card.type_line ?? null, rarity: card.rarity ?? null,
+        mana_cost: manaOf(card),
         lang, condition: cond, foil, qty, price,
         hist: price == null ? [] : [{ d: today(), v: price }],
       };
@@ -1690,6 +1754,7 @@ async function miImport() {
         p_cm_id: card.cardmarket_id ?? null,
         p_lang: lang, p_condition: cond, p_foil: foil, p_price: price,
         p_type_line: card.type_line ?? null, p_rarity: card.rarity ?? null,
+        p_mana_cost: manaOf(card),
       });
       if (error) { sag("✗ " + dbErr(error), "var(--err)"); fail++; continue; }
 
