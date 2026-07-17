@@ -751,7 +751,11 @@ function renderCollection() {
       <td class="num">${cmLink(c.cm_id)
         ? `<a class="cm" href="${esc(cmLink(c.cm_id))}" target="_blank" rel="noopener noreferrer"
              title="Angebote auf Cardmarket ansehen">CM</a>` : ""}</td>
-      <td class="num"><button class="btn ghost sm" data-del>&times;</button></td>
+      <td class="num" style="white-space:nowrap">
+        <button class="btn ghost sm" data-edit title="Sprache, Zustand oder Ausführung ändern">&#9998;</button>
+        <button class="btn ghost sm" data-price title="Preis dieser Karte neu von Scryfall holen">&#8635;</button>
+        <button class="btn ghost sm" data-del title="Zeile löschen">&times;</button>
+      </td>
     </tr>`).join("");
 
   $$("#tbl tbody [data-qty]").forEach(inp => inp.onchange = async () => {
@@ -771,6 +775,23 @@ function renderCollection() {
       if (error) throw error;
       await reload(); renderAll(); toast("Karte entfernt");
     } catch (e) { toast(dbErr(e)); }
+  });
+  $$("#tbl tbody [data-edit]").forEach(b => b.onclick = () =>
+    editCard(b.closest("tr").dataset.id));
+  $$("#tbl tbody [data-price]").forEach(b => b.onclick = async () => {
+    const c = CARDS.find(x => x.id === b.closest("tr").dataset.id);
+    if (!c) return;
+    b.disabled = true;
+    try {
+      const fresh = await withPrice(await sfById(c.scryfall_id));
+      if (!fresh) throw new Error("Karte bei Scryfall nicht gefunden");
+      const p = priceOf(fresh, c.foil);
+      // set_price schreibt in die Preishistorie: ein Punkt pro Tag, 60 bleiben.
+      const { error } = await sb.rpc("set_price", { p_card_id: c.id, p_price: p });
+      if (error) throw new Error(dbErr(error));
+      await reload(); renderAll();
+      toast(p == null ? "Scryfall führt keinen Preis für diese Auflage" : "Preis aktualisiert: " + eur(p));
+    } catch (e) { b.disabled = false; toast(e.message); }
   });
 }
 
@@ -792,6 +813,94 @@ async function updatePrices() {
   try { await reload(); renderAll(); } catch (e) { toast(dbErr(e)); }
   btn.disabled = false; btn.textContent = "Preise aktualisieren";
   toast(failed ? `Preise aktualisiert, ${failed} nicht abrufbar` : "Preise aktualisiert");
+}
+
+/* ---------------------------------------------- Karte bearbeiten ----- */
+const LANG_NAMES = { de: "Deutsch", en: "Englisch", fr: "Französisch", it: "Italienisch",
+  es: "Spanisch", ja: "Japanisch", pt: "Portugiesisch", ru: "Russisch", ko: "Koreanisch" };
+
+async function editCard(id) {
+  const c = CARDS.find(x => x.id === id);
+  if (!c) return;
+  const langs = LANG_NAMES[c.lang] ? Object.keys(LANG_NAMES) : [c.lang, ...Object.keys(LANG_NAMES)];
+  const CONDS = ["NM", "LP", "MP", "HP", "DMG"];
+  const ok = await confirmDlg(`
+    <b>${esc(c.disp)}</b>
+    <p class="hint" style="margin:2px 0 10px">${esc(c.set_name || c.set)} · #${esc(c.cn)} · Anzahl ${c.qty}</p>
+    <div class="row">
+      <div><label>Sprache</label><select id="ed-lang">${langs.map(l =>
+        `<option value="${esc(l)}"${l === c.lang ? " selected" : ""}>${esc(LANG_NAMES[l] || l)}</option>`).join("")}</select></div>
+      <div><label>Zustand</label><select id="ed-cond">${CONDS.map(x =>
+        `<option${x === c.condition ? " selected" : ""}>${x}</option>`).join("")}</select></div>
+      <div><label>Ausführung</label><select id="ed-foil">
+        <option value="0"${!c.foil ? " selected" : ""}>Normal</option>
+        <option value="1"${c.foil ? " selected" : ""}>Foil</option></select></div>
+    </div>
+    <p class="hint">Bei geänderter Ausführung oder Sprache wird der Preis neu geholt.
+      Gibt es dieselbe Karte in der Ziel-Ausprägung schon, werden die Anzahlen zusammengelegt.</p>`);
+  if (!ok) return;
+  const lang = $("#ed-lang").value, cond = $("#ed-cond").value, foil = $("#ed-foil").value === "1";
+  if (lang === c.lang && cond === c.condition && foil === c.foil) return;
+  try { await applyCardEdit(c, lang, cond, foil); }
+  catch (e) { toast(e.message); }
+}
+
+async function applyCardEdit(c, lang, cond, foil) {
+  const patch = { lang, condition: cond, foil };
+
+  // Sprachwechsel: die sprachgenaue Auflage hat eine eigene Scryfall-ID,
+  // eigenen gedruckten Namen und eigenes Bild. Gibt es sie nicht (viele
+  // Karten führt Scryfall nur englisch), bleibt die bisherige Auflage
+  // stehen und nur das Sprachfeld wechselt.
+  let fresh = null;
+  if (lang !== c.lang) {
+    fresh = await withPrice(await sfCode(c.set, c.cn, lang));
+    if (fresh) {
+      patch.scryfall_id = fresh.id;
+      patch.printed_name = fresh.printed_name || null;
+      patch.img = imgOf(fresh) || c.img;
+      patch.cm_id = fresh.cardmarket_id ?? c.cm_id;
+    }
+  }
+
+  // Andere Ausführung oder andere Auflage → Preis passend dazu, Historie
+  // beginnt neu (die alte gehörte zur anderen Ausprägung).
+  if (foil !== c.foil || fresh) {
+    const src = fresh || await withPrice(await sfById(c.scryfall_id));
+    if (src) {
+      const p = priceOf(src, foil);
+      patch.price = p;
+      patch.hist = p == null ? [] : [{ d: today(), v: p }];
+    }
+  }
+
+  // Kollidiert die Ziel-Ausprägung mit einer vorhandenen Zeile, wird
+  // zusammengelegt: Anzahl addieren, Deck-Einträge umhängen, alte Zeile weg.
+  const sid = patch.scryfall_id || c.scryfall_id;
+  const twin = CARDS.find(x => x.id !== c.id && x.scryfall_id === sid &&
+                               x.lang === lang && x.condition === cond && x.foil === foil);
+  if (twin) {
+    const up = await sb.from("cards").update({ qty: twin.qty + c.qty }).eq("id", twin.id);
+    if (up.error) throw new Error(dbErr(up.error));
+    const de = await sb.from("deck_entries").select("*").eq("card_id", c.id);
+    for (const en of (de.data || [])) {
+      const ex = await sb.from("deck_entries").select("qty")
+        .eq("deck_id", en.deck_id).eq("card_id", twin.id).maybeSingle();
+      const merge = await sb.from("deck_entries").upsert(
+        [{ deck_id: en.deck_id, card_id: twin.id, qty: (ex.data?.qty || 0) + en.qty }],
+        { onConflict: "deck_id,card_id" });
+      if (!merge.error)
+        await sb.from("deck_entries").delete().eq("deck_id", en.deck_id).eq("card_id", c.id);
+    }
+    const del = await sb.from("cards").delete().eq("id", c.id);
+    if (del.error) throw new Error(dbErr(del.error));
+    toast(`Mit vorhandener Zeile zusammengelegt — Anzahl jetzt ${twin.qty + c.qty}`);
+  } else {
+    const { error } = await sb.from("cards").update(patch).eq("id", c.id);
+    if (error) throw new Error(dbErr(error));
+    toast("Karte aktualisiert");
+  }
+  await reload(); renderAll();
 }
 
 /* ============================= Decks-Ansicht ========================== */
