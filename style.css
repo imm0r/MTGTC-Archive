@@ -123,13 +123,19 @@ td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000
    und bleiben Panel. */
 .deck-dash .dash-raster .card{background:var(--panel2)}
 
-/* Waagerechte Balken: Beschriftung | Spur | Zahl. Die Spur nimmt den Rest. */
-.balken{display:flex;flex-direction:column;gap:7px}
+/* Waagerechte Balken: Beschriftung | Spur | Zahl. Die Spur nimmt den Rest.
+   BEWUSST kantige Datenbalken, keine Pillen: voll abgerundete Balken auf
+   grauem Track sahen aus wie Slider-Regler, und Pillenformen nutzt die App
+   sonst nur für anklickbare Chips und Nav-Buttons — der Balken las sich
+   dadurch als Bedienelement. Der Track ist jetzt dunkel eingelassen
+   (--bg, dunkler als jede Kartenfarbe), der Balken links kantig an der Achse
+   verankert und nur rechts leicht gerundet: eindeutig ein wachsender Wert. */
+.balken{display:flex;flex-direction:column;gap:8px}
 .balken-zeile{display:flex;align-items:center;gap:8px;font-size:13px}
 .balken-label{display:flex;align-items:center;gap:5px;width:38%;min-width:0;color:var(--dim)}
 .balken-label span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.balken-spur{flex:1;height:9px;background:var(--panel2);border-radius:5px;overflow:hidden}
-.balken-spur i{display:block;height:100%;background:var(--acc);border-radius:5px;
+.balken-spur{flex:1;height:16px;background:var(--bg);border-radius:3px;overflow:hidden}
+.balken-spur i{display:block;height:100%;background:var(--acc);border-radius:0 3px 3px 0;
   transition:width .3s}
 .balken-wert{width:76px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 
