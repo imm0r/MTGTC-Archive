@@ -570,35 +570,97 @@ const loadImg = file => new Promise((res, rej) => {
   im.src = URL.createObjectURL(file);
 });
 
-async function scanFile(file) {
+/* Ein Job in der Warteschlange: identifizieren und Ergebnis anzeigen. img ist
+   ein <img> ODER ein <canvas> — beide lassen sich gleich zeichnen und messen.
+   Genutzt vom Einzelscan (ein Foto = eine Karte) UND vom Mehrfach-Scan (ein
+   Foto = mehrere Karten, je Ausschnitt ein Aufruf hierher). */
+async function scanBild(img, thumbSrc, lang) {
   const el = document.createElement("div");
   el.className = "job";
-  el.innerHTML = `<img class="thumb" src="${URL.createObjectURL(file)}" alt="">
+  el.innerHTML = `<img class="thumb" src="${esc(thumbSrc)}" alt="">
     <div class="body"><div class="title">Wird verarbeitet…</div>
-    <div class="meta" data-step>Bild wird geladen…</div>
-    <div class="bar"><i style="width:15%"></i></div></div>`;
+    <div class="meta" data-step>Karte wird gelesen…</div>
+    <div class="bar"><i style="width:35%"></i></div></div>`;
   $("#queue").prepend(el);
   const step = t => { const n = el.querySelector("[data-step]"); if (n) n.textContent = t; };
   const prog = p => { const n = el.querySelector(".bar i"); if (n) n.style.width = p + "%"; };
-
   try {
-    const img = await loadImg(file);
-    prog(35);
-    // Sprache jetzt festhalten: der Nutzer kann das Feld umstellen,
-    // während dieser Scan noch läuft.
-    const lang = $("#d-lang").value;
     const r = await identify(img, lang, s => { step(s); prog(70); });
     prog(100);
-    if (r.card) {
-      // Nur die Sprache übernehmen — sie steht auf der Karte. Foil und
-      // Zustand bleiben beim Nutzer.
-      await addToCollection(r.card, el, r.vision ? { lang: r.lang } : null);
-    } else renderManual(el, r.guess, r.candidates);
+    // Nur die Sprache übernehmen — sie steht auf der Karte. Foil und Zustand
+    // bleiben beim Nutzer.
+    if (r.card) await addToCollection(r.card, el, r.vision ? { lang: r.lang } : null);
+    else renderManual(el, r.guess, r.candidates);
   } catch (e) {
     el.querySelector(".body").innerHTML =
       `<div class="title">Fehlgeschlagen</div>
        <div class="meta"><span class="pill err">${esc(e.message)}</span></div>`;
   }
+}
+
+async function scanFile(file) {
+  try {
+    const img = await loadImg(file);
+    await scanBild(img, URL.createObjectURL(file), $("#d-lang").value);
+  } catch { toast("Bild nicht lesbar"); }
+}
+
+/* Ein Foto mit MEHREREN Karten: erst die Rechtecke vom Modell holen (detect),
+   dann jede Karte ausschneiden und wie einen Einzelscan durch dieselbe Pipeline
+   schicken — NACHEINANDER, um die Funktion und ihre Ratenbegrenzung nicht zu
+   überrennen. Foil/Zustand/Sprache gelten wie beim Einzelscan aus den Dropdowns;
+   Ausreißer korrigiert man je Karte in der Warteschlange. */
+async function scanMultiFile(file) {
+  let img;
+  try { img = await loadImg(file); } catch { return toast("Bild nicht lesbar"); }
+  toast("Karten werden gesucht…");
+  let boxes;
+  try { boxes = await detectCards(img); }
+  catch (e) { return toast(e.message || "Karten konnten nicht gefunden werden."); }
+  if (!boxes.length) return toast("Keine Karten erkannt — näher/heller fotografieren oder einzeln scannen.");
+  toast(`${boxes.length} ${boxes.length === 1 ? "Karte" : "Karten"} erkannt — werden gelesen…`);
+  const lang = $("#d-lang").value;
+  for (const box of boxes) {
+    const cv = cropCanvas(img, box, 0.06);
+    await scanBild(cv, cv.toDataURL("image/jpeg", 0.7), lang);
+  }
+}
+
+/* Kartenrechtecke (Anteile 0..1) für ein Foto über die "detect"-Betriebsart.
+   Unplausible/leere Rechtecke fliegen gleich raus. */
+async function detectCards(img) {
+  if (visionAus) throw new Error("Bilderkennung ist für diese Sitzung deaktiviert.");
+  const ganz = { x: 0, y: 0, w: img.width, h: img.height };
+  const { data, error } = await sb.functions.invoke("scan-card", {
+    body: { mode: "detect", images: [{ b64: toJpegBase64(img, ganz, 1600), media_type: "image/jpeg" }] },
+  });
+  if (error) {
+    let msg = "";
+    try { msg = (await error.context.json()).error; } catch { /* kein JSON-Körper */ }
+    throw new Error(msg || "Bilderkennung nicht erreichbar (CORS oder Netzwerk).");
+  }
+  const cards = Array.isArray(data?.detect?.cards) ? data.detect.cards : [];
+  return cards
+    .map(b => ({ x: +b.x, y: +b.y, w: +b.w, h: +b.h }))
+    .filter(b => [b.x, b.y, b.w, b.h].every(Number.isFinite) &&
+                 b.w > 0.03 && b.h > 0.03 && b.x >= 0 && b.y >= 0 && b.x < 1 && b.y < 1);
+}
+
+/* Schneidet ein Kartenrechteck mit etwas Rand aus dem Foto in ein eigenes
+   Canvas. Der Rand gibt findCardBounds beim Einzelscan Luft, die Karte exakt zu
+   fassen. */
+function cropCanvas(img, box, padFrac) {
+  const px = box.x * img.width, py = box.y * img.height;
+  const pw = box.w * img.width, ph = box.h * img.height;
+  const padX = pw * padFrac, padY = ph * padFrac;
+  const x = Math.max(0, Math.round(px - padX)), y = Math.max(0, Math.round(py - padY));
+  const x2 = Math.min(img.width, Math.round(px + pw + padX));
+  const y2 = Math.min(img.height, Math.round(py + ph + padY));
+  const cw = Math.max(1, x2 - x), ch = Math.max(1, y2 - y);
+  const cv = document.createElement("canvas");
+  cv.width = cw; cv.height = ch;
+  cv.getContext("2d").drawImage(img, x, y, cw, ch, 0, 0, cw, ch);
+  return cv;
 }
 
 /* detected.lang schlägt das Dropdown: Die Sprache ist auf die Karte gedruckt,
@@ -2762,6 +2824,8 @@ function wireApp() {
 
   $("#drop").onclick = () => $("#file").click();
   $("#file").onchange = e => { [...e.target.files].forEach(scanFile); e.target.value = ""; };
+  $("#multi-btn").onclick = () => $("#multi-file").click();
+  $("#multi-file").onchange = e => { const f = e.target.files[0]; e.target.value = ""; if (f) scanMultiFile(f); };
   ["dragenter", "dragover"].forEach(ev => $("#drop").addEventListener(ev, e => {
     e.preventDefault(); $("#drop").classList.add("hot");
   }));

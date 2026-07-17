@@ -103,6 +103,45 @@ Programm anhand fester Regeln. Deine einzige Aufgabe ist eine treue Abschrift.
 Ganz alte Karten haben diesen Aufdruck nicht. Dann bleiben beide Eckzeilen leer,
 und nur der Kartenname oben zählt.`;
 
+/* Betriebsart "detect": Auf EINEM Foto liegen mehrere Karten. Das Modell soll
+   sie nur LOKALISIEREN — je Karte ein achsenparalleles Rechteck in Bild-Anteilen
+   (0..1). Die genaue Ecke liest danach der Einzelscan je Ausschnitt; das Modell
+   muss also nur grob sagen, wo und wie viele Karten liegen. */
+const DETECT_SCHEMA = {
+  type: "object",
+  properties: {
+    cards: {
+      type: "array",
+      description: "Ein Eintrag je sichtbarer Magic-Karte. Leer, wenn keine zu sehen ist.",
+      items: {
+        type: "object",
+        properties: {
+          x: { type: "number", description: "Linke Kante als Anteil der Bildbreite, 0..1." },
+          y: { type: "number", description: "Obere Kante als Anteil der Bildhöhe, 0..1." },
+          w: { type: "number", description: "Breite als Anteil der Bildbreite, 0..1." },
+          h: { type: "number", description: "Höhe als Anteil der Bildhöhe, 0..1." },
+        },
+        required: ["x", "y", "w", "h"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["cards"],
+  additionalProperties: false,
+} as const;
+
+const DETECT_SYSTEM = `Du bekommst ein Foto, auf dem MEHRERE Magic-the-Gathering-Karten
+liegen, in der Regel nebeneinander. Deine einzige Aufgabe ist, JEDE einzelne Karte
+zu lokalisieren — nicht zu lesen, nicht zu benennen.
+
+Gib für jede Karte ein achsenparalleles Rechteck an, das die GANZE Karte umschließt,
+als Anteile der Bildmaße: x und y sind die linke obere Ecke, w und h Breite und Höhe,
+alle Werte zwischen 0 und 1 (x+w und y+h also höchstens 1).
+
+  * Zähle nur echte Magic-Karten. Ignoriere Hintergrund, Tisch, Hände, Hüllen.
+  * Jede Karte genau einmal. Lieber ein etwas zu großes Rechteck als ein zu kleines.
+  * Liegt keine Karte im Bild, gib eine leere Liste. Erfinde nichts.`;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Nur POST" }, 405);
@@ -125,8 +164,12 @@ Deno.serve(async (req) => {
 
   const ERLAUBT = ["image/jpeg", "image/png", "image/webp", "image/gif"];
   let images: { b64: string; media_type: string }[];
+  let mode = "transcribe";
   try {
     const body = await req.json();
+    // "detect": mehrere Karten auf einem Foto lokalisieren. Sonst wie bisher
+    // eine Karte transkribieren.
+    if (body.mode === "detect") mode = "detect";
     // Neu: images[] (Karte + Eckausschnitt). Alt: image_b64 — bleibt
     // erlaubt, damit eine ältere App-Fassung nicht bricht.
     images = Array.isArray(body.images) && body.images.length
@@ -146,6 +189,32 @@ Deno.serve(async (req) => {
 
   try {
     const anthropic = new Anthropic({ apiKey: key });
+
+    // Betriebsart "detect": nur die Kartenrechtecke zurückgeben. Das genaue
+    // Ablesen je Karte macht danach der Einzelscan im Client.
+    if (mode === "detect") {
+      const det = await anthropic.messages.create({
+        model: MODEL,
+        max_tokens: 1024,
+        system: DETECT_SYSTEM,
+        output_config: { format: { type: "json_schema", schema: DETECT_SCHEMA } },
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text" as const, text: "Finde alle Karten im Bild und gib ihre Rechtecke." },
+            { type: "image" as const, source: { type: "base64" as const, media_type: images[0].media_type, data: images[0].b64 } },
+          ],
+        }],
+      });
+      if (det.stop_reason === "refusal") return json({ error: "Anfrage wurde abgelehnt" }, 422);
+      const dtext = det.content.find((b) => b.type === "text");
+      if (!dtext || dtext.type !== "text") return json({ error: "Keine verwertbare Antwort" }, 502);
+      return json({
+        detect: JSON.parse(dtext.text),
+        usage: { input: det.usage.input_tokens, output: det.usage.output_tokens, model: det.model },
+      });
+    }
+
     const res = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 1024,          // die Antwort ist ein kleines JSON-Objekt
