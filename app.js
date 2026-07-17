@@ -788,8 +788,12 @@ function cardRow(c, o = {}) {
       ${imDeck ? "" : `<td class="hide-s">${langHtml(c.lang)}</td>
       <td class="hide-s">${esc(c.condition || "")}</td>
       <td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap">${dtShort(c.added)}</td>`}
+      <!-- 54 px ist die schmalste Breite, bei der drei Stellen noch ganz
+           hineinpassen (gemessen, inklusive Spinner-Pfeilen; ab 50 px wird
+           abgeschnitten). Zwei Stellen sind der Regelfall, aber 100 Wälder
+           sind kein Sonderfall genug, um sie unlesbar zu machen. -->
       <td class="num"><input type="number" min="0" value="${qty}" data-qty
-             style="width:62px;padding:4px 6px;text-align:right"></td>
+             style="width:54px;padding:4px 6px;text-align:right"></td>
       ${imDeck ? `<td class="num">${fehlt
         ? `<span class="pill err">${fehlt} fehlen</span>`
         : '<span class="pill ok">vorhanden</span>'}</td>`
