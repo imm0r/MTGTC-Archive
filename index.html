@@ -6,7 +6,7 @@
 <title>MTG Sammlung</title>
 <!-- ?v= bei jeder Änderung hochzählen: sonst servieren Browser (und der
      Cache von GitHub Pages) nach einem Push weiter die alten Dateien. -->
-<link rel="stylesheet" href="style.css?v=57">
+<link rel="stylesheet" href="style.css?v=58">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='14'>&#9670;</text></svg>">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
@@ -99,9 +99,21 @@
 <!-- ---------------- Decks ---------------- -->
 <section class="view" id="v-decks">
   <div class="card">
-    <div class="row">
-      <div><label>Neues Deck</label><input type="text" id="deck-name" placeholder="z. B. Mono Red Aggro"></div>
+    <div class="row" style="align-items:flex-end">
+      <div style="flex:2"><label>Neues Deck</label><input type="text" id="deck-name" placeholder="z. B. Mono Red Aggro"></div>
+      <div><label>Format</label><select id="deck-format"></select></div>
+      <div><label>Archetyp</label><select id="deck-arch"></select></div>
       <div style="flex:none"><button class="btn" id="deck-add">Deck anlegen</button></div>
+    </div>
+  </div>
+  <!-- Filterleiste nach Klassifizierung. deckFilterUi() befüllt die Auswahlen
+       mit den vergebenen Werten und blendet die Karte ein, sobald es etwas zu
+       filtern gibt (ab zwei Decks, sobald mind. eines eingeordnet ist). -->
+  <div class="card" id="deck-filter" style="display:none">
+    <div class="row" style="align-items:flex-end">
+      <div style="flex:none"><span class="hint" style="font-weight:600">Filtern nach</span></div>
+      <div><label>Format</label><select id="fd-format"></select></div>
+      <div><label>Archetyp</label><select id="fd-arch"></select></div>
     </div>
   </div>
   <div id="deck-list"></div>
@@ -215,6 +227,6 @@
 <div id="hovercard"></div>
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=57"></script>
+<script src="app.js?v=58"></script>
 </body>
 </html>

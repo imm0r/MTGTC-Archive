@@ -1846,6 +1846,27 @@ const deckOffen = {
    aufgeklappte Deck. Ein neuer Seitenaufruf startet ohne offene Dashboards. */
 const deckDashOffen = new Set();
 
+/* Filter der Deck-Ansicht nach Klassifizierung. Nur im Speicher wie die
+   Statistik — ein neuer Seitenaufruf zeigt wieder alle Decks. "" heißt "egal". */
+let deckFilter = { format: "", archetype: "" };
+
+/* Klassifizierung der Decks. Festes Vokabular an einer Stelle, damit Anlegen,
+   Bearbeiten und Filter dieselbe Liste teilen und nichts auseinanderläuft.
+   Format = in welchem Rahmen gespielt wird, Archetyp = wie das Deck gewinnt.
+   Reihenfolge ist Absicht (Geläufigstes zuerst); danach richtet sich auch die
+   Sortierung im Filter. Frei lassbar — kein Deck MUSS eingeordnet sein. */
+const DECK_FORMATE = ["Commander", "Standard", "Pioneer", "Modern", "Legacy",
+                      "Vintage", "Pauper", "Draft", "Brawl", "Casual"];
+const DECK_ARCHETYPEN = ["Aggro", "Midrange", "Control", "Combo", "Tempo",
+                         "Ramp", "Tribal"];
+
+/* <option>-Liste für die Auswahlfelder. leer ist die erste, wertlose Option
+   ("—" im Formular für „nicht eingeordnet", "Alle …" im Filter); sel wird
+   vorausgewählt. */
+const deckOptions = (werte, sel, leer) =>
+  `<option value="">${esc(leer)}</option>` +
+  werte.map(w => `<option value="${esc(w)}"${w === sel ? " selected" : ""}>${esc(w)}</option>`).join("");
+
 /* Ein Commander muss eine legendäre Kreatur oder ein legendärer Planeswalker
    sein — legendäre Artefakte, Länder und Hexereien zählen nicht.
 
@@ -1886,44 +1907,92 @@ async function setMainCard(deckId, cardId) {
 }
 
 /* ============================= Decks-Ansicht ========================== */
-/* Deck umbenennen. Dieselben Regeln wie beim Anlegen: getrimmt, leer geht
-   nicht. Ist der Name unverändert, wird gar nicht erst geschrieben — ein
-   Klick auf OK ohne Änderung soll nichts tun.
-   Der Name gehört dem Deck, nicht seinen Karten: die Zuordnungen hängen an
-   der Deck-ID und bleiben unberührt. */
-async function renameDeck(id) {
+/* Deck bearbeiten: Name und Klassifizierung (Format, Archetyp) in einem
+   Dialog. Wie beim Anlegen wird der Name getrimmt und darf nicht leer sein;
+   Format und Archetyp sind frei lassbar ("" wird zu NULL). Hat sich nichts
+   geändert, wird gar nicht erst geschrieben — OK ohne Änderung tut nichts.
+   Name und Einordnung gehören dem Deck, nicht seinen Karten: die Zuordnungen
+   hängen an der Deck-ID und bleiben unberührt. */
+async function editDeck(id) {
   const d = DECKS.find(x => x.id === id);
   if (!d) return;
   const ok = await confirmDlg(`
-    <b>Deck umbenennen</b>
+    <b>Deck bearbeiten</b>
     <div style="margin-top:10px">
       <label>Name</label>
       <input type="text" id="dn-name" value="${esc(d.name)}" autofocus>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div><label>Format</label><select id="dn-format">${deckOptions(DECK_FORMATE, d.format, "—")}</select></div>
+      <div><label>Archetyp</label><select id="dn-arch">${deckOptions(DECK_ARCHETYPEN, d.archetype, "—")}</select></div>
     </div>
     <p class="hint">Die Karten im Deck bleiben unverändert.</p>`);
   if (!ok) return;
   const name = $("#dn-name").value.trim();
   if (!name) return toast("Bitte einen Decknamen eingeben");
-  if (name === d.name) return;
+  const format    = $("#dn-format").value || null;
+  const archetype = $("#dn-arch").value   || null;
+  // Nichts geändert? Dann nicht schreiben. NULL und "" gelten als gleich.
+  if (name === d.name && format === (d.format || null) && archetype === (d.archetype || null)) return;
   try {
-    const { error } = await sb.from("decks").update({ name }).eq("id", d.id);
+    const { error } = await sb.from("decks").update({ name, format, archetype }).eq("id", d.id);
     if (error) throw error;
     await reload(); renderDecks();
-    toast("Deck heißt jetzt „" + name + "“");
+    toast("Deck gespeichert");
   } catch (e) { toast(dbErr(e)); }
+}
+
+/* Füllt die Filterleiste der Deck-Ansicht und blendet sie ein oder aus.
+   Angeboten werden nur TATSÄCHLICH vergebene Werte (in kanonischer
+   Reihenfolge) — man soll nicht auf ein Format filtern können, das kein Deck
+   trägt. Kein Filter, wenn kaum etwas zu filtern ist: unter zwei Decks oder
+   solange nichts eingeordnet ist. In beiden Fällen wird ein etwaiger Filter
+   geräumt, sonst versteckte er die sichtbaren Decks heimlich. */
+function deckFilterUi() {
+  const karte = $("#deck-filter");
+  if (!karte) return;
+  const inGebrauch = (feld, reihenfolge) =>
+    [...new Set(DECKS.map(d => d[feld]).filter(Boolean))]
+      .sort((a, b) => reihenfolge.indexOf(a) - reihenfolge.indexOf(b));
+  const fmt = inGebrauch("format", DECK_FORMATE);
+  const arc = inGebrauch("archetype", DECK_ARCHETYPEN);
+  if (DECKS.length < 2 || (!fmt.length && !arc.length)) {
+    deckFilter = { format: "", archetype: "" };
+    karte.style.display = "none";
+    return;
+  }
+  // Ein weggefallener Wert (letztes Deck dieses Formats gelöscht oder
+  // umklassiert) darf nicht als toter Filter hängenbleiben.
+  if (deckFilter.format && !fmt.includes(deckFilter.format)) deckFilter.format = "";
+  if (deckFilter.archetype && !arc.includes(deckFilter.archetype)) deckFilter.archetype = "";
+  const ff = $("#fd-format"), fa = $("#fd-arch");
+  ff.innerHTML = deckOptions(fmt, deckFilter.format, "Alle Formate");
+  fa.innerHTML = deckOptions(arc, deckFilter.archetype, "Alle Archetypen");
+  ff.onchange = () => { deckFilter.format = ff.value; renderDecks(); };
+  fa.onchange = () => { deckFilter.archetype = fa.value; renderDecks(); };
+  karte.style.display = "";
 }
 
 function renderDecks() {
   if (!DECKS.length) {
     $("#deck-list").innerHTML = '<div class="card"><div class="empty">Noch keine Decks angelegt.</div></div>';
+    deckFilterUi();
     return;
   }
+  deckFilterUi();
+  // Nach der Klassifizierung filtern (leerer Filter = alle Decks). Die
+  // Filterleiste sitzt in einer eigenen Karte darüber; deckFilterUi() füllt
+  // ihre Auswahlfelder und blendet sie ein, sobald es etwas zu filtern gibt.
+  const sichtbar = DECKS.filter(d =>
+    (!deckFilter.format    || d.format    === deckFilter.format) &&
+    (!deckFilter.archetype || d.archetype === deckFilter.archetype));
+
   // Für jedes Deck mit offener Statistik die Karten mit ihrer DECKMENGE als
   // qty — damit renderDash die Deckmenge zählt, nicht den Sammlungsbestand.
   // Nach dem Einhängen der HTML gefüllt, weil renderDash in ein reales
   // Element schreibt.
   const deckDashRows = new Map();
-  $("#deck-list").innerHTML = DECKS.map(d => {
+  const html = sichtbar.map(d => {
     // Nach Namen sortiert wie die Sammlung in ihrer Voreinstellung, bis
     // jemand eine Spaltenüberschrift dieses Decks anklickt.
     const ds = deckSort[d.id] ||= { key: "name", dir: 1 };
@@ -1950,11 +2019,14 @@ function renderDecks() {
              title="Hauptkarte: ${esc(haupt.disp)}">` : ""}
         <div style="flex:1;min-width:0">
           <h3 style="margin:0">${esc(d.name)}</h3>
+          ${d.format || d.archetype ? `<div class="deck-tags">${
+            d.format ? `<span class="pill fmt">${esc(d.format)}</span>` : ""}${
+            d.archetype ? `<span class="pill">${esc(d.archetype)}</span>` : ""}</div>` : ""}
           <div class="hint" style="margin:2px 0 0">${n} Karten &middot; ${eur(v)}${
             fehlt ? ` &middot; <span style="color:var(--err)">${fehlt} unvollständig</span>` : ""}</div>
         </div>
-        <button class="btn ghost sm" data-drn="${d.id}" style="flex:none"
-          title="Deck umbenennen">&#9998;</button>
+        <button class="btn ghost sm" data-ded="${d.id}" style="flex:none"
+          title="Deck bearbeiten">&#9998;</button>
         <button class="btn danger sm" data-dx="${d.id}" style="flex:none">Deck löschen</button>
       </div>
       <div class="deck-inhalt" style="display:${offen ? "block" : "none"}">
@@ -1971,6 +2043,10 @@ function renderDecks() {
       </div>
     </div>`;
   }).join("");
+  // Bei aktivem Filter kann die Auswahl leer sein — dann ein Hinweis statt
+  // einer blanken Fläche.
+  $("#deck-list").innerHTML = html ||
+    '<div class="card"><div class="empty">Kein Deck passt zum Filter.</div></div>';
 
   $$("#deck-list .deck-kopf").forEach(k => k.onclick = ev => {
     // Im Kopf sitzen Knöpfe (Umbenennen, Löschen) — ihr Klick darf nicht
@@ -2011,7 +2087,7 @@ function renderDecks() {
     });
   });
 
-  $$("[data-drn]").forEach(b => b.onclick = () => renameDeck(b.dataset.drn));
+  $$("[data-ded]").forEach(b => b.onclick = () => editDeck(b.dataset.ded));
 
   $$("[data-dx]").forEach(b => b.onclick = async () => {
     const d = DECKS.find(x => x.id === b.dataset.dx);
@@ -2495,13 +2571,20 @@ function wireApp() {
   $("#f-foil").onchange = renderCollection;
   $("#upd").onclick = updatePrices;
 
+  // Anlege-Dropdowns aus demselben Vokabular wie Bearbeiten und Filter.
+  $("#deck-format").innerHTML = deckOptions(DECK_FORMATE, "", "—");
+  $("#deck-arch").innerHTML   = deckOptions(DECK_ARCHETYPEN, "", "—");
   $("#deck-add").onclick = async () => {
     const name = $("#deck-name").value.trim();
     if (!name) return toast("Bitte einen Decknamen eingeben");
+    const format    = $("#deck-format").value || null;
+    const archetype = $("#deck-arch").value   || null;
     try {
-      const { error } = await sb.from("decks").insert({ name });
+      const { error } = await sb.from("decks").insert({ name, format, archetype });
       if (error) throw error;
       $("#deck-name").value = "";
+      $("#deck-format").value = "";
+      $("#deck-arch").value = "";
       await reload(); renderAll();
     } catch (e) { toast(dbErr(e)); }
   };

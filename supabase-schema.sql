@@ -78,6 +78,12 @@ create table if not exists public.decks (
   -- verschwindet die Karte aus der Sammlung, verliert das Deck nur sein
   -- Bild — es darf auf keinen Fall mitgelöscht werden.
   main_card_id uuid references public.cards(id) on delete set null,
+  -- Klassifizierung aus festem Vokabular (die Listen stehen in app.js): format
+  -- etwa Commander/Modern, archetype etwa Aggro/Control. Beides darf leer sein
+  -- (NULL = nicht eingeordnet). Bewusst text und kein enum — das Vokabular
+  -- wächst in der App, ohne dass die Datenbank mitwandern muss.
+  format    text,
+  archetype text,
   created timestamptz not null default now()
 );
 
@@ -94,6 +100,8 @@ alter table public.cards add column if not exists printed_name text;
 alter table public.cards add column if not exists cm_id integer;
 alter table public.decks add column if not exists main_card_id uuid
   references public.cards(id) on delete set null;
+alter table public.decks add column if not exists format text;
+alter table public.decks add column if not exists archetype text;
 alter table public.cards add column if not exists type_line text;
 alter table public.cards add column if not exists rarity text;
 alter table public.cards add column if not exists mana_cost text;
