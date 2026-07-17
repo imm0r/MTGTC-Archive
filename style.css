@@ -102,11 +102,19 @@ dialog{background:var(--panel);color:var(--txt);border:1px solid var(--line);bor
 dialog::backdrop{background:#000a}
 
 /* -------------------------------------------------- Karten-Detailansicht */
-#detail-dlg{max-width:620px;width:94vw}
+#detail-dlg{max-width:640px;width:94vw}
 .detail{display:flex;gap:16px;flex-wrap:wrap}
 .detail-img{width:230px;max-width:100%;border-radius:10px;background:#000;flex:none;align-self:flex-start}
-.detail-info{flex:1;min-width:200px}
-.chart-svg{width:100%;height:auto;display:block;margin-top:4px}
+.detail-info{flex:1;min-width:220px}
+.chart-svg{width:100%;max-width:360px;height:auto;display:block;margin-top:4px}
+
+/* Hover-Vorschau: schwebt neben dem Zeiger, nimmt keine Mausereignisse an
+   (sonst flackert sie, sobald der Zeiger sie berührt). */
+#hovercard{position:fixed;z-index:90;display:none;pointer-events:none;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:12px;width:430px;max-width:calc(100vw - 16px);box-shadow:0 10px 34px #000c}
+#hovercard .detail-img{width:140px;height:196px;object-fit:cover}
+#hovercard .detail-info b{font-size:15px}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--panel2);
        border:1px solid var(--acc);border-radius:8px;padding:10px 18px;z-index:99;opacity:0;
        transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}

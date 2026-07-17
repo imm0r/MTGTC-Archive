@@ -790,8 +790,17 @@ function renderCollection() {
       await reload(); renderAll(); toast("Karte entfernt");
     } catch (e) { toast(dbErr(e)); }
   });
-  $$("#tbl tbody [data-view]").forEach(el => el.onclick = () =>
-    showCardDetail(el.closest("tr").dataset.id));
+  $$("#tbl tbody [data-view]").forEach(el => {
+    const id = el.closest("tr").dataset.id;
+    el.onclick = () => { hideHover(); showCardDetail(id); };
+    if (HOVER_OK) {
+      el.addEventListener("mouseenter", e => {
+        clearTimeout(hoverTimer);
+        hoverTimer = setTimeout(() => showHover(id, e.clientX, e.clientY), 300);
+      });
+      el.addEventListener("mouseleave", hideHover);
+    }
+  });
   $$("#tbl tbody [data-edit]").forEach(b => b.onclick = () =>
     editCard(b.closest("tr").dataset.id));
   $$("#tbl tbody [data-price]").forEach(b => b.onclick = async () => {
@@ -842,10 +851,10 @@ const dtShort = iso => {
 /* Preisverlauf als richtiger Graph: Gitterlinien mit Eurowerten, Datum an
    den Enden, ein Punkt pro Tag (bis 60, so weit reicht die Historie).
    Grün bei gestiegenem, rot bei gefallenem Kurs — wie die Mini-Kurve. */
-function priceChart(hist) {
+function priceChart(hist, w = 560, h = 200) {
   const H = (hist || []).map(p => ({ d: p.d, v: Number(p.v) })).filter(p => !isNaN(p.v));
   if (!H.length) return '<p class="hint">Noch keine Preishistorie — sie wächst mit jedem Preis-Update um einen Punkt pro Tag.</p>';
-  const w = 560, h = 200, pl = 62, pr = 14, pt = 12, pb = 26;
+  const pl = w > 400 ? 62 : 54, pr = 14, pt = 12, pb = 26;
   let min = Math.min(...H.map(p => p.v)), max = Math.max(...H.map(p => p.v));
   if (min === max) { const d = Math.max(0.05, min * 0.1); min -= d; max += d; }
   const X = i => H.length === 1 ? pl + (w - pl - pr) / 2 : pl + i * (w - pl - pr) / (H.length - 1);
@@ -867,13 +876,14 @@ function priceChart(hist) {
   </svg>`;
 }
 
-function showCardDetail(id) {
-  const c = CARDS.find(x => x.id === id);
-  if (!c) return;
+/* Gemeinsame Vorlage für Dialog und Hover-Vorschau. Der Preisgraph sitzt in
+   der rechten Spalte unter dem Hinzugefügt-Datum — kompakt (320er-viewBox),
+   damit die Beschriftung beim Skalieren lesbar bleibt. */
+function detailHtml(c, hover) {
   // Scryfall-Bild-URLs tragen die Größe im Pfad — aus small wird normal
   // (488×680), ohne einen weiteren API-Aufruf.
   const gross = (c.img || "").replace("/small/", "/normal/");
-  $("#detail-body").innerHTML = `
+  return `
     <div class="detail">
       ${gross ? `<img class="detail-img" src="${esc(gross)}" alt="">` : ""}
       <div class="detail-info">
@@ -887,16 +897,50 @@ function showCardDetail(id) {
           <span class="pill">Anzahl ${c.qty}</span>
         </div>
         <div>Preis: <b>${eur(c.price)}</b>${c.qty > 1 ? ` · Wert: <b>${eur(c.price == null ? null : c.price * c.qty)}</b>` : ""}
-          ${cmLink(c.cm_id) ? ` <a class="cm" href="${esc(cmLink(c.cm_id))}" target="_blank"
+          ${!hover && cmLink(c.cm_id) ? ` <a class="cm" href="${esc(cmLink(c.cm_id))}" target="_blank"
             rel="noopener noreferrer" title="Angebote auf Cardmarket">CM</a>` : ""}</div>
         <div class="hint" style="margin-top:10px">Hinzugefügt: ${dtShort(c.added)} Uhr</div>
+        <div style="margin-top:10px">
+          <label style="margin-bottom:2px">Preisverlauf</label>
+          ${priceChart(c.hist, 320, 150)}
+        </div>
       </div>
-    </div>
-    <div style="margin-top:14px">
-      <label style="margin-bottom:2px">Preisverlauf</label>
-      ${priceChart(c.hist)}
     </div>`;
+}
+
+function showCardDetail(id) {
+  const c = CARDS.find(x => x.id === id);
+  if (!c) return;
+  $("#detail-body").innerHTML = detailHtml(c, false);
   $("#detail-dlg").showModal();
+}
+
+/* Hover-Vorschau: dieselben Details schweben neben dem Mauszeiger, ohne
+   Klick. Nur auf Geräten mit echtem Hover — auf dem Handy bleibt der Tipp
+   aufs Bild bzw. den Namen der Weg zur Detailansicht. */
+const HOVER_OK = matchMedia("(hover: hover)").matches;
+let hoverTimer = null;
+
+function hideHover() {
+  clearTimeout(hoverTimer);
+  hoverTimer = null;
+  const hc = $("#hovercard");
+  if (hc) hc.style.display = "none";
+}
+
+function showHover(id, x, y) {
+  const c = CARDS.find(k => k.id === id);
+  if (!c) return;
+  const hc = $("#hovercard");
+  hc.innerHTML = detailHtml(c, true);
+  hc.style.left = "0px"; hc.style.top = "0px";   // erst einblenden, dann messen
+  hc.style.display = "block";
+  const r = hc.getBoundingClientRect();
+  let links = x + 18, oben = y + 14;
+  if (links + r.width > innerWidth - 8) links = Math.max(8, x - r.width - 18);
+  if (oben + r.height > innerHeight - 8) oben = Math.max(8, innerHeight - r.height - 8);
+  hc.style.left = links + "px";
+  hc.style.top = oben + "px";
 }
 
 /* ---------------------------------------------- Karte bearbeiten ----- */
@@ -1549,6 +1593,9 @@ function wireApp() {
     try { await importJson(f); } catch (err) { toast("Import fehlgeschlagen: " + err.message); }
   };
   $("#detail-close").onclick = () => $("#detail-dlg").close();
+  // Beim Scrollen (auch innerhalb der Tabelle) verrutscht die Vorschau —
+  // lieber ausblenden. capture:true erwischt auch innere Scroller.
+  addEventListener("scroll", hideHover, true);
   $("#mi-toggle").onclick = () => {
     const s = $("#manual-import");
     const zeigen = s.style.display === "none";
