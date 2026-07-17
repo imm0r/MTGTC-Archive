@@ -79,19 +79,41 @@ wieder, was tatsächlich zu sehen ist — rate nichts und ergänze nichts aus Vo
 über existierende Karten. Ist ein Feld nicht sicher lesbar, gib es leer zurück; ein
 leeres Feld ist brauchbar, ein falsches nicht.
 
-Der wichtigste Bereich ist unten links. Dort stehen zwei kleine Zeilen:
-  0008/013 T
-  MKM • DE
-Die erste Zeile ist Sammlernummer/Gesamtzahl und danach das Seltenheitszeichen
-(C, U, R, M oder T). T bedeutet Token — dieses Zeichen ist entscheidend, weil
-Karte und Token dieselbe Nummer tragen können und trotzdem verschieden sind.
-Die zweite Zeile ist Setcode und Sprache.
+Der wichtigste Bereich ist unten links. Dort stehen zwei kleine Zeilen. Ihr
+Aufbau schwankt je nach Set erheblich — halte dich an diese Regeln, nicht an
+ein festes Muster.
 
-Gib die Sammlernummer ohne führende Nullen und ohne den Teil nach dem Schrägstrich
-zurück: aus "0008/013" wird "8". Beim Setcode nur der Code selbst, ohne Sprachkürzel.
+ZWEITE ZEILE — hier steht IMMER der Setcode, gefolgt von einem Trennzeichen
+(• · *) und dem Sprachkürzel. Dahinter kann der Name des Illustrators stehen,
+der zählt nicht:
+  MKM • DE          -> set_code "MKM", lang "de"
+  FIN • DE  Solan   -> set_code "FIN", lang "de"
+Nimm den Setcode ausschließlich aus dieser Zeile.
 
-Sehr alte Karten haben diesen Aufdruck nicht. Dann bleiben set_code und
-collector_number leer, und nur der Kartenname oben zählt.`;
+ERSTE ZEILE — hier steht die Sammlernummer, meist mit einem Seltenheitszeichen
+(C, U, R, M, S oder T). Position und Form wechseln von Set zu Set:
+  0008/013 T        -> collector_number "8",   is_token true
+  T 0009 FFXIV      -> collector_number "9",   is_token true
+  0123/281 R        -> collector_number "123", is_token false
+  0009              -> collector_number "9",   is_token false
+Regeln dafür:
+  * Die Sammlernummer ist die erste Ziffernfolge der Zeile, ohne führende
+    Nullen. Steht ein Schrägstrich dahinter, ist das die Gesamtzahl der Karten
+    im Set — sie gehört NICHT zur Nummer.
+  * Ein alleinstehendes T irgendwo auf dieser Zeile bedeutet Token, gleich ob
+    vor oder hinter der Nummer.
+  * Weitere Buchstabengruppen auf dieser Zeile sind Franchise-Kürzel
+    (z. B. FFXIV) und KEIN Setcode. Ignoriere sie vollständig.
+
+Warum das T so wichtig ist: Karte und Token tragen dieselbe Nummer und sind
+trotzdem verschieden. FIN #9 ist "Battle Menu", das Token FIN #9 ist "Held".
+Ein übersehenes T liefert also die falsche Karte, nicht bloß eine ungenaue.
+
+Ein weiterer Hinweis auf ein Token ist die Typzeile in der Mitte der Karte:
+"Spielsteinkreatur", "Token Creature" oder "Emblem".
+
+Sehr alte Karten haben diesen Aufdruck unten links nicht. Dann bleiben set_code
+und collector_number leer, und nur der Kartenname oben zählt.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });

@@ -325,20 +325,39 @@ function preprocessCorner(img) {
   return cv;
 }
 
-/* Erwartet zwei Zeilen wie "0008/013 T" und "MKM • DE". Der Trennpunkt wird
-   von der Erkennung gern als *, . oder ° gelesen, die Null als O. */
+/* Der Aufbau der Ecke schwankt je nach Set — mal "0008/013 T", mal
+   "T 0009 FFXIV". Deshalb keine feste Schablone, sondern Regeln:
+   Der Setcode steht immer vor dem Trennzeichen in der Sprachzeile, die
+   Nummer ist die erste Ziffernfolge der anderen Zeile, und ein einzelnes
+   T darauf bedeutet Token — egal an welcher Stelle. */
 function parseCorner(text) {
-  const T = text.toUpperCase().replace(/[|]/g, " ");
-  const code = T.match(/\b([A-Z0-9]{3,5})\s*[•·*.,°\-]\s*([A-Z]{2})\b/);
-  const numT = T.match(/\b(\d{1,4})\s*\/\s*\d{1,4}\s*([A-Z])?/) || T.match(/\b(\d{2,4})\b/);
-  if (!code || !numT) return null;
-  return {
-    set: code[1],
-    lang: code[2].toLowerCase(),
-    num: numT[1],
-    // Der Buchstabe hinter der Nummer ist die Seltenheit; T steht für Token.
-    token: (numT[2] || "") === "T" || /\bT\b/.test(T.split("\n")[0] || "")
-  };
+  const lines = text.toUpperCase().replace(/[|]/g, " ")
+    .split("\n").map(l => l.trim()).filter(Boolean);
+
+  // Sprachzeile finden: CODE <Trennzeichen> SPRACHE. Die Erkennung liest den
+  // Punkt gern als *, . oder °.
+  let set = null, lang = null, setLine = -1;
+  lines.forEach((l, i) => {
+    if (set) return;
+    const m = l.match(/\b([A-Z0-9]{3,6})\s*[•·*.,°\-]\s*([A-Z]{2})\b/);
+    if (m) { set = m[1]; lang = m[2].toLowerCase(); setLine = i; }
+  });
+  if (!set) return null;
+
+  // Nummernzeile: die erste andere Zeile, die eine Ziffernfolge enthält.
+  for (let i = 0; i < lines.length; i++) {
+    if (i === setLine) continue;
+    const n = lines[i].match(/(\d{1,4})/);
+    if (!n) continue;
+    return {
+      set, lang,
+      num: n[1],
+      // Alleinstehendes T = Token. Buchstabengruppen wie FFXIV enthalten
+      // zwar ein T, matchen aber \bT\b nicht.
+      token: /\bT\b/.test(lines[i]),
+    };
+  }
+  return null;
 }
 
 const candidates = text => text.split("\n")
