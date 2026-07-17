@@ -838,12 +838,7 @@ function wireCardRows(root) {
       if (!c) return;
       pb.disabled = true;
       try {
-        const fresh = await withPrice(await sfById(c.scryfall_id));
-        if (!fresh) throw new Error("Karte bei Scryfall nicht gefunden");
-        const p = priceOf(fresh, c.foil);
-        // set_price schreibt in die Preishistorie: ein Punkt pro Tag, 60 bleiben.
-        const { error } = await sb.rpc("set_price", { p_card_id: c.id, p_price: p });
-        if (error) throw new Error(dbErr(error));
+        const p = await preisNeuZiehen(c);
         await reload(); renderAll();
         toast(p == null ? "Scryfall führt keinen Preis für diese Auflage" : "Preis aktualisiert: " + eur(p));
       } catch (e) { pb.disabled = false; toast(e.message); }
@@ -911,6 +906,35 @@ function renderCollection() {
   });
 }
 
+/* Trägt nach, was der Karte fehlt. Bestände aus der Zeit vor den Spalten
+   type_line/rarity haben sie leer — und ohne Typzeile lehnt der Trigger die
+   Karte als Hauptkarte ab und verweist dafür genau hierher ("Preis neu
+   ziehen"). Dieser Weg muss sie also wirklich füllen, sonst schickt die App
+   in eine Sackgasse.
+   Nur LEERE Felder werden gesetzt: eine bereits erfasste Auflage behält ihre
+   Angaben. Der Preis ist tagesaktuell, die Typzeile ist es nicht. */
+async function nachtragen(c, fresh) {
+  const patch = {};
+  if (!c.type_line && fresh.type_line) patch.type_line = fresh.type_line;
+  if (!c.rarity && fresh.rarity) patch.rarity = fresh.rarity;
+  if (!Object.keys(patch).length) return;
+  const { error } = await sb.from("cards").update(patch).eq("id", c.id);
+  if (error) throw new Error(dbErr(error));
+}
+
+/* Preis einer einzelnen Karte neu holen. Zeile und Detailansicht teilen sich
+   diesen Weg — sonst füllt nur einer von beiden die Lücken nach. */
+async function preisNeuZiehen(c) {
+  const fresh = await withPrice(await sfById(c.scryfall_id));
+  if (!fresh) throw new Error("Karte bei Scryfall nicht gefunden");
+  const p = priceOf(fresh, c.foil);
+  // set_price schreibt in die Preishistorie: ein Punkt pro Tag, 60 bleiben.
+  const { error } = await sb.rpc("set_price", { p_card_id: c.id, p_price: p });
+  if (error) throw new Error(dbErr(error));
+  await nachtragen(c, fresh);
+  return p;
+}
+
 async function updatePrices() {
   const btn = $("#upd");
   btn.disabled = true;
@@ -923,7 +947,8 @@ async function updatePrices() {
     if (!fresh) { failed++; continue; }
     for (const c of CARDS.filter(x => x.scryfall_id === sid)) {
       const { error } = await sb.rpc("set_price", { p_card_id: c.id, p_price: priceOf(fresh, c.foil) });
-      if (error) failed++;
+      if (error) { failed++; continue; }
+      try { await nachtragen(c, fresh); } catch { failed++; }
     }
   }
   try { await reload(); renderAll(); } catch (e) { toast(dbErr(e)); }
@@ -1041,11 +1066,7 @@ function showCardDetail(id) {
   pb.onclick = async () => {
     pb.disabled = true;
     try {
-      const fresh = await withPrice(await sfById(c.scryfall_id));
-      if (!fresh) throw new Error("Karte bei Scryfall nicht gefunden");
-      const p = priceOf(fresh, c.foil);
-      const { error } = await sb.rpc("set_price", { p_card_id: c.id, p_price: p });
-      if (error) throw new Error(dbErr(error));
+      const p = await preisNeuZiehen(c);
       await reload(); renderAll();
       toast(p == null ? "Scryfall führt keinen Preis für diese Auflage" : "Preis aktualisiert: " + eur(p));
       // Ansicht mit dem frischen Preis und dem neuen Kurvenpunkt neu zeichnen.
