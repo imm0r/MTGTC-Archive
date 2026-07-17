@@ -27,7 +27,7 @@ for /f "delims=" %%I in ('powershell -NoProfile -Command ^
 
 echo.
 echo   ============================================
-echo     MTG Sammlung laeuft
+echo     Arcanum Archive laeuft
 echo   ============================================
 echo.
 echo     Auf diesem PC:  http://localhost:%PORT%/

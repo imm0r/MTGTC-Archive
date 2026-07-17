@@ -1,4 +1,6 @@
-# MTG Sammlung
+# Arcanum Archive
+
+*Unearth your collection.*
 
 Magic-Karten per Foto erfassen: Texterkennung liest den Kartennamen, Scryfall
 liefert Set, Sammlernummer, Bild und Marktpreis, Supabase speichert die Sammlung

@@ -1,5 +1,5 @@
 -- =====================================================================
---  MTG Sammlung — Datenbankschema
+--  Arcanum Archive — Datenbankschema
 --  Einmalig ausführen: Supabase → SQL Editor → einfügen → "Run".
 --  Das Skript ist wiederholbar; ein zweiter Lauf richtet keinen Schaden an.
 -- =====================================================================

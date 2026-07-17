@@ -2163,7 +2163,7 @@ function exportCsv() {
     c.mana_cost ?? "", c.cmc ?? "", c.lang, c.condition,
     c.foil ? "ja" : "nein", c.qty, c.price ?? "",
     c.price == null ? "" : (c.price * c.qty).toFixed(2)]);
-  download(`mtg-sammlung-${today()}.csv`,
+  download(`arcanum-archive-${today()}.csv`,
     "﻿" + [head, ...rows].map(r => r.map(csvCell).join(";")).join("\r\n"), "text/csv");
 }
 
@@ -2589,7 +2589,7 @@ function wireApp() {
     } catch (e) { toast(dbErr(e)); }
   };
 
-  $("#ex-json").onclick = () => download(`mtg-sicherung-${today()}.json`,
+  $("#ex-json").onclick = () => download(`arcanum-archive-sicherung-${today()}.json`,
     JSON.stringify({ v: 2, exported: new Date().toISOString(), cards: CARDS, decks: DECKS }, null, 1),
     "application/json");
   $("#ex-csv").onclick = exportCsv;

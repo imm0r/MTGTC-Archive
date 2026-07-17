@@ -3,19 +3,65 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>MTG Sammlung</title>
+<title>Arcanum Archive</title>
 <!-- ?v= bei jeder Änderung hochzählen: sonst servieren Browser (und der
      Cache von GitHub Pages) nach einem Push weiter die alten Dateien. -->
-<link rel="stylesheet" href="style.css?v=58">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='14'>&#9670;</text></svg>">
+<link rel="stylesheet" href="style.css?v=59">
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PGRlZnM+PHJhZGlhbEdyYWRpZW50IGlkPSJsIiBjeD0iNDAlIiBjeT0iMzYlIiByPSI3MiUiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2RjZWZmZiIvPjxzdG9wIG9mZnNldD0iMjYlIiBzdG9wLWNvbG9yPSIjNWY4OGUyIi8+PHN0b3Agb2Zmc2V0PSI2MCUiIHN0b3AtY29sb3I9IiM2ZTM3YTQiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiMxNDBmMmMiLz48L3JhZGlhbEdyYWRpZW50PjwvZGVmcz48cmVjdCB4PSIxLjIiIHk9IjEuMiIgd2lkdGg9IjI5LjYiIGhlaWdodD0iMjkuNiIgcng9IjcuNSIgZmlsbD0iIzIxMWMzZiIgc3Ryb2tlPSIjYzlhMjI3IiBzdHJva2Utd2lkdGg9IjIiLz48bGluZSB4MT0iMTgiIHkxPSIxNy41IiB4Mj0iMjYiIHkyPSIyNS41IiBzdHJva2U9IiNlM2JmNGEiIHN0cm9rZS13aWR0aD0iMy42IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48Y2lyY2xlIGN4PSIxNCIgY3k9IjE0IiByPSI4IiBmaWxsPSJ1cmwoI2wpIiBzdHJva2U9IiNjOWEyMjciIHN0cm9rZS13aWR0aD0iMi40Ii8+PHBhdGggZD0iTTE0IDE0IEMxMSAxMS42IDExLjQgNy44IDE1IDciIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2UyZWVmZiIgc3Ryb2tlLXdpZHRoPSIxLjMiIG9wYWNpdHk9Ii44NSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGNpcmNsZSBjeD0iMTQiIGN5PSIxNCIgcj0iMS43IiBmaWxsPSIjZjJmOGZmIi8+PC9zdmc+">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
 </head>
 <body>
 
+<!-- Logo-Emblem einmal als <symbol> definiert; Kopfzeile und Login binden es
+     per <use> in ihrer jeweiligen Größe ein. Buch = Sammlung, Lupe mit
+     kosmischem Wirbel = Suche/„unearth", die fünf Punkte = die Mana-Farben. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="aa-shield" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#211c3f"/><stop offset="1" stop-color="#2c1c49"/></linearGradient>
+    <radialGradient id="aa-lens" cx="40%" cy="36%" r="72%">
+      <stop offset="0" stop-color="#dcefff"/><stop offset="26%" stop-color="#5f88e2"/>
+      <stop offset="60%" stop-color="#6e37a4"/><stop offset="100%" stop-color="#140f2c"/></radialGradient>
+    <linearGradient id="aa-page" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eef2fa"/><stop offset="1" stop-color="#bcc6da"/></linearGradient>
+    <radialGradient id="aa-glow" cx="50%" cy="42%" r="58%">
+      <stop offset="0" stop-color="#7b4fd0" stop-opacity=".55"/><stop offset="100%" stop-color="#7b4fd0" stop-opacity="0"/></radialGradient>
+  </defs>
+  <symbol id="aa-emblem" viewBox="0 0 128 128">
+    <path d="M64 3 L69 15 L64 22 L59 15 Z" fill="#e3bf4a"/>
+    <path d="M64 20 L107 33 L104 74 Q104 98 64 115 Q24 98 24 74 L21 33 Z" fill="url(#aa-shield)" stroke="#c9a227" stroke-width="3"/>
+    <ellipse cx="64" cy="52" rx="35" ry="31" fill="url(#aa-glow)"/>
+    <g fill="#e9e6ff" opacity=".9">
+      <circle cx="40" cy="40" r="1.1"/><circle cx="92" cy="43" r="1.3"/><circle cx="86" cy="30" r="0.9"/>
+      <circle cx="33" cy="58" r="0.9"/><circle cx="97" cy="62" r="1"/><circle cx="47" cy="30" r="0.8"/></g>
+    <path d="M64 70 L33 75 L35 93 L64 89 Z" fill="url(#aa-page)" stroke="#95a0ba" stroke-width="1"/>
+    <path d="M64 70 L95 75 L93 93 L64 89 Z" fill="url(#aa-page)" stroke="#95a0ba" stroke-width="1"/>
+    <line x1="64" y1="70" x2="64" y2="89" stroke="#7f8aa5" stroke-width="1.4"/>
+    <g stroke="#aab3c8" stroke-width="1" opacity=".8">
+      <line x1="40" y1="85" x2="58" y2="83.6"/><line x1="40" y1="88.5" x2="56" y2="87.2"/>
+      <line x1="70" y1="83.6" x2="88" y2="85"/><line x1="70" y1="87.2" x2="86" y2="88.5"/></g>
+    <g stroke="#20233a" stroke-width=".7">
+      <circle cx="44" cy="79" r="3.3" fill="#f3efe0"/><circle cx="54" cy="78" r="3.3" fill="#4a8fe0"/>
+      <circle cx="64" cy="77.6" r="3.3" fill="#4a4458"/><circle cx="74" cy="78" r="3.3" fill="#d85148"/>
+      <circle cx="84" cy="79" r="3.3" fill="#46a35f"/></g>
+    <line x1="75" y1="62" x2="93" y2="81" stroke="#8a6d1f" stroke-width="6.5" stroke-linecap="round"/>
+    <line x1="75" y1="62" x2="93" y2="81" stroke="#e3bf4a" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="61" cy="50" r="18.5" fill="url(#aa-lens)" stroke="#c9a227" stroke-width="3.5"/>
+    <circle cx="61" cy="50" r="18.5" fill="none" stroke="#f0d97a" stroke-width="1" opacity=".55"/>
+    <g fill="none" stroke="#e2eeff" stroke-width="1.5" opacity=".85" stroke-linecap="round">
+      <path d="M61 50 C56 46 56 39 61.5 37"/><path d="M61 50 C66 54 66 61 60.5 63"/></g>
+    <circle cx="61" cy="50" r="2.6" fill="#f2f8ff"/>
+  </symbol>
+</svg>
+
 <!-- ================= Einrichtung / Login ================= -->
 <div id="gate" style="display:none">
-  <h2>&#9670; MTG Sammlung</h2>
+  <div class="brand-hero">
+    <svg class="brand-emblem" viewBox="0 0 128 128" width="78" height="78"><use href="#aa-emblem"/></svg>
+    <div class="brand-word"><b>Arcanum</b><em>Archive</em></div>
+    <div class="brand-tag">Unearth your collection</div>
+  </div>
 
   <!-- Erststart: Verbindung zur eigenen Supabase-Datenbank -->
   <div class="pane" data-pane="setup" style="display:none">
@@ -62,7 +108,10 @@
 <!-- ===================== Anwendung ====================== -->
 <div id="app" style="display:none">
 <header>
-  <h1>&#9670; MTG SAMMLUNG</h1>
+  <h1 class="brand">
+    <svg class="brand-emblem" viewBox="0 0 128 128" width="28" height="28"><use href="#aa-emblem"/></svg>
+    <span class="brand-word inline"><b>Arcanum</b> <em>Archive</em></span>
+  </h1>
   <nav>
     <button data-v="coll" class="on">Sammlung</button>
     <button data-v="decks">Decks</button>
@@ -227,6 +276,6 @@
 <div id="hovercard"></div>
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=58"></script>
+<script src="app.js?v=59"></script>
 </body>
 </html>
