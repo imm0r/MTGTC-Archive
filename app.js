@@ -785,7 +785,7 @@ function cardRow(c, o = {}) {
         : `Manawert ${c.cmc ?? "?"}`}">${manaHtml(c.mana_cost)}</td>
       <td class="hide-s">${esc(c.set_name || c.set || "")}
           ${c.rarity ? `<div style="margin-top:3px">${rarityPill(c.rarity)}</div>` : ""}</td>
-      ${imDeck ? "" : `<td class="hide-s">${esc((c.lang || "").toUpperCase())}</td>
+      ${imDeck ? "" : `<td class="hide-s">${langHtml(c.lang)}</td>
       <td class="hide-s">${esc(c.condition || "")}</td>
       <td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap">${dtShort(c.added)}</td>`}
       <td class="num"><input type="number" min="0" value="${qty}" data-qty
@@ -1013,6 +1013,85 @@ function rarityPill(r) {
   return `<span class="pill" style="border-color:${d.farbe};color:${d.farbe}">${esc(d.text)}</span>`;
 }
 
+/* ----------------------------------------------------- Sprache ------- */
+/* Die Sprachen, die Scryfall führt und die App anbietet. Der Schlüssel ist
+   IMMER der Scryfall-Code — nicht der auf der Karte gedruckte. Die beiden
+   gehen auseinander: Japanisch steht als "JP" auf der Karte, heißt bei
+   Scryfall aber "ja"; Chinesisch ist gedruckt "CS"/"CT" und dort
+   "zhs"/"zht". Umgerechnet wird in parseCorner. */
+const LANG_NAMES = { de: "Deutsch", en: "Englisch", fr: "Französisch", it: "Italienisch",
+  es: "Spanisch", ja: "Japanisch", pt: "Portugiesisch", ru: "Russisch", ko: "Koreanisch" };
+
+/* Flaggen als eingebettetes SVG. Zwei Wege scheiden aus:
+   * Emoji-Flaggen (🇩🇪) zeigt Windows NICHT — gemessen: die beiden Regional
+     Indicators verschmelzen dort nicht zu einem Glyph, es erscheinen zwei
+     Buchstabenkästen. Auf Benjamins Rechner wäre die Spalte also unbrauchbar.
+   * Ein Flaggen-CDN wäre ein weiterer Fremdanbieter für etwas, das sich in
+     wenigen Zeilen selbst zeichnen lässt und sich nie ändert.
+   Einheitlich 3:2, damit die Spalte ruhig bleibt — echte Seitenverhältnisse
+   schwanken (Union Jack 2:1, Japan 3:2), das fällt bei 14 px nicht auf.
+   Eine Sprache ist kein Land; die Zuordnung folgt der in Magic üblichen:
+   Englisch → Vereinigtes Königreich, Portugiesisch → Brasilien (dort werden
+   die portugiesischen Auflagen gedruckt). */
+const FLAGGEN = {
+  de: `<rect width="60" height="13.3" fill="#000"/><rect width="60" height="13.4" y="13.3" fill="#DD0000"/>
+       <rect width="60" height="13.3" y="26.7" fill="#FFCE00"/>`,
+  fr: `<rect width="20" height="40" fill="#002395"/><rect width="20" height="40" x="20" fill="#fff"/>
+       <rect width="20" height="40" x="40" fill="#ED2939"/>`,
+  it: `<rect width="20" height="40" fill="#009246"/><rect width="20" height="40" x="20" fill="#fff"/>
+       <rect width="20" height="40" x="40" fill="#CE2B37"/>`,
+  es: `<rect width="60" height="40" fill="#AA151B"/><rect width="60" height="20" y="10" fill="#F1BF00"/>`,
+  ja: `<rect width="60" height="40" fill="#fff"/><circle cx="30" cy="20" r="12" fill="#BC002D"/>`,
+  ru: `<rect width="60" height="13.3" fill="#fff"/><rect width="60" height="13.4" y="13.3" fill="#0039A6"/>
+       <rect width="60" height="13.3" y="26.7" fill="#D52B1E"/>`,
+  // Vereinfacht: der rote Schrägbalken sitzt hier mittig statt versetzt.
+  // Bei 14 px ist der Unterschied nicht zu sehen, spart aber sechs Pfade.
+  en: `<rect width="60" height="40" fill="#012169"/>
+       <path d="M0,0 60,40 M60,0 0,40" stroke="#fff" stroke-width="8"/>
+       <path d="M0,0 60,40 M60,0 0,40" stroke="#C8102E" stroke-width="4.8"/>
+       <path d="M30,0 V40 M0,20 H60" stroke="#fff" stroke-width="13.3"/>
+       <path d="M30,0 V40 M0,20 H60" stroke="#C8102E" stroke-width="8"/>`,
+  // Vereinfacht: ohne Sternbild und Spruchband — bei 14 px unsichtbar.
+  pt: `<rect width="60" height="40" fill="#009C3B"/>
+       <path d="M30,4 56,20 30,36 4,20Z" fill="#FFDF00"/><circle cx="30" cy="20" r="7" fill="#002776"/>`,
+  // Vereinfacht: Taegeuk als zwei Halbkreise, Trigramme als vier Balken.
+  ko: `<rect width="60" height="40" fill="#fff"/>
+       <path d="M30,10a10,10 0 0,1 0,20a10,10 0 0,1 0,-20Z" fill="#CD2E3A"/>
+       <path d="M30,30a10,10 0 0,1 0,-20a5,5 0 0,1 0,10a5,5 0 0,0 0,10Z" fill="#0047A0"/>
+       <g fill="#000"><rect x="6" y="7" width="10" height="1.8"/><rect x="6" y="10" width="10" height="1.8"/>
+       <rect x="44" y="7" width="10" height="1.8"/><rect x="44" y="10" width="10" height="1.8"/>
+       <rect x="6" y="29" width="10" height="1.8"/><rect x="6" y="32" width="10" height="1.8"/>
+       <rect x="44" y="29" width="10" height="1.8"/><rect x="44" y="32" width="10" height="1.8"/></g>`,
+};
+
+/* Nur die Flagge, oder "" wenn wir den Code nicht kennen.
+   Steht der Klartextname daneben (Detailansicht), ist die Flagge bloß
+   Schmuck und wird stummgeschaltet — sonst liest ein Screenreader
+   "Deutsch Deutsch". Steht sie allein (Tabellenspalte), trägt sie den Namen
+   in aria-label und title: eine Flagge ohne Text ist für Screenreader
+   wertlos, und nicht jeder erkennt jede. */
+function flaggeHtml(lang, dekorativ = false) {
+  const l = (lang || "").toLowerCase();
+  const f = FLAGGEN[l];
+  if (!f) return "";
+  if (dekorativ)
+    return `<svg class="flagge" viewBox="0 0 60 40" aria-hidden="true">${f}</svg>`;
+  const name = LANG_NAMES[l] || l.toUpperCase();
+  return `<svg class="flagge" viewBox="0 0 60 40" role="img"
+               aria-label="${esc(name)}"><title>${esc(name)}</title>${f}</svg>`;
+}
+
+/* Die Sprache für die Tabellenspalte. Unbekannte Codes bekommen KEINE
+   Flagge, sondern den Code im Klartext: eine geratene Flagge würde einen
+   Datenfehler in eine scheinbar saubere Angabe verwandeln. So bleibt
+   sichtbar, dass da etwas nicht stimmt — z. B. das ungültige "JP". */
+function langHtml(lang) {
+  const l = (lang || "").toLowerCase();
+  return flaggeHtml(l) ||
+    `<span class="pill err" title="Kein Scryfall-Sprachcode: ${esc(l.toUpperCase())}"
+           >${esc(l.toUpperCase() || "?")}</span>`;
+}
+
 /* --------------------------------------------------- Manakosten ------ */
 /* Scryfall liefert die Kosten als Zeichenkette ("{2}{G/W}{X}") und hostet zu
    jedem Symbol ein SVG. Im Dateinamen entfallen Klammern und Schrägstrich:
@@ -1093,7 +1172,8 @@ function detailHtml(c, hover) {
         <div style="margin:10px 0">
           ${rarityPill(c.rarity)}
           ${c.foil ? '<span class="pill foil">Foil</span> ' : ""}
-          <span class="pill">${esc((c.lang || "").toUpperCase())}</span>
+          <span class="pill">${flaggeHtml(c.lang, true)} ${esc(LANG_NAMES[c.lang]
+            || (c.lang || "").toUpperCase() || "?")}</span>
           <span class="pill">${esc(c.condition || "")}</span>
           <span class="pill">Anzahl ${c.qty}</span>
         </div>
@@ -1169,9 +1249,6 @@ function showHover(id, x, y) {
 }
 
 /* ---------------------------------------------- Karte bearbeiten ----- */
-const LANG_NAMES = { de: "Deutsch", en: "Englisch", fr: "Französisch", it: "Italienisch",
-  es: "Spanisch", ja: "Japanisch", pt: "Portugiesisch", ru: "Russisch", ko: "Koreanisch" };
-
 async function editCard(id) {
   const c = CARDS.find(x => x.id === id);
   if (!c) return;

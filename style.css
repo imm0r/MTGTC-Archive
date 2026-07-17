@@ -99,6 +99,13 @@ td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000
    Sortierung springen: 1% zwingt die Tabelle, sie auf den Inhalt zu schrumpfen. */
 .mana-spalte{width:1%}
 
+/* Sprachflagge. display:inline-block gegen dieselbe Falle wie bei den
+   Manasymbolen: "td img" gilt zwar nur für img, aber SVG erbt hier nichts —
+   der Rahmen hebt die Flagge trotzdem vom dunklen Hintergrund ab, sonst
+   verschwände die weiße Fläche der japanischen Flagge im Nichts. */
+.flagge{width:20px;height:13.3px;display:inline-block;vertical-align:-2px;
+  border:1px solid var(--line);border-radius:2px}
+
 .stats{display:flex;gap:10px;flex-wrap:wrap}
 .stat{flex:1;min-width:130px;background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);padding:12px}
 .stat .v{font-size:22px;font-weight:700;color:var(--acc);font-variant-numeric:tabular-nums}
