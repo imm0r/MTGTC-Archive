@@ -899,6 +899,11 @@ async function editCard(id) {
   const ok = await confirmDlg(`
     <b>${esc(c.disp)}</b>
     <p class="hint" style="margin:2px 0 10px">${esc(c.set_name || c.set)} · #${esc(c.cn)} · Anzahl ${c.qty}</p>
+    <div class="row" style="margin-bottom:8px">
+      <div><label>Set-Code</label><input type="text" id="ed-set" value="${esc(c.set || "")}"
+        style="text-transform:uppercase" placeholder="MKM"></div>
+      <div><label>Nummer</label><input type="text" id="ed-cn" value="${esc(c.cn || "")}" placeholder="8"></div>
+    </div>
     <div class="row">
       <div><label>Sprache</label><select id="ed-lang">${langs.map(l =>
         `<option value="${esc(l)}"${l === c.lang ? " selected" : ""}>${esc(LANG_NAMES[l] || l)}</option>`).join("")}</select></div>
@@ -908,24 +913,43 @@ async function editCard(id) {
         <option value="0"${!c.foil ? " selected" : ""}>Normal</option>
         <option value="1"${c.foil ? " selected" : ""}>Foil</option></select></div>
     </div>
-    <p class="hint">Bei geänderter Ausführung oder Sprache wird der Preis neu geholt.
+    <p class="hint">Geänderter Set-Code oder Nummer löst die Karte neu auf — Name, Bild und Preis
+      kommen dann von der neuen Auflage; Anzahl, Zustand und Deck-Zuordnung bleiben.
+      Bei Tokens beginnt der Set-Code mit T (z.&nbsp;B. TFIN).
       Gibt es dieselbe Karte in der Ziel-Ausprägung schon, werden die Anzahlen zusammengelegt.</p>`);
   if (!ok) return;
   const lang = $("#ed-lang").value, cond = $("#ed-cond").value, foil = $("#ed-foil").value === "1";
-  if (lang === c.lang && cond === c.condition && foil === c.foil) return;
-  try { await applyCardEdit(c, lang, cond, foil); }
+  const setIn = $("#ed-set").value.trim().toUpperCase();
+  const cnIn  = $("#ed-cn").value.trim();
+  const auflageNeu = setIn !== (c.set || "").toUpperCase() || cnIn !== String(c.cn || "");
+  if (!auflageNeu && lang === c.lang && cond === c.condition && foil === c.foil) return;
+  if (auflageNeu && (!setIn || !cnIn)) return toast("Set-Code und Nummer dürfen nicht leer sein");
+  try { await applyCardEdit(c, lang, cond, foil, auflageNeu ? { set: setIn, cn: cnIn } : null); }
   catch (e) { toast(e.message); }
 }
 
-async function applyCardEdit(c, lang, cond, foil) {
+async function applyCardEdit(c, lang, cond, foil, neu) {
   const patch = { lang, condition: cond, foil };
 
-  // Sprachwechsel: die sprachgenaue Auflage hat eine eigene Scryfall-ID,
-  // eigenen gedruckten Namen und eigenes Bild. Gibt es sie nicht (viele
-  // Karten führt Scryfall nur englisch), bleibt die bisherige Auflage
-  // stehen und nur das Sprachfeld wechselt.
   let fresh = null;
-  if (lang !== c.lang) {
+  if (neu) {
+    // Andere Auflage: komplett neu auflösen. findByCode probiert den Code
+    // wörtlich und mit t-Präfix, tippt man TFIN direkt ein, trifft es sofort.
+    fresh = await findByCode(neu.set, neu.cn, lang, false);
+    if (!fresh) throw new Error(`${neu.set} #${neu.cn} bei Scryfall nicht gefunden`);
+    patch.scryfall_id = fresh.id;
+    patch.name = fresh.name;
+    patch.printed_name = fresh.printed_name || null;
+    patch.set_code = (fresh.set || "").toUpperCase();
+    patch.set_name = fresh.set_name;
+    patch.cn = fresh.collector_number;
+    patch.img = imgOf(fresh);
+    patch.cm_id = fresh.cardmarket_id ?? null;
+  } else if (lang !== c.lang) {
+    // Sprachwechsel: die sprachgenaue Auflage hat eine eigene Scryfall-ID,
+    // eigenen gedruckten Namen und eigenes Bild. Gibt es sie nicht (viele
+    // Karten führt Scryfall nur englisch), bleibt die bisherige Auflage
+    // stehen und nur das Sprachfeld wechselt.
     fresh = await withPrice(await sfCode(c.set, c.cn, lang));
     if (fresh) {
       patch.scryfall_id = fresh.id;
@@ -970,7 +994,9 @@ async function applyCardEdit(c, lang, cond, foil) {
   } else {
     const { error } = await sb.from("cards").update(patch).eq("id", c.id);
     if (error) throw new Error(dbErr(error));
-    toast("Karte aktualisiert");
+    toast(neu
+      ? `Jetzt: ${fresh.printed_name || fresh.name} · ${patch.set_code} #${patch.cn}`
+      : "Karte aktualisiert");
   }
   await reload(); renderAll();
 }
