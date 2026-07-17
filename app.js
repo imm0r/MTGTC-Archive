@@ -418,6 +418,40 @@ function preprocessCorner(img) {
   return cv;
 }
 
+/* ------------------------------------------------- Sprachcodes ------- */
+/* Die Sprachen, die die App führt. Der Schlüssel ist IMMER der
+   Scryfall-Code, nicht der auf der Karte gedruckte — die beiden gehen
+   auseinander, siehe unten. Steht hier oben, weil parseCorner es braucht:
+   const wird nicht hochgezogen, ein Zugriff vor der Deklaration stürzt ab. */
+const LANG_NAMES = { de: "Deutsch", en: "Englisch", fr: "Französisch", it: "Italienisch",
+  es: "Spanisch", ja: "Japanisch", pt: "Portugiesisch", ru: "Russisch", ko: "Koreanisch" };
+
+/* Der auf die Karte GEDRUCKTE Sprachcode ist nicht immer Scryfalls Code.
+   Belegt an Scryfall selbst: "lang:jp" und "lang:ja" liefern dieselben 30049
+   Karten, "lang:cs" und "lang:zhs" dieselben 23988, "lang:ct" und "lang:zht"
+   dieselben 17525 — es sind Aliasse derselben Sprache. Die Kartensuche
+   akzeptiert beide Schreibweisen, der Endpunkt /cards/:set/:num/:lang aber
+   NUR den kanonischen Code: /c16/32/ja liefert die Karte, /c16/32/jp einen
+   404. In dieser Lücke ging es bisher verloren — eine japanische Karte lief
+   in den 404, fiel still auf die englische Auflage zurück und wurde trotzdem
+   als "jp" gespeichert.
+   Alle übrigen Codes (EN, DE, FR, IT, ES, PT, RU, KO) sind gedruckt und bei
+   Scryfall identisch. */
+const GEDRUCKT_ZU_SCRYFALL = { jp: "ja", cs: "zhs", ct: "zht" };
+
+/* Die Sprachen, die wir zu deuten wagen. Liest die Erkennung etwas anderes
+   aus der Ecke — verwackelt, verkratzt, oder eine Sprache, die wir nicht
+   führen (Hebräisch, Phyrexianisch) —, kommt null zurück und identify()
+   nimmt die im Dropdown gewählte Sprache. Lieber die Angabe des Nutzers als
+   ein erfundener Code in der Datenbank. */
+const SCRYFALL_LANGS = new Set([...Object.keys(LANG_NAMES), "zhs", "zht"]);
+
+function sprachCode(gedruckt) {
+  const l = (gedruckt || "").toLowerCase();
+  const s = GEDRUCKT_ZU_SCRYFALL[l] || l;
+  return SCRYFALL_LANGS.has(s) ? s : null;
+}
+
 /* Der Aufbau der Ecke schwankt je nach Set — mal "0008/013 T", mal
    "T 0009 FFXIV". Deshalb keine feste Schablone, sondern Regeln:
    Der Setcode steht immer vor dem Trennzeichen in der Sprachzeile, die
@@ -433,7 +467,9 @@ function parseCorner(text) {
   lines.forEach((l, i) => {
     if (set) return;
     const m = l.match(/\b([A-Z0-9]{3,6})\s*[•·*.,°\-]\s*([A-Z]{2})\b/);
-    if (m) { set = m[1]; lang = m[2].toLowerCase(); setLine = i; }
+    // sprachCode übersetzt den gedruckten Code (JP) in Scryfalls (ja) und
+    // gibt null, wenn wir ihn nicht kennen — dann gilt das Dropdown.
+    if (m) { set = m[1]; lang = sprachCode(m[2]); setLine = i; }
   });
   if (!set) return null;
 
@@ -1018,14 +1054,6 @@ function rarityPill(r) {
 }
 
 /* ----------------------------------------------------- Sprache ------- */
-/* Die Sprachen, die Scryfall führt und die App anbietet. Der Schlüssel ist
-   IMMER der Scryfall-Code — nicht der auf der Karte gedruckte. Die beiden
-   gehen auseinander: Japanisch steht als "JP" auf der Karte, heißt bei
-   Scryfall aber "ja"; Chinesisch ist gedruckt "CS"/"CT" und dort
-   "zhs"/"zht". Umgerechnet wird in parseCorner. */
-const LANG_NAMES = { de: "Deutsch", en: "Englisch", fr: "Französisch", it: "Italienisch",
-  es: "Spanisch", ja: "Japanisch", pt: "Portugiesisch", ru: "Russisch", ko: "Koreanisch" };
-
 /* Flaggen als eingebettetes SVG. Zwei Wege scheiden aus:
    * Emoji-Flaggen (🇩🇪) zeigt Windows NICHT — gemessen: die beiden Regional
      Indicators verschmelzen dort nicht zu einem Glyph, es erscheinen zwei
