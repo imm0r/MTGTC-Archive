@@ -2592,6 +2592,32 @@ function renderWho() {
   el.onclick = () => { const b = $('nav button[data-v="profile"]'); if (b) b.click(); };
 }
 
+/* Zwei persönliche Highlights über der Sammlungs-Statistik: die wertvollste
+   Karte und die neueste Errungenschaft — je mit Mini-Bild und klickbar zur
+   Detailansicht. Beides sind Einzel-Callouts, die das Dashboard so nicht zeigt. */
+function profilHighlightsHtml() {
+  const mitPreis = CARDS.filter(c => c.price != null);
+  const wertvollste = mitPreis.length ? mitPreis.reduce((a, b) => (b.price > a.price ? b : a)) : null;
+  const mitDatum = CARDS.filter(c => c.added);
+  // added ist ein ISO-Zeitstempel — String-Vergleich reicht für "das späteste".
+  const neueste = mitDatum.length ? mitDatum.reduce((a, b) => (b.added > a.added ? b : a)) : null;
+  const kachel = (label, c, sub) => c ? `
+    <div class="profil-hl-item" data-hl="${c.id}" title="Großansicht &amp; Preisverlauf">
+      ${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy">`
+              : '<div class="profil-hl-noimg">&#9670;</div>'}
+      <div class="profil-hl-txt">
+        <div class="k">${esc(label)}</div>
+        <div class="v">${esc(c.disp)}</div>
+        <div class="sub">${esc(sub)}</div>
+      </div>
+    </div>` : "";
+  const tiles = [
+    kachel("Wertvollste Karte", wertvollste, wertvollste ? eur(wertvollste.price) : ""),
+    kachel("Neueste Errungenschaft", neueste, neueste ? datShort(neueste.added) : ""),
+  ].filter(Boolean).join("");
+  return tiles ? `<div class="profil-hl">${tiles}</div>` : "";
+}
+
 function renderProfile() {
   const el = $("#v-profile");
   if (!el) return;
@@ -2621,6 +2647,7 @@ function renderProfile() {
     <div class="card">
       <h3 style="margin-top:0">Deine Sammlung</h3>
       <p class="hint" style="margin-top:-4px">${decks} ${decks === 1 ? "Deck" : "Decks"} &middot; Statistik über den gesamten Bestand.</p>
+      ${profilHighlightsHtml()}
       <div id="profile-dash" style="margin-top:12px"></div>
     </div>
 
@@ -2639,6 +2666,9 @@ function renderProfile() {
   // Statistik über den GESAMTEN Bestand — dieselbe Funktion wie das
   // Sammlungs-Dashboard, nur ungefiltert und in ein eigenes Ziel.
   renderDash(CARDS, $("#profile-dash"), false);
+
+  // Highlight-Kacheln öffnen die Detailansicht der jeweiligen Karte.
+  $$("#v-profile [data-hl]").forEach(k => k.onclick = () => showCardDetail(k.dataset.hl));
 
   $("#pf-avatar-btn").onclick = () => $("#pf-avatar-file").click();
   $("#pf-avatar-file").onchange = e => { const f = e.target.files[0]; e.target.value = ""; if (f) avatarHochladen(f); };

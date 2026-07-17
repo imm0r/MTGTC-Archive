@@ -62,6 +62,19 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .profil-kopf{display:flex;gap:22px;align-items:center;flex-wrap:wrap}
 .profil-avatar{display:flex;flex-direction:column;align-items:center;gap:10px;flex:none}
 .profil-ident{flex:1;min-width:220px}
+
+/* Persönliche Highlights über der Statistik: Karte im Kleinformat + Kennzahl,
+   klickbar zur Detailansicht. */
+.profil-hl{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px}
+.profil-hl-item{display:flex;gap:10px;align-items:center;flex:1;min-width:230px;
+  background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer}
+.profil-hl-item:hover{border-color:var(--acc)}
+.profil-hl-item img,.profil-hl-noimg{width:44px;height:61px;border-radius:4px;flex:none;object-fit:cover}
+.profil-hl-noimg{display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--dim)}
+.profil-hl-txt{min-width:0}
+.profil-hl-txt .k{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+.profil-hl-txt .v{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.profil-hl-txt .sub{font-size:13px;color:var(--acc)}
 .tabs{display:flex;gap:6px;margin-bottom:12px}
 .tabs button{flex:1;background:transparent;border:1px solid var(--line);color:var(--dim);
              padding:8px;border-radius:8px;cursor:pointer}
