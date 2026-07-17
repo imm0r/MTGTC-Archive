@@ -117,13 +117,16 @@ Anmeldung, damit niemand mit der bloßen URL auf deine Rechnung scannt.
 Ohne diese Schritte läuft die App weiter — sie meldet die Bilderkennung einmal
 als nicht verfügbar und nutzt danach Tesseract.
 
-**Kosten.** Gemessen an einer Testkarte: 2.304 Eingabe- und 63 Ausgabe-Tokens
-pro Scan.
+**Kosten.** Beide Modelle an derselben Testkarte gemessen — sie lasen sie
+identisch und fehlerfrei, inklusive des Token-Zeichens:
 
-| Modell (`const MODEL` in `index.ts`) | Pro Karte | 1.000 Karten |
-|---|---|---|
-| `claude-haiku-4-5` (eingestellt) | 0,26 ct | 2,60 € |
-| `claude-opus-4-8` | 1,31 ct | 13,10 € |
+| Modell (`const MODEL` in `index.ts`) | Tokens (ein/aus) | Pro Karte | 1.000 Karten |
+|---|---|---|---|
+| `claude-haiku-4-5` (eingestellt) | 2.012 / 49 | 0,23 ct | 2,30 € |
+| `claude-opus-4-8` | 2.304 / 63 | 1,31 ct | 13,10 € |
+
+Die Wartezeit ist praktisch gleich (7,1 gegen 7,7 s kalt, ~4,5 s warm) — sie
+steckt in Netzwerk und Kaltstart der Funktion, nicht im Modell.
 
 Jede Antwort meldet unter `usage` die tatsächlich verbrauchten Tokens — damit
 lässt sich das jederzeit nachrechnen statt schätzen.
