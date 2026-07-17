@@ -1504,6 +1504,33 @@ async function setMainCard(deckId, cardId) {
 }
 
 /* ============================= Decks-Ansicht ========================== */
+/* Deck umbenennen. Dieselben Regeln wie beim Anlegen: getrimmt, leer geht
+   nicht. Ist der Name unverändert, wird gar nicht erst geschrieben — ein
+   Klick auf OK ohne Änderung soll nichts tun.
+   Der Name gehört dem Deck, nicht seinen Karten: die Zuordnungen hängen an
+   der Deck-ID und bleiben unberührt. */
+async function renameDeck(id) {
+  const d = DECKS.find(x => x.id === id);
+  if (!d) return;
+  const ok = await confirmDlg(`
+    <b>Deck umbenennen</b>
+    <div style="margin-top:10px">
+      <label>Name</label>
+      <input type="text" id="dn-name" value="${esc(d.name)}" autofocus>
+    </div>
+    <p class="hint">Die Karten im Deck bleiben unverändert.</p>`);
+  if (!ok) return;
+  const name = $("#dn-name").value.trim();
+  if (!name) return toast("Bitte einen Decknamen eingeben");
+  if (name === d.name) return;
+  try {
+    const { error } = await sb.from("decks").update({ name }).eq("id", d.id);
+    if (error) throw error;
+    await reload(); renderDecks();
+    toast("Deck heißt jetzt „" + name + "“");
+  } catch (e) { toast(dbErr(e)); }
+}
+
 function renderDecks() {
   if (!DECKS.length) {
     $("#deck-list").innerHTML = '<div class="card"><div class="empty">Noch keine Decks angelegt.</div></div>';
@@ -1537,6 +1564,8 @@ function renderDecks() {
           <div class="hint" style="margin:2px 0 0">${n} Karten &middot; ${eur(v)}${
             fehlt ? ` &middot; <span style="color:var(--err)">${fehlt} unvollständig</span>` : ""}</div>
         </div>
+        <button class="btn ghost sm" data-drn="${d.id}" style="flex:none"
+          title="Deck umbenennen">&#9998;</button>
         <button class="btn danger sm" data-dx="${d.id}" style="flex:none">Deck löschen</button>
       </div>
       <div class="deck-inhalt" style="display:${offen ? "block" : "none"}">
@@ -1552,8 +1581,10 @@ function renderDecks() {
   }).join("");
 
   $$("#deck-list .deck-kopf").forEach(k => k.onclick = ev => {
-    // Der Löschen-Knopf sitzt im Kopf — sein Klick darf nicht zuklappen.
-    if (ev.target.closest("[data-dx]")) return;
+    // Im Kopf sitzen Knöpfe (Umbenennen, Löschen) — ihr Klick darf nicht
+    // zuklappen. Bewusst alle Knöpfe statt einer Liste einzelner Auswahlen:
+    // die wäre beim nächsten Knopf wieder unvollständig.
+    if (ev.target.closest("button")) return;
     const offen = deckOffen.schalte(k.dataset.toggle);
     const karte = k.parentElement;
     karte.querySelector(".deck-inhalt").style.display = offen ? "block" : "none";
@@ -1573,6 +1604,8 @@ function renderDecks() {
       renderDecks();
     });
   });
+
+  $$("[data-drn]").forEach(b => b.onclick = () => renameDeck(b.dataset.drn));
 
   $$("[data-dx]").forEach(b => b.onclick = async () => {
     const d = DECKS.find(x => x.id === b.dataset.dx);
