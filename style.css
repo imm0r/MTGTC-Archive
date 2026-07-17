@@ -209,6 +209,22 @@ dialog::backdrop{background:#000a}
 .detail-info{flex:1;min-width:220px}
 .chart-svg{width:100%;max-width:360px;height:auto;display:block;margin-top:4px}
 
+/* Fähigkeiten. Schlüsselwörter als Tags, darunter der Regeltext in einem
+   abgesetzten Kasten (pre-line: die Zeilenumbrüche aus oracle_text bleiben,
+   Leerzeichen werden zusammengefasst). Die geratene Tabelle sitzt eingeklappt
+   darunter — offen ist nur, was Scryfall verbürgt. */
+.kw-tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
+.regeltext{font-size:13px;line-height:1.55;white-space:pre-line;
+  background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.regeltext .mana{width:1em;height:1em;vertical-align:-0.12em}
+.faehig{margin-top:8px}
+.faehig summary{cursor:pointer;color:var(--dim);font-size:13px;user-select:none}
+.faehig summary:hover{color:var(--txt)}
+.faehig-tbl{width:100%;margin-top:8px;font-size:12px}
+.faehig-tbl th{font-size:10px}
+.faehig-tbl td{vertical-align:top;padding:6px 6px}
+.faehig-tbl .mana{width:1em;height:1em;vertical-align:-0.12em}
+
 /* Hover-Vorschau: schwebt neben dem Zeiger, nimmt keine Mausereignisse an
    (sonst flackert sie, sobald der Zeiger sie berührt). */
 #hovercard{position:fixed;z-index:90;display:none;pointer-events:none;

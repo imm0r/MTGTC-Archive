@@ -50,6 +50,13 @@ create table if not exists public.cards (
   -- Abenteuern zählt nur die Kreatur. Die Farbe folgt nicht aus den Kosten.
   -- {} heißt farblos (eine Aussage), NULL heißt „noch nicht erfasst".
   colors      text[],
+  -- Schlüsselwörter (Scryfalls keywords: Fliegend, Bedrohlich …) und der volle
+  -- Regeltext. Beides ist, was Scryfall VERBÜRGT — ein strukturiertes
+  -- „Fähigkeit = Name/Typ/Kosten" gibt es dort nicht; diese Aufteilung
+  -- berechnet die App beim Anzeigen aus oracle_text. keywords: {} = keine
+  -- (gültig), NULL = unerfasst. oracle_text: '' gültig (Vanilla), NULL Lücke.
+  keywords    text[],
+  oracle_text text,
   lang        text not null default 'en',
   condition   text not null default 'NM',
   foil        boolean not null default false,
@@ -93,6 +100,8 @@ alter table public.cards add column if not exists mana_cost text;
 alter table public.cards add column if not exists cmc numeric;
 alter table public.cards add column if not exists released date;
 alter table public.cards add column if not exists colors text[];
+alter table public.cards add column if not exists keywords text[];
+alter table public.cards add column if not exists oracle_text text;
 
 create index if not exists cards_user_idx        on public.cards(user_id);
 create index if not exists decks_user_idx        on public.decks(user_id);
@@ -154,6 +163,8 @@ drop function if exists public.add_card(
   text, text, text, text, text, text, text, text, integer, text, text, boolean, numeric, text, text, text, numeric);
 drop function if exists public.add_card(
   text, text, text, text, text, text, text, text, integer, text, text, boolean, numeric, text, text, text, numeric, date);
+drop function if exists public.add_card(
+  text, text, text, text, text, text, text, text, integer, text, text, boolean, numeric, text, text, text, numeric, date, text[]);
 
 create or replace function public.add_card(
   p_scryfall_id text, p_oracle_id text, p_name text, p_printed_name text,
@@ -161,7 +172,8 @@ create or replace function public.add_card(
   p_lang text, p_condition text, p_foil boolean, p_price numeric,
   p_type_line text default null, p_rarity text default null,
   p_mana_cost text default null, p_cmc numeric default null,
-  p_released date default null, p_colors text[] default null
+  p_released date default null, p_colors text[] default null,
+  p_keywords text[] default null, p_oracle_text text default null
 ) returns public.cards
 language plpgsql
 security invoker
@@ -172,14 +184,15 @@ begin
   insert into public.cards as c
     (scryfall_id, oracle_id, name, printed_name, set_code, set_name, cn, img,
      cm_id, lang, condition, foil, qty, price, hist, type_line, rarity,
-     mana_cost, cmc, released, colors)
+     mana_cost, cmc, released, colors, keywords, oracle_text)
   values
     (p_scryfall_id, p_oracle_id, p_name, p_printed_name, p_set_code, p_set_name,
      p_cn, p_img, p_cm_id, p_lang, p_condition, p_foil, 1, p_price,
      case when p_price is null then '[]'::jsonb
           else jsonb_build_array(jsonb_build_object(
                  'd', to_char(current_date, 'YYYY-MM-DD'), 'v', p_price)) end,
-     p_type_line, p_rarity, p_mana_cost, p_cmc, p_released, p_colors)
+     p_type_line, p_rarity, p_mana_cost, p_cmc, p_released, p_colors,
+     p_keywords, p_oracle_text)
   on conflict on constraint cards_unique_printing do update
     set qty       = c.qty + 1,
         price     = coalesce(excluded.price, c.price),
@@ -192,7 +205,9 @@ begin
         mana_cost = coalesce(excluded.mana_cost, c.mana_cost),
         cmc       = coalesce(excluded.cmc, c.cmc),
         released  = coalesce(excluded.released, c.released),
-        colors    = coalesce(excluded.colors, c.colors)
+        colors    = coalesce(excluded.colors, c.colors),
+        keywords  = coalesce(excluded.keywords, c.keywords),
+        oracle_text = coalesce(excluded.oracle_text, c.oracle_text)
   returning * into r;
   return r;
 end $$;

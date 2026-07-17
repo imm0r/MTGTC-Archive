@@ -625,7 +625,8 @@ async function addToCollection(card, el, detected) {
     p_lang: lang, p_condition: cond, p_foil: foil, p_price: price,
     p_type_line: card.type_line ?? null, p_rarity: card.rarity ?? null,
     p_mana_cost: manaOf(card), p_cmc: card.cmc ?? null,
-    p_released: card.released_at ?? null, p_colors: farbenOf(card)
+    p_released: card.released_at ?? null, p_colors: farbenOf(card),
+    p_keywords: keywordsOf(card), p_oracle_text: oracleOf(card)
   });
   if (error) throw new Error(dbErr(error));
 
@@ -1253,6 +1254,24 @@ const farbenOf = card => {
   return [...new Set(angaben.flat())].sort();
 };
 
+/* Schlüsselwörter einer Scryfall-Karte. Scryfall führt sie OBEN gesammelt über
+   alle Seiten — anders als mana_cost/colors nicht je Seite. [] heißt "keine"
+   (gültig), null "noch nicht erfasst". Diese Liste ist die verbürgte Quelle
+   für die Namen der Schlüsselwort-Fähigkeiten; geraten wird nichts. */
+const keywordsOf = card => Array.isArray(card?.keywords) ? card.keywords : null;
+
+/* Voller Regeltext. Wie manaOf: einseitig oben, doppelseitig je Seite (dann
+   mit "//" getrennt, damit man beide Hälften sieht). "" ist gültig (Vanilla-
+   Kreaturen, viele Tokens), null eine Lücke. */
+const oracleOf = card => {
+  if (typeof card?.oracle_text === "string") return card.oracle_text;
+  const seiten = card?.card_faces;
+  if (!Array.isArray(seiten) || !seiten.length) return null;
+  const angaben = seiten.map(f => f.oracle_text).filter(x => typeof x === "string");
+  if (!angaben.length) return null;
+  return angaben.join("\n//\n");
+};
+
 /* Trägt nach, was der Karte fehlt. Bestände aus der Zeit vor den Spalten
    type_line/rarity/mana_cost haben sie leer — und ohne Typzeile lehnt der
    Trigger die Karte als Hauptkarte ab und verweist dafür genau hierher
@@ -1278,6 +1297,16 @@ async function nachtragen(c, fresh) {
   if (c.colors == null) {
     const f = farbenOf(fresh);
     if (f != null) patch.colors = f;
+  }
+  // [] bzw. "" sind gültig (keine Schlüsselwörter / kein Regeltext), nur null
+  // ist eine Lücke — daher == null.
+  if (c.keywords == null) {
+    const k = keywordsOf(fresh);
+    if (k != null) patch.keywords = k;
+  }
+  if (c.oracle_text == null) {
+    const o = oracleOf(fresh);
+    if (o != null) patch.oracle_text = o;
   }
   if (!Object.keys(patch).length) return;
   const { error } = await sb.from("cards").update(patch).eq("id", c.id);
@@ -1437,19 +1466,22 @@ function langHtml(lang) {
    alt-Attribut ("{G}") lesbar stehen.
    Alles ausserhalb der Klammern (bei geteilten Karten das " // ") wird
    escaped durchgereicht, nicht als HTML. */
-function manaHtml(cost) {
-  if (!cost) return "";        // "" = kostet nichts, null = unbekannt: beides zeigt nichts
+function mitSymbolen(text) {
   const re = /\{([^}]+)\}/g;
   let out = "", last = 0, m;
-  while ((m = re.exec(cost))) {
-    out += esc(cost.slice(last, m.index));
+  while ((m = re.exec(text))) {
+    out += esc(text.slice(last, m.index));
     const datei = encodeURIComponent(m[1].replace(/\//g, "").toUpperCase());
     const roh = `{${m[1]}}`;
     out += `<img class="mana" src="https://svgs.scryfall.io/card-symbols/${datei}.svg"
                  alt="${esc(roh)}" title="${esc(roh)}" loading="lazy">`;
     last = m.index + m[0].length;
   }
-  return out + esc(cost.slice(last));
+  return out + esc(text.slice(last));
+}
+
+function manaHtml(cost) {
+  return cost ? mitSymbolen(cost) : "";   // "" = kostet nichts, null = unbekannt
 }
 
 /* ------------------------------------------- Karten-Detailansicht ---- */
@@ -1498,6 +1530,82 @@ function priceChart(hist, w = 560, h = 200) {
   </svg>`;
 }
 
+/* ---------------------------------------------------- Fähigkeiten ---- */
+/* Scryfall liefert Fähigkeiten NICHT als Name/Typ/Kosten — nur die keywords-
+   Liste und den vollen oracle_text. Diese Funktion zerlegt den Regeltext
+   heuristisch in Zeilen und rät je Zeile den Typ; die Namen der
+   Schlüsselwörter kommen dagegen aus der verbürgten keywords-Liste, nicht aus
+   dem Raten. Das Ergebnis ist ausdrücklich "automatisch bestimmt" und kann bei
+   Sonderfällen (Erinnerungstext, mehrzeilige Fähigkeiten) danebenliegen —
+   deshalb steht der volle Regeltext unverändert darüber.
+   Reihenfolge der Prüfung ist Absicht: Loyalität und Schlüsselwort zuerst,
+   damit ihre Doppelpunkte/Muster nicht als aktivierte Fähigkeit durchgehen. */
+function parseAbilities(text, keywords) {
+  if (text == null) return null;
+  const kw = keywords || [];
+  return text.split("\n").map(z => z.trim()).filter(Boolean).map(z => {
+    // Loyalität: +N / −N / −X / 0. Scryfall nutzt das echte Minus (U+2212).
+    let m = z.match(/^([+−][0-9X]+|0):\s+(.+)$/);
+    if (m) return { typ: "Loyalität", name: "", kosten: m[1], effekt: m[2] };
+
+    // Schlüsselwort: das erste Wort steht in der verbürgten Liste. Wert wie
+    // "Ward {2}" wird als Kosten mitgenommen, Erinnerungstext als Wirkung.
+    const ohneKlammer = z.replace(/\s*\([^)]*\)\s*$/, "").trim();
+    const treffer = kw.find(k => {
+      const l = ohneKlammer.toLowerCase(), n = k.toLowerCase();
+      return l === n || l.startsWith(n + " ") || l.startsWith(n + ",");
+    });
+    if (treffer && ohneKlammer.length < 40) {
+      const symbole = ohneKlammer.match(/\{[^}]+\}/g);
+      const rem = z.match(/\(([^)]*)\)\s*$/);
+      return { typ: "Schlüsselwort", name: treffer,
+               kosten: symbole ? symbole.join("") : "",
+               effekt: rem ? rem[1] : "" };
+    }
+
+    // Aktiviert: "Kosten: Wirkung" — Kosten müssen wie Kosten aussehen (Symbol
+    // oder ein einleitendes Kostenwort), sonst faengt die Regel Saetze mit
+    // Doppelpunkt fälschlich ab.
+    m = z.match(/^([^:]{1,60}):\s+(.+)$/);
+    if (m && (/\{[^}]+\}/.test(m[1]) ||
+              /^(Tap|Untap|Sacrifice|Discard|Pay|Exile|Remove|Return|Reveal)\b/i.test(m[1])))
+      return { typ: "Aktiviert", name: "", kosten: m[1].trim(), effekt: m[2] };
+
+    // Ausgelöst
+    if (/^(When|Whenever|At )/i.test(z)) return { typ: "Ausgelöst", name: "", kosten: "", effekt: z };
+
+    return { typ: "Statisch", name: "", kosten: "", effekt: z };
+  });
+}
+
+/* Fähigkeiten-Block für die Detailansicht: verbürgte Schlüsselwörter als Tags,
+   der volle Regeltext (mit Symbolen), und — nur im Dialog, eingeklappt — die
+   geratene Aufschlüsselung. Die Reihenfolge ist die Ehrlichkeit: was Scryfall
+   sagt, steht offen; was wir raten, liegt unter einem Klick. */
+function faehigkeitenHtml(c, kompakt) {
+  const teile = [];
+  if (Array.isArray(c.keywords) && c.keywords.length)
+    teile.push(`<div class="kw-tags">${c.keywords.map(k => `<span class="pill">${esc(k)}</span>`).join("")}</div>`);
+  if (c.oracle_text)
+    teile.push(`<div class="regeltext">${mitSymbolen(c.oracle_text)}</div>`);
+  if (!kompakt && c.oracle_text) {
+    const ab = parseAbilities(c.oracle_text, c.keywords) || [];
+    if (ab.length) teile.push(`
+      <details class="faehig">
+        <summary>Aufgeschlüsselt <span class="hint" style="display:inline">(automatisch bestimmt)</span></summary>
+        <table class="faehig-tbl"><thead><tr>
+          <th>Name</th><th>Typ</th><th>Kosten</th><th>Wirkung</th></tr></thead>
+        <tbody>${ab.map(a => `<tr>
+          <td>${a.name ? esc(a.name) : "—"}</td>
+          <td>${esc(a.typ)}</td>
+          <td class="num" style="white-space:nowrap">${a.kosten ? mitSymbolen(a.kosten) : "—"}</td>
+          <td>${a.effekt ? mitSymbolen(a.effekt) : "—"}</td></tr>`).join("")}</tbody></table>
+      </details>`);
+  }
+  if (!teile.length) return "";
+  return `<div style="margin-top:10px"><label style="margin-bottom:4px">Fähigkeiten</label>${teile.join("")}</div>`;
+}
+
 /* Gemeinsame Vorlage für Dialog und Hover-Vorschau. Der Preisgraph sitzt in
    der rechten Spalte unter dem Hinzugefügt-Datum — kompakt (320er-viewBox),
    damit die Beschriftung beim Skalieren lesbar bleibt. */
@@ -1515,6 +1623,7 @@ function detailHtml(c, hover) {
         <div class="hint" style="margin-top:2px">${esc(c.set_name || c.set)} · #${esc(c.cn)}${
           c.released ? ` · erschienen ${esc(datShort(c.released))}` : ""}</div>
         ${c.type_line ? `<div class="hint" style="margin-top:2px">${esc(c.type_line)}</div>` : ""}
+        ${faehigkeitenHtml(c, hover)}
         <div style="margin:10px 0">
           ${rarityPill(c.rarity)}
           ${c.foil ? '<span class="pill foil">Foil</span> ' : ""}
@@ -1657,6 +1766,8 @@ async function applyCardEdit(c, lang, cond, foil, neu) {
     // Andere Auflage = anderes Set = anderes Erscheinungsdatum.
     patch.released = fresh.released_at ?? null;
     patch.colors = farbenOf(fresh);
+    patch.keywords = keywordsOf(fresh);
+    patch.oracle_text = oracleOf(fresh);
   } else if (lang !== c.lang) {
     // Sprachwechsel: die sprachgenaue Auflage hat eine eigene Scryfall-ID,
     // eigenen gedruckten Namen und eigenes Bild. Gibt es sie nicht (viele
@@ -1968,10 +2079,12 @@ const csvCell = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
 function exportCsv() {
   const head = ["Name", "Name (englisch)", "Set", "Set-Code", "Nummer", "Seltenheit",
-                "Erschienen", "Typzeile", "Manakosten", "Manawert", "Sprache",
+                "Erschienen", "Typzeile", "Schlüsselwörter", "Regeltext",
+                "Manakosten", "Manawert", "Sprache",
                 "Zustand", "Foil", "Anzahl", "Preis EUR", "Wert EUR"];
   const rows = CARDS.map(c => [c.disp, c.name, c.set_name, c.set, c.cn, c.rarity ?? "",
-    c.released ?? "", c.type_line ?? "", c.mana_cost ?? "", c.cmc ?? "", c.lang, c.condition,
+    c.released ?? "", c.type_line ?? "", (c.keywords || []).join(", "), c.oracle_text ?? "",
+    c.mana_cost ?? "", c.cmc ?? "", c.lang, c.condition,
     c.foil ? "ja" : "nein", c.qty, c.price ?? "",
     c.price == null ? "" : (c.price * c.qty).toFixed(2)]);
   download(`mtg-sammlung-${today()}.csv`,
@@ -2000,7 +2113,8 @@ async function importJson(file) {
         // Aus der Sicherung, nicht von Scryfall: hier stehen die Werte schon
         // fertig in der Zeile — manaOf() erwartet eine Scryfall-Karte.
         p_mana_cost: c.mana_cost ?? null, p_cmc: c.cmc ?? null,
-        p_released: c.released ?? null, p_colors: c.colors ?? null
+        p_released: c.released ?? null, p_colors: c.colors ?? null,
+        p_keywords: c.keywords ?? null, p_oracle_text: c.oracle_text ?? null
       });
       if (error) { bad++; break; } else ok++;
     }
@@ -2144,6 +2258,7 @@ async function importCsv(file) {
         type_line: card.type_line ?? null, rarity: card.rarity ?? null,
         mana_cost: manaOf(card), cmc: card.cmc ?? null,
         released: card.released_at ?? null, colors: farbenOf(card),
+        keywords: keywordsOf(card), oracle_text: oracleOf(card),
         lang, condition: cond, foil, qty, price,
         hist: price == null ? [] : [{ d: today(), v: price }],
       };
@@ -2268,6 +2383,7 @@ async function miImport() {
         p_type_line: card.type_line ?? null, p_rarity: card.rarity ?? null,
         p_mana_cost: manaOf(card), p_cmc: card.cmc ?? null,
         p_released: card.released_at ?? null, p_colors: farbenOf(card),
+        p_keywords: keywordsOf(card), p_oracle_text: oracleOf(card),
       });
       if (error) { sag("✗ " + dbErr(error), "var(--err)"); fail++; continue; }
 
