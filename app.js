@@ -430,7 +430,7 @@ const LANG_NAMES = { de: "Deutsch", en: "Englisch", fr: "Französisch", it: "Ita
   es: "Spanisch", ja: "Japanisch", pt: "Portugiesisch", ru: "Russisch", ko: "Koreanisch",
   zhs: "Chinesisch (vereinfacht)", zht: "Chinesisch (traditionell)",
   // Phyrexianisch gibt es wirklich — 49 Karten bei Scryfall, gedruckt "PH".
-  // Eine Flagge bekommt es nicht: Phyrexia ist eine Ebene, kein Land.
+  // Ein Land ist Phyrexia nicht, ein Wappen hat es trotzdem: siehe FLAGGEN.
   ph: "Phyrexianisch" };
 
 /* Der auf die Karte GEDRUCKTE Sprachcode ist nicht immer Scryfalls Code.
@@ -1318,6 +1318,17 @@ const FLAGGEN = {
   // Vereinfacht: ohne Sternbild und Spruchband — bei 14 px unsichtbar.
   pt: `<rect width="60" height="40" fill="#009C3B"/>
        <path d="M30,4 56,20 30,36 4,20Z" fill="#FFDF00"/><circle cx="30" cy="20" r="7" fill="#002776"/>`,
+  /* Phyrexianisch hat kein Land und damit keine Flagge — aber ein Wappen:
+     das Phyrexia-Zeichen. Nach Benjamins Vorlage gezeichnet, nicht von
+     Scryfall geliehen: dort gibt es das Zeichen nur eingebettet in farbige
+     Manasymbole ({W/P} & Co.), und {P} allein ist laut Symbologie ein
+     "modal budget pawprint" — eine Pfote.
+     Der Ring ist links dicker als rechts; das macht der nach rechts
+     versetzte innere Kreis. Der Strich steht oben und unten über. */
+  ph: `<rect width="60" height="40" fill="#333"/>
+       <circle cx="30" cy="20" r="15" fill="#fff"/>
+       <circle cx="31.4" cy="20" r="10.2" fill="#333"/>
+       <rect x="28.8" y="1.5" width="2.4" height="37" fill="#fff"/>`,
   // Vereinfacht: Taegeuk als zwei Halbkreise, Trigramme als vier Balken.
   ko: `<rect width="60" height="40" fill="#fff"/>
        <path d="M30,10a10,10 0 0,1 0,20a10,10 0 0,1 0,-20Z" fill="#CD2E3A"/>
@@ -1347,11 +1358,11 @@ function flaggeHtml(lang, dekorativ = false) {
 
 /* Die Sprache für die Tabellenspalte. Drei Fälle, und sie auseinanderzuhalten
    ist der Punkt:
-   1. Sprache mit Flagge → Flagge.
-   2. Sprache OHNE Flagge (Phyrexianisch — eine Ebene, kein Land; Chinesisch,
-      dessen Flaggen noch keiner gebraucht hat) → neutrale Pille mit dem Code.
-      Die Angabe ist richtig, uns fehlt nur das Bild. Eine geratene Flagge
-      wäre hier falsch, eine rote Fehlerpille eine Lüge über die Daten.
+   1. Sprache mit Flagge (oder Wappen, siehe Phyrexianisch) → Bild.
+   2. Sprache OHNE Bild (Chinesisch, dessen Flaggen noch keiner gebraucht
+      hat) → neutrale Pille mit dem Code. Die Angabe ist richtig, uns fehlt
+      nur das Bild. Eine geratene Flagge wäre hier falsch, eine rote
+      Fehlerpille eine Lüge über die Daten.
    3. Kein Scryfall-Code (z. B. das ungültige "JP") → rote Pille. Hier stimmt
       wirklich etwas nicht, und das soll man sehen. */
 function langHtml(lang) {
