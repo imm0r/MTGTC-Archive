@@ -6,7 +6,7 @@
 <title>MTG Sammlung</title>
 <!-- ?v= bei jeder Änderung hochzählen: sonst servieren Browser (und der
      Cache von GitHub Pages) nach einem Push weiter die alten Dateien. -->
-<link rel="stylesheet" href="style.css?v=55">
+<link rel="stylesheet" href="style.css?v=56">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='14'>&#9670;</text></svg>">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
@@ -87,7 +87,7 @@
         <option value="">Alle</option><option value="1">Nur Foil</option><option value="0">Nur Normal</option></select></div>
       <div style="flex:none"><button class="btn ghost" id="upd">Preise aktualisieren</button></div>
     </div>
-    <div style="overflow-x:auto">
+    <div class="xscroll" style="overflow-x:auto">
       <!-- Kopf- und Datenzeilen erzeugt cardHead()/cardRow() in app.js —
            dieselben Funktionen bedienen die Deck-Tabellen. -->
       <table id="tbl"><thead></thead><tbody></tbody></table>
@@ -164,7 +164,7 @@
             <option value="DMG">Damaged</option>
           </select></div>
       </div>
-      <div style="overflow-x:auto">
+      <div class="xscroll" style="overflow-x:auto">
         <table id="mi-tbl">
           <thead><tr>
             <th>Set</th><th>Nummer</th><th>Zeichen</th><th>Ausführung</th><th>Sprache</th><th></th><th></th>
@@ -215,6 +215,6 @@
 <div id="hovercard"></div>
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=55"></script>
+<script src="app.js?v=56"></script>
 </body>
 </html>

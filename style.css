@@ -163,6 +163,21 @@ td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000
 .saeule-spur i{display:block;width:100%;background:var(--acc);border-radius:3px 3px 0 0;
   transition:height .3s}
 .saeule-label{font-size:11px;color:var(--dim);padding-top:4px;white-space:nowrap}
+
+/* Waagerechte Bildlaufleisten im Inhalt (Säulen-Diagramme, Tabellen bei
+   schmalem Fenster). Ohne Zutun rendert das System sie hell und mit
+   Pfeiltasten — auf Windows ein weißes Band, das im dunklen Layout wie ein
+   fremdes Bedienelement wirkt. Hier dünn, dunkel und ohne Pfeile.
+   Zwei Syntaxen nötig: scrollbar-* für Firefox, ::-webkit-* für Chrome/Edge/
+   Safari. Die senkrechte Fensterleiste bleibt bewusst unangetastet — sie ist
+   erwartete Fensterchrome, kein Element in einer Karte. */
+.saeulen,.xscroll{scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+.saeulen::-webkit-scrollbar,.xscroll::-webkit-scrollbar{height:8px}
+.saeulen::-webkit-scrollbar-track,.xscroll::-webkit-scrollbar-track{background:transparent}
+.saeulen::-webkit-scrollbar-thumb,.xscroll::-webkit-scrollbar-thumb{
+  background:var(--line);border-radius:4px}
+.saeulen::-webkit-scrollbar-thumb:hover,.xscroll::-webkit-scrollbar-thumb:hover{background:var(--dim)}
+.saeulen::-webkit-scrollbar-button,.xscroll::-webkit-scrollbar-button{display:none;width:0;height:0}
 .empty{text-align:center;color:var(--dim);padding:36px 10px}
 .spark{display:inline-block;vertical-align:middle}
 

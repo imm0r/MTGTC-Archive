@@ -1854,7 +1854,7 @@ function renderDecks() {
             >&#128202; Statistik ${dashOffen ? "ausblenden" : "anzeigen"}</button></div>` : ""}
         </div>
         <div class="deck-dash" data-dash="${d.id}" style="margin-top:12px"></div>
-        ${rows ? `<div style="overflow-x:auto"><table class="deck-tbl" style="margin-top:10px">
+        ${rows ? `<div class="xscroll" style="overflow-x:auto"><table class="deck-tbl" style="margin-top:10px">
                     <thead>${cardHead(true)}</thead><tbody>${rows}</tbody></table></div>`
                : '<div class="empty">Noch keine Karten in diesem Deck.</div>'}
       </div>
