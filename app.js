@@ -742,19 +742,22 @@ function spark(hist) {
    sich im Deck: die Anzahl ist die Deck-Menge (deck_entries.qty, nicht der
    Sammlungsbestand), eine Spalte zeigt den Fehlbestand, und das Kreuz löst
    nur die Zuordnung — die Karte bleibt in der Sammlung. */
+/* Das Deck zeigt bewusst weniger: Sprache, Zustand, Datum, Preis und Wert
+   stehen in der Detailansicht — hier zählt, welche Karte wie oft drin ist
+   und ob sie da ist. Sortierbar ist nur die Sammlung. */
 function cardHead(imDeck) {
-  const s = k => imDeck ? "" : ` data-s="${k}"`;   // sortierbar nur in der Sammlung
+  const s = k => imDeck ? "" : ` data-s="${k}"`;
   return `<tr>
     <th class="hide-s"></th>
     <th${s("name")}>Karte</th>
     <th${s("set_name")} class="hide-s">Set</th>
-    <th${s("lang")} class="hide-s">Spr.</th>
+    ${imDeck ? "" : `<th${s("lang")} class="hide-s">Spr.</th>
     <th${s("condition")} class="hide-s">Zust.</th>
-    <th${s("added")} class="hide-s">Hinzugefügt</th>
+    <th${s("added")} class="hide-s">Hinzugefügt</th>`}
     <th${s("qty")} class="num">Anz.</th>
-    ${imDeck ? '<th class="num">Bestand</th>' : ""}
-    <th${s("price")} class="num">Preis</th>
-    <th${s("value")} class="num">Wert</th>
+    ${imDeck ? '<th class="num">Bestand</th>'
+             : `<th${s("price")} class="num">Preis</th>
+    <th${s("value")} class="num">Wert</th>`}
     <th></th><th></th>
   </tr>`;
 }
@@ -772,24 +775,30 @@ function cardRow(c, o = {}) {
             ${c.printed_name && c.printed_name !== c.name ? esc(c.name) + " &middot; " : ""}
             ${c.foil ? '<span class="pill foil">Foil</span> ' : ""}#${esc(c.cn)}</div></td>
       <td class="hide-s">${esc(c.set_name || c.set || "")}</td>
-      <td class="hide-s">${esc((c.lang || "").toUpperCase())}</td>
+      ${imDeck ? "" : `<td class="hide-s">${esc((c.lang || "").toUpperCase())}</td>
       <td class="hide-s">${esc(c.condition || "")}</td>
-      <td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap">${dtShort(c.added)}</td>
+      <td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap">${dtShort(c.added)}</td>`}
       <td class="num"><input type="number" min="0" value="${qty}" data-qty
              style="width:62px;padding:4px 6px;text-align:right"></td>
       ${imDeck ? `<td class="num">${fehlt
         ? `<span class="pill err">${fehlt} fehlen</span>`
-        : '<span class="pill ok">vorhanden</span>'}</td>` : ""}
-      <td class="num">${eur(c.price)} ${spark(c.hist)}</td>
-      <td class="num">${eur(c.price == null ? null : c.price * qty)}</td>
+        : '<span class="pill ok">vorhanden</span>'}</td>`
+      : `<td class="num">${eur(c.price)} ${spark(c.hist)}</td>
+      <td class="num">${eur(c.price == null ? null : c.price * qty)}</td>`}
       <td class="num" style="white-space:nowrap">${cmLink(c.cm_id)
         ? `<a class="cm" href="${esc(cmLink(c.cm_id))}" target="_blank" rel="noopener noreferrer"
              title="Angebote auf Cardmarket ansehen">CM</a>` : ""}${sfLink(c)
         ? ` <a class="cm" href="${esc(sfLink(c))}" target="_blank" rel="noopener noreferrer"
              title="Kartentext und alle Auflagen auf Scryfall">SF</a>` : ""}</td>
       <td class="num" style="white-space:nowrap">
-        <button class="btn ghost sm" data-edit title="Sprache, Zustand oder Ausführung ändern">&#9998;</button>
-        <button class="btn ghost sm" data-price title="Preis dieser Karte neu von Scryfall holen">&#8635;</button>
+        ${imDeck
+          // Bearbeiten und Preis stehen im Deck in der Detailansicht — hier
+          // nur, was das Deck betrifft: Hauptkarte und Zuordnung lösen.
+          ? `<button class="btn ghost sm${o.istHaupt ? " star-on" : ""}" data-main
+              title="${o.istHaupt ? "Ist die Hauptkarte — nochmal klicken zum Entfernen"
+                                  : "Als Hauptkarte des Decks setzen"}">${o.istHaupt ? "&#9733;" : "&#9734;"}</button>`
+          : `<button class="btn ghost sm" data-edit title="Sprache, Zustand oder Ausführung ändern">&#9998;</button>
+        <button class="btn ghost sm" data-price title="Preis dieser Karte neu von Scryfall holen">&#8635;</button>`}
         <button class="btn ghost sm" data-del title="${imDeck
           ? "Aus dem Deck entfernen (Karte bleibt in der Sammlung)" : "Zeile löschen"}">&times;</button>
       </td>
@@ -811,11 +820,14 @@ function wireCardRows(root) {
       }
     });
 
-    // Bearbeiten und Preis gelten immer der Karte in der Sammlung —
-    // auch wenn man sie aus einem Deck heraus anfasst.
-    tr.querySelector("[data-edit]").onclick = () => editCard(id);
+    // Nicht jede Ansicht hat jeden Knopf: im Deck fehlen Bearbeiten und
+    // Preis (die stehen dort in der Detailansicht), in der Sammlung der
+    // Hauptkarten-Stern. Deshalb überall prüfen, bevor verdrahtet wird.
+    const eb = tr.querySelector("[data-edit]");
+    if (eb) eb.onclick = () => editCard(id);
+
     const pb = tr.querySelector("[data-price]");
-    pb.onclick = async () => {
+    if (pb) pb.onclick = async () => {
       const c = CARDS.find(x => x.id === id);
       if (!c) return;
       pb.disabled = true;
@@ -846,7 +858,11 @@ function wireCardRows(root) {
       } catch (e) { toast(dbErr(e)); }
     };
 
-    tr.querySelector("[data-del]").onclick = async () => {
+    const mb = tr.querySelector("[data-main]");
+    if (mb) mb.onclick = () => setMainCard(deck, id);
+
+    const db = tr.querySelector("[data-del]");
+    if (db) db.onclick = async () => {
       try {
         const { error } = deck
           ? await sb.from("deck_entries").delete().eq("deck_id", deck).eq("card_id", id)
@@ -971,6 +987,12 @@ function detailHtml(c, hover) {
             rel="noopener noreferrer" title="Angebote auf Cardmarket">CM</a> ` : ""}
           ${sfLink(c) ? `<a class="cm" href="${esc(sfLink(c))}" target="_blank"
             rel="noopener noreferrer" title="Kartentext und alle Auflagen auf Scryfall">SF</a>` : ""}
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div style="flex:none"><button class="btn ghost sm" id="dt-edit"
+            title="Sprache, Zustand oder Ausführung ändern">&#9998; Bearbeiten</button></div>
+          <div style="flex:none"><button class="btn ghost sm" id="dt-price"
+            title="Preis neu von Scryfall holen">&#8635; Preis</button></div>
         </div>` : ""}
         <div class="hint" style="margin-top:10px">Hinzugefügt: ${dtShort(c.added)} Uhr</div>
         <div style="margin-top:10px">
@@ -986,6 +1008,24 @@ function showCardDetail(id) {
   if (!c) return;
   $("#detail-body").innerHTML = detailHtml(c, false);
   $("#detail-dlg").showModal();
+
+  // Erst schließen, dann bearbeiten: zwei gestapelte Dialoge wären fragil.
+  $("#dt-edit").onclick = () => { $("#detail-dlg").close(); editCard(id); };
+  const pb = $("#dt-price");
+  pb.onclick = async () => {
+    pb.disabled = true;
+    try {
+      const fresh = await withPrice(await sfById(c.scryfall_id));
+      if (!fresh) throw new Error("Karte bei Scryfall nicht gefunden");
+      const p = priceOf(fresh, c.foil);
+      const { error } = await sb.rpc("set_price", { p_card_id: c.id, p_price: p });
+      if (error) throw new Error(dbErr(error));
+      await reload(); renderAll();
+      toast(p == null ? "Scryfall führt keinen Preis für diese Auflage" : "Preis aktualisiert: " + eur(p));
+      // Ansicht mit dem frischen Preis und dem neuen Kurvenpunkt neu zeichnen.
+      if ($("#detail-dlg").open) showCardDetail(id);
+    } catch (e) { pb.disabled = false; toast(e.message); }
+  };
 }
 
 /* Hover-Vorschau: dieselben Details schweben neben dem Mauszeiger, ohne
@@ -1130,6 +1170,38 @@ async function applyCardEdit(c, lang, cond, foil, neu) {
   await reload(); renderAll();
 }
 
+/* ============================= Decks-Ansicht ==========================
+   Der Auf-/Zuklapp-Zustand ist reine Ansichtssache und bleibt deshalb im
+   Browser, nicht in der Datenbank — auf dem Handy will man andere Decks
+   offen haben als am großen Bildschirm. Voreinstellung: zugeklappt, sonst
+   scrollt man bei 90 Karten pro Deck ewig. */
+const deckOffen = {
+  lies() { try { return new Set(JSON.parse(localStorage.getItem("mtg-decks-offen") || "[]")); }
+           catch { return new Set(); } },
+  ist(id) { return this.lies().has(id); },
+  schalte(id) {
+    const s = this.lies();
+    s.has(id) ? s.delete(id) : s.add(id);
+    localStorage.setItem("mtg-decks-offen", JSON.stringify([...s]));
+    return s.has(id);
+  },
+};
+
+async function setMainCard(deckId, cardId) {
+  const d = DECKS.find(x => x.id === deckId);
+  // Nochmal auf dieselbe Karte: Hauptkarte wieder abwählen.
+  const neu = d?.main_card_id === cardId ? null : cardId;
+  const { error } = await sb.from("decks").update({ main_card_id: neu }).eq("id", deckId);
+  if (error) {
+    // Fehlt die Spalte, ist das Schema älter als die App.
+    if (error.code === "42703" || /main_card_id/.test(error.message || ""))
+      return toast("Spalte fehlt — bitte supabase-schema.sql neu ausführen.");
+    return toast(dbErr(error));
+  }
+  await reload(); renderDecks();
+  toast(neu ? "Als Hauptkarte gesetzt" : "Hauptkarte entfernt");
+}
+
 /* ============================= Decks-Ansicht ========================== */
 function renderDecks() {
   if (!DECKS.length) {
@@ -1142,27 +1214,48 @@ function renderDecks() {
       .map(e => ({ e, c: CARDS.find(x => x.id === e.cardId) }))
       .filter(x => x.c)
       .sort((a, b) => a.c.disp.localeCompare(b.c.disp));
-    const rows = eintraege.map(({ e, c }) => cardRow(c, { deckId: d.id, qty: e.qty })).join("");
+    const rows = eintraege.map(({ e, c }) => cardRow(c, {
+      deckId: d.id, qty: e.qty, istHaupt: d.main_card_id === c.id })).join("");
 
     const n = eintraege.reduce((s, x) => s + x.e.qty, 0);
     const v = eintraege.reduce((s, x) => s + (x.c.price || 0) * x.e.qty, 0);
     const fehlt = eintraege.filter(x => x.e.qty > x.c.qty).length;
+    const offen = deckOffen.ist(d.id);
+    const haupt = d.main_card_id ? CARDS.find(c => c.id === d.main_card_id) : null;
+
     return `<div class="card">
-      <div class="row" style="align-items:center">
-        <div><h3 style="margin:0">${esc(d.name)}</h3>
+      <div class="deck-kopf" data-toggle="${d.id}" title="${offen ? "Zuklappen" : "Aufklappen"}">
+        <span class="deck-pfeil">${offen ? "&#9660;" : "&#9654;"}</span>
+        ${haupt?.img ? `<img class="deck-haupt" src="${esc(haupt.img)}" alt=""
+             title="Hauptkarte: ${esc(haupt.disp)}">` : ""}
+        <div style="flex:1;min-width:0">
+          <h3 style="margin:0">${esc(d.name)}</h3>
           <div class="hint" style="margin:2px 0 0">${n} Karten &middot; ${eur(v)}${
-            fehlt ? ` &middot; <span style="color:var(--err)">${fehlt} unvollständig</span>` : ""}</div></div>
-        <div style="flex:none"><button class="btn danger sm" data-dx="${d.id}">Deck löschen</button></div>
+            fehlt ? ` &middot; <span style="color:var(--err)">${fehlt} unvollständig</span>` : ""}</div>
+        </div>
+        <button class="btn danger sm" data-dx="${d.id}" style="flex:none">Deck löschen</button>
       </div>
-      <div class="row" style="margin-top:10px">
-        <div class="sugg"><input type="text" data-dadd="${d.id}" placeholder="Karte aus der Sammlung hinzufügen…"></div>
-        <div style="flex:none;min-width:80px"><input type="number" min="1" value="1" data-dqty="${d.id}"></div>
+      <div class="deck-inhalt" style="display:${offen ? "block" : "none"}">
+        <div class="row" style="margin-top:10px">
+          <div class="sugg"><input type="text" data-dadd="${d.id}" placeholder="Karte aus der Sammlung hinzufügen…"></div>
+          <div style="flex:none;min-width:80px"><input type="number" min="1" value="1" data-dqty="${d.id}"></div>
+        </div>
+        ${rows ? `<div style="overflow-x:auto"><table class="deck-tbl" style="margin-top:10px">
+                    <thead>${cardHead(true)}</thead><tbody>${rows}</tbody></table></div>`
+               : '<div class="empty">Noch keine Karten in diesem Deck.</div>'}
       </div>
-      ${rows ? `<div style="overflow-x:auto"><table class="deck-tbl" style="margin-top:10px">
-                  <thead>${cardHead(true)}</thead><tbody>${rows}</tbody></table></div>`
-             : '<div class="empty">Noch keine Karten in diesem Deck.</div>'}
     </div>`;
   }).join("");
+
+  $$("#deck-list .deck-kopf").forEach(k => k.onclick = ev => {
+    // Der Löschen-Knopf sitzt im Kopf — sein Klick darf nicht zuklappen.
+    if (ev.target.closest("[data-dx]")) return;
+    const offen = deckOffen.schalte(k.dataset.toggle);
+    const karte = k.parentElement;
+    karte.querySelector(".deck-inhalt").style.display = offen ? "block" : "none";
+    k.querySelector(".deck-pfeil").innerHTML = offen ? "&#9660;" : "&#9654;";
+    k.title = offen ? "Zuklappen" : "Aufklappen";
+  });
 
   $$("#deck-list .deck-tbl").forEach(t => wireCardRows(t));
 

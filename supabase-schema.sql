@@ -34,6 +34,10 @@ create table if not exists public.decks (
   id      uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
   name    text not null,
+  -- Aushängeschild des Decks (Kommandeur o. ä.). "set null" beim Löschen:
+  -- verschwindet die Karte aus der Sammlung, verliert das Deck nur sein
+  -- Bild — es darf auf keinen Fall mitgelöscht werden.
+  main_card_id uuid references public.cards(id) on delete set null,
   created timestamptz not null default now()
 );
 
@@ -48,6 +52,8 @@ create table if not exists public.deck_entries (
 -- Für Bestände, die vor diesen Spalten angelegt wurden:
 alter table public.cards add column if not exists printed_name text;
 alter table public.cards add column if not exists cm_id integer;
+alter table public.decks add column if not exists main_card_id uuid
+  references public.cards(id) on delete set null;
 
 create index if not exists cards_user_idx        on public.cards(user_id);
 create index if not exists decks_user_idx        on public.decks(user_id);

@@ -96,6 +96,15 @@ td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000
 .sugg li{padding:8px 10px;cursor:pointer;font-size:14px}
 .sugg li:hover,.sugg li.sel{background:var(--acc);color:#1a1400}
 
+/* --------------------------------------------------------------- Decks */
+.deck-kopf{display:flex;align-items:center;gap:12px;cursor:pointer;
+  user-select:none;padding:2px 0}
+.deck-kopf:hover h3{color:var(--acc)}
+.deck-pfeil{color:var(--dim);font-size:12px;flex:none;width:12px}
+.deck-haupt{width:44px;height:61px;object-fit:cover;border-radius:5px;
+  background:#000;flex:none;box-shadow:0 2px 8px #0008}
+.star-on{border-color:var(--acc);color:var(--acc)}
+
 /* ------------------------------------------------------------ Diverses */
 dialog{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:var(--radius);
        padding:16px;max-width:440px;width:92vw}
