@@ -152,6 +152,15 @@ const cmLink = id => id
   ? `https://www.cardmarket.com/de/Magic/Products?idProduct=${id}`
   : null;
 
+/* Scryfall-Seite der Karte: Regeltext, Legalitäten, alle Auflagen. Die
+   Adresse folgt dem Muster /card/<set>/<nummer>, das brauchen wir nicht
+   abzurufen — Setcode und Nummer stehen längst in der Zeile. Die Sprache
+   hängt hinten an, sofern Scryfall die Auflage in ihr führt. */
+const sfLink = c => c?.set && c?.cn
+  ? `https://scryfall.com/card/${encodeURIComponent(String(c.set).toLowerCase())}/${encodeURIComponent(c.cn)}`
+    + (c.printed_name && c.lang && c.lang !== "en" ? `/${encodeURIComponent(c.lang)}` : "")
+  : null;
+
 async function findByCode(code, num, lang, isToken) {
   const n = String(num).replace(/^0+/, "") || "0";   // führende Nullen ergeben 404
   const base = code.toLowerCase();
@@ -762,9 +771,11 @@ function renderCollection() {
              style="width:62px;padding:4px 6px;text-align:right"></td>
       <td class="num">${eur(c.price)} ${spark(c.hist)}</td>
       <td class="num">${eur(c.price == null ? null : c.price * c.qty)}</td>
-      <td class="num">${cmLink(c.cm_id)
+      <td class="num" style="white-space:nowrap">${cmLink(c.cm_id)
         ? `<a class="cm" href="${esc(cmLink(c.cm_id))}" target="_blank" rel="noopener noreferrer"
-             title="Angebote auf Cardmarket ansehen">CM</a>` : ""}</td>
+             title="Angebote auf Cardmarket ansehen">CM</a>` : ""}${sfLink(c)
+        ? ` <a class="cm" href="${esc(sfLink(c))}" target="_blank" rel="noopener noreferrer"
+             title="Kartentext und alle Auflagen auf Scryfall">SF</a>` : ""}</td>
       <td class="num" style="white-space:nowrap">
         <button class="btn ghost sm" data-edit title="Sprache, Zustand oder Ausführung ändern">&#9998;</button>
         <button class="btn ghost sm" data-price title="Preis dieser Karte neu von Scryfall holen">&#8635;</button>
@@ -896,9 +907,13 @@ function detailHtml(c, hover) {
           <span class="pill">${esc(c.condition || "")}</span>
           <span class="pill">Anzahl ${c.qty}</span>
         </div>
-        <div>Preis: <b>${eur(c.price)}</b>${c.qty > 1 ? ` · Wert: <b>${eur(c.price == null ? null : c.price * c.qty)}</b>` : ""}
-          ${!hover && cmLink(c.cm_id) ? ` <a class="cm" href="${esc(cmLink(c.cm_id))}" target="_blank"
-            rel="noopener noreferrer" title="Angebote auf Cardmarket">CM</a>` : ""}</div>
+        <div>Preis: <b>${eur(c.price)}</b>${c.qty > 1 ? ` · Wert: <b>${eur(c.price == null ? null : c.price * c.qty)}</b>` : ""}</div>
+        ${!hover ? `<div style="margin-top:8px">
+          ${cmLink(c.cm_id) ? `<a class="cm" href="${esc(cmLink(c.cm_id))}" target="_blank"
+            rel="noopener noreferrer" title="Angebote auf Cardmarket">CM</a> ` : ""}
+          ${sfLink(c) ? `<a class="cm" href="${esc(sfLink(c))}" target="_blank"
+            rel="noopener noreferrer" title="Kartentext und alle Auflagen auf Scryfall">SF</a>` : ""}
+        </div>` : ""}
         <div class="hint" style="margin-top:10px">Hinzugefügt: ${dtShort(c.added)} Uhr</div>
         <div style="margin-top:10px">
           <label style="margin-bottom:2px">Preisverlauf</label>
