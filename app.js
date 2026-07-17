@@ -1231,6 +1231,93 @@ async function importCsv(file) {
   toast(`${imported} Karten importiert${skipped ? `, ${skipped} übersprungen` : ""}`);
 }
 
+/* ================= Manueller Import (Set + Nummer) ====================
+   Tabelleneingabe für Karten, deren Ecke man abliest oder kennt:
+   Set, Nummer, Zeichen (T = Token), Ausführung, Sprache. Die Auflösung
+   läuft über findByCode — denselben Weg wie Scan und Handeingabe. */
+const MI_LANGS = ["de", "en", "fr", "it", "es", "ja", "pt", "ru", "ko"];
+
+function miAddRow() {
+  const tb = $("#mi-rows");
+  // Neue Zeilen erben Ausführung und Sprache der vorigen — wer einen Stapel
+  // deutscher Karten eintippt, soll das nicht 30-mal wählen müssen.
+  const prev = tb.lastElementChild;
+  const pFoil = prev?.querySelector("[data-mi-foil]")?.value ?? "0";
+  const pLang = prev?.querySelector("[data-mi-lang]")?.value ?? "de";
+
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td><input type="text" data-mi-set placeholder="MKM" style="width:80px;text-transform:uppercase"></td>
+    <td><input type="text" data-mi-num placeholder="8" style="width:72px"></td>
+    <td><input type="text" data-mi-let placeholder="T" maxlength="2" style="width:52px;text-transform:uppercase"></td>
+    <td><select data-mi-foil><option value="0">Normal</option><option value="1">Foil</option></select></td>
+    <td><select data-mi-lang>${MI_LANGS.map(l =>
+      `<option value="${l}">${l.toUpperCase()}</option>`).join("")}</select></td>
+    <td class="num"><button class="btn ghost sm" data-mi-del title="Zeile entfernen">&times;</button></td>
+    <td data-mi-status style="white-space:nowrap;font-size:13px"></td>`;
+  tr.querySelector("[data-mi-foil]").value = pFoil;
+  tr.querySelector("[data-mi-lang]").value = pLang;
+  tr.querySelector("[data-mi-del]").onclick = () => {
+    tr.remove();
+    if (!tb.children.length) miAddRow();
+  };
+  // Tippen in der letzten Zeile hängt automatisch eine leere neue an.
+  tr.querySelectorAll("input[type=text]").forEach(i => i.addEventListener("input", () => {
+    if (tr === tb.lastElementChild && i.value.trim()) miAddRow();
+  }));
+  tb.appendChild(tr);
+  return tr;
+}
+
+async function miImport() {
+  const btn = $("#mi-import");
+  const cond = $("#mi-cond").value;
+  const rows = [...$("#mi-rows").children];
+  let ok = 0, fail = 0;
+  btn.disabled = true;
+  try {
+    for (const tr of rows) {
+      if (tr.dataset.done) continue;                       // schon importiert
+      const set  = tr.querySelector("[data-mi-set]").value.trim();
+      const num  = tr.querySelector("[data-mi-num]").value.trim();
+      const zei  = tr.querySelector("[data-mi-let]").value.trim().toUpperCase();
+      const foil = tr.querySelector("[data-mi-foil]").value === "1";
+      const lang = tr.querySelector("[data-mi-lang]").value;
+      const status = tr.querySelector("[data-mi-status]");
+      const sag = (t, farbe) => { status.textContent = t; status.style.color = farbe || ""; };
+
+      if (!set && !num) continue;                          // leere Zeile
+      if (!set || !num) { sag("✗ Set und Nummer nötig", "var(--err)"); fail++; continue; }
+
+      sag("sucht…");
+      let card = null;
+      try { card = await findByCode(set, num, lang, zei === "T"); } catch { /* unten melden */ }
+      if (!card) { sag(`✗ ${set.toUpperCase()} #${num} nicht gefunden`, "var(--err)"); fail++; continue; }
+
+      const price = priceOf(card, foil);
+      const { error } = await sb.rpc("add_card", {
+        p_scryfall_id: card.id, p_oracle_id: card.oracle_id, p_name: card.name,
+        p_printed_name: card.printed_name || null,
+        p_set_code: (card.set || "").toUpperCase(), p_set_name: card.set_name,
+        p_cn: card.collector_number, p_img: imgOf(card),
+        p_cm_id: card.cardmarket_id ?? null,
+        p_lang: lang, p_condition: cond, p_foil: foil, p_price: price,
+      });
+      if (error) { sag("✗ " + dbErr(error), "var(--err)"); fail++; continue; }
+
+      // Erfolgreiche Zeilen bleiben sichtbar stehen (man sieht, was aus der
+      // Eingabe wurde), sind aber gesperrt — ein zweites "Importieren"
+      // würde sie sonst erneut einbuchen.
+      tr.dataset.done = "1";
+      tr.querySelectorAll("input,select,button").forEach(x => x.disabled = true);
+      sag("✓ " + (card.printed_name || card.name) + (price != null ? " · " + eur(price) : ""), "var(--ok)");
+      ok++;
+    }
+    await reload(); renderAll();
+    toast(`${ok} Karten importiert${fail ? `, ${fail} fehlgeschlagen` : ""}`);
+  } finally { btn.disabled = false; }
+}
+
 /* =============================== Rendern ============================== */
 function renderAll() { renderCollection(); renderDecks(); }
 
@@ -1351,6 +1438,14 @@ function wireApp() {
     if (!f) return;
     try { await importJson(f); } catch (err) { toast("Import fehlgeschlagen: " + err.message); }
   };
+  $("#mi-toggle").onclick = () => {
+    const s = $("#manual-import");
+    const zeigen = s.style.display === "none";
+    s.style.display = zeigen ? "block" : "none";
+    if (zeigen && !$("#mi-rows").children.length) miAddRow();
+  };
+  $("#mi-add").onclick = () => miAddRow();
+  $("#mi-import").onclick = miImport;
   $("#im-csv").onclick = () => $("#csv-file").click();
   $("#csv-file").onchange = async e => {
     const f = e.target.files[0]; e.target.value = "";
