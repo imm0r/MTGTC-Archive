@@ -1045,7 +1045,11 @@ async function importCsv(file) {
     const csvName = g("name");
     const lang = (g("lang") || "en").toLowerCase();
     const cond = (() => { const c = g("condition").toUpperCase(); return CONDS.includes(c) ? c : "NM"; })();
-    const foil = /foil|etched/i.test(g("finish"));   // etched wie foil behandeln
+    // Exakt vergleichen: "nonfoil" enthält "foil" als Teilstring — ein
+    // Substring-Test hielte deshalb JEDE Zeile für Foil. Scryfall kennt
+    // genau drei Finishes: nonfoil, foil, etched.
+    const fin = g("finish").toLowerCase();
+    const foil = fin === "foil" || fin === "etched";
     const qty = Math.max(1, parseInt(g("qty")) || 1);
 
     say(`<p class="hint">Karte ${i + 1} von ${data.length} … ${esc(csvName)}
