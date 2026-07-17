@@ -157,7 +157,13 @@ async function findByCode(code, num, lang, isToken) {
   const base = code.toLowerCase();
   // Achtung: "mkm/8" und "tmkm/8" existieren beide und sind verschiedene
   // Karten. Das T-Zeichen auf der Karte entscheidet, welche gemeint ist.
-  const codes = [...new Set(isToken ? ["t" + base, base] : [base, "t" + base])];
+  // Zuletzt das p-Präfix: Promo-Karten führt Scryfall in eigenen Sets
+  // (pemn, pdft, …), auf der Karte selbst steht aber der normale Setcode.
+  // Als letzter Kandidat ist es ungefährlich — es greift nur, wenn wörtlich
+  // und t-Präfix beide ins Leere laufen.
+  const codes = [...new Set(isToken
+    ? ["t" + base, base, "p" + base]
+    : [base, "t" + base, "p" + base])];
   const langs = lang && lang !== "en" ? [lang, "en"] : ["en"];
   for (const c of codes)
     for (const l of langs) {
@@ -607,7 +613,8 @@ function renderManual(el, guess, candidates) {
     </div>
     <p class="hint" style="margin-top:6px">Immer eindeutig: Setcode und Sammlernummer von unten
       links auf der Karte, z. B. <code>MKM 8</code> — bei einem Token ein <code>T</code> anhängen
-      (<code>FIN 9 T</code>). Der Setcode steht in der Zeile mit dem Sprachkürzel.</p>`;
+      (<code>FIN 9 T</code>), bei Promos den Setcode mit <code>P</code> davor (<code>PEMN 1Z</code>).
+      Der Setcode steht in der Zeile mit dem Sprachkürzel.</p>`;
 
   el.querySelectorAll("[data-pick]").forEach(b => b.onclick = async () => {
     try { await addToCollection(cs[+b.dataset.pick], el); }
@@ -621,12 +628,17 @@ function renderManual(el, guess, candidates) {
     if (!v) return;
     el.querySelector(".meta").textContent = "Suche…";
     try {
-      // "MKM 8", "mkm/8 T" oder "TMKM 8": Eingabe von Setcode und Nummer,
-      // wie sie unten links auf der Karte stehen.
-      const m = v.match(/^([a-z0-9]{3,5})[\s\-\/·•]+(\d{1,4})\s*(t)?$/i);
-      const card = m
+      // "MKM 8", "FIN 9 T" oder "PEMN 1Z": Eingabe von Setcode und Nummer,
+      // wie sie unten links auf der Karte stehen. Die Nummer darf einen
+      // Buchstaben tragen (1Z, 173p, 251★) — Promos und Sonderdrucke.
+      const m = v.match(/^([a-z0-9]{3,5})[\s\-\/·•]+(\d{1,4}[a-z★]?)(?:\s+(t))?$/i);
+      let card = m
         ? await findByCode(m[1], m[2], $("#d-lang").value, !!m[3])
         : null;
+      // "FIN 9T" ohne Leerzeichen: erst als Nummer "9T" versucht (eben
+      // fehlgeschlagen), jetzt als Nummer 9 mit Token-Zeichen.
+      if (!card && m && !m[3] && /^\d+t$/i.test(m[2]))
+        card = await findByCode(m[1], m[2].slice(0, -1), $("#d-lang").value, true);
       if (card) return addToCollection(card, el);
       if (m) return el.querySelector(".meta").innerHTML =
         `<span class="pill err">${esc(m[1].toUpperCase())} #${esc(m[2])} gibt es nicht${m[3] ? " als Token" : ""}</span>`;
@@ -915,7 +927,7 @@ async function editCard(id) {
     </div>
     <p class="hint">Geänderter Set-Code oder Nummer löst die Karte neu auf — Name, Bild und Preis
       kommen dann von der neuen Auflage; Anzahl, Zustand und Deck-Zuordnung bleiben.
-      Bei Tokens beginnt der Set-Code mit T (z.&nbsp;B. TFIN).
+      Bei Tokens beginnt der Set-Code mit T (z.&nbsp;B. TFIN), bei Promos mit P (PEMN).
       Gibt es dieselbe Karte in der Ziel-Ausprägung schon, werden die Anzahlen zusammengelegt.</p>`);
   if (!ok) return;
   const lang = $("#ed-lang").value, cond = $("#ed-cond").value, foil = $("#ed-foil").value === "1";

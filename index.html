@@ -6,7 +6,7 @@
 <title>MTG Sammlung</title>
 <!-- ?v= bei jeder Änderung hochzählen: sonst servieren Browser (und der
      Cache von GitHub Pages) nach einem Push weiter die alten Dateien. -->
-<link rel="stylesheet" href="style.css?v=19">
+<link rel="stylesheet" href="style.css?v=20">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='14'>&#9670;</text></svg>">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
@@ -195,7 +195,9 @@
       </div>
       <p class="hint">Set und Nummer stehen unten links auf der Karte („MKM • DE“ und „0008/013 T“).
         Das Zeichen ist der Buchstabe bei der Nummer — wichtig ist <code>T</code> für Token;
-        C, U, R oder M kannst du weglassen. Neue Zeilen übernehmen Ausführung und Sprache der vorigen.
+        C, U, R oder M kannst du weglassen. Promo-Karten findest du mit <code>P</code> vor dem
+        Setcode (<code>PEMN</code>, Nummer <code>1Z</code>); die Nummer darf Buchstaben enthalten.
+        Neue Zeilen übernehmen Ausführung und Sprache der vorigen.
         Dieselbe Karte mehrfach eingetragen erhöht ihre Anzahl.</p>
     </div>
     <input type="file" id="im-file" accept="application/json,.json" hidden>
@@ -229,6 +231,6 @@
 </dialog>
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=19"></script>
+<script src="app.js?v=20"></script>
 </body>
 </html>
