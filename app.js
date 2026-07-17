@@ -940,6 +940,184 @@ async function importJson(file) {
   toast(bad ? `${ok} Karten eingespielt, ${bad} fehlgeschlagen` : `${ok} Karten eingespielt`);
 }
 
+/* ==================== Import aus Mythic Tools (CSV) ===================
+   Mythic Tools exportiert reichhaltiger als unser eigener Export: mit
+   Scryfall-ID, Sprache, Finish und über die Container-Spalte sogar der
+   Deck-Zuordnung. Wir werten das voll aus. */
+
+/* CSV nach RFC 4180 zerlegen — Kartennamen und Set-Namen enthalten Kommas
+   ("Warhammer 40,000 Commander", "Reyhan, Last of the Abzan"), deshalb kein
+   naives split. Anführungszeichen schützen das Trennzeichen, "" ist ein
+   literales ". */
+function parseCsv(text, delim) {
+  const s = text.replace(/^﻿/, "");
+  const rows = []; let row = [], f = "", q = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (q) {
+      if (c === '"') { if (s[i + 1] === '"') { f += '"'; i++; } else q = false; }
+      else f += c;
+    } else if (c === '"') q = true;
+    else if (c === delim) { row.push(f); f = ""; }
+    else if (c === "\n") { row.push(f); rows.push(row); row = []; f = ""; }
+    else if (c !== "\r") f += c;
+  }
+  if (f.length || row.length) { row.push(f); rows.push(row); }
+  return rows;
+}
+
+/* Spalten über ihre Überschrift finden, nicht über die Position — so
+   übersteht der Import eine geänderte Spaltenreihenfolge. */
+const CSV_ALIASES = {
+  name: ["card name", "name"],
+  set_code: ["set code", "set-code"],
+  cn: ["collector number", "nummer"],
+  lang: ["language", "sprache"],
+  qty: ["quantity", "anzahl"],
+  condition: ["condition", "zustand"],
+  finish: ["finish", "ausführung"],
+  scryfall_id: ["scryfall id"],
+  cname: ["container name"],
+  ctype: ["container type"],
+};
+function csvColumns(header) {
+  const H = header.map(h => h.trim().toLowerCase());
+  const idx = {};
+  for (const [key, al] of Object.entries(CSV_ALIASES)) idx[key] = H.findIndex(h => al.includes(h));
+  return idx;
+}
+
+/* Eine CSV-Zeile zu einer Scryfall-Karte auflösen. Reihenfolge nach
+   Zuverlässigkeit: die auflagen- und sprachgenaue ID zuerst; sonst Setcode +
+   Nummer in der Kartensprache; sonst englisch (viele Karten gibt es bei
+   Scryfall nur auf Englisch). Kein t-Präfix — der Import kennt keine Tokens. */
+async function resolveImportCard(set_code, cn, lang, scryfall_id) {
+  let card = null;
+  if (scryfall_id) { try { card = await sfById(scryfall_id); } catch { /* weiter */ } }
+  if (!card && set_code && cn) {
+    const n = String(cn).replace(/^0+/, "") || "0";
+    try { card = await sfCode(set_code, n, lang); } catch { /* weiter */ }
+    if (!card && lang !== "en") { try { card = await sfCode(set_code, n, "en"); } catch { /* weiter */ } }
+  }
+  return card ? withPrice(card) : null;
+}
+
+async function importCsv(file) {
+  const text = await file.text();
+  // Trennzeichen erraten: Mythic Tools nutzt Komma, unser Export Semikolon.
+  const first = text.replace(/^﻿/, "").split("\n")[0] || "";
+  const delim = (first.split(";").length > first.split(",").length) ? ";" : ",";
+  const rows = parseCsv(text, delim);
+  if (rows.length < 2) throw new Error("Die Datei enthält keine Kartenzeilen.");
+
+  const col = csvColumns(rows[0]);
+  if (col.name < 0 || (col.scryfall_id < 0 && (col.set_code < 0 || col.cn < 0)))
+    throw new Error("Unbekanntes CSV-Format — weder Scryfall-ID noch Setcode/Nummer gefunden.");
+
+  const data = rows.slice(1).filter(r => r.some(c => c.trim()));
+  const decks = col.cname >= 0
+    ? [...new Set(data.map(r => (r[col.cname] || "").trim()).filter(Boolean))] : [];
+
+  const ok = await confirmDlg(`<b>${data.length} Zeilen aus „${esc(file.name)}“ importieren?</b>
+    <p class="hint">Karten werden zu deiner Sammlung hinzugefügt; bereits vorhandene
+    werden <b>übersprungen</b>. Preise kommen frisch von Scryfall.
+    ${decks.length ? `Angelegt wird außerdem das Deck „${esc(decks.join("“, „"))}“.` : ""}
+    Das dauert einen Moment.</p>`);
+  if (!ok) return;
+
+  const box = $("#import-status");
+  const say = h => { if (box) box.innerHTML = h; };
+
+  // Was schon in der Sammlung ist, kennen wir. Key wie der Eindeutigkeits-
+  // schlüssel der Datenbank, damit "überspringen" dieselbe Karte trifft.
+  const key = (sid, foil, lang, cond) => `${sid}|${foil ? 1 : 0}|${lang}|${cond}`;
+  const known = new Map();
+  for (const c of CARDS) known.set(key(c.scryfall_id, c.foil, c.lang, c.condition), c.id);
+
+  const CONDS = ["NM", "LP", "MP", "HP", "DMG"];
+  let imported = 0, skipped = 0;
+  const failed = [];
+  const deckWants = [];   // { name, cardId, qty }
+
+  for (let i = 0; i < data.length; i++) {
+    const r = data[i];
+    const g = k => (col[k] >= 0 ? (r[col[k]] || "").trim() : "");
+    const csvName = g("name");
+    const lang = (g("lang") || "en").toLowerCase();
+    const cond = (() => { const c = g("condition").toUpperCase(); return CONDS.includes(c) ? c : "NM"; })();
+    const foil = /foil|etched/i.test(g("finish"));   // etched wie foil behandeln
+    const qty = Math.max(1, parseInt(g("qty")) || 1);
+
+    say(`<p class="hint">Karte ${i + 1} von ${data.length} … ${esc(csvName)}
+      <br>${imported} neu · ${skipped} schon vorhanden · ${failed.length} nicht gefunden</p>`);
+
+    let card;
+    try { card = await resolveImportCard(g("set_code"), g("cn"), lang, g("scryfall_id")); }
+    catch { card = null; }
+    if (!card) { failed.push(csvName); continue; }
+
+    const k = key(card.id, foil, lang, cond);
+    let cardId = known.get(k);
+    if (cardId) { skipped++; }
+    else {
+      const price = priceOf(card, foil);
+      const row = {
+        scryfall_id: card.id, oracle_id: card.oracle_id, name: card.name,
+        // Fehlt Scryfall der fremdsprachige Name, nimm den aus der CSV.
+        printed_name: card.printed_name || (lang !== "en" ? csvName : null),
+        set_code: (card.set || "").toUpperCase(), set_name: card.set_name,
+        cn: card.collector_number, img: imgOf(card),
+        cm_id: card.cardmarket_id ?? null,
+        lang, condition: cond, foil, qty, price,
+        hist: price == null ? [] : [{ d: today(), v: price }],
+      };
+      const { data: ins, error } = await sb.from("cards").insert(row).select("id").single();
+      if (error) {
+        // 23505 = Karte doch schon da (parallel), kein Fehler, sondern Duplikat.
+        if (error.code === "23505") { skipped++; }
+        else { failed.push(csvName); continue; }
+      } else { cardId = ins.id; known.set(k, cardId); imported++; }
+    }
+    if (cardId && col.ctype >= 0 && g("ctype") === "deck" && g("cname"))
+      deckWants.push({ name: g("cname"), cardId, qty });
+  }
+
+  // Decks anlegen (bestehende gleichen Namens wiederverwenden) und zuordnen.
+  let deckMsg = "";
+  if (deckWants.length) {
+    say(`<p class="hint">Decks werden angelegt …</p>`);
+    const idByName = new Map();
+    for (const name of new Set(deckWants.map(w => w.name))) {
+      let d = DECKS.find(x => x.name === name);
+      if (!d) {
+        const { data: nd, error } = await sb.from("decks").insert({ name }).select("id").single();
+        if (error) continue;
+        idByName.set(name, nd.id);
+      } else idByName.set(name, d.id);
+    }
+    // Pro (Deck, Karte) ein Eintrag; eine Karte kann in der CSV mehrfach dem
+    // Deck zugeordnet sein — dann die Mengen summieren.
+    const merged = new Map();
+    for (const w of deckWants) {
+      const did = idByName.get(w.name); if (!did) continue;
+      const mk = did + "|" + w.cardId;
+      merged.set(mk, { deck_id: did, card_id: w.cardId, qty: (merged.get(mk)?.qty || 0) + w.qty });
+    }
+    const entries = [...merged.values()];
+    if (entries.length) {
+      const { error } = await sb.from("deck_entries").upsert(entries, { onConflict: "deck_id,card_id" });
+      deckMsg = error ? " · Deck-Zuordnung teilweise fehlgeschlagen"
+                      : ` · Deck „${[...idByName.keys()].join("“, „")}“ angelegt`;
+    }
+  }
+
+  await reload(); renderAll();
+  say(`<p class="hint"><b>Fertig.</b> ${imported} neu importiert,
+    ${skipped} schon vorhanden${deckMsg}.
+    ${failed.length ? `<br>${failed.length} nicht gefunden: ${esc(failed.slice(0, 8).join(", "))}${failed.length > 8 ? " …" : ""}` : ""}</p>`);
+  toast(`${imported} Karten importiert${skipped ? `, ${skipped} übersprungen` : ""}`);
+}
+
 /* =============================== Rendern ============================== */
 function renderAll() { renderCollection(); renderDecks(); }
 
@@ -1059,6 +1237,16 @@ function wireApp() {
     const f = e.target.files[0]; e.target.value = "";
     if (!f) return;
     try { await importJson(f); } catch (err) { toast("Import fehlgeschlagen: " + err.message); }
+  };
+  $("#im-csv").onclick = () => $("#csv-file").click();
+  $("#csv-file").onchange = async e => {
+    const f = e.target.files[0]; e.target.value = "";
+    if (!f) return;
+    try { await importCsv(f); }
+    catch (err) {
+      $("#import-status").innerHTML = `<span class="pill err">${esc(err.message)}</span>`;
+      toast("Import fehlgeschlagen: " + err.message);
+    }
   };
   $("#reset-cfg").onclick = async () => {
     if (!await confirmDlg(`<b>Verbindung zurücksetzen?</b>

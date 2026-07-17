@@ -6,7 +6,7 @@
 <title>MTG Sammlung</title>
 <!-- ?v= bei jeder Änderung hochzählen: sonst servieren Browser (und der
      Cache von GitHub Pages) nach einem Push weiter die alten Dateien. -->
-<link rel="stylesheet" href="style.css?v=13">
+<link rel="stylesheet" href="style.css?v=14">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='14'>&#9670;</text></svg>">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
@@ -162,9 +162,15 @@
       <div style="flex:none"><button class="btn" id="ex-json">Sicherung (JSON)</button></div>
       <div style="flex:none"><button class="btn ghost" id="ex-csv">Export (CSV)</button></div>
       <div style="flex:none"><button class="btn ghost" id="im-json">Sicherung einspielen</button></div>
+      <div style="flex:none"><button class="btn ghost" id="im-csv">Mythic Tools (CSV)</button></div>
       <div style="flex:none"><button class="btn ghost" id="reset-cfg">Verbindung zurücksetzen</button></div>
     </div>
+    <p class="hint">„Mythic Tools (CSV)“ liest eine Export-Datei aus der Mythic-Tools-App ein:
+      Karten kommen in die Sammlung, ein enthaltenes Deck wird angelegt, bereits vorhandene
+      Karten werden übersprungen.</p>
+    <div id="import-status" style="margin-top:6px"></div>
     <input type="file" id="im-file" accept="application/json,.json" hidden>
+    <input type="file" id="csv-file" accept="text/csv,.csv" hidden>
   </div>
   <div class="card">
     <h3 style="margin-top:0">So funktioniert die Erkennung</h3>
@@ -188,6 +194,6 @@
 </dialog>
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=13"></script>
+<script src="app.js?v=14"></script>
 </body>
 </html>
