@@ -20,10 +20,16 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 // Handeingabe es ab. Wechsel ist diese eine Zeile.
 const MODEL = "claude-haiku-4-5";
 
+// x-client-info schickt supabase-js bei JEDEM invoke mit. Fehlt er hier,
+// scheitert schon der Preflight und die Anfrage erreicht die Funktion nie —
+// der Browser meldet dann nur einen Netzwerkfehler ohne Status. Von file://
+// fällt das nicht auf, erst von einer echten Web-Herkunft wie GitHub Pages.
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, content-type, apikey",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-api-version",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
 };
 
 const json = (body: unknown, status = 200) =>

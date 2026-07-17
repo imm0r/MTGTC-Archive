@@ -339,18 +339,20 @@ async function readWithVision(img) {
     const s = error.context?.status;
     let msg = "";
     try { msg = (await error.context.json()).error; } catch { /* kein JSON-Körper */ }
-    // Diese Zustände ändern sich nicht von allein — für die Sitzung
-    // abschalten, statt es bei jeder Karte erneut zu versuchen. 400 gehört
-    // dazu: Es bedeutet, dass die ausgerollte Funktion älter ist als die App
-    // und das Format nicht kennt.
-    if ([400, 402, 404, 500, 502].includes(s)) {
-      visionAus = true;
-      toast(msg
-        ? msg + " Weiter mit Texterkennung."
-        : "Bilderkennung nicht verfügbar (Fehler " + s + ") — weiter mit Texterkennung.");
-    } else if (s === 429) {
+
+    if (s === 429) {
+      // Vorübergehend — nicht abschalten, nur diese Karte anders lösen.
       toast(msg || "Zu viele Anfragen — diese Karte über Texterkennung.");
+      return null;
     }
+    // Alles andere ändert sich nicht von allein: für die Sitzung abschalten.
+    // Ein Fehler OHNE Status ist kein Sonderfall, sondern der wichtigste —
+    // er bedeutet CORS oder Netzwerk. Genau der ist mir hier stumm
+    // durchgerutscht, weil ich nur bekannte Statuscodes behandelt habe.
+    visionAus = true;
+    toast(msg ? msg + " Weiter mit Texterkennung."
+      : s ? `Bilderkennung nicht verfügbar (Fehler ${s}) — weiter mit Texterkennung.`
+          : "Bilderkennung nicht erreichbar (CORS oder Netzwerk) — weiter mit Texterkennung.");
     return null;
   }
   return data?.card || null;
