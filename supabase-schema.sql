@@ -113,6 +113,9 @@ alter table public.cards add column if not exists released date;
 alter table public.cards add column if not exists colors text[];
 alter table public.cards add column if not exists keywords text[];
 alter table public.cards add column if not exists oracle_text text;
+-- Kuratierte Verkaufsliste: Karte für den Cardmarket-Verkauf markiert.
+alter table public.cards add column if not exists for_sale boolean not null default false;
+create index if not exists cards_for_sale_idx on public.cards(user_id) where for_sale;
 
 create index if not exists cards_user_idx        on public.cards(user_id);
 create index if not exists decks_user_idx        on public.decks(user_id);

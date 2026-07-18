@@ -1031,7 +1031,8 @@ function cardRow(c, o = {}) {
                                   : esc(t("row.mainSetTitle"))}">${o.istHaupt ? "&#9733;" : "&#9734;"}</button>`
             : "")
           : `<button class="btn ghost sm" data-edit title="${esc(t("row.editTitle"))}">&#9998;</button>
-        <button class="btn ghost sm" data-price title="${esc(t("row.priceTitle"))}">&#8635;</button>`}
+        <button class="btn ghost sm" data-price title="${esc(t("row.priceTitle"))}">&#8635;</button>
+        <button class="btn ghost sm sell-toggle${c.for_sale ? " on" : ""}" data-sell title="${esc(t("row.sellTitle"))}">&#8364;</button>`}
         <button class="btn ghost sm" data-del title="${imDeck
           ? esc(t("row.removeFromDeck")) : esc(t("row.removeRow"))}">&times;</button>
       </td>
@@ -1085,6 +1086,9 @@ function wireCardRows(root) {
         await reload(); renderAll();
       } catch (e) { toast(dbErr(e)); }
     };
+
+    const sl = tr.querySelector("[data-sell]");
+    if (sl) sl.onclick = () => toggleSale(id, sl);
 
     const mb = tr.querySelector("[data-main]");
     if (mb) mb.onclick = () => setMainCard(deck, id);
@@ -1361,6 +1365,7 @@ function renderCollection() {
   $("#tbl tbody").innerHTML = seite.map(c => cardRow(c)).join("");
   wireCardRows($("#tbl"));
   renderPager(rows.length, seiten);
+  aktualisiereVerkaufZaehler();
 
   // Die Kopfzeile wird bei jedem Rendern neu gebaut, also auch die
   // Sortier-Handler neu hängen.
@@ -3026,51 +3031,230 @@ function exportCsv() {
     "﻿" + [head, ...rows].map(r => r.map(csvCell).join(";")).join("\r\n"), "text/csv");
 }
 
-/* ---- Cardmarket-Verkaufsexport ------------------------------------------
-   Cardmarkets API ist für neue Zugänge geschlossen (Stand 2026), deshalb der
-   Datei-Weg: eine CSV, die die Erweiterung „Cardmarket Bulk Import" ins
-   Bulk-Listing-Formular einliest (csv-parse, KOMMA-getrennt, Kopfzeile Pflicht;
-   matcht per Name + Set, Zustand/Sprache über tolerante Matcher, Foil = "foil").
-   Deshalb der ENGLISCHE Name (c.name), Cardmarkets englische Sprachnamen und
-   unsere Zustands-Codes (MT/NM/EX/…, sind Cardmarkets eigene) — alles passt
-   unmittelbar. setCode/Nummer/idProduct reisen als Zusatzspalten mit: der
-   Importer ignoriert Unbekanntes, dem Menschen hilft die Referenz. */
+/* ---- Cardmarket-Verkaufsliste -------------------------------------------
+   Nicht die ganze Sammlung, sondern eine KURATIERTE Liste: einzelne Karten
+   werden in der Sammlung mit dem €-Knopf markiert (DB-Spalte `for_sale`, damit
+   es geräteübergreifend synchron bleibt). Aus dieser Liste entsteht die CSV
+   (Format wie zuvor für die Bulk-Listing-Importer) UND eine kompakte JSON, die
+   unser eigenes Bookmarklet auf der Cardmarket-Seite aus der Zwischenablage
+   liest. Cardmarkets API ist für neue Zugänge geschlossen, ein Add-on nutzen
+   wir bewusst nicht — das Bookmarklet ist unser eigener Code, kein Store. */
 const CM_LANG = { en: "English", de: "German", fr: "French", es: "Spanish",
   it: "Italian", pt: "Portuguese", ja: "Japanese", ko: "Korean", ru: "Russian",
   zhs: "S-Chinese", zht: "T-Chinese" };
 const CM_COLS = ["name", "set", "setCode", "collectorNumber", "language",
   "condition", "isFoil", "isSigned", "quantity", "price", "comment", "idProduct"];
 
-function cmSellRows() {
-  return CARDS.filter(c => (c.qty | 0) > 0)
-    .map(c => ({
-      name: c.name || c.disp || "",
-      set: c.set_name || "",
-      setCode: c.set || "",
-      collectorNumber: c.cn || "",
-      language: CM_LANG[(c.lang || "").toLowerCase()] || "",
-      condition: c.condition || "NM",
-      isFoil: c.foil ? "foil" : "",
-      isSigned: "",
-      quantity: c.qty | 0,
-      price: c.price == null ? "" : Number(c.price).toFixed(2),
-      comment: "",
-      idProduct: c.cm_id ?? "",
-    }))
-    .sort((a, b) => (a.set || "").localeCompare(b.set || "") ||
-                    (a.name || "").localeCompare(b.name || ""));
+/* Die markierten Karten (Bestand > 0). for_sale kommt über reload() mit. */
+function sellList() {
+  return CARDS.filter(c => c.for_sale && (c.qty | 0) > 0);
 }
 
-function exportCardmarket() {
-  const rows = cmSellRows();
-  if (!rows.length) { toast(t("cm.cmNone")); return; }
+function cmRow(c) {
+  return {
+    name: c.name || c.disp || "",
+    set: c.set_name || "",
+    setCode: c.set || "",
+    collectorNumber: c.cn || "",
+    language: CM_LANG[(c.lang || "").toLowerCase()] || "",
+    condition: c.condition || "NM",
+    isFoil: c.foil ? "foil" : "",
+    isSigned: "",
+    quantity: c.qty | 0,
+    price: c.price == null ? "" : Number(c.price).toFixed(2),
+    comment: "",
+    idProduct: c.cm_id ?? "",
+  };
+}
+function cmSortRows(cards) {
+  return cards.map(cmRow).sort((a, b) =>
+    (a.set || "").localeCompare(b.set || "") || (a.name || "").localeCompare(b.name || ""));
+}
+function cmCsv(rows) {
   // KEIN BOM: csv-parse strippt keins, sonst wird die erste Überschrift
   // („﻿name") nicht als Spalte erkannt. Quoting über csvCell (RFC 4180).
-  const csv = CM_COLS.join(",") + "\r\n" +
+  return CM_COLS.join(",") + "\r\n" +
     rows.map(r => CM_COLS.map(k => csvCell(r[k])).join(",")).join("\r\n");
-  download(`cardmarket-verkauf-${today()}.csv`, csv, "text/csv");
-  toast(t("cm.cmDone", { n: rows.length }));
 }
+
+/* Cardmarkets „mehrere Artikel einstellen" — lokalisiert, verifizierte URL. */
+function massListingUrl() {
+  const l = ["de", "en", "fr", "es", "it"].includes(LANG) ? LANG : "en";
+  return `https://www.cardmarket.com/${l}/Magic/MassListing`;
+}
+
+/* Kompakte JSON für die Zwischenablage → das Bookmarklet liest sie drüben. */
+function sellClipboardPayload(cards) {
+  return JSON.stringify(cards.map(c => ({
+    n: c.name || c.disp || "", s: c.set_name || "", sc: c.set || "", cn: c.cn || "",
+    l: CM_LANG[(c.lang || "").toLowerCase()] || "", c: c.condition || "NM",
+    f: !!c.foil, q: c.qty | 0, p: c.price == null ? "" : Number(c.price).toFixed(2),
+    id: c.cm_id ?? "",
+  })));
+}
+
+/* Markieren/Entmarkieren. Optimistisch lokal, dann DB; bei Fehler zurück. */
+async function setSale(id, val, btn) {
+  const c = CARDS.find(x => x.id === id);
+  if (!c || c.for_sale === val) { syncSaleUI(id, val, btn); return true; }
+  const prev = c.for_sale;
+  c.for_sale = val;
+  syncSaleUI(id, val, btn);
+  const { error } = await sb.from("cards").update({ for_sale: val }).eq("id", id);
+  if (error) { c.for_sale = prev; syncSaleUI(id, prev, btn); toast(dbErr(error)); return false; }
+  return true;
+}
+function toggleSale(id, btn) {
+  const c = CARDS.find(x => x.id === id);
+  return setSale(id, !(c && c.for_sale), btn);
+}
+function syncSaleUI(id, val, btn) {
+  const b = btn || document.querySelector(`#tbl tr[data-id="${CSS.escape(id)}"] [data-sell]`);
+  if (b) b.classList.toggle("on", !!val);
+  aktualisiereVerkaufZaehler();
+}
+function aktualisiereVerkaufZaehler() {
+  const b = $("#sell-open");
+  if (!b) return;
+  const n = sellList().length;
+  b.textContent = `\u{1F3F7} ${t("sell.list")} (${n})`;
+  b.classList.toggle("has", n > 0);
+}
+
+/* Verkaufsliste-Dialog */
+function oeffneVerkauf() { renderVerkauf(); $("#sell-dlg").showModal(); }
+
+function renderVerkauf() {
+  const body = $("#sell-body");
+  if (!body) return;
+  const list = sellList();
+  const head = `<h3 style="margin:0 0 6px">${esc(t("sell.title"))} (${list.length})</h3>`;
+  if (!list.length) {
+    body.innerHTML = head + `<p class="hint">${esc(t("sell.emptyHint"))}</p>` + bookmarkletBoxHtml();
+    wireVerkauf(); return;
+  }
+  const items = list.map(c => `
+    <div class="sell-item" data-id="${esc(c.id)}">
+      ${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy">` : `<div class="sell-noimg"></div>`}
+      <div class="sell-meta">
+        <div class="sell-nm">${esc(c.name || c.disp)}</div>
+        <div class="hint">${esc([c.set_name, CONDITION_BY[c.condition]?.name || c.condition,
+          c.foil ? "Foil" : "", langName(c.lang)].filter(Boolean).join(" · "))}</div>
+      </div>
+      <div class="sell-pq">${c.qty}&times; ${c.price == null ? "&mdash;" : eur(c.price)}</div>
+      <button class="btn ghost sm" data-unsell title="${esc(t("sell.remove"))}">&times;</button>
+    </div>`).join("");
+  const actions = `
+    <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap">
+      <div style="flex:none"><button class="btn" id="sell-go">${esc(t("sell.copyOpen"))}</button></div>
+      <div style="flex:none"><button class="btn ghost" id="sell-csv">${esc(t("sell.csv"))}</button></div>
+      <div style="flex:none"><button class="btn ghost" id="sell-clear">${esc(t("sell.clear"))}</button></div>
+    </div>`;
+  body.innerHTML = head + `<div class="sell-liste">${items}</div>` + actions + bookmarkletBoxHtml();
+  wireVerkauf();
+}
+
+function bookmarkletBoxHtml() {
+  return `
+    <details class="bm-box" style="margin-top:16px">
+      <summary>${esc(t("sell.bmSetup"))}</summary>
+      <p class="hint" style="margin-top:8px">${esc(t("sell.bmHow"))}</p>
+      <p style="margin:8px 0"><a id="bm-link" class="bm-link" draggable="true">&#8595; ${esc(t("sell.bmName"))}</a></p>
+      <div class="row"><div style="flex:none"><button class="btn ghost sm" id="bm-copy">${esc(t("sell.bmCopy"))}</button></div></div>
+      <p class="hint" style="margin-top:8px">${esc(t("sell.bmBeta"))}</p>
+    </details>`;
+}
+
+function wireVerkauf() {
+  const go = $("#sell-go"); if (go) go.onclick = verkaufKopierenUndOeffnen;
+  const csv = $("#sell-csv"); if (csv) csv.onclick = verkaufCsv;
+  const cl = $("#sell-clear"); if (cl) cl.onclick = verkaufLeeren;
+  $$("#sell-body [data-unsell]").forEach(b => {
+    b.onclick = async () => { await setSale(b.closest("[data-id]").dataset.id, false); renderVerkauf(); };
+  });
+  const link = $("#bm-link"); if (link) link.href = BOOKMARKLET;
+  const bc = $("#bm-copy");
+  if (bc) bc.onclick = async () => {
+    try { await navigator.clipboard.writeText(BOOKMARKLET); toast(t("sell.bmCopied")); }
+    catch (e) { toast(e.message); }
+  };
+}
+
+async function verkaufKopierenUndOeffnen() {
+  const list = sellList();
+  if (!list.length) { toast(t("sell.empty")); return; }
+  try { await navigator.clipboard.writeText(sellClipboardPayload(list)); toast(t("sell.copied")); }
+  catch (e) { toast(t("sell.copyFail")); }
+  // Auch bei Clipboard-Fehler die Seite öffnen — die Liste steht ja noch da.
+  window.open(massListingUrl(), "_blank", "noopener");
+}
+function verkaufCsv() {
+  const list = sellList();
+  if (!list.length) { toast(t("sell.empty")); return; }
+  download(`cardmarket-verkauf-${today()}.csv`, cmCsv(cmSortRows(list)), "text/csv");
+}
+async function verkaufLeeren() {
+  const list = sellList();
+  if (!list.length) return;
+  if (!await confirmDlg(t("sell.clearConfirm", { n: list.length }))) return;
+  const ids = list.map(c => c.id);
+  const { error } = await sb.from("cards").update({ for_sale: false }).in("id", ids);
+  if (error) { toast(dbErr(error)); return; }
+  list.forEach(c => c.for_sale = false);
+  renderVerkauf(); aktualisiereVerkaufZaehler(); renderCollection();
+}
+
+/* ---- Bookmarklet ---------------------------------------------------------
+   Läuft NICHT in unserer App, sondern auf der Cardmarket-Seite (deshalb kein
+   Zugriff auf unsere Variablen/i18n — alles selbstständig, Texte deutsch).
+   v1 ist bewusst NUR eine Lese-Hilfe: es liest die Verkaufsliste aus der
+   Zwischenablage und legt sie als verschiebbares Panel ÜBER die Seite, je
+   Karte ein Klick = Name kopiert. Es schreibt NICHTS ins Verkaufsformular —
+   ein blindes Auto-Ausfüllen einer echten (Geld-)Verkaufsmaske wäre fahrlässig;
+   das echte Ausfüllen kalibrieren wir separat an der Live-Seite. */
+function bookmarkletSource() {
+  var H = location.hostname.replace(/^www\./, "");
+  if (H !== "cardmarket.com") { alert("Bitte zuerst die Cardmarket-Seite öffnen (Verkaufen → mehrere Artikel einstellen)."); return; }
+  function esc(s) { var d = document.createElement("div"); d.textContent = (s == null ? "" : String(s)); return d.innerHTML; }
+  function build(items) {
+    var old = document.getElementById("aa-sell-ov"); if (old) old.remove();
+    var ov = document.createElement("div"); ov.id = "aa-sell-ov";
+    ov.style.cssText = "position:fixed;top:12px;right:12px;z-index:2147483647;width:330px;max-height:86vh;overflow:auto;background:#12131a;color:#e9e9ee;font:13px/1.4 system-ui,Arial,sans-serif;border:1px solid #d4af37;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.55)";
+    var rows = items.map(function (it, i) {
+      var sub = [it.s, it.c, (it.f ? "Foil" : ""), it.l].filter(Boolean).join(" · ");
+      return '<div class="aa-it" data-i="' + i + '" style="padding:8px 10px;border-top:1px solid #2a2c38;cursor:pointer">'
+        + '<div style="display:flex;justify-content:space-between;gap:8px">'
+        + '<b style="font-weight:600">' + esc(it.n) + '</b>'
+        + '<span style="color:#d4af37;white-space:nowrap">' + (it.q || 1) + '× ' + (it.p ? esc(it.p) + " €" : "—") + '</span></div>'
+        + '<div style="color:#99a;margin-top:2px">' + esc(sub) + '</div></div>';
+    }).join("");
+    ov.innerHTML = '<div id="aa-h" style="padding:10px 12px;background:#1b1d27;cursor:move;display:flex;justify-content:space-between;align-items:center;border-radius:10px 10px 0 0">'
+      + '<b>Arcanum → Verkauf (' + items.length + ')</b>'
+      + '<button id="aa-x" style="background:none;border:0;color:#e9e9ee;font-size:18px;cursor:pointer;line-height:1">×</button></div>'
+      + '<div style="padding:8px 12px;color:#99a;border-bottom:1px solid #2a2c38">Karte antippen → Name ist kopiert, dann ins Cardmarket-Suchfeld einfügen. Preis/Zustand daneben ablesen.</div>'
+      + rows;
+    document.body.appendChild(ov);
+    document.getElementById("aa-x").onclick = function () { ov.remove(); };
+    var h = document.getElementById("aa-h"), dx = 0, dy = 0, drag = false;
+    h.onmousedown = function (e) { drag = true; dx = e.clientX - ov.offsetLeft; dy = e.clientY - ov.offsetTop; e.preventDefault(); };
+    document.addEventListener("mousemove", function (e) { if (!drag) return; ov.style.left = (e.clientX - dx) + "px"; ov.style.top = (e.clientY - dy) + "px"; ov.style.right = "auto"; });
+    document.addEventListener("mouseup", function () { drag = false; });
+    Array.prototype.forEach.call(ov.querySelectorAll(".aa-it"), function (el) {
+      el.onclick = function () {
+        navigator.clipboard.writeText(items[+el.dataset.i].n).then(function () { el.style.background = "#243024"; });
+      };
+    });
+  }
+  navigator.clipboard.readText().then(function (txt) {
+    var items = null; try { items = JSON.parse(txt); } catch (e) { items = null; }
+    if (!items || !items.length || !items[0] || !items[0].n) {
+      alert("Keine Verkaufsliste in der Zwischenablage.\nIn Arcanum Archive erst „Liste kopieren + Cardmarket öffnen“ anklicken.");
+      return;
+    }
+    build(items);
+  }, function () { alert("Zwischenablage nicht lesbar – bitte die Leseberechtigung erlauben und erneut klicken."); });
+}
+const BOOKMARKLET = "javascript:(" + bookmarkletSource.toString().replace(/\s+/g, " ") + ")()";
 
 /* Einspielen einer alten lokalen Sicherung (aus der IndexedDB-Fassung). */
 async function importJson(file) {
@@ -5035,7 +5219,9 @@ function wireApp() {
     JSON.stringify({ v: 2, exported: new Date().toISOString(), cards: CARDS, decks: DECKS }, null, 1),
     "application/json");
   $("#ex-csv").onclick = exportCsv;
-  $("#ex-cardmarket").onclick = exportCardmarket;
+  $("#ex-cardmarket").onclick = oeffneVerkauf;
+  $("#sell-open").onclick = oeffneVerkauf;
+  $("#sell-close").onclick = () => $("#sell-dlg").close();
   $("#im-json").onclick = () => $("#im-file").click();
   $("#im-file").onchange = async e => {
     const f = e.target.files[0]; e.target.value = "";
@@ -5083,6 +5269,8 @@ function onLangChange() {
   else if (aktiv === "v-session") renderSession();
   else if (aktiv === "v-events") renderTermine();
   else if (aktiv === "v-settings") renderSettings();
+  aktualisiereVerkaufZaehler();
+  if ($("#sell-dlg")?.open) renderVerkauf();
 }
 
 /* ================================ Start =============================== */

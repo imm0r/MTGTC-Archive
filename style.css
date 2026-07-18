@@ -517,3 +517,22 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px}
   .hide-s{display:none}
   h1{font-size:15px}
 }
+
+/* --------- Cardmarket-Verkaufsliste --------- */
+.sell-toggle.on{border-color:var(--acc);color:var(--acc);background:rgba(201,162,39,.14);font-weight:700}
+#sell-open.has{border-color:var(--acc);color:var(--acc2)}
+#sell-dlg{max-width:560px;width:calc(100% - 32px)}
+.sell-liste{display:flex;flex-direction:column;max-height:46vh;overflow:auto;
+  border:1px solid var(--line);border-radius:10px}
+.sell-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-top:1px solid var(--line)}
+.sell-item:first-child{border-top:0}
+.sell-item img,.sell-noimg{width:34px;height:47px;object-fit:cover;border-radius:4px;
+  flex:none;border:1px solid var(--line)}
+.sell-noimg{background:var(--bg)}
+.sell-meta{flex:1;min-width:0}
+.sell-nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sell-pq{white-space:nowrap;color:var(--acc2);font-size:13px}
+.bm-box summary{cursor:pointer;color:var(--dim)}
+.bm-link{display:inline-block;padding:8px 14px;border:1px solid var(--acc);border-radius:8px;
+  color:var(--acc2);text-decoration:none;cursor:grab;background:var(--panel2)}
+.bm-link:hover{background:var(--panel)}
