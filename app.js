@@ -3343,6 +3343,10 @@ async function afterLogin(user) {
   showApp();
   try { await reload(); renderAll(); }
   catch (e) { toast(dbErr(e)); }
+  // Spielrunde: Einladungs-Badge + laufende Session live, auch ohne die Ansicht
+  // zu öffnen. Nicht kritisch — schlägt es fehl, läuft der Rest weiter.
+  try { await ladeSession(); subscribeInvites(); if (SESSION) subscribeSession(); }
+  catch (e) { /* Realtime optional */ }
 }
 
 function wireAuth() {
@@ -3929,6 +3933,311 @@ async function importFriendDeck(deckId) {
   } catch (e) { toast(dbErr(e)); }
 }
 
+/* ======================= Spielrunde (live) ==========================
+   Synchrone Session über Supabase Realtime: befreundete Nutzer einladen, jeder
+   tritt auf seinem Gerät bei, Lebenspunkte + Würfelwürfe aktualisieren sich bei
+   allen live. Tabellen game_sessions/session_players/session_events, RLS + RPCs
+   in der DB; hier nur Laden, Zeichnen und die Realtime-Kanäle. */
+let SESSION = null;            // aktive eigene Session {id, host, start_life, status}
+let SESSION_PLAYERS = [];      // [{user_id, life, status, seat, profile}]
+let SESSION_INVITES = [];      // offene Einladungen an mich [{...session, hostProfile}]
+let SESSION_LOG = [];          // jüngste Events (Würfe) für die Anzeige
+let sessionChannel = null, inviteChannel = null;
+const lifeTimers = {};         // entprellt das Schreiben je Spieler
+
+function sessionBadge() {
+  const b = $("#sess-badge");
+  if (!b) return;
+  b.textContent = SESSION_INVITES.length || "";
+  b.hidden = !SESSION_INVITES.length;
+}
+
+/* Eigene aktive Session + offene Einladungen laden (zwei einfache Abfragen statt
+   eingebetteter Filter). */
+async function ladeSession() {
+  SESSION = null; SESSION_PLAYERS = []; SESSION_INVITES = [];
+  if (!USER) { sessionBadge(); return; }
+  const sp = await sb.from("session_players").select("session_id,status")
+    .eq("user_id", USER.id).in("status", ["joined", "invited"]);
+  const rows = sp.data || [];
+  if (rows.length) {
+    const ids = [...new Set(rows.map(r => r.session_id))];
+    const gs = await sb.from("game_sessions").select("*").in("id", ids).eq("status", "open");
+    const byId = {}; (gs.data || []).forEach(g => byId[g.id] = g);
+    const joined = rows.filter(r => r.status === "joined" && byId[r.session_id]).map(r => byId[r.session_id]);
+    const invited = rows.filter(r => r.status === "invited" && byId[r.session_id]).map(r => byId[r.session_id]);
+    const hostIds = [...new Set(invited.map(s => s.host))];
+    const hostProf = {};
+    if (hostIds.length) {
+      const pr = await sb.from("profiles").select("id,display_name,avatar_url").in("id", hostIds);
+      (pr.data || []).forEach(p => hostProf[p.id] = p);
+    }
+    SESSION_INVITES = invited.map(s => ({ ...s, hostProfile: hostProf[s.host] || { id: s.host, display_name: null } }));
+    if (joined[0]) { SESSION = joined[0]; await ladeSpieler(); await ladeLog(); }
+  }
+  sessionBadge();
+}
+
+/* Spielerliste über die SECURITY-DEFINER-RPC (Mitspieler müssen nicht
+   untereinander befreundet sein, dürfen sich in der Runde aber sehen). */
+async function ladeSpieler() {
+  if (!SESSION) { SESSION_PLAYERS = []; return; }
+  const { data } = await sb.rpc("session_roster", { p_session: SESSION.id });
+  SESSION_PLAYERS = (data || []).map(r => ({
+    user_id: r.user_id, life: r.life, status: r.status, seat: r.seat,
+    profile: { id: r.user_id, display_name: r.display_name, avatar_url: r.avatar_url },
+  }));
+}
+
+async function ladeLog() {
+  if (!SESSION) { SESSION_LOG = []; return; }
+  const { data } = await sb.from("session_events").select("*")
+    .eq("session_id", SESSION.id).order("id", { ascending: false }).limit(30);
+  SESSION_LOG = data || [];
+}
+
+async function oeffneSession() {
+  try { await ladeFreunde(); } catch { /* Freundeliste ist nur fürs Einladen */ }
+  try { await ladeSession(); } catch (e) { toast(dbErr(e)); }
+  if (SESSION) subscribeSession();
+  renderSession();
+}
+
+function renderSession() {
+  const el = $("#v-session");
+  if (!el) return;
+  el.innerHTML = SESSION ? sessionBoardHtml() : sessionLobbyHtml();
+  wireSession();
+}
+
+function sessionLobbyHtml() {
+  const inv = SESSION_INVITES.map(s => `
+    <div class="freund-zeile">
+      ${avatarHtml(34, s.hostProfile)}
+      <div style="flex:1;min-width:0"><b>${esc(s.hostProfile?.display_name || t("friends.unknown"))}</b>
+        <div class="hint">${esc(t("sess.invitedYou", { life: s.start_life }))}</div></div>
+      <div style="flex:none"><button class="btn sm" data-sess-join="${esc(s.id)}">${esc(t("sess.join"))}</button></div>
+      <div style="flex:none"><button class="btn ghost sm" data-sess-decline="${esc(s.id)}">${esc(t("sess.decline"))}</button></div>
+    </div>`).join("");
+  return `
+    <div class="card">
+      <h3 style="margin-top:0">${esc(t("sess.newTitle"))}</h3>
+      <p class="hint" style="margin-top:-4px">${esc(t("sess.newHint"))}</p>
+      <label>${esc(t("sess.startLife"))}</label>
+      <div class="row" style="align-items:center">
+        <div style="flex:none"><input type="number" id="sess-life" min="1" max="999" value="40" style="width:100px"></div>
+        <div style="flex:none">${[20, 40].map(v => `<button class="btn ghost sm" data-life-preset="${v}">${v}</button>`).join(" ")}</div>
+        <div style="flex:none"><button class="btn" id="sess-create">${esc(t("sess.create"))}</button></div>
+      </div>
+    </div>
+    ${inv ? `<div class="card"><h3 style="margin-top:0">${esc(t("sess.invitesTitle"))}</h3>${inv}</div>` : ""}`;
+}
+
+function sessionBoardHtml() {
+  const istHost = SESSION.host === USER.id;
+  const spieler = SESSION_PLAYERS.map(p => {
+    const joined = p.status === "joined";
+    const name = p.profile?.display_name
+      || (p.user_id === USER.id ? (PROFILE?.display_name || t("sess.you")) : t("friends.unknown"));
+    return `<div class="sp-card${joined ? "" : " wartet"}">
+      ${avatarHtml(48, p.profile)}
+      <div class="sp-name">${esc(name)}${p.user_id === SESSION.host ? ` <span class="sp-host" title="${esc(t("sess.host"))}">&#9733;</span>` : ""}</div>
+      ${joined
+        ? `<div class="sp-life" data-u="${esc(p.user_id)}">${p.life}</div>
+           <div class="sp-ctrl">
+             <button class="btn ghost sm" data-life="${esc(p.user_id)}" data-d="-5">&minus;5</button>
+             <button class="btn ghost sm" data-life="${esc(p.user_id)}" data-d="-1">&minus;1</button>
+             <button class="btn ghost sm" data-life="${esc(p.user_id)}" data-d="1">+1</button>
+             <button class="btn ghost sm" data-life="${esc(p.user_id)}" data-d="5">+5</button>
+           </div>`
+        : `<div class="sp-wait">${esc(t("sess.waiting"))}</div>`}
+    </div>`;
+  }).join("");
+
+  const drin = new Set(SESSION_PLAYERS.map(p => p.user_id));
+  const einladbar = (FRIENDS?.accepted || []).map(f => f.other).filter(o => o && !drin.has(o.id));
+  const inviteList = einladbar.map(o => `
+    <div class="freund-zeile">
+      ${avatarHtml(30, o)}
+      <div style="flex:1;min-width:0">${esc(o.display_name || t("friends.unknown"))}</div>
+      <div style="flex:none"><button class="btn ghost sm" data-sess-invite="${esc(o.id)}">${esc(t("sess.invite"))}</button></div>
+    </div>`).join("");
+
+  return `
+    <div class="card">
+      <div class="row" style="align-items:center;justify-content:space-between">
+        <h3 style="margin:0">${esc(t("sess.roundTitle"))} <span class="hint">&middot; ${esc(t("sess.startLife"))} ${SESSION.start_life}</span></h3>
+        <div class="row" style="flex:none;gap:6px">
+          ${istHost ? `<button class="btn ghost sm" id="sess-reset">${esc(t("sess.reset"))}</button>` : ""}
+          ${istHost ? `<button class="btn danger sm" id="sess-end">${esc(t("sess.end"))}</button>`
+                    : `<button class="btn danger sm" id="sess-leave">${esc(t("sess.leave"))}</button>`}
+        </div>
+      </div>
+      <div class="sp-grid">${spieler}</div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">${esc(t("sess.dice"))}</h3>
+      <div class="row" style="align-items:center">
+        <div style="flex:none"><input type="number" id="dice-sides" min="2" max="1000" value="20" style="width:90px"></div>
+        <div style="flex:none">${[6, 20].map(s => `<button class="btn ghost sm" data-dice="${s}">W${s}</button>`).join(" ")}</div>
+        <div style="flex:none"><button class="btn" id="dice-roll">${esc(t("sess.roll"))}</button></div>
+        <div style="flex:1;text-align:right"><span class="dice-result" id="dice-result"></span></div>
+      </div>
+      <div class="sess-log" id="sess-log">${SESSION_LOG.slice(0, 8).map(logZeile).join("")}</div>
+    </div>
+
+    ${(FRIENDS?.accepted?.length) ? `<div class="card">
+      <h3 style="margin-top:0">${esc(t("sess.inviteTitle"))}</h3>
+      ${inviteList || `<div class="empty">${esc(t("sess.allInvited"))}</div>`}
+    </div>` : ""}`;
+}
+
+function logZeile(ev) {
+  const p = SESSION_PLAYERS.find(x => x.user_id === ev.user_id);
+  const name = p?.profile?.display_name || (ev.user_id === USER?.id ? t("sess.you") : "?");
+  if (ev.kind === "dice")
+    return `<div class="log-zeile">&#127922; <b>${esc(name)}</b>: W${esc(String(ev.data?.sides))} &rarr; <b>${esc(String(ev.data?.result))}</b></div>`;
+  return "";
+}
+
+function wireSession() {
+  const create = $("#sess-create");
+  if (create) {
+    $$("[data-life-preset]").forEach(b => b.onclick = () => { $("#sess-life").value = b.dataset.lifePreset; });
+    create.onclick = () => sessionErstellen(parseInt($("#sess-life").value) || 40);
+  }
+  $$("[data-sess-join]").forEach(b => b.onclick = () => sessionBeitreten(b.dataset.sessJoin));
+  $$("[data-sess-decline]").forEach(b => b.onclick = () => sessionAblehnen(b.dataset.sessDecline));
+  $$("[data-life]").forEach(b => b.onclick = () => lebenAendern(b.dataset.life, parseInt(b.dataset.d)));
+  $$("[data-sess-invite]").forEach(b => b.onclick = () => sessionEinladen(b.dataset.sessInvite, b));
+  const reset = $("#sess-reset"); if (reset) reset.onclick = lebenReset;
+  const end = $("#sess-end"); if (end) end.onclick = sessionBeenden;
+  const leave = $("#sess-leave"); if (leave) leave.onclick = sessionVerlassen;
+  const roll = $("#dice-roll");
+  if (roll) {
+    $$("[data-dice]").forEach(b => b.onclick = () => { $("#dice-sides").value = b.dataset.dice; wuerfeln(parseInt(b.dataset.dice)); });
+    roll.onclick = () => wuerfeln(parseInt($("#dice-sides").value) || 20);
+  }
+}
+
+async function sessionErstellen(life) {
+  try {
+    const { error } = await sb.rpc("create_session", { p_start_life: Math.max(1, Math.min(999, life)) });
+    if (error) throw error;
+    await ladeSession(); subscribeSession(); renderSession();
+  } catch (e) { toast(dbErr(e)); }
+}
+async function sessionBeitreten(id) {
+  try {
+    const { error } = await sb.rpc("join_session", { p_session: id });
+    if (error) throw error;
+    await ladeSession(); subscribeSession(); renderSession();
+  } catch (e) { toast(dbErr(e)); }
+}
+async function sessionAblehnen(id) {
+  try { await sb.rpc("leave_session", { p_session: id }); await ladeSession(); renderSession(); }
+  catch (e) { toast(dbErr(e)); }
+}
+async function sessionEinladen(userId, btn) {
+  if (btn) btn.disabled = true;
+  try { const { error } = await sb.rpc("invite_to_session", { p_session: SESSION.id, p_user: userId }); if (error) throw error; toast(t("sess.invited")); }
+  catch (e) { if (btn) btn.disabled = false; toast(dbErr(e)); }
+}
+async function sessionVerlassen() {
+  try {
+    await sb.rpc("leave_session", { p_session: SESSION.id });
+    unsubscribeSession(); SESSION = null; SESSION_PLAYERS = [];
+    await ladeSession(); renderSession();
+  } catch (e) { toast(dbErr(e)); }
+}
+async function sessionBeenden() {
+  if (!await confirmDlg(t("sess.endConfirm"))) return;
+  try {
+    await sb.rpc("end_session", { p_session: SESSION.id });
+    unsubscribeSession(); SESSION = null; SESSION_PLAYERS = [];
+    await ladeSession(); renderSession();
+  } catch (e) { toast(dbErr(e)); }
+}
+async function lebenReset() {
+  try { await sb.rpc("reset_lives", { p_session: SESSION.id }); await ladeSpieler(); renderSession(); }
+  catch (e) { toast(dbErr(e)); }
+}
+
+/* Leben ändern: lokal sofort (optimistisch), Schreiben entprellt. Fremde
+   Änderungen kommen per Realtime rein und überschreiben die Anzeige. */
+function lebenAendern(userId, delta) {
+  const p = SESSION_PLAYERS.find(x => x.user_id === userId);
+  if (!p || p.status !== "joined") return;
+  p.life = Math.max(-99, Math.min(999, p.life + delta));
+  const el = $(`.sp-life[data-u="${userId}"]`); if (el) el.textContent = p.life;
+  clearTimeout(lifeTimers[userId]);
+  lifeTimers[userId] = setTimeout(async () => {
+    const wert = p.life; delete lifeTimers[userId];
+    try { await sb.from("session_players").update({ life: wert }).eq("session_id", SESSION.id).eq("user_id", userId); }
+    catch (e) { toast(dbErr(e)); }
+  }, 400);
+}
+
+/* Würfel: Ergebnis lokal (Math.random) sofort zeigen, als Event einfügen — die
+   Runde sieht den Wurf über Realtime. */
+function wuerfeln(sides) {
+  if (!SESSION) return;
+  const s = Math.max(2, Math.min(1000, sides | 0));
+  const result = 1 + Math.floor(Math.random() * s);
+  const rd = $("#dice-result"); if (rd) rd.textContent = `\u{1F3B2} ${result}`;
+  sb.from("session_events").insert({ session_id: SESSION.id, user_id: USER.id, kind: "dice", data: { sides: s, result } })
+    .then(({ error }) => { if (error) toast(dbErr(error)); });
+}
+
+/* -------- Realtime -------- */
+function subscribeInvites() {
+  if (inviteChannel || !USER) return;
+  inviteChannel = sb.channel(`inv:${USER.id}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "session_players", filter: `user_id=eq.${USER.id}` },
+      async () => { await ladeSession(); if ($(".view.on")?.id === "v-session") renderSession(); })
+    .subscribe();
+}
+function subscribeSession() {
+  if (!SESSION) return;
+  unsubscribeSession();
+  const sid = SESSION.id;
+  sessionChannel = sb.channel(`sess:${sid}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "session_players", filter: `session_id=eq.${sid}` }, onSpielerChange)
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "session_events", filter: `session_id=eq.${sid}` }, onEvent)
+    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "game_sessions", filter: `id=eq.${sid}` }, onSessionChange)
+    .subscribe();
+}
+function unsubscribeSession() {
+  if (sessionChannel) { sb.removeChannel(sessionChannel); sessionChannel = null; }
+}
+function onSpielerChange(payload) {
+  if (!SESSION) return;
+  if (payload.eventType === "UPDATE" && payload.new && payload.new.status === "joined") {
+    const u = payload.new.user_id;
+    if (lifeTimers[u]) return;   // eigener, noch nicht geschriebener Wert hat Vorrang
+    const p = SESSION_PLAYERS.find(x => x.user_id === u);
+    if (p) { p.life = payload.new.life; const el = $(`.sp-life[data-u="${u}"]`); if (el) el.textContent = p.life; return; }
+  }
+  ladeSpieler().then(() => { if ($(".view.on")?.id === "v-session") renderSession(); });
+}
+function onEvent(payload) {
+  const ev = payload.new;
+  if (!ev || !SESSION || ev.session_id !== SESSION.id) return;
+  SESSION_LOG.unshift(ev);
+  SESSION_LOG = SESSION_LOG.slice(0, 30);
+  const box = $("#sess-log");
+  if (box) box.innerHTML = SESSION_LOG.slice(0, 8).map(logZeile).join("");
+}
+function onSessionChange(payload) {
+  if (payload.new && payload.new.status === "ended") {
+    unsubscribeSession();
+    toast(t("sess.ended"));
+    SESSION = null; SESSION_PLAYERS = [];
+    ladeSession().then(() => { if ($(".view.on")?.id === "v-session") renderSession(); });
+  }
+}
+
 function wireApp() {
   $$("nav button[data-v]").forEach(b => b.onclick = () => {
     $$("nav button[data-v]").forEach(x => x.classList.toggle("on", x === b));
@@ -3937,6 +4246,7 @@ function wireApp() {
     if (b.dataset.v === "profile") renderProfile();
     if (b.dataset.v === "dashboard") renderDashboard();
     if (b.dataset.v === "friends") oeffneFreunde();
+    if (b.dataset.v === "session") oeffneSession();
     if (b.dataset.v === "settings") renderSettings();
   });
   // Klick irgendwo anders schließt das per Klick geöffnete Benutzermenü (Touch)
@@ -4055,6 +4365,7 @@ function onLangChange() {
   if (aktiv === "v-profile") renderProfile();
   else if (aktiv === "v-dashboard") renderDashboard();
   else if (aktiv === "v-friends") renderFriends();
+  else if (aktiv === "v-session") renderSession();
   else if (aktiv === "v-settings") renderSettings();
 }
 

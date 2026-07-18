@@ -646,3 +646,143 @@ create policy "flags nur admin" on public.feature_flags
 
 insert into public.feature_flags (key, enabled) values ('ki_synergy', true)
   on conflict (key) do nothing;
+
+-- =====================================================================
+--  Spielrunde (live, synchron über Supabase Realtime)
+-- =====================================================================
+create table if not exists public.game_sessions (
+  id         uuid primary key default gen_random_uuid(),
+  host       uuid not null references auth.users(id) on delete cascade,
+  start_life integer not null default 40 check (start_life between 1 and 999),
+  status     text not null default 'open' check (status in ('open','ended')),
+  created    timestamptz not null default now()
+);
+create table if not exists public.session_players (
+  session_id uuid not null references public.game_sessions(id) on delete cascade,
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  life       integer not null default 40,
+  status     text not null default 'invited' check (status in ('invited','joined','left')),
+  seat       integer,
+  joined_at  timestamptz,
+  primary key (session_id, user_id)
+);
+create index if not exists session_players_user on public.session_players(user_id);
+create table if not exists public.session_events (
+  id         bigint generated always as identity primary key,
+  session_id uuid not null references public.game_sessions(id) on delete cascade,
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  kind       text not null,
+  data       jsonb not null default '{}'::jsonb,
+  created    timestamptz not null default now()
+);
+create index if not exists session_events_sess on public.session_events(session_id, id);
+alter table public.game_sessions   replica identity full;
+alter table public.session_players replica identity full;
+alter table public.session_events  replica identity full;
+
+-- Teilnehmer? security definer gegen RLS-Rekursion in den Policies.
+create or replace function public.in_session(s uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.game_sessions g where g.id = s and g.host = auth.uid())
+      or exists (select 1 from public.session_players p
+                  where p.session_id = s and p.user_id = auth.uid() and p.status <> 'left');
+$$;
+revoke execute on function public.in_session(uuid) from anon;
+
+alter table public.game_sessions   enable row level security;
+alter table public.session_players enable row level security;
+alter table public.session_events  enable row level security;
+revoke all on public.game_sessions, public.session_players, public.session_events from anon;
+
+create policy gs_select on public.game_sessions for select to authenticated
+  using (host = auth.uid() or public.in_session(id));
+create policy gs_insert on public.game_sessions for insert to authenticated
+  with check (host = auth.uid());
+create policy gs_update on public.game_sessions for update to authenticated
+  using (host = auth.uid()) with check (host = auth.uid());
+create policy gs_delete on public.game_sessions for delete to authenticated
+  using (host = auth.uid());
+create policy sp_select on public.session_players for select to authenticated
+  using (public.in_session(session_id));
+create policy sp_insert on public.session_players for insert to authenticated
+  with check (exists (select 1 from public.game_sessions g where g.id = session_id and g.host = auth.uid())
+              and (user_id = auth.uid() or public.are_friends(auth.uid(), user_id)));
+create policy sp_update on public.session_players for update to authenticated
+  using (public.in_session(session_id)) with check (public.in_session(session_id));
+create policy sp_delete on public.session_players for delete to authenticated
+  using (user_id = auth.uid()
+    or exists (select 1 from public.game_sessions g where g.id = session_id and g.host = auth.uid()));
+create policy se_select on public.session_events for select to authenticated
+  using (public.in_session(session_id));
+create policy se_insert on public.session_events for insert to authenticated
+  with check (public.in_session(session_id) and user_id = auth.uid());
+
+alter publication supabase_realtime add table public.game_sessions;
+alter publication supabase_realtime add table public.session_players;
+alter publication supabase_realtime add table public.session_events;
+
+-- Ablauf-RPCs (security invoker; RLS entscheidet).
+create or replace function public.create_session(p_start_life integer default 40)
+returns uuid language plpgsql security invoker set search_path = public as $$
+declare sid uuid; sl integer := greatest(1, least(999, coalesce(p_start_life, 40)));
+begin
+  insert into public.game_sessions (host, start_life, status)
+    values (auth.uid(), sl, 'open') returning id into sid;
+  insert into public.session_players (session_id, user_id, life, status, seat, joined_at)
+    values (sid, auth.uid(), sl, 'joined', 0, now());
+  return sid;
+end $$;
+create or replace function public.invite_to_session(p_session uuid, p_user uuid)
+returns void language plpgsql security invoker set search_path = public as $$
+declare sl integer;
+begin
+  select start_life into sl from public.game_sessions where id = p_session;
+  if sl is null then raise exception 'Session nicht gefunden'; end if;
+  insert into public.session_players (session_id, user_id, life, status)
+    values (p_session, p_user, sl, 'invited')
+    on conflict (session_id, user_id)
+      do update set status = case when public.session_players.status = 'left'
+                                  then 'invited' else public.session_players.status end;
+end $$;
+create or replace function public.join_session(p_session uuid)
+returns void language plpgsql security invoker set search_path = public as $$
+declare sl integer;
+begin
+  select start_life into sl from public.game_sessions where id = p_session and status = 'open';
+  if sl is null then raise exception 'Session nicht offen'; end if;
+  update public.session_players set status = 'joined', life = sl, joined_at = now()
+   where session_id = p_session and user_id = auth.uid();
+  if not found then raise exception 'Keine Einladung'; end if;
+end $$;
+create or replace function public.leave_session(p_session uuid)
+returns void language plpgsql security invoker set search_path = public as $$
+begin
+  update public.session_players set status = 'left'
+   where session_id = p_session and user_id = auth.uid();
+end $$;
+create or replace function public.end_session(p_session uuid)
+returns void language plpgsql security invoker set search_path = public as $$
+begin
+  update public.game_sessions set status = 'ended' where id = p_session and host = auth.uid();
+end $$;
+create or replace function public.reset_lives(p_session uuid)
+returns void language plpgsql security invoker set search_path = public as $$
+declare sl integer;
+begin
+  select start_life into sl from public.game_sessions where id = p_session and host = auth.uid();
+  if sl is null then raise exception 'Nur der Host darf zuruecksetzen'; end if;
+  update public.session_players set life = sl where session_id = p_session and status = 'joined';
+end $$;
+
+-- Spielerliste inkl. Name/Avatar (Mitspieler müssen nicht befreundet sein).
+create or replace function public.session_roster(p_session uuid)
+returns table(user_id uuid, life integer, status text, seat integer,
+              display_name text, avatar_url text)
+language sql stable security definer set search_path = public as $$
+  select sp.user_id, sp.life, sp.status, sp.seat, pr.display_name, pr.avatar_url
+    from public.session_players sp
+    left join public.profiles pr on pr.id = sp.user_id
+   where sp.session_id = p_session and sp.status <> 'left' and public.in_session(p_session)
+   order by sp.seat nulls last, sp.joined_at nulls last;
+$$;
+revoke execute on function public.session_roster(uuid) from anon;

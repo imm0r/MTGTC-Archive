@@ -1672,4 +1672,71 @@ Object.assign(I18N.it, {
   "syn.aiError": "La ricerca IA non è disponibile al momento.",
 });
 
+/* ---- Teil 7: Spielrunde (live) ---- */
+Object.assign(I18N.de, {
+  "nav.session": "Spielrunde",
+  "sess.newTitle": "Neue Spielrunde", "sess.newHint": "Starte eine Runde und lade Freunde ein — jeder tippt auf seinem eigenen Gerät mit.",
+  "sess.startLife": "Startleben", "sess.create": "Runde starten",
+  "sess.invitesTitle": "Einladungen", "sess.invitedYou": "lädt dich ein (Startleben {life})",
+  "sess.join": "Beitreten", "sess.decline": "Ablehnen",
+  "sess.roundTitle": "Spielrunde", "sess.you": "Du", "sess.host": "Gastgeber", "sess.waiting": "eingeladen",
+  "sess.reset": "Neues Spiel", "sess.end": "Beenden", "sess.leave": "Verlassen",
+  "sess.endConfirm": "Spielrunde für alle beenden?", "sess.ended": "Die Spielrunde wurde beendet.",
+  "sess.dice": "Würfel", "sess.roll": "Würfeln",
+  "sess.inviteTitle": "Freunde einladen", "sess.invite": "Einladen", "sess.invited": "Einladung gesendet",
+  "sess.allInvited": "Alle Freunde sind schon dabei oder eingeladen.",
+});
+Object.assign(I18N.en, {
+  "nav.session": "Game night",
+  "sess.newTitle": "New game", "sess.newHint": "Start a game and invite friends — everyone plays along on their own device.",
+  "sess.startLife": "Starting life", "sess.create": "Start game",
+  "sess.invitesTitle": "Invitations", "sess.invitedYou": "invites you (starting life {life})",
+  "sess.join": "Join", "sess.decline": "Decline",
+  "sess.roundTitle": "Game", "sess.you": "You", "sess.host": "Host", "sess.waiting": "invited",
+  "sess.reset": "New round", "sess.end": "End", "sess.leave": "Leave",
+  "sess.endConfirm": "End the game for everyone?", "sess.ended": "The game has ended.",
+  "sess.dice": "Dice", "sess.roll": "Roll",
+  "sess.inviteTitle": "Invite friends", "sess.invite": "Invite", "sess.invited": "Invitation sent",
+  "sess.allInvited": "All friends are already in or invited.",
+});
+Object.assign(I18N.fr, {
+  "nav.session": "Partie",
+  "sess.newTitle": "Nouvelle partie", "sess.newHint": "Lance une partie et invite des amis — chacun joue sur son propre appareil.",
+  "sess.startLife": "Points de vie de départ", "sess.create": "Lancer la partie",
+  "sess.invitesTitle": "Invitations", "sess.invitedYou": "t'invite (points de vie {life})",
+  "sess.join": "Rejoindre", "sess.decline": "Refuser",
+  "sess.roundTitle": "Partie", "sess.you": "Toi", "sess.host": "Hôte", "sess.waiting": "invité",
+  "sess.reset": "Nouvelle manche", "sess.end": "Terminer", "sess.leave": "Quitter",
+  "sess.endConfirm": "Terminer la partie pour tout le monde ?", "sess.ended": "La partie est terminée.",
+  "sess.dice": "Dé", "sess.roll": "Lancer",
+  "sess.inviteTitle": "Inviter des amis", "sess.invite": "Inviter", "sess.invited": "Invitation envoyée",
+  "sess.allInvited": "Tous les amis sont déjà présents ou invités.",
+});
+Object.assign(I18N.es, {
+  "nav.session": "Partida",
+  "sess.newTitle": "Nueva partida", "sess.newHint": "Empieza una partida e invita a amigos — cada uno juega en su propio dispositivo.",
+  "sess.startLife": "Vida inicial", "sess.create": "Empezar partida",
+  "sess.invitesTitle": "Invitaciones", "sess.invitedYou": "te invita (vida inicial {life})",
+  "sess.join": "Unirse", "sess.decline": "Rechazar",
+  "sess.roundTitle": "Partida", "sess.you": "Tú", "sess.host": "Anfitrión", "sess.waiting": "invitado",
+  "sess.reset": "Nueva ronda", "sess.end": "Terminar", "sess.leave": "Salir",
+  "sess.endConfirm": "¿Terminar la partida para todos?", "sess.ended": "La partida ha terminado.",
+  "sess.dice": "Dado", "sess.roll": "Tirar",
+  "sess.inviteTitle": "Invitar amigos", "sess.invite": "Invitar", "sess.invited": "Invitación enviada",
+  "sess.allInvited": "Todos los amigos ya están dentro o invitados.",
+});
+Object.assign(I18N.it, {
+  "nav.session": "Partita",
+  "sess.newTitle": "Nuova partita", "sess.newHint": "Avvia una partita e invita gli amici — ognuno gioca sul proprio dispositivo.",
+  "sess.startLife": "Punti vita iniziali", "sess.create": "Avvia partita",
+  "sess.invitesTitle": "Inviti", "sess.invitedYou": "ti invita (punti vita {life})",
+  "sess.join": "Partecipa", "sess.decline": "Rifiuta",
+  "sess.roundTitle": "Partita", "sess.you": "Tu", "sess.host": "Ospite", "sess.waiting": "invitato",
+  "sess.reset": "Nuova partita", "sess.end": "Termina", "sess.leave": "Esci",
+  "sess.endConfirm": "Terminare la partita per tutti?", "sess.ended": "La partita è terminata.",
+  "sess.dice": "Dado", "sess.roll": "Lancia",
+  "sess.inviteTitle": "Invita amici", "sess.invite": "Invita", "sess.invited": "Invito inviato",
+  "sess.allInvited": "Tutti gli amici sono già presenti o invitati.",
+});
+
 initLang();
