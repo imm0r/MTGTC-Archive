@@ -1685,6 +1685,10 @@ Object.assign(I18N.de, {
   "sess.dice": "Würfel", "sess.roll": "Würfeln",
   "sess.inviteTitle": "Freunde einladen", "sess.invite": "Einladen", "sess.invited": "Einladung gesendet",
   "sess.allInvited": "Alle Freunde sind schon dabei oder eingeladen.",
+  "sess.myDeck": "Mein Deck", "sess.noDeck": "— kein Deck —",
+  "sess.trackerTitle": "Mein Deck: {deck}", "sess.trackerReset": "Alles zurück",
+  "sess.trackerSearch": "Karte suchen…", "sess.trackerSummary": "Rest {rest} · gespielt {played}",
+  "sess.markPlayed": "gespielt", "sess.undoPlayed": "zurück", "sess.trackerEmpty": "Keine Karte gefunden.",
 });
 Object.assign(I18N.en, {
   "nav.session": "Game night",
@@ -1698,6 +1702,10 @@ Object.assign(I18N.en, {
   "sess.dice": "Dice", "sess.roll": "Roll",
   "sess.inviteTitle": "Invite friends", "sess.invite": "Invite", "sess.invited": "Invitation sent",
   "sess.allInvited": "All friends are already in or invited.",
+  "sess.myDeck": "My deck", "sess.noDeck": "— no deck —",
+  "sess.trackerTitle": "My deck: {deck}", "sess.trackerReset": "Reset all",
+  "sess.trackerSearch": "Search card…", "sess.trackerSummary": "Left {rest} · played {played}",
+  "sess.markPlayed": "played", "sess.undoPlayed": "undo", "sess.trackerEmpty": "No card found.",
 });
 Object.assign(I18N.fr, {
   "nav.session": "Partie",
@@ -1711,6 +1719,10 @@ Object.assign(I18N.fr, {
   "sess.dice": "Dé", "sess.roll": "Lancer",
   "sess.inviteTitle": "Inviter des amis", "sess.invite": "Inviter", "sess.invited": "Invitation envoyée",
   "sess.allInvited": "Tous les amis sont déjà présents ou invités.",
+  "sess.myDeck": "Mon deck", "sess.noDeck": "— aucun deck —",
+  "sess.trackerTitle": "Mon deck : {deck}", "sess.trackerReset": "Tout réinitialiser",
+  "sess.trackerSearch": "Rechercher une carte…", "sess.trackerSummary": "Reste {rest} · jouées {played}",
+  "sess.markPlayed": "jouée", "sess.undoPlayed": "annuler", "sess.trackerEmpty": "Aucune carte trouvée.",
 });
 Object.assign(I18N.es, {
   "nav.session": "Partida",
@@ -1724,6 +1736,10 @@ Object.assign(I18N.es, {
   "sess.dice": "Dado", "sess.roll": "Tirar",
   "sess.inviteTitle": "Invitar amigos", "sess.invite": "Invitar", "sess.invited": "Invitación enviada",
   "sess.allInvited": "Todos los amigos ya están dentro o invitados.",
+  "sess.myDeck": "Mi mazo", "sess.noDeck": "— sin mazo —",
+  "sess.trackerTitle": "Mi mazo: {deck}", "sess.trackerReset": "Restablecer todo",
+  "sess.trackerSearch": "Buscar carta…", "sess.trackerSummary": "Restan {rest} · jugadas {played}",
+  "sess.markPlayed": "jugada", "sess.undoPlayed": "deshacer", "sess.trackerEmpty": "No se encontró ninguna carta.",
 });
 Object.assign(I18N.it, {
   "nav.session": "Partita",
@@ -1737,6 +1753,10 @@ Object.assign(I18N.it, {
   "sess.dice": "Dado", "sess.roll": "Lancia",
   "sess.inviteTitle": "Invita amici", "sess.invite": "Invita", "sess.invited": "Invito inviato",
   "sess.allInvited": "Tutti gli amici sono già presenti o invitati.",
+  "sess.myDeck": "Il mio mazzo", "sess.noDeck": "— nessun mazzo —",
+  "sess.trackerTitle": "Il mio mazzo: {deck}", "sess.trackerReset": "Reimposta tutto",
+  "sess.trackerSearch": "Cerca carta…", "sess.trackerSummary": "Restano {rest} · giocate {played}",
+  "sess.markPlayed": "giocata", "sess.undoPlayed": "annulla", "sess.trackerEmpty": "Nessuna carta trovata.",
 });
 
 initLang();

@@ -3943,7 +3943,9 @@ let SESSION_PLAYERS = [];      // [{user_id, life, status, seat, profile}]
 let SESSION_INVITES = [];      // offene Einladungen an mich [{...session, hostProfile}]
 let SESSION_LOG = [];          // jüngste Events (Würfe) für die Anzeige
 let sessionChannel = null, inviteChannel = null;
-const lifeTimers = {};         // entprellt das Schreiben je Spieler
+let SESSION_PLAYED = {};        // card_id → gespielt-Anzahl (privat, nur mein Deck)
+const lifeTimers = {}, playedTimers = {};   // entprellt das Schreiben je Spieler/Karte
+const meinSpieler = () => SESSION_PLAYERS.find(p => p.user_id === USER?.id);
 
 function sessionBadge() {
   const b = $("#sess-badge");
@@ -3973,7 +3975,7 @@ async function ladeSession() {
       (pr.data || []).forEach(p => hostProf[p.id] = p);
     }
     SESSION_INVITES = invited.map(s => ({ ...s, hostProfile: hostProf[s.host] || { id: s.host, display_name: null } }));
-    if (joined[0]) { SESSION = joined[0]; await ladeSpieler(); await ladeLog(); }
+    if (joined[0]) { SESSION = joined[0]; await ladeSpieler(); await ladeLog(); await ladePlayed(); }
   }
   sessionBadge();
 }
@@ -3985,8 +3987,18 @@ async function ladeSpieler() {
   const { data } = await sb.rpc("session_roster", { p_session: SESSION.id });
   SESSION_PLAYERS = (data || []).map(r => ({
     user_id: r.user_id, life: r.life, status: r.status, seat: r.seat,
+    deck_id: r.deck_id, deck_name: r.deck_name, commander: r.commander, commander_img: r.commander_img,
     profile: { id: r.user_id, display_name: r.display_name, avatar_url: r.avatar_url },
   }));
+}
+
+/* Eigener Karten-Tracker der Partie laden (privat: nur die eigenen Zeilen). */
+async function ladePlayed() {
+  SESSION_PLAYED = {};
+  if (!SESSION || !USER) return;
+  const { data } = await sb.from("session_played").select("card_id,qty")
+    .eq("session_id", SESSION.id).eq("user_id", USER.id);
+  (data || []).forEach(r => { if (r.qty > 0) SESSION_PLAYED[r.card_id] = r.qty; });
 }
 
 async function ladeLog() {
@@ -4042,6 +4054,7 @@ function sessionBoardHtml() {
     return `<div class="sp-card${joined ? "" : " wartet"}">
       ${avatarHtml(48, p.profile)}
       <div class="sp-name">${esc(name)}${p.user_id === SESSION.host ? ` <span class="sp-host" title="${esc(t("sess.host"))}">&#9733;</span>` : ""}</div>
+      ${p.deck_name ? `<div class="sp-deck" title="${esc(p.deck_name)}">${p.commander_img ? `<img src="${esc(p.commander_img)}" alt="">` : ""}<span>${esc(p.deck_name)}</span></div>` : ""}
       ${joined
         ? `<div class="sp-life" data-u="${esc(p.user_id)}">${p.life}</div>
            <div class="sp-ctrl">
@@ -4074,7 +4087,16 @@ function sessionBoardHtml() {
         </div>
       </div>
       <div class="sp-grid">${spieler}</div>
+      <div class="row" style="align-items:center;margin-top:12px">
+        <div style="flex:none"><label style="margin:0">${esc(t("sess.myDeck"))}</label></div>
+        <div style="flex:none;min-width:200px"><select id="sess-deck">
+          <option value="">${esc(t("sess.noDeck"))}</option>
+          ${(DECKS || []).map(d => `<option value="${esc(d.id)}"${d.id === (meinSpieler()?.deck_id || "") ? " selected" : ""}>${esc(d.name)}</option>`).join("")}
+        </select></div>
+      </div>
     </div>
+
+    ${deckTrackerHtml()}
 
     <div class="card">
       <h3 style="margin-top:0">${esc(t("sess.dice"))}</h3>
@@ -4101,6 +4123,101 @@ function logZeile(ev) {
   return "";
 }
 
+/* Privater Karten-Tracker: die Karten des eigenen gewählten Decks, jede als
+   „gespielt" abhakbar → Überblick, was noch in der Bibliothek liegt. Nur der
+   Spieler selbst sieht das. */
+function deckTrackerHtml() {
+  const deckId = meinSpieler()?.deck_id;
+  const deck = deckId && (DECKS || []).find(d => d.id === deckId);
+  if (!deck) return "";
+  return `<div class="card" id="trk-card">
+    <div class="row" style="align-items:center;justify-content:space-between">
+      <h3 style="margin:0">${esc(t("sess.trackerTitle", { deck: deck.name }))}</h3>
+      <div style="flex:none"><button class="btn ghost sm" id="trk-reset">${esc(t("sess.trackerReset"))}</button></div>
+    </div>
+    <div class="row" style="margin-top:8px"><div style="flex:1"><input type="text" id="trk-search"
+      placeholder="${esc(t("sess.trackerSearch"))}"></div></div>
+    <div id="trk-panel">${trackerInnerHtml("")}</div>
+  </div>`;
+}
+
+// Lesbarer Kartenname für den Tracker: sonst wie in der App der gedruckte Name,
+// aber für Phyrexianisch (unlesbare Glyphen) der englische Name.
+const trkName = c => ((c.lang === "ph" ? c.name : (c.disp || c.name)) || c.name || "");
+
+function trackerInnerHtml(filter) {
+  const deck = (DECKS || []).find(d => d.id === meinSpieler()?.deck_id);
+  if (!deck) return "";
+  const f = (filter || "").trim().toLowerCase();
+  const entries = (deck.entries || []).map(e => {
+    const card = CARDS.find(c => c.id === e.cardId);
+    return card ? { card, cardId: e.cardId, total: e.qty, played: SESSION_PLAYED[e.cardId] || 0 } : null;
+  }).filter(Boolean);
+  let restN = 0, gespieltN = 0;
+  entries.forEach(e => { restN += Math.max(0, e.total - e.played); gespieltN += Math.min(e.total, e.played); });
+  // Noch in der Bibliothek zuerst, dann alphabetisch.
+  entries.sort((a, b) => ((b.total - b.played > 0) - (a.total - a.played > 0))
+    || trkName(a.card).localeCompare(trkName(b.card)));
+  const rows = entries
+    .filter(e => !f || trkName(e.card).toLowerCase().includes(f))
+    .map(e => {
+      const rest = e.total - e.played;
+      return `<div class="trk-row${rest <= 0 ? " leer" : ""}">
+        <span class="trk-q">${rest}${e.total > 1 ? `/${e.total}` : ""}</span>
+        <span class="trk-n">${esc(trkName(e.card))}</span>
+        <span class="trk-btns">
+          ${e.played > 0 ? `<button class="btn ghost sm" data-trk-undo="${esc(e.cardId)}" title="${esc(t("sess.undoPlayed"))}">&#8617;</button>` : ""}
+          <button class="btn ghost sm" data-trk-play="${esc(e.cardId)}"${rest <= 0 ? " disabled" : ""}>${esc(t("sess.markPlayed"))}</button>
+        </span>
+      </div>`;
+    }).join("");
+  return `<div class="trk-sum">${esc(t("sess.trackerSummary", { rest: restN, played: gespieltN }))}</div>
+    <div class="trk-list">${rows || `<div class="empty">${esc(t("sess.trackerEmpty"))}</div>`}</div>`;
+}
+
+function renderTracker() {
+  const panel = $("#trk-panel");
+  if (panel) panel.innerHTML = trackerInnerHtml($("#trk-search")?.value || "");
+}
+
+/* Eine Karte als gespielt markieren (+1) oder zurücknehmen (−1). Lokal sofort,
+   Schreiben entprellt. */
+function trackerMark(cardId, delta) {
+  const deck = (DECKS || []).find(d => d.id === meinSpieler()?.deck_id);
+  const total = deck?.entries?.find(e => e.cardId === cardId)?.qty || 0;
+  const next = Math.max(0, Math.min(total, (SESSION_PLAYED[cardId] || 0) + delta));
+  if (next > 0) SESSION_PLAYED[cardId] = next; else delete SESSION_PLAYED[cardId];
+  renderTracker();
+  clearTimeout(playedTimers[cardId]);
+  playedTimers[cardId] = setTimeout(async () => {
+    const q = SESSION_PLAYED[cardId] || 0; delete playedTimers[cardId];
+    try {
+      if (q > 0) await sb.from("session_played")
+        .upsert({ session_id: SESSION.id, user_id: USER.id, card_id: cardId, qty: q }, { onConflict: "session_id,user_id,card_id" });
+      else await sb.from("session_played").delete()
+        .eq("session_id", SESSION.id).eq("user_id", USER.id).eq("card_id", cardId);
+    } catch (e) { toast(dbErr(e)); }
+  }, 350);
+}
+
+async function trackerReset() {
+  SESSION_PLAYED = {}; renderTracker();
+  try { await sb.from("session_played").delete().eq("session_id", SESSION.id).eq("user_id", USER.id); }
+  catch (e) { toast(dbErr(e)); }
+}
+
+/* Deck für die Runde wählen: an session_players (Realtime → Mitspieler sehen es),
+   und den Tracker der alten Wahl leeren. */
+async function sessDeckWaehlen(deckId) {
+  try {
+    await sb.from("session_players").update({ deck_id: deckId || null })
+      .eq("session_id", SESSION.id).eq("user_id", USER.id);
+    SESSION_PLAYED = {};
+    await sb.from("session_played").delete().eq("session_id", SESSION.id).eq("user_id", USER.id);
+    await ladeSpieler(); renderSession();
+  } catch (e) { toast(dbErr(e)); }
+}
+
 function wireSession() {
   const create = $("#sess-create");
   if (create) {
@@ -4119,6 +4236,14 @@ function wireSession() {
     $$("[data-dice]").forEach(b => b.onclick = () => { $("#dice-sides").value = b.dataset.dice; wuerfeln(parseInt(b.dataset.dice)); });
     roll.onclick = () => wuerfeln(parseInt($("#dice-sides").value) || 20);
   }
+  const deckSel = $("#sess-deck"); if (deckSel) deckSel.onchange = () => sessDeckWaehlen(deckSel.value);
+  const trkReset = $("#trk-reset"); if (trkReset) trkReset.onclick = trackerReset;
+  const trkSearch = $("#trk-search"); if (trkSearch) trkSearch.oninput = renderTracker;
+  const trkPanel = $("#trk-panel");   // Delegation: die Reihen entstehen bei jedem Abhaken neu
+  if (trkPanel) trkPanel.onclick = e => {
+    const play = e.target.closest("[data-trk-play]"); if (play) return trackerMark(play.dataset.trkPlay, 1);
+    const undo = e.target.closest("[data-trk-undo]"); if (undo) return trackerMark(undo.dataset.trkUndo, -1);
+  };
 }
 
 async function sessionErstellen(life) {
@@ -4160,8 +4285,11 @@ async function sessionBeenden() {
   } catch (e) { toast(dbErr(e)); }
 }
 async function lebenReset() {
-  try { await sb.rpc("reset_lives", { p_session: SESSION.id }); await ladeSpieler(); renderSession(); }
-  catch (e) { toast(dbErr(e)); }
+  try {
+    await sb.rpc("reset_lives", { p_session: SESSION.id });
+    SESSION_PLAYED = {};   // eigener Tracker sofort leer; das reset-Event räumt die DB
+    await ladeSpieler(); renderSession();
+  } catch (e) { toast(dbErr(e)); }
 }
 
 /* Leben ändern: lokal sofort (optimistisch), Schreiben entprellt. Fremde
@@ -4224,6 +4352,12 @@ function onSpielerChange(payload) {
 function onEvent(payload) {
   const ev = payload.new;
   if (!ev || !SESSION || ev.session_id !== SESSION.id) return;
+  if (ev.kind === "reset") {   // „Neues Spiel" → eigenen Tracker leeren (lokal + DB)
+    SESSION_PLAYED = {};
+    sb.from("session_played").delete().eq("session_id", SESSION.id).eq("user_id", USER.id).then(() => {});
+    if ($(".view.on")?.id === "v-session") renderTracker();
+    return;
+  }
   SESSION_LOG.unshift(ev);
   SESSION_LOG = SESSION_LOG.slice(0, 30);
   const box = $("#sess-log");

@@ -189,6 +189,18 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .dice-result{font-size:24px;font-weight:800}
 .sess-log{margin-top:10px;display:flex;flex-direction:column;gap:3px}
 .log-zeile{font-size:13px;color:var(--dim)}
+.sp-deck{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--dim);max-width:100%;margin-top:-2px}
+.sp-deck img{width:15px;height:21px;border-radius:2px;object-fit:cover;flex:none}
+.sp-deck span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trk-sum{font-size:13px;color:var(--dim);margin:8px 0}
+.trk-list{display:flex;flex-direction:column;gap:2px;max-height:340px;overflow:auto}
+.trk-row{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;font-size:13px}
+.trk-row:hover{background:var(--panel2)}
+.trk-row.leer{opacity:.5}
+.trk-q{flex:none;min-width:36px;text-align:right;font-variant-numeric:tabular-nums;color:var(--dim)}
+.trk-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trk-btns{flex:none;display:flex;gap:4px}
+.trk-btns .btn{padding:3px 8px}
 /* Synergie-Modus (persönliche Einstellung): welche Synergie-Knöpfe erscheinen. */
 html[data-syn-mode="ki"] .syn-std-btn{display:none}
 html[data-syn-mode="standard"] .syn-ai-btn{display:none}

@@ -786,3 +786,54 @@ language sql stable security definer set search_path = public as $$
    order by sp.seat nulls last, sp.joined_at nulls last;
 $$;
 revoke execute on function public.session_roster(uuid) from anon;
+
+-- --- Erweiterung: gespieltes Deck je Spieler + privater Karten-Tracker ---
+alter table public.session_players
+  add column if not exists deck_id uuid references public.decks(id) on delete set null;
+
+-- Spielerliste zusätzlich mit Deckname + Commander (nur eigenes Deck).
+drop function if exists public.session_roster(uuid);
+create function public.session_roster(p_session uuid)
+returns table(user_id uuid, life integer, status text, seat integer,
+              display_name text, avatar_url text,
+              deck_id uuid, deck_name text, commander text, commander_img text)
+language sql stable security definer set search_path = public as $$
+  select sp.user_id, sp.life, sp.status, sp.seat, pr.display_name, pr.avatar_url,
+         sp.deck_id, d.name, cm.name, cm.img
+    from public.session_players sp
+    left join public.profiles pr on pr.id = sp.user_id
+    left join public.decks d on d.id = sp.deck_id and d.user_id = sp.user_id
+    left join public.cards cm on cm.id = d.main_card_id
+   where sp.session_id = p_session and sp.status <> 'left' and public.in_session(p_session)
+   order by sp.seat nulls last, sp.joined_at nulls last;
+$$;
+revoke execute on function public.session_roster(uuid) from anon;
+
+-- Privater Tracker: welche Karten habe ich diese Partie schon gespielt.
+-- NUR der Spieler selbst sieht/ändert seine Zeilen.
+create table if not exists public.session_played (
+  session_id uuid not null references public.game_sessions(id) on delete cascade,
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  card_id    uuid not null references public.cards(id) on delete cascade,
+  qty        integer not null default 0 check (qty >= 0),
+  primary key (session_id, user_id, card_id)
+);
+alter table public.session_played enable row level security;
+alter table public.session_played force row level security;
+revoke all on public.session_played from anon;
+drop policy if exists played_own on public.session_played;
+create policy played_own on public.session_played for all to authenticated
+  using (user_id = auth.uid() and public.in_session(session_id))
+  with check (user_id = auth.uid() and public.in_session(session_id));
+
+-- „Neues Spiel": Leben zurück + reset-Event (jeder Client leert seinen Tracker).
+create or replace function public.reset_lives(p_session uuid)
+returns void language plpgsql security invoker set search_path = public as $$
+declare sl integer;
+begin
+  select start_life into sl from public.game_sessions where id = p_session and host = auth.uid();
+  if sl is null then raise exception 'Nur der Host darf zuruecksetzen'; end if;
+  update public.session_players set life = sl where session_id = p_session and status = 'joined';
+  insert into public.session_events (session_id, user_id, kind, data)
+    values (p_session, auth.uid(), 'reset', '{}'::jsonb);
+end $$;
