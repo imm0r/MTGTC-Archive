@@ -97,6 +97,16 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .freund-zeile{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);flex-wrap:wrap}
 .freund-zeile:first-of-type{border-top:0}
 .freund-zeile>div:first-of-type{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Blätterleiste der Sammlung. :empty hält sie unsichtbar, solange es nur eine
+   Seite gibt; scroll-margin-top lässt beim Sprung an den Tabellenanfang Platz
+   für den klebenden Seitenkopf. */
+.pager{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:12px}
+.pager:empty{display:none}
+.pager .pager-on{border-color:var(--acc);color:var(--acc);font-weight:600}
+.pager button:disabled{opacity:.4;cursor:default}
+.pager-dots{color:var(--dim);padding:0 2px}
+#tbl{scroll-margin-top:70px}
 .tabs{display:flex;gap:6px;margin-bottom:12px}
 .tabs button{flex:1;background:transparent;border:1px solid var(--line);color:var(--dim);
              padding:8px;border-radius:8px;cursor:pointer}

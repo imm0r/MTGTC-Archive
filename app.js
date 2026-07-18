@@ -1266,24 +1266,49 @@ function renderDash(rows, ziel = $("#dash"), gefiltert = false) {
   ziel.querySelectorAll("[data-ans-ende]").forEach(el => el.scrollLeft = el.scrollWidth);
 }
 
+/* Aktuelle Seite der Sammlungstabelle (0-basiert). Nur im Speicher: eine
+   Seitenzahl ist kein Dauerzustand. Filter, Suche und Sortierung springen
+   zurück auf Seite 1. */
+let collPage = 0;
+
+/* Karten je Sammlungsseite aus dem Profil (Einstellungen): 0 = alles in einer
+   Liste, NULL/fehlt = Voreinstellung 50. */
+function seitenGroesse() {
+  const n = Number(PROFILE?.page_size);
+  return Number.isFinite(n) && n >= 0 ? n : 50;
+}
+
 function renderCollection() {
   const rows = filtered();
-  renderDash(rows, $("#dash"), rows.length !== CARDS.length);
+  // Das Dashboard wertet IMMER alle gefilterten Karten aus, nicht nur die
+  // aktuelle Seite. Der „gefiltert"-Hinweis vergleicht gegen die BESESSENEN
+  // Karten — qty-0-Zeilen (Import-Platzhalter) sind nie Teil der Sammlung
+  // und dürfen den Hinweis nicht dauerhaft anschalten.
+  const besessen = CARDS.filter(c => c.qty > 0);
+  renderDash(rows, $("#dash"), rows.length !== besessen.length);
 
-  const sets = [...new Set(CARDS.map(c => c.set))].filter(Boolean).sort();
+  const sets = [...new Set(besessen.map(c => c.set))].filter(Boolean).sort();
   const cur = $("#f-set").value;
   $("#f-set").innerHTML = '<option value="">Alle</option>' +
     sets.map(s => `<option value="${esc(s)}"${s === cur ? " selected" : ""}>${esc(s)}</option>`).join("");
 
-  $("#coll-empty").textContent = CARDS.length
+  $("#coll-empty").textContent = besessen.length
     ? "Keine Karte passt zu diesem Filter."
     : "Noch keine Karten. Fotografiere deine erste Karte unter „Card Management“.";
   $("#coll-empty").style.display = rows.length ? "none" : "block";
   $("#tbl").style.display = rows.length ? "" : "none";
 
+  // Seitenaufteilung — nur für die Tabelle. Die Seitenzahl klemmt sich fest,
+  // falls Löschen oder ein engerer Filter sie über das Ende geschoben hat.
+  const gr = seitenGroesse();
+  const seiten = gr ? Math.max(1, Math.ceil(rows.length / gr)) : 1;
+  collPage = Math.max(0, Math.min(collPage, seiten - 1));
+  const seite = gr ? rows.slice(collPage * gr, (collPage + 1) * gr) : rows;
+
   $("#tbl thead").innerHTML = cardHead(false);
-  $("#tbl tbody").innerHTML = rows.map(c => cardRow(c)).join("");
+  $("#tbl tbody").innerHTML = seite.map(c => cardRow(c)).join("");
   wireCardRows($("#tbl"));
+  renderPager(rows.length, seiten);
 
   // Die Kopfzeile wird bei jedem Rendern neu gebaut, also auch die
   // Sortier-Handler neu hängen.
@@ -1291,7 +1316,39 @@ function renderCollection() {
     const z = { key: sortKey, dir: sortDir };
     sortUm(z, th.dataset.s);
     sortKey = z.key; sortDir = z.dir;
+    collPage = 0;                          // neue Ordnung: oben anfangen
     renderCollection();
+  });
+}
+
+/* Blätterleiste unter der Sammlungstabelle. Erscheint erst ab zwei Seiten.
+   Kompakte Seitenliste: erste, letzte und die Umgebung der aktuellen Seite,
+   Lücken als „…". */
+function renderPager(gesamt, seiten) {
+  const el = $("#pager");
+  if (!el) return;
+  if (seiten <= 1) { el.innerHTML = ""; return; }
+  const gr = seitenGroesse();
+  const von = collPage * gr + 1, bis = Math.min(gesamt, (collPage + 1) * gr);
+  const nums = [...new Set([0, seiten - 1, collPage - 1, collPage, collPage + 1])]
+    .filter(n => n >= 0 && n < seiten).sort((a, b) => a - b);
+  let knoepfe = "", prev = -1;
+  for (const n of nums) {
+    if (prev >= 0 && n - prev > 1) knoepfe += '<span class="pager-dots">&hellip;</span>';
+    knoepfe += `<button class="btn ghost sm${n === collPage ? " pager-on" : ""}" data-page="${n}">${n + 1}</button>`;
+    prev = n;
+  }
+  el.innerHTML = `
+    <button class="btn ghost sm" data-page="${collPage - 1}"${collPage === 0 ? " disabled" : ""}>&lsaquo; Zurück</button>
+    ${knoepfe}
+    <button class="btn ghost sm" data-page="${collPage + 1}"${collPage >= seiten - 1 ? " disabled" : ""}>Weiter &rsaquo;</button>
+    <span class="hint" style="margin-left:auto">${von}&ndash;${bis} von ${gesamt}</span>`;
+  el.querySelectorAll("[data-page]").forEach(b => b.onclick = () => {
+    collPage = Math.max(0, Math.min(seiten - 1, parseInt(b.dataset.page)));
+    renderCollection();
+    // Beim Blättern an den Tabellenanfang — sonst steht man am Seitenfuß.
+    // scroll-margin-top in der CSS hält den klebenden Kopf frei.
+    $("#tbl").scrollIntoView({ behavior: "smooth", block: "start" });
   });
 }
 
@@ -2758,6 +2815,19 @@ function renderProfile() {
     </div>
 
     <div class="card">
+      <h3 style="margin-top:0">Einstellungen</h3>
+      <label>Karten pro Seite in der Sammlung</label>
+      <div class="row">
+        <div style="flex:none;min-width:220px"><select id="pf-pagesize">${
+          [[25, "25"], [50, "50 (Voreinstellung)"], [100, "100"], [250, "250"], [0, "Alle — eine lange Liste"]]
+            .map(([w, t]) => `<option value="${w}"${w === seitenGroesse() ? " selected" : ""}>${esc(t)}</option>`).join("")
+        }</select></div>
+      </div>
+      <p class="hint">Gilt für die Tabelle der Sammlung. Die Auswertung darüber zählt
+        immer alle gefilterten Karten, egal welche Seite gerade offen ist.</p>
+    </div>
+
+    <div class="card">
       <h3 style="margin-top:0">Konto</h3>
       <label>Neues Passwort</label>
       <div class="row" style="margin-bottom:6px">
@@ -2782,8 +2852,22 @@ function renderProfile() {
   const del = $("#pf-avatar-del"); if (del) del.onclick = avatarEntfernen;
   $("#pf-name-save").onclick = nameSpeichern;
   $("#pf-name").addEventListener("keydown", e => { if (e.key === "Enter") nameSpeichern(); });
+  $("#pf-pagesize").onchange = ev => pageSizeSpeichern(parseInt(ev.target.value));
   $("#pf-pw-save").onclick = passwortAendern;
   $("#pf-logout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+}
+
+/* Karten je Sammlungsseite speichern (Profil-Einstellung, gilt damit auf allen
+   Geräten). 0 = keine Seitenaufteilung. */
+async function pageSizeSpeichern(n) {
+  try {
+    const { error } = await sb.from("profiles").update({ page_size: n }).eq("id", USER.id);
+    if (error) throw error;
+    PROFILE.page_size = n;
+    collPage = 0;
+    renderCollection();
+    toast(n ? `Sammlung zeigt jetzt ${n} Karten je Seite` : "Sammlung zeigt wieder alles in einer Liste");
+  } catch (e) { toast(dbErr(e)); }
 }
 
 async function nameSpeichern() {
@@ -3115,9 +3199,10 @@ function wireApp() {
   $("#drop").addEventListener("drop", e =>
     [...e.dataTransfer.files].filter(f => f.type.startsWith("image/")).forEach(scanFile));
 
-  $("#q").oninput = renderCollection;
-  $("#f-set").onchange = renderCollection;
-  $("#f-foil").onchange = renderCollection;
+  // Suche/Filter ändern die Treffermenge — immer zurück auf Seite 1.
+  $("#q").oninput = () => { collPage = 0; renderCollection(); };
+  $("#f-set").onchange = () => { collPage = 0; renderCollection(); };
+  $("#f-foil").onchange = () => { collPage = 0; renderCollection(); };
   $("#upd").onclick = updatePrices;
 
   // Anlege-Dropdowns aus demselben Vokabular wie Bearbeiten und Filter.

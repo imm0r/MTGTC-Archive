@@ -323,8 +323,17 @@ create table if not exists public.profiles (
   id           uuid primary key references auth.users(id) on delete cascade,
   display_name text,
   avatar_url   text,
+  -- Karten je Sammlungsseite (Profil-Einstellung). NULL = Voreinstellung (50),
+  -- 0 = alles auf einer Seite.
+  page_size    integer,
   created      timestamptz not null default now()
 );
+
+-- Für Bestände, die vor dieser Spalte angelegt wurden:
+alter table public.profiles add column if not exists page_size integer;
+alter table public.profiles drop constraint if exists profiles_page_size_check;
+alter table public.profiles add constraint profiles_page_size_check
+  check (page_size is null or (page_size >= 0 and page_size <= 1000));
 
 alter table public.profiles enable row level security;
 
