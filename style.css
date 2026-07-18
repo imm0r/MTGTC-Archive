@@ -242,8 +242,9 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 @keyframes cube-tumble{0%{transform:rotateX(0) rotateY(0)}100%{transform:rotateX(720deg) rotateY(1080deg)}}
 .cube.rolling{animation:cube-tumble .85s linear infinite}
 @media (prefers-reduced-motion:reduce){.dice-die.rolling,.dice-die.landed,.d20.rolling,.d20.landed,.cube.rolling{animation:none}}
-/* three.js-Würfel-Canvas (W6/W20, wenn geladen) */
-canvas.dice-gl{width:132px;height:132px;display:block}
+/* three.js-Würfel-Canvas (W6/W20, wenn geladen) — breit, damit der Würfel quer
+   durchrollt; Seitenverhältnis bleibt über height:auto erhalten. */
+canvas.dice-gl{width:100%;max-width:340px;height:auto;display:block;margin:0 auto}
 /* Synergie-Modus (persönliche Einstellung): welche Synergie-Knöpfe erscheinen. */
 html[data-syn-mode="ki"] .syn-std-btn{display:none}
 html[data-syn-mode="standard"] .syn-ai-btn{display:none}

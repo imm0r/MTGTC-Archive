@@ -4329,10 +4329,10 @@ const DiceGL = {
         this.THREE = T;
         this.renderer = new T.WebGLRenderer({ alpha: true, antialias: true });
         this.renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1));
-        this.renderer.setSize(140, 140);
+        this.renderer.setSize(340, 150);   // breite Bühne: der Würfel rollt quer durch
         this.canvas = this.renderer.domElement; this.canvas.className = "dice-gl";
         this.scene = new T.Scene();
-        this.cam = new T.PerspectiveCamera(32, 1, 0.1, 100); this.cam.position.set(0, 0, 6.4);
+        this.cam = new T.PerspectiveCamera(32, 340 / 150, 0.1, 100); this.cam.position.set(0, 0, 6.6);
         this.scene.add(new T.AmbientLight(0xffffff, 0.85));
         const d1 = new T.DirectionalLight(0xffffff, 1.2); d1.position.set(3, 5, 6); this.scene.add(d1);
         const d2 = new T.DirectionalLight(0xffe9c0, 0.5); d2.position.set(-4, -2, 3); this.scene.add(d2);
@@ -4358,6 +4358,7 @@ const DiceGL = {
       (L[v] || []).forEach(k => { x.beginPath(); x.arc(P[k][0], P[k][1], 15, 0, 7); x.fill(); }); });
     const mats = [3, 4, 2, 5, 1, 6].map(v => new T.MeshStandardMaterial({ map: pip(v), metalness: 0.25, roughness: 0.55 }));
     const m = new T.Mesh(new T.BoxGeometry(2.1, 2.1, 2.1), mats);
+    m.scale.setScalar(0.62);   // klein genug, um mit Rand quer durchzurollen
     m.userData.norm = { 1: [0, 0, 1], 6: [0, 0, -1], 3: [1, 0, 0], 4: [-1, 0, 0], 2: [0, 1, 0], 5: [0, -1, 0] };
     return m;
   },
@@ -4385,6 +4386,7 @@ const DiceGL = {
       const pl = new T.Mesh(new T.PlaneGeometry(0.9, 0.9), new T.MeshBasicMaterial({ map: numTex(num), transparent: true }));
       pl.position.copy(cen.clone().multiplyScalar(1.03)); pl.lookAt(cen.clone().multiplyScalar(3)); grp.add(pl);
     }
+    grp.scale.setScalar(0.62);   // klein genug, um mit Rand quer durchzurollen
     grp.userData.norm = norm;
     return grp;
   },
@@ -4402,35 +4404,32 @@ const DiceGL = {
     const die = sides === 6 ? this.cube : this.ico;
     const target = this._targetQuat(die, result);
     cancelAnimationFrame(this._raf); clearTimeout(this._safety);
-    const t0 = performance.now(), tumble = 750, settle = 700, total = tumble + settle;
+    const t0 = performance.now(), tumble = 800, settle = 650, total = tumble + settle;
     const axis = new T.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
-    // Wurf-Startpunkt: von unten seitlich hereingeworfen, dann Bogen zur Mitte.
-    const start = new T.Vector3((Math.random() < 0.5 ? -1 : 1) * 1.25, -1.0, -0.6);
-    die.position.copy(start);
+    // Quer durchrollen: von links herein (startX) nach rechts (endX), flacher Bogen.
+    const startX = -3.0, endX = 0.9, arcH = 0.35;
+    die.position.set(startX, 0, 0);
     let q0 = null, settling = false;
     const step = now => {
       const el = now - t0;
-      // Flug durch den Raum: Startversatz klingt aus (easeOut) + ein Bogen nach oben.
-      const tp = Math.min(1, el / total), ez = 1 - Math.pow(1 - tp, 2);
-      die.position.set(start.x * (1 - ez),
-                       start.y * (1 - ez) + 1.0 * Math.sin(Math.PI * Math.min(1, tp * 1.05)),
-                       start.z * (1 - ez));
-      if (el < tumble) { die.rotateOnWorldAxis(axis, 0.3); }
+      const tp = Math.min(1, el / total), ez = 1 - Math.pow(1 - tp, 2);   // easeOut
+      die.position.set(startX + (endX - startX) * ez, arcH * Math.sin(Math.PI * Math.min(1, tp * 1.1)), 0);
+      if (el < tumble) { die.rotateOnWorldAxis(axis, 0.32); }
       else {
         if (!settling) { settling = true; q0 = die.quaternion.clone(); }
         const p = Math.min(1, (el - tumble) / settle), e = 1 - Math.pow(1 - p, 3);
         die.quaternion.copy(q0).slerp(target, e);
-        if (p >= 1) { clearTimeout(this._safety); die.position.set(0, 0, 0); this.renderer.render(this.scene, this.cam); this._raf = null; return; }
+        if (p >= 1) { clearTimeout(this._safety); die.position.set(endX, 0, 0); this.renderer.render(this.scene, this.cam); this._raf = null; return; }
       }
       this.renderer.render(this.scene, this.cam);
       this._raf = requestAnimationFrame(step);
     };
     this._raf = requestAnimationFrame(step);
     // Sicherheitsnetz: falls requestAnimationFrame gedrosselt wird (Tab im
-    // Hintergrund), sitzen Ergebnis-Fläche UND Mittelposition trotzdem garantiert.
+    // Hintergrund), sitzen Ergebnis-Fläche UND Endposition trotzdem garantiert.
     this._safety = setTimeout(() => {
       cancelAnimationFrame(this._raf); this._raf = null;
-      die.position.set(0, 0, 0); die.quaternion.copy(target); this.renderer.render(this.scene, this.cam);
+      die.position.set(endX, 0, 0); die.quaternion.copy(target); this.renderer.render(this.scene, this.cam);
     }, total + 350);
   },
 };
