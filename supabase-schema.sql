@@ -485,6 +485,9 @@ alter table public.cards add constraint cards_qty_check check (qty >= 0);
 -- Ein geteiltes Freund-Deck als neues, privates Deck übernehmen — NUR das Deck.
 -- Fehlende Karten kommen als Bestand-0-Zeilen (im Deck „fehlen", nicht in der
 -- Sammlung). Prüft geteilt + befreundet; schreibt nur eigene Zeilen.
+-- Für „besitze ich die Karte?" zählt die AUFLAGE (Set + Nummer): Sprache, Foil
+-- und Zustand sind für den Bestand egal. Über set_code + cn statt scryfall_id,
+-- weil verschiedene Sprachfassungen derselben Auflage eigene IDs tragen.
 create or replace function public.import_shared_deck(p_deck uuid) returns uuid
 language plpgsql security definer set search_path = public as $$
 declare
@@ -510,9 +513,19 @@ begin
     from public.deck_entries de join public.cards c on c.id = de.card_id
     where de.deck_id = p_deck
   loop
+    -- 1. exakt dieselbe Ausführung; 2. dieselbe Auflage in beliebiger
+    -- Ausführung — besessene mit größtem Bestand zuerst, notfalls ein
+    -- vorhandener Bestand-0-Platzhalter (statt einen zweiten anzulegen).
     select id into mycard from public.cards
       where user_id = me and scryfall_id = e.scryfall_id and foil = e.foil
         and lang = e.lang and condition = e.condition;
+    if mycard is null and e.set_code is not null and e.cn is not null then
+      select id into mycard from public.cards
+        where user_id = me
+          and upper(set_code) = upper(e.set_code) and cn = e.cn
+        order by (qty > 0) desc, qty desc
+        limit 1;
+    end if;
     if mycard is null then
       insert into public.cards (user_id, scryfall_id, oracle_id, name, printed_name, set_code,
         set_name, cn, img, cm_id, type_line, rarity, mana_cost, cmc, released, colors,

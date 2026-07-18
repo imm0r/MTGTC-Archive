@@ -838,12 +838,22 @@ const deckSort = {};
    englischen: eine sichtbare Liste nach einem unsichtbaren Schlüssel zu
    ordnen, verwirrt nur — "Überfluss" gehört unter Ü, nicht unter A
    (Abundance). */
+/* Bestand einer AUFLAGE über alle Ausführungen hinweg: für „habe ich die
+   Karte?" sind Sprache, Foil und Zustand egal — gezählt wird alles mit
+   demselben Set + Sammlernummer. (Über Set+Nummer, nicht scryfall_id:
+   verschiedene Sprachfassungen derselben Auflage tragen eigene IDs.)
+   Ohne Set/Nummer (Uralt-Zeilen) zählt die einzelne Zeile. */
+function bestandVon(c) {
+  if (!c.set || !c.cn) return c.qty;
+  return CARDS.reduce((s, x) => s + (x.set === c.set && x.cn === c.cn ? x.qty : 0), 0);
+}
+
 function sortWert(key, c, e) {
   const qty = e ? e.qty : c.qty;
   if (key === "name")  return c.disp;
   if (key === "mana")  return c.cmc;
   if (key === "qty")   return qty;
-  if (key === "fehlt") return e ? Math.max(0, e.qty - c.qty) : 0;
+  if (key === "fehlt") return e ? Math.max(0, e.qty - bestandVon(c)) : 0;
   // Erscheinungsdatum liegt als "2024-07-05" vor. Da sortiert die
   // Zeichenkette schon chronologisch — Jahr, Monat, Tag stehen in genau der
   // Reihenfolge und mit fester Stellenzahl. Kein Date-Objekt nötig.
@@ -920,7 +930,9 @@ function cardHead(imDeck) {
 function cardRow(c, o = {}) {
   const imDeck = !!o.deckId;
   const qty = imDeck ? o.qty : c.qty;
-  const fehlt = imDeck ? Math.max(0, qty - c.qty) : 0;
+  // Fehlbestand gegen den AUFLAGEN-Bestand (Sprache/Foil/Zustand egal), nicht
+  // gegen die einzelne verknüpfte Zeile — wichtig bei importierten Decks.
+  const fehlt = imDeck ? Math.max(0, qty - bestandVon(c)) : 0;
   return `
     <tr data-id="${c.id}"${imDeck ? ` data-deck="${esc(o.deckId)}"` : ""}>
       <td class="hide-s">${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy" data-view
@@ -2090,7 +2102,7 @@ function renderDecks() {
 
     const n = eintraege.reduce((s, x) => s + x.e.qty, 0);
     const v = eintraege.reduce((s, x) => s + (x.c.price || 0) * x.e.qty, 0);
-    const fehlt = eintraege.filter(x => x.e.qty > x.c.qty).length;
+    const fehlt = eintraege.filter(x => x.e.qty > bestandVon(x.c)).length;
     const offen = deckOffen.ist(d.id);
     const dashOffen = deckDashOffen.has(d.id);
     if (dashOffen) deckDashRows.set(d.id, eintraege.map(({ e, c }) => ({ ...c, qty: e.qty })));
@@ -2674,13 +2686,15 @@ function avatarHtml(size, prof = PROFILE) {
   return `<span class="avatar avatar-init" style="${s};font-size:${Math.round(size * 0.4)}px">${esc(initialen(name))}</span>`;
 }
 
-/* Kopfzeile rechts: Avatar + Name (oder E-Mail), klickbar zum Profil. */
+/* Kopfzeile rechts: Avatar + Name (oder E-Mail). Dahinter klappt das Menü mit
+   Profil, Freunde und Abmelden auf — per Hover am Desktop, per Klick auf
+   Touch-Geräten (dort gibt es kein Hover). */
 function renderWho() {
   const el = $("#who");
   if (!el) return;
-  el.innerHTML = `${avatarHtml(26)}<span>${esc(profilName())}</span>`;
-  el.title = "Profil öffnen";
-  el.onclick = () => { const b = $('nav button[data-v="profile"]'); if (b) b.click(); };
+  el.innerHTML = `${avatarHtml(26)}<span>${esc(profilName())}</span><span class="who-caret">&#9662;</span>`;
+  el.title = "Menü";
+  el.onclick = ev => { ev.stopPropagation(); $("#who-menu")?.classList.toggle("open"); };
 }
 
 /* Zwei persönliche Highlights über der Sammlungs-Statistik: die wertvollste
@@ -3078,8 +3092,14 @@ function wireApp() {
   $$("nav button[data-v]").forEach(b => b.onclick = () => {
     $$("nav button[data-v]").forEach(x => x.classList.toggle("on", x === b));
     $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + b.dataset.v));
+    $("#who-menu")?.classList.remove("open");   // Menüauswahl klappt das Menü zu
     if (b.dataset.v === "profile") renderProfile();
     if (b.dataset.v === "friends") oeffneFreunde();
+  });
+  // Klick irgendwo anders schließt das per Klick geöffnete Benutzermenü (Touch).
+  document.addEventListener("click", e => {
+    const m = $("#who-menu");
+    if (m && !m.contains(e.target)) m.classList.remove("open");
   });
 
   $("#drop").onclick = () => $("#file").click();

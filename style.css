@@ -14,9 +14,22 @@ nav button{background:transparent;border:1px solid var(--line);color:var(--dim);
            padding:7px 14px;border-radius:999px;cursor:pointer;font-size:14px}
 nav button.on{background:var(--acc);border-color:var(--acc);color:#1a1400;font-weight:600}
 #who{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--dim);
-     margin-left:4px;cursor:pointer;max-width:190px}
+     cursor:pointer;max-width:190px}
 #who:hover{color:var(--txt)}
 #who>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.who-caret{color:var(--dim);font-size:9px;flex:none}
+/* Benutzermenü hinter Avatar + Name: Profil, Freunde, Abmelden. Öffnet per
+   Hover (Desktop) oder Klick (.open, Touch). Direkt an der Unterkante ohne
+   Lücke — sonst schließt es auf dem Mausweg dorthin. */
+.who-menu{position:relative;display:inline-flex;align-items:center;margin-left:4px}
+.who-menu .menu{position:absolute;top:100%;right:0;display:none;flex-direction:column;
+  min-width:160px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+  padding:5px;z-index:40;box-shadow:0 10px 26px #000a}
+.who-menu:hover .menu,.who-menu.open .menu{display:flex}
+.who-menu .menu button{background:transparent;border:0;border-radius:7px;color:var(--txt);
+  padding:8px 11px;text-align:left;font-size:14px;cursor:pointer;width:100%;font-weight:400}
+.who-menu .menu button:hover{background:var(--panel)}
+.who-menu .menu button.on{color:var(--acc);font-weight:600}
 main{padding:14px;max-width:1100px;margin:0 auto}
 .view{display:none} .view.on{display:block}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:14px}
