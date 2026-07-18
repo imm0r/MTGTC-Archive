@@ -74,6 +74,12 @@ Deno.serve(async (req) => {
   const { data: { user }, error: authErr } = await sb.auth.getUser();
   if (authErr || !user) return json({ error: "Nicht angemeldet" }, 401);
 
+  // Globaler Feature-Schalter: Nur wenn der Admin die KI-Synergien freigeschaltet
+  // hat, laufen (kostenpflichtige) Anfragen — die echte Sperre sitzt HIER, nicht
+  // nur im Ausblenden des Knopfes. Jeder Angemeldete darf feature_flags lesen.
+  const { data: flag } = await sb.from("feature_flags").select("enabled").eq("key", "ki_synergy").maybeSingle();
+  if (!flag?.enabled) return json({ error: "KI-Synergien sind derzeit deaktiviert.", code: "disabled" }, 403);
+
   const key = Deno.env.get("ANTHROPIC_API_KEY");
   if (!key) return json({ error: "ANTHROPIC_API_KEY ist nicht gesetzt" }, 500);
 

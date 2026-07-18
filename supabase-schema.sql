@@ -614,3 +614,35 @@ end $$;
 revoke execute on function public.add_wish_to_deck(
   uuid, text, text, text, text, text, text, text, text, text, numeric,
   text, text, text, numeric, date, text[], text[], text) from anon;
+
+-- ---------------- Admin + globale Feature-Schalter --------------------
+-- Nur Benjamin (m0nsum@hotmail.com) ist Admin — die user_id ist HART
+-- hinterlegt, damit sich kein Nutzer über ein beschreibbares Feld selbst
+-- befördern kann. security definer, damit die Prüfung unabhängig von RLS greift.
+create or replace function public.is_admin() returns boolean
+language sql stable security definer set search_path = public
+as $$ select auth.uid() = 'db4f0a25-1b8d-468d-8654-16f2339572d8'::uuid $$;
+revoke execute on function public.is_admin() from anon;
+
+-- Globale Feature-Schalter: eine Zeile je Funktion, gilt für ALLE Nutzer.
+-- Alle Angemeldeten dürfen LESEN (um zu wissen, was aktiv ist); NUR der Admin
+-- schreibt. Die echte Durchsetzung teurer Funktionen (KI) sitzt ZUSÄTZLICH in
+-- der Edge Function card-synergy, nicht nur in der Sichtbarkeit im Client.
+create table if not exists public.feature_flags (
+  key     text primary key,
+  enabled boolean not null default false
+);
+alter table public.feature_flags enable row level security;
+alter table public.feature_flags force row level security;
+revoke all on public.feature_flags from anon;
+
+drop policy if exists "flags lesbar" on public.feature_flags;
+create policy "flags lesbar" on public.feature_flags
+  for select to authenticated using (true);
+
+drop policy if exists "flags nur admin" on public.feature_flags;
+create policy "flags nur admin" on public.feature_flags
+  for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+insert into public.feature_flags (key, enabled) values ('ki_synergy', true)
+  on conflict (key) do nothing;

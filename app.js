@@ -43,6 +43,7 @@ function confirmDlg(html) {
 
 /* ============================== Supabase ============================== */
 let sb = null, USER = null, PROFILE = null;
+let FLAGS = {}, IS_ADMIN = false;   // globale Feature-Schalter + ob der Nutzer Admin ist
 
 function cfg() {
   if (CONFIG.url && CONFIG.key) return CONFIG;
@@ -2168,6 +2169,27 @@ function synModusSetzen(m) {
   synModusAnwenden();
 }
 
+/* Globale Feature-Schalter + Admin-Status laden (nach Login). Setzt zusätzlich
+   das Attribut data-ki-global an <html>: hat der Admin die KI-Synergien global
+   ausgeschaltet, blendet CSS den KI-Knopf für ALLE aus (die harte Sperre sitzt
+   in der Edge Function). */
+async function ladeFlags() {
+  try {
+    const { data } = await sb.from("feature_flags").select("key,enabled");
+    FLAGS = {}; (data || []).forEach(f => { FLAGS[f.key] = f.enabled; });
+  } catch { FLAGS = {}; }
+  try { const { data } = await sb.rpc("is_admin"); IS_ADMIN = !!data; } catch { IS_ADMIN = false; }
+  document.documentElement.dataset.kiGlobal = FLAGS.ki_synergy ? "on" : "off";
+}
+
+/* Einen globalen Schalter umlegen — nur der Admin darf; die RLS auf
+   feature_flags erzwingt es zusätzlich serverseitig. */
+async function flagSetzen(key, enabled) {
+  const { error } = await sb.from("feature_flags").update({ enabled }).eq("key", key);
+  if (error) throw error;
+  await ladeFlags();
+}
+
 /* Vorschläge in einen Container zeichnen (Lade-/Leer-Zustand inklusive). */
 async function synergieAnzeigen(box, hooks, opts = {}) {
   if (!box) return;
@@ -3299,6 +3321,7 @@ async function afterLogin(user) {
   // Profil laden (bei Erstanmeldung anlegen). Nicht kritisch: schlägt es fehl
   // (z. B. Tabelle noch nicht angelegt), zeigt die App die E-Mail und läuft weiter.
   try { await ladeProfile(); } catch (e) { PROFILE = null; }
+  await ladeFlags();   // globale Schalter + Admin-Status, bevor gezeichnet wird
   showApp();
   try { await reload(); renderAll(); }
   catch (e) { toast(dbErr(e)); }
@@ -3544,7 +3567,15 @@ function renderSettings() {
         }</select></div>
       </div>
       <p class="hint">${esc(t("settings.synHint"))}</p>
-    </div>`;
+    </div>${IS_ADMIN ? `
+    <div class="card">
+      <h3 style="margin-top:0">${esc(t("admin.title"))}</h3>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:14px;color:var(--txt)">
+        <input type="checkbox" id="flag-ki"${FLAGS.ki_synergy ? " checked" : ""} style="width:auto">
+        <span>${esc(t("admin.kiFlag"))}</span>
+      </label>
+      <p class="hint">${esc(t("admin.hint"))}</p>
+    </div>` : ""}`;
   // Eigenes Sprach-Dropdown mit Flaggen (ein natives <option> kann kein SVG
   // tragen, und Windows zeigt Flaggen-Emoji nur als Buchstaben). Öffnen/Schließen
   // wie das Benutzermenü über die Klasse „open"; Außenklick schließt (wireApp).
@@ -3557,6 +3588,14 @@ function renderSettings() {
   });
   $("#set-pagesize").onchange = ev => pageSizeSpeichern(parseInt(ev.target.value));
   $("#set-synmode").onchange = ev => synModusSetzen(ev.target.value);
+  const fk = $("#flag-ki");
+  if (fk) fk.onchange = async ev => {
+    const an = ev.target.checked;
+    fk.disabled = true;
+    try { await flagSetzen("ki_synergy", an); toast(t(an ? "admin.kiOn" : "admin.kiOff")); }
+    catch (e) { fk.checked = !an; toast(dbErr(e)); }
+    finally { fk.disabled = false; }
+  };
 }
 
 /* Karten je Sammlungsseite speichern (Profil-Einstellung, gilt damit auf allen
