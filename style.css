@@ -263,12 +263,16 @@ td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000
    (--bg, dunkler als jede Kartenfarbe), der Balken links kantig an der Achse
    verankert und nur rechts leicht gerundet: eindeutig ein wachsender Wert. */
 .balken{display:flex;flex-direction:column;gap:8px}
-.balken-zeile{display:flex;align-items:center;gap:8px;font-size:13px}
-.balken-label{display:flex;align-items:center;gap:5px;width:38%;min-width:0;color:var(--dim)}
+.balken-zeile{display:flex;align-items:center;gap:10px;font-size:13px}
+/* Name liegt jetzt AUF dem Balken (statt in einer schmalen linken Spalte, die
+   ihn abschnitt). Weißer, halbfetter Text mit Schatten + einem dezenten dunklen
+   Verlauf unter dem Text bleibt auf dem Gold UND auf dem dunklen Rest lesbar. */
+.balken-spur{position:relative;flex:1;height:24px;background:var(--bg);border-radius:6px;overflow:hidden;min-width:0}
+.balken-spur i{position:absolute;left:0;top:0;bottom:0;background:var(--acc);border-radius:6px;transition:width .3s}
+.balken-label{position:absolute;inset:0;display:flex;align-items:center;gap:5px;padding:0 11px;
+  color:#fff;font-weight:500;text-shadow:0 1px 2px rgba(0,0,0,.75);overflow:hidden;
+  background:linear-gradient(90deg,rgba(0,0,0,.34),rgba(0,0,0,.12) 46%,transparent 72%)}
 .balken-label span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.balken-spur{flex:1;height:16px;background:var(--bg);border-radius:3px;overflow:hidden}
-.balken-spur i{display:block;height:100%;background:var(--acc);border-radius:0 3px 3px 0;
-  transition:width .3s}
 .balken-wert{width:76px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 
 /* Tortendiagramm: Kreis links, Legende rechts; bei Enge untereinander.

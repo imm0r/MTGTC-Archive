@@ -1135,9 +1135,8 @@ function balkenHtml(daten, hinweis) {
   const max = Math.max(1, ...daten.map(d => d.wert));
   return `<div class="balken">${daten.map(d => `
     <div class="balken-zeile" title="${esc(d.label)}: ${esc(String(d.text ?? d.wert))}">
-      <div class="balken-label">${d.icon || ""}<span>${esc(d.label)}</span></div>
       <div class="balken-spur"><i style="width:${(d.wert / max * 100).toFixed(1)}%${
-        d.farbe ? `;background:${d.farbe}` : ""}"></i></div>
+        d.farbe ? `;background:${d.farbe}` : ""}"></i><span class="balken-label">${d.icon || ""}<span>${esc(d.label)}</span></span></div>
       <div class="balken-wert">${esc(String(d.text ?? d.wert))}</div>
     </div>`).join("")}</div>${hinweis ? `<p class="hint">${hinweis}</p>` : ""}`;
 }
