@@ -1935,14 +1935,22 @@ function untertypen(typeLine) {
   return i < 0 ? [] : vorder.slice(i + 1).trim().split(/\s+/).filter(Boolean);
 }
 
-/* Synergie-Haken einer Karte: { kind, label, q }. */
+/* Gewicht je Hakenart: Fähigkeiten (Schlüsselwort, Regeltext-Thema) zählen
+   deutlich mehr als bloße Typgleichheit — zwei Karten mit demselben Mechanismus
+   passen besser zusammen als zwei, die nur denselben Kreaturentyp teilen. */
+const HOOK_GEWICHT = { keyword: 3, theme: 3, tribe: 1 };
+const hookGewicht = kind => HOOK_GEWICHT[kind] || 1;
+
+/* Synergie-Haken einer Karte: { kind, label, q }. Reihenfolge: erst die
+   Fähigkeiten (Schlüsselwörter, Themen), dann Tribal — so bleiben beim Kappen
+   (maxHooks) die aussagekräftigen Haken erhalten. */
 function synergyHooks(card) {
   const hooks = [];
   (card.keywords || []).forEach(k => hooks.push({ kind: "keyword", label: k, q: `keyword:"${k}"` }));
-  if (/creature/i.test(card.type_line || ""))
-    untertypen(card.type_line).forEach(s => hooks.push({ kind: "tribe", label: s, q: `type:${s.toLowerCase()}` }));
   const text = card.oracle_text || "";
   SYNERGY_THEMES.forEach(th => { if (th.re.test(text)) hooks.push({ kind: "theme", label: th.key, q: th.q }); });
+  if (/creature/i.test(card.type_line || ""))
+    untertypen(card.type_line).forEach(s => hooks.push({ kind: "tribe", label: s, q: `type:${s.toLowerCase()}` }));
   return hooks;
 }
 
@@ -2009,8 +2017,12 @@ async function synergieSuchen(hooks, opts = {}) {
     });
     await new Promise(res => setTimeout(res, 110));   // Scryfall schonen
   }
+  // Bewertung: Summe der Hakengewichte (Fähigkeiten > Tribal), erst danach der
+  // EDHREC-Rang als Feinschliff. So steht eine Karte, die dieselbe Fähigkeit
+  // teilt, über einer, die nur denselben Kreaturentyp hat.
+  const punkte = e => [...e.hooks.values()].reduce((s, kind) => s + hookGewicht(kind), 0);
   let rang = [...treffer.values()]
-    .sort((a, b) => (b.hooks.size - a.hooks.size) ||
+    .sort((a, b) => (punkte(b) - punkte(a)) ||
                     ((a.card.edhrec_rank ?? 9e9) - (b.card.edhrec_rank ?? 9e9)))
     .slice(0, opts.limit || 18);
   // Gesamtbudget (Deck): beste Synergien zuerst aufnehmen, bis das Geld reicht.
@@ -2034,14 +2046,14 @@ function synergyErklaerung(e) {
   const kw = [], tr = [], th = [];
   for (const [label, kind] of e.hooks)
     (kind === "keyword" ? kw : kind === "tribe" ? tr : th).push(label);
+  // Fähigkeiten zuerst nennen (Schlüsselwort, Thema), dann den Typ.
   const gruende = [];
-  if (tr.length) gruende.push(t("syn.exp.tribe", { list: tr.join(", ") }));
   if (kw.length) gruende.push(t("syn.exp.keyword", { list: kw.join(", ") }));
   if (th.length) gruende.push(t("syn.exp.theme", { list: th.join(", ") }));
+  if (tr.length) gruende.push(t("syn.exp.tribe", { list: tr.join(", ") }));
   const reasons = gruende.length <= 1 ? (gruende[0] || "")
     : gruende.slice(0, -1).join(", ") + " " + t("syn.exp.and") + " " + gruende[gruende.length - 1];
-  const kopf = t(e.hooks.size >= 2 ? "syn.exp.multi" : "syn.exp.single", { reasons });
-  return kopf + ((e.card.edhrec_rank ?? 9e9) < 600 ? " " + t("syn.exp.popular") : "");
+  return t(gruende.length >= 2 ? "syn.exp.multi" : "syn.exp.single", { reasons });
 }
 
 /* Eine Vorschlagskarte als Kachel: Bild, Name, Typ, Erklärung, Preis. */
@@ -2084,7 +2096,9 @@ async function synergieAnzeigen(box, hooks, opts = {}) {
   box.innerHTML = kopf + `<div class="syn-grid">${res.map(synergyCardHtml).join("")}</div>`;
 }
 
-/* Haken eines ganzen Decks: über alle Karten sammeln, häufigste zuerst. */
+/* Haken eines ganzen Decks: über alle Karten sammeln, dann nach Häufigkeit MAL
+   Gewicht sortieren — eine oft geteilte Fähigkeit schlägt einen oft geteilten
+   Kreaturentyp, damit auch bei der Deck-Suche die Mechanik führt. */
 function deckHooks(eintraege) {
   const zaehler = new Map();
   for (const { c } of eintraege)
@@ -2093,7 +2107,9 @@ function deckHooks(eintraege) {
       const cur = zaehler.get(k) || { hook: h, n: 0 };
       cur.n++; zaehler.set(k, cur);
     }
-  return [...zaehler.values()].sort((a, b) => b.n - a.n).map(x => x.hook);
+  return [...zaehler.values()]
+    .sort((a, b) => b.n * hookGewicht(b.hook.kind) - a.n * hookGewicht(a.hook.kind))
+    .map(x => x.hook);
 }
 
 /* ---------------------------------------------- Karte bearbeiten ----- */
