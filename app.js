@@ -2856,10 +2856,19 @@ function renderSettings() {
       <h3 style="margin-top:0">${esc(t("settings.title"))}</h3>
       <label>${esc(t("settings.language"))}</label>
       <div class="row">
-        <div style="flex:none;min-width:220px"><select id="set-lang">${
-          Object.entries(UI_LANGS).map(([code, name]) =>
-            `<option value="${code}"${code === LANG ? " selected" : ""}>${esc(name)}</option>`).join("")
-        }</select></div>
+        <div style="flex:none">
+          <div class="lang-select" id="lang-select">
+            <button type="button" class="lang-trigger" id="lang-trigger" aria-haspopup="listbox">
+              ${flaggeHtml(LANG, true)}<span class="lang-name">${esc(UI_LANGS[LANG])}</span>
+              <span class="lang-caret" aria-hidden="true">&#9662;</span>
+            </button>
+            <ul class="lang-menu" role="listbox">${
+              Object.entries(UI_LANGS).map(([code, name]) =>
+                `<li role="option" class="lang-item${code === LANG ? " on" : ""}" data-lang="${code}"
+                     aria-selected="${code === LANG}">${flaggeHtml(code, true)}<span>${esc(name)}</span></li>`).join("")
+            }</ul>
+          </div>
+        </div>
       </div>
       <p class="hint">${esc(t("settings.langHint"))}</p>
     </div>
@@ -2873,7 +2882,16 @@ function renderSettings() {
       </div>
       <p class="hint">${esc(t("settings.pageHint"))}</p>
     </div>`;
-  $("#set-lang").onchange = ev => setLang(ev.target.value);
+  // Eigenes Sprach-Dropdown mit Flaggen (ein natives <option> kann kein SVG
+  // tragen, und Windows zeigt Flaggen-Emoji nur als Buchstaben). Öffnen/Schließen
+  // wie das Benutzermenü über die Klasse „open"; Außenklick schließt (wireApp).
+  const ls = $("#lang-select");
+  $("#lang-trigger").onclick = ev => { ev.stopPropagation(); ls.classList.toggle("open"); };
+  ls.querySelectorAll("[data-lang]").forEach(li => li.onclick = () => {
+    const code = li.dataset.lang;
+    ls.classList.remove("open");
+    if (code !== LANG) setLang(code);   // setLang → onLangChange → renderSettings baut neu
+  });
   $("#set-pagesize").onchange = ev => pageSizeSpeichern(parseInt(ev.target.value));
 }
 
@@ -3199,10 +3217,13 @@ function wireApp() {
     if (b.dataset.v === "friends") oeffneFreunde();
     if (b.dataset.v === "settings") renderSettings();
   });
-  // Klick irgendwo anders schließt das per Klick geöffnete Benutzermenü (Touch).
+  // Klick irgendwo anders schließt das per Klick geöffnete Benutzermenü (Touch)
+  // und das Sprach-Dropdown in den Einstellungen.
   document.addEventListener("click", e => {
     const m = $("#who-menu");
     if (m && !m.contains(e.target)) m.classList.remove("open");
+    const ls = $("#lang-select");
+    if (ls && !ls.contains(e.target)) ls.classList.remove("open");
   });
 
   $("#drop").onclick = () => $("#file").click();
