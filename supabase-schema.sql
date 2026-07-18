@@ -837,3 +837,81 @@ begin
   insert into public.session_events (session_id, user_id, kind, data)
     values (p_session, auth.uid(), 'reset', '{}'::jsonb);
 end $$;
+
+-- ===================== Termine (geplante Spieleabende) =====================
+create table if not exists public.game_events (
+  id uuid primary key default gen_random_uuid(),
+  host uuid not null references auth.users(id) on delete cascade,
+  title text not null, description text, starts_at timestamptz not null,
+  created timestamptz not null default now());
+create table if not exists public.event_rsvp (
+  event_id uuid not null references public.game_events(id) on delete cascade,
+  user_id  uuid not null references auth.users(id) on delete cascade,
+  status   text not null default 'invited' check (status in ('invited','yes','no','maybe')),
+  primary key (event_id, user_id));
+create index if not exists event_rsvp_user_idx on public.event_rsvp(user_id);
+
+create or replace function public.event_host(e uuid) returns uuid
+language sql stable security definer set search_path=public as $$ select host from public.game_events where id = e $$;
+create or replace function public.in_event(e uuid) returns boolean
+language sql stable security definer set search_path=public
+as $$ select public.event_host(e) = auth.uid()
+        or exists(select 1 from public.event_rsvp where event_id = e and user_id = auth.uid()) $$;
+create or replace function public.event_roster(p_event uuid)
+returns table(user_id uuid, status text, display_name text, avatar_url text)
+language sql stable security definer set search_path=public as $$
+  select r.user_id, r.status, pr.display_name, pr.avatar_url
+  from public.event_rsvp r left join public.profiles pr on pr.id = r.user_id
+  where r.event_id = p_event and public.in_event(p_event)
+  order by (r.status='yes') desc, (r.status='maybe') desc, r.user_id $$;
+
+alter table public.game_events enable row level security; alter table public.game_events force row level security;
+alter table public.event_rsvp enable row level security;  alter table public.event_rsvp force row level security;
+revoke all on public.game_events from anon; revoke all on public.event_rsvp from anon;
+create policy ev_select on public.game_events for select to authenticated using (public.in_event(id));
+create policy ev_insert on public.game_events for insert to authenticated with check (host = auth.uid());
+create policy ev_update on public.game_events for update to authenticated using (host = auth.uid()) with check (host = auth.uid());
+create policy ev_delete on public.game_events for delete to authenticated using (host = auth.uid());
+create policy rsvp_select on public.event_rsvp for select to authenticated using (public.in_event(event_id));
+create policy rsvp_insert on public.event_rsvp for insert to authenticated
+  with check (public.event_host(event_id) = auth.uid() and (user_id = auth.uid() or public.are_friends(auth.uid(), user_id)));
+create policy rsvp_update on public.event_rsvp for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy rsvp_delete on public.event_rsvp for delete to authenticated
+  using (user_id = auth.uid() or public.event_host(event_id) = auth.uid());
+
+-- Termin anlegen (Host-Zusage + Freunde einladen)
+create or replace function public.create_event(p_title text, p_desc text, p_starts_at timestamptz, p_invitees uuid[])
+returns uuid language plpgsql security definer set search_path=public as $$
+declare eid uuid; me uuid := auth.uid(); f uuid;
+begin
+  if me is null then raise exception 'Nicht angemeldet'; end if;
+  if coalesce(trim(p_title),'') = '' then raise exception 'Titel fehlt'; end if;
+  insert into public.game_events (host, title, description, starts_at)
+    values (me, left(p_title,120), nullif(trim(left(coalesce(p_desc,''),1000)),''), p_starts_at) returning id into eid;
+  insert into public.event_rsvp (event_id, user_id, status) values (eid, me, 'yes');
+  if p_invitees is not null then foreach f in array p_invitees loop
+    if f <> me and public.are_friends(me, f) then
+      insert into public.event_rsvp (event_id, user_id, status) values (eid, f, 'invited') on conflict do nothing;
+    end if; end loop; end if;
+  return eid;
+end $$;
+revoke execute on function public.create_event(text,text,timestamptz,uuid[]) from anon;
+
+-- Live-Spielrunde aus Termin: Session + Zusagende ('yes'/'maybe') als eingeladen
+create or replace function public.start_session_from_event(p_event uuid, p_start_life integer default 40)
+returns uuid language plpgsql security definer set search_path=public as $$
+declare sid uuid; me uuid := auth.uid(); sl integer := greatest(1, least(999, coalesce(p_start_life,40))); r record;
+begin
+  if public.event_host(p_event) <> me then raise exception 'Nur der Ersteller darf starten'; end if;
+  insert into public.game_sessions (host, start_life, status) values (me, sl, 'open') returning id into sid;
+  insert into public.session_players (session_id, user_id, life, status, seat, joined_at)
+    values (sid, me, sl, 'joined', 0, now());
+  for r in select user_id from public.event_rsvp where event_id = p_event and status in ('yes','maybe') and user_id <> me loop
+    insert into public.session_players (session_id, user_id, life, status)
+      values (sid, r.user_id, sl, 'invited') on conflict do nothing;
+  end loop;
+  return sid;
+end $$;
+revoke execute on function public.start_session_from_event(uuid,integer) from anon;
+alter publication supabase_realtime add table public.game_events;
+alter publication supabase_realtime add table public.event_rsvp;

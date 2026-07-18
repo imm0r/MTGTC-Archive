@@ -4033,6 +4033,259 @@ async function oeffneSession() {
   renderSession();
 }
 
+/* =========================== Termine (Kalender) ===========================
+   Geplante Spieleabende: Termin mit Titel/Datum/Beschreibung, Freunde einladen,
+   Zu-/Absage, Monatskalender + Liste, und „Spielrunde starten" (erstellt die
+   Live-Runde und übernimmt die Zusagenden als eingeladen). */
+let EVENTS = [], eventsChannel = null, kalMonat = null, terminReloadT = null;
+const terminOffen = new Set();                 // aufgeklappte Termine (id)
+const eventForm = { offen: false, editId: null };
+let terminInviteOffen = null;                  // Termin-id mit offener „weitere einladen"-Liste
+
+async function ladeTermine() {
+  EVENTS = [];
+  if (!USER) return;
+  const { data: evs } = await sb.from("game_events").select("*").order("starts_at");
+  const ids = (evs || []).map(e => e.id);
+  let rsvps = [];
+  if (ids.length) { const r = await sb.from("event_rsvp").select("event_id,user_id,status").in("event_id", ids); rsvps = r.data || []; }
+  EVENTS = (evs || []).map(e => {
+    const rs = rsvps.filter(x => x.event_id === e.id);
+    return { ...e, rsvps: rs, myStatus: rs.find(x => x.user_id === USER.id)?.status || null, isHost: e.host === USER.id };
+  });
+}
+
+async function oeffneTermine() {
+  try { await ladeFreunde(); } catch { /* nur für die Einladeliste */ }
+  try { await ladeTermine(); } catch (e) { toast(dbErr(e)); }
+  subscribeTermine();
+  renderTermine();
+}
+
+function subscribeTermine() {
+  if (eventsChannel || !USER) return;
+  eventsChannel = sb.channel("events:" + USER.id)
+    .on("postgres_changes", { event: "*", schema: "public", table: "event_rsvp" }, onTerminChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "game_events" }, onTerminChange)
+    .subscribe();
+}
+function onTerminChange() {
+  clearTimeout(terminReloadT);
+  terminReloadT = setTimeout(async () => { await ladeTermine(); if ($(".view.on")?.id === "v-events") renderTermine(); }, 350);
+}
+
+/* Profil (Name/Avatar) eines Beteiligten: ich selbst oder ein Freund. */
+function terminProfil(userId) {
+  if (userId === USER?.id) return { id: userId, display_name: PROFILE?.display_name || t("sess.you"), avatar_url: PROFILE?.avatar_url };
+  const f = (FRIENDS?.accepted || []).find(x => x.other?.id === userId);
+  return f?.other || { id: userId, display_name: t("friends.unknown"), avatar_url: null };
+}
+
+const zPad = n => String(n).padStart(2, "0");
+function isoToLocalInput(iso) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${zPad(d.getMonth() + 1)}-${zPad(d.getDate())}T${zPad(d.getHours())}:${zPad(d.getMinutes())}`;
+}
+function wannText(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString(LANG, { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" })
+    + " · " + d.toLocaleTimeString(LANG, { hour: "2-digit", minute: "2-digit" });
+}
+
+function renderTermine() {
+  const el = $("#v-events"); if (!el) return;
+  el.innerHTML = terminFormHtml() + kalenderHtml() + terminListeHtml();
+  wireTermine();
+}
+
+/* -------- Anlege-/Bearbeiten-Formular -------- */
+function terminFormHtml() {
+  if (!eventForm.offen) return `<div class="card"><button class="btn" id="ev-neu">+ ${esc(t("cal.newEvent"))}</button></div>`;
+  const ed = eventForm.editId ? EVENTS.find(e => e.id === eventForm.editId) : null;
+  let defDt;
+  if (ed) defDt = isoToLocalInput(ed.starts_at);
+  else { const dd = new Date(); dd.setDate(dd.getDate() + 1); dd.setHours(20, 0, 0, 0); defDt = isoToLocalInput(dd.toISOString()); }
+  const freunde = (FRIENDS?.accepted || []).map(f => f.other).filter(Boolean);
+  return `<div class="card">
+    <h3 style="margin-top:0">${esc(ed ? t("cal.editEvent") : t("cal.newEvent"))}</h3>
+    <label>${esc(t("cal.fTitle"))}</label>
+    <input type="text" id="ev-title" maxlength="120" value="${esc(ed?.title || "")}" placeholder="${esc(t("cal.fTitlePh"))}">
+    <label style="margin-top:8px">${esc(t("cal.fWhen"))}</label>
+    <input type="datetime-local" id="ev-when" value="${esc(defDt)}">
+    <label style="margin-top:8px">${esc(t("cal.fDesc"))}</label>
+    <textarea id="ev-desc" rows="2" maxlength="1000" placeholder="${esc(t("cal.fDescPh"))}">${esc(ed?.description || "")}</textarea>
+    ${!ed ? `<label style="margin-top:8px">${esc(t("cal.fInvite"))}</label>
+      <div class="ev-invite-list">${freunde.length
+        ? freunde.map(f => `<label class="ev-inv"><input type="checkbox" value="${esc(f.id)}">${avatarHtml(22, f)}<span>${esc(f.display_name || t("friends.unknown"))}</span></label>`).join("")
+        : `<div class="hint">${esc(t("cal.noFriends"))}</div>`}</div>` : ""}
+    <div class="row" style="margin-top:12px;gap:8px">
+      <div style="flex:none"><button class="btn" id="ev-save">${esc(ed ? t("common.save") : t("cal.create"))}</button></div>
+      <div style="flex:none"><button class="btn ghost" id="ev-cancel">${esc(t("dlg.cancel"))}</button></div>
+    </div>
+  </div>`;
+}
+
+/* -------- Monatskalender -------- */
+function kalAktuell() {
+  if (kalMonat) return kalMonat;
+  const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+function kalenderHtml() {
+  const m = kalAktuell(), jahr = m.getFullYear(), monat = m.getMonth();
+  const h = new Date();
+  const istHeute = d => jahr === h.getFullYear() && monat === h.getMonth() && d === h.getDate();
+  const ersterWT = (new Date(jahr, monat, 1).getDay() + 6) % 7;   // 0 = Montag
+  const tage = new Date(jahr, monat + 1, 0).getDate();
+  const proTag = {};
+  EVENTS.forEach(e => { const d = new Date(e.starts_at); if (d.getFullYear() === jahr && d.getMonth() === monat) (proTag[d.getDate()] ||= []).push(e); });
+  let zellen = "";
+  for (let i = 0; i < ersterWT; i++) zellen += `<div class="kal-tag leer"></div>`;
+  for (let d = 1; d <= tage; d++) {
+    const evs = (proTag[d] || []).sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+    const pills = evs.slice(0, 2).map(e => `<span class="kal-pill" data-ev="${esc(e.id)}" title="${esc(e.title)}">${esc(e.title)}</span>`).join("");
+    const mehr = evs.length > 2 ? `<span class="kal-mehr" data-ev="${esc(evs[2].id)}">+${evs.length - 2}</span>` : "";
+    zellen += `<div class="kal-tag${istHeute(d) ? " heute" : ""}"><span class="kal-nr">${d}</span>${pills}${mehr}</div>`;
+  }
+  const wt = t("cal.weekdays").split(",");
+  return `<div class="card">
+    <div class="row" style="align-items:center;justify-content:space-between">
+      <div style="flex:none"><button class="btn ghost sm" id="kal-prev" title="${esc(t("cal.prevMonth"))}">&#8249;</button></div>
+      <h3 style="margin:0;text-transform:capitalize">${esc(m.toLocaleDateString(LANG, { month: "long", year: "numeric" }))}</h3>
+      <div style="flex:none"><button class="btn ghost sm" id="kal-next" title="${esc(t("cal.nextMonth"))}">&#8250;</button></div>
+    </div>
+    <div class="kal-grid kal-head">${wt.map(w => `<div class="kal-wt">${esc(w)}</div>`).join("")}</div>
+    <div class="kal-grid">${zellen}</div>
+  </div>`;
+}
+
+/* -------- Terminliste (kommende) -------- */
+function terminListeHtml() {
+  const grenze = Date.now() - 3 * 3600 * 1000;   // 3h Kulanz für laufende Runden
+  const kommend = EVENTS.filter(e => new Date(e.starts_at).getTime() >= grenze)
+    .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+  return `<div class="card"><h3 style="margin-top:0">${esc(t("cal.upcoming"))}</h3>
+    ${kommend.length ? kommend.map(terminRowHtml).join("") : `<div class="empty">${esc(t("cal.noneUpcoming"))}</div>`}</div>`;
+}
+function terminRowHtml(e) {
+  const ja = e.rsvps.filter(r => r.status === "yes").length;
+  const viel = e.rsvps.filter(r => r.status === "maybe").length;
+  const nein = e.rsvps.filter(r => r.status === "no").length;
+  return `<div class="termin" id="ev-${esc(e.id)}">
+    <div class="termin-kopf" data-ev-toggle="${esc(e.id)}">
+      <div class="termin-wann">${esc(wannText(e.starts_at))}</div>
+      <div class="termin-titel">${esc(e.title)}${e.isHost ? ` <span class="termin-host" title="${esc(t("cal.youHost"))}">&#9733;</span>` : ""}</div>
+      <div class="termin-zahlen">&#10003;&nbsp;${ja} · ?&nbsp;${viel} · &#10007;&nbsp;${nein}</div>
+    </div>
+    ${terminOffen.has(e.id) ? terminDetailHtml(e) : ""}
+  </div>`;
+}
+function terminDetailHtml(e) {
+  const atts = e.rsvps.map(r => { const p = terminProfil(r.user_id);
+    return `<div class="ev-att">${avatarHtml(24, p)}<span class="ev-att-name">${esc(p.display_name || t("friends.unknown"))}</span><span class="ev-att-st st-${r.status}">${esc(t("cal.st." + r.status))}</span></div>`;
+  }).join("");
+  const rsvp = e.isHost ? "" : `<div class="row" style="gap:6px;margin-top:10px">${
+    ["yes", "maybe", "no"].map(s => `<button class="btn ghost sm ev-rsvp${e.myStatus === s ? " on" : ""}" data-ev-rsvp="${esc(e.id)}" data-st="${s}">${esc(t("cal.set." + s))}</button>`).join("")}</div>`;
+  // Host: weitere Freunde einladen (noch nicht im Termin)
+  let inviteMore = "";
+  if (e.isHost) {
+    const drin = new Set(e.rsvps.map(r => r.user_id));
+    const rest = (FRIENDS?.accepted || []).map(f => f.other).filter(o => o && !drin.has(o.id));
+    inviteMore = `<div style="margin-top:10px"><button class="btn ghost sm" data-ev-invtoggle="${esc(e.id)}">${esc(t("cal.inviteMore"))}</button>
+      ${terminInviteOffen === e.id ? `<div class="ev-invite-list" style="margin-top:8px">${
+        rest.length ? rest.map(o => `<label class="ev-inv"><input type="checkbox" value="${esc(o.id)}">${avatarHtml(22, o)}<span>${esc(o.display_name || t("friends.unknown"))}</span></label>`).join("")
+                    : `<div class="hint">${esc(t("cal.allInvited"))}</div>`}
+        ${rest.length ? `<div style="margin-top:8px"><button class="btn sm" data-ev-invsave="${esc(e.id)}">${esc(t("cal.inviteSel"))}</button></div>` : ""}</div>` : ""}</div>`;
+  }
+  const hostAct = e.isHost ? `<div class="row" style="gap:6px;margin-top:12px;flex-wrap:wrap">
+    <div style="flex:none"><button class="btn sm" data-ev-start="${esc(e.id)}">&#127922; ${esc(t("cal.startSession"))}</button></div>
+    <div style="flex:none"><button class="btn ghost sm" data-ev-edit="${esc(e.id)}">${esc(t("detail.edit"))}</button></div>
+    <div style="flex:none"><button class="btn danger sm" data-ev-del="${esc(e.id)}">${esc(t("cal.delete"))}</button></div>
+  </div>` : "";
+  return `<div class="termin-detail">
+    ${e.description ? `<p class="termin-beschr">${esc(e.description)}</p>` : ""}
+    <div class="ev-atts">${atts}</div>
+    ${rsvp}${inviteMore}${hostAct}
+  </div>`;
+}
+
+function wireTermine() {
+  const neu = $("#ev-neu"); if (neu) neu.onclick = () => { eventForm.offen = true; eventForm.editId = null; renderTermine(); };
+  const cancel = $("#ev-cancel"); if (cancel) cancel.onclick = () => { eventForm.offen = false; eventForm.editId = null; renderTermine(); };
+  const save = $("#ev-save"); if (save) save.onclick = terminSpeichern;
+  const prev = $("#kal-prev"); if (prev) prev.onclick = () => { const m = kalAktuell(); kalMonat = new Date(m.getFullYear(), m.getMonth() - 1, 1); renderTermine(); };
+  const next = $("#kal-next"); if (next) next.onclick = () => { const m = kalAktuell(); kalMonat = new Date(m.getFullYear(), m.getMonth() + 1, 1); renderTermine(); };
+
+  $$("#v-events [data-ev]").forEach(el => el.onclick = () => {
+    const id = el.dataset.ev; terminOffen.add(id); renderTermine();
+    setTimeout(() => $(`#ev-${CSS.escape(id)}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+  });
+  $$("#v-events [data-ev-toggle]").forEach(el => el.onclick = () => {
+    const id = el.dataset.evToggle; terminOffen.has(id) ? terminOffen.delete(id) : terminOffen.add(id); renderTermine();
+  });
+  $$("#v-events [data-ev-rsvp]").forEach(b => b.onclick = () => terminRsvp(b.dataset.evRsvp, b.dataset.st));
+  $$("#v-events [data-ev-start]").forEach(b => b.onclick = () => terminSpielrunde(b.dataset.evStart));
+  $$("#v-events [data-ev-del]").forEach(b => b.onclick = () => terminLoeschen(b.dataset.evDel));
+  $$("#v-events [data-ev-edit]").forEach(b => b.onclick = () => { eventForm.offen = true; eventForm.editId = b.dataset.evEdit; renderTermine(); window.scrollTo({ top: 0, behavior: "smooth" }); });
+  $$("#v-events [data-ev-invtoggle]").forEach(b => b.onclick = () => { const id = b.dataset.evInvtoggle; terminInviteOffen = terminInviteOffen === id ? null : id; renderTermine(); });
+  $$("#v-events [data-ev-invsave]").forEach(b => b.onclick = () => terminEinladen(b.dataset.evInvsave));
+}
+
+async function terminSpeichern() {
+  const title = $("#ev-title")?.value.trim();
+  const whenVal = $("#ev-when")?.value;
+  const desc = $("#ev-desc")?.value || "";
+  if (!title) { toast(t("cal.needTitle")); return; }
+  if (!whenVal) { toast(t("cal.needWhen")); return; }
+  const iso = new Date(whenVal).toISOString();
+  try {
+    if (eventForm.editId) {
+      const { error } = await sb.from("game_events").update({ title, description: desc.trim() || null, starts_at: iso }).eq("id", eventForm.editId);
+      if (error) throw error;
+    } else {
+      const invitees = $$("#v-events .ev-invite-list input:checked").map(c => c.value);
+      const { error } = await sb.rpc("create_event", { p_title: title, p_desc: desc, p_starts_at: iso, p_invitees: invitees });
+      if (error) throw error;
+    }
+    eventForm.offen = false; eventForm.editId = null;
+    await ladeTermine(); renderTermine();
+  } catch (e) { toast(dbErr(e)); }
+}
+async function terminRsvp(eventId, status) {
+  try {
+    const { error } = await sb.from("event_rsvp").update({ status }).eq("event_id", eventId).eq("user_id", USER.id);
+    if (error) throw error;
+    await ladeTermine(); renderTermine();
+  } catch (e) { toast(dbErr(e)); }
+}
+async function terminEinladen(eventId) {
+  const ids = $$(`#ev-${CSS.escape(eventId)} .ev-invite-list input:checked`).map(c => c.value);
+  if (!ids.length) return;
+  try {
+    const { error } = await sb.from("event_rsvp").insert(ids.map(id => ({ event_id: eventId, user_id: id, status: "invited" })));
+    if (error) throw error;
+    terminInviteOffen = null;
+    await ladeTermine(); renderTermine();
+  } catch (e) { toast(dbErr(e)); }
+}
+async function terminLoeschen(eventId) {
+  const e = EVENTS.find(x => x.id === eventId);
+  if (!await confirmDlg(t("cal.delConfirm", { title: e?.title || "" }))) return;
+  try {
+    const { error } = await sb.from("game_events").delete().eq("id", eventId);
+    if (error) throw error;
+    terminOffen.delete(eventId);
+    await ladeTermine(); renderTermine();
+  } catch (e2) { toast(dbErr(e2)); }
+}
+async function terminSpielrunde(eventId) {
+  try {
+    const { error } = await sb.rpc("start_session_from_event", { p_event: eventId, p_start_life: 40 });
+    if (error) throw error;
+    toast(t("cal.sessionStarted"));
+    $('#who-menu [data-v="session"]')?.click();   // Session-Ansicht öffnen (lädt die neue Runde)
+  } catch (e) { toast(dbErr(e)); }
+}
+
 function renderSession() {
   const el = $("#v-session");
   if (!el) return;
@@ -4661,6 +4914,7 @@ function wireApp() {
     if (b.dataset.v === "dashboard") renderDashboard();
     if (b.dataset.v === "friends") oeffneFreunde();
     if (b.dataset.v === "session") oeffneSession();
+    if (b.dataset.v === "events") oeffneTermine();
     if (b.dataset.v === "settings") renderSettings();
   });
   // Klick irgendwo anders schließt das per Klick geöffnete Benutzermenü (Touch)
@@ -4780,6 +5034,7 @@ function onLangChange() {
   else if (aktiv === "v-dashboard") renderDashboard();
   else if (aktiv === "v-friends") renderFriends();
   else if (aktiv === "v-session") renderSession();
+  else if (aktiv === "v-events") renderTermine();
   else if (aktiv === "v-settings") renderSettings();
 }
 

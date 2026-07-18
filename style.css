@@ -205,6 +205,40 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
   border:1px solid var(--line);border-radius:12px;padding:8px;box-shadow:0 10px 34px #000c}
 .cmd-hover img{width:220px;max-width:60vw;border-radius:8px;display:block}
 .cmd-hover-nm{text-align:center;font-weight:600;font-size:14px;color:var(--txt);margin-top:6px;max-width:220px}
+/* ===== Termine / Kalender ===== */
+.kal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:10px}
+.kal-head{margin-top:8px}
+.kal-wt{text-align:center;font-size:11px;color:var(--dim);padding:2px 0;font-weight:600}
+.kal-tag{min-height:64px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:3px;
+  display:flex;flex-direction:column;gap:2px;overflow:hidden}
+.kal-tag.leer{background:transparent;border:none}
+.kal-tag.heute{border-color:var(--acc)}
+.kal-nr{font-size:11px;color:var(--dim);text-align:right;line-height:1}
+.kal-pill{font-size:10px;background:var(--acc);color:#1a1400;border-radius:4px;padding:1px 4px;cursor:pointer;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.kal-mehr{font-size:10px;color:var(--dim);cursor:pointer;padding-left:4px}
+.termin{border-top:1px solid var(--line)}
+.termin:first-of-type{border-top:none}
+.termin-kopf{display:flex;align-items:center;gap:10px;padding:9px 2px;cursor:pointer;border-radius:6px}
+.termin-kopf:hover{background:var(--panel2)}
+.termin-wann{flex:none;font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums;min-width:150px}
+.termin-titel{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.termin-host{color:var(--acc)}
+.termin-zahlen{flex:none;font-size:12px;color:var(--dim);white-space:nowrap}
+.termin-detail{padding:2px 2px 12px}
+.termin-beschr{margin:2px 0 10px;color:var(--txt);white-space:pre-wrap}
+.ev-atts{display:flex;flex-direction:column;gap:5px}
+.ev-att{display:flex;align-items:center;gap:8px;font-size:13px}
+.ev-att-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ev-att-st{flex:none;font-size:11px;padding:1px 8px;border-radius:999px;background:var(--panel2);color:var(--dim)}
+.ev-att-st.st-yes{background:rgba(60,180,90,.2);color:var(--ok)}
+.ev-att-st.st-no{background:rgba(210,80,80,.18);color:var(--err)}
+.ev-att-st.st-maybe{background:rgba(210,170,60,.18);color:var(--acc)}
+.ev-rsvp.on{background:var(--acc);color:#1a1400}
+.ev-invite-list{display:flex;flex-direction:column;gap:4px;max-height:200px;overflow:auto}
+.ev-inv{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
+.ev-inv span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:560px){.termin-wann{min-width:0}.termin-kopf{flex-wrap:wrap}.kal-tag{min-height:52px}}
 .trk-sum{font-size:13px;color:var(--dim);margin:8px 0}
 .trk-list{display:flex;flex-direction:column;gap:2px;max-height:340px;overflow:auto}
 .trk-row{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;font-size:13px}
