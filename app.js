@@ -4332,7 +4332,7 @@ const DiceGL = {
         this.renderer.setSize(140, 140);
         this.canvas = this.renderer.domElement; this.canvas.className = "dice-gl";
         this.scene = new T.Scene();
-        this.cam = new T.PerspectiveCamera(32, 1, 0.1, 100); this.cam.position.set(0, 0, 6);
+        this.cam = new T.PerspectiveCamera(32, 1, 0.1, 100); this.cam.position.set(0, 0, 6.4);
         this.scene.add(new T.AmbientLight(0xffffff, 0.85));
         const d1 = new T.DirectionalLight(0xffffff, 1.2); d1.position.set(3, 5, 6); this.scene.add(d1);
         const d2 = new T.DirectionalLight(0xffe9c0, 0.5); d2.position.set(-4, -2, 3); this.scene.add(d2);
@@ -4363,9 +4363,17 @@ const DiceGL = {
   },
   _buildIco() {
     const T = this.THREE;
-    const numTex = n => this._faceTex(x => { x.fillStyle = "#241a00"; x.font = "bold 84px sans-serif";
-      x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(String(n), 80, 88);
-      if (n === 6 || n === 9) x.fillRect(52, 120, 56, 7); });
+    // Zahlen auf TRANSPARENTEM Grund (kein goldenes Quadrat) → sie sitzen direkt
+    // auf den Würfelflächen; heller Rand hebt sie vom facettierten Gold ab.
+    const numTex = n => {
+      const c = document.createElement("canvas"); c.width = c.height = 160;
+      const x = c.getContext("2d");
+      x.font = "bold 96px sans-serif"; x.textAlign = "center"; x.textBaseline = "middle";
+      x.lineWidth = 7; x.strokeStyle = "rgba(255,244,214,.55)"; x.strokeText(String(n), 80, 86);
+      x.fillStyle = "#2a1e02"; x.fillText(String(n), 80, 86);
+      if (n === 6 || n === 9) x.fillRect(50, 122, 60, 8);
+      return new T.CanvasTexture(c);
+    };
     const g = new T.IcosahedronGeometry(1.7, 0); g.computeVertexNormals();
     const grp = new T.Group();
     grp.add(new T.Mesh(g, new T.MeshStandardMaterial({ color: 0xc9962b, metalness: 0.3, roughness: 0.5, flatShading: true })));
@@ -4394,28 +4402,36 @@ const DiceGL = {
     const die = sides === 6 ? this.cube : this.ico;
     const target = this._targetQuat(die, result);
     cancelAnimationFrame(this._raf); clearTimeout(this._safety);
-    const t0 = performance.now(), tumble = 750, settle = 700;
+    const t0 = performance.now(), tumble = 750, settle = 700, total = tumble + settle;
     const axis = new T.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
+    // Wurf-Startpunkt: von unten seitlich hereingeworfen, dann Bogen zur Mitte.
+    const start = new T.Vector3((Math.random() < 0.5 ? -1 : 1) * 1.25, -1.0, -0.6);
+    die.position.copy(start);
     let q0 = null, settling = false;
     const step = now => {
       const el = now - t0;
+      // Flug durch den Raum: Startversatz klingt aus (easeOut) + ein Bogen nach oben.
+      const tp = Math.min(1, el / total), ez = 1 - Math.pow(1 - tp, 2);
+      die.position.set(start.x * (1 - ez),
+                       start.y * (1 - ez) + 1.0 * Math.sin(Math.PI * Math.min(1, tp * 1.05)),
+                       start.z * (1 - ez));
       if (el < tumble) { die.rotateOnWorldAxis(axis, 0.3); }
       else {
         if (!settling) { settling = true; q0 = die.quaternion.clone(); }
         const p = Math.min(1, (el - tumble) / settle), e = 1 - Math.pow(1 - p, 3);
         die.quaternion.copy(q0).slerp(target, e);
-        if (p >= 1) { clearTimeout(this._safety); this.renderer.render(this.scene, this.cam); this._raf = null; return; }
+        if (p >= 1) { clearTimeout(this._safety); die.position.set(0, 0, 0); this.renderer.render(this.scene, this.cam); this._raf = null; return; }
       }
       this.renderer.render(this.scene, this.cam);
       this._raf = requestAnimationFrame(step);
     };
     this._raf = requestAnimationFrame(step);
     // Sicherheitsnetz: falls requestAnimationFrame gedrosselt wird (Tab im
-    // Hintergrund), sitzt die Ergebnis-Fläche trotzdem garantiert vorn.
+    // Hintergrund), sitzen Ergebnis-Fläche UND Mittelposition trotzdem garantiert.
     this._safety = setTimeout(() => {
       cancelAnimationFrame(this._raf); this._raf = null;
-      die.quaternion.copy(target); this.renderer.render(this.scene, this.cam);
-    }, tumble + settle + 350);
+      die.position.set(0, 0, 0); die.quaternion.copy(target); this.renderer.render(this.scene, this.cam);
+    }, total + 350);
   },
 };
 
