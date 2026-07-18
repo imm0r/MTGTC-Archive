@@ -1547,6 +1547,7 @@ Object.assign(I18N.de, {
   "syn.aiDeckTitle": "Karten für das ganze Deck per KI vorschlagen — auch implizite Synergien",
   "syn.aiLoading": "Die KI sucht passende Karten…",
   "syn.aiNote": "KI-Vorschläge (Karten gegen Scryfall geprüft; die Begründungen können irren):",
+  "syn.aiCost": "Diese Abfrage: ≈ {cost} · {in} → {out} Tokens",
   "syn.aiError": "Die KI-Suche ist gerade nicht möglich.",
 });
 Object.assign(I18N.en, {
@@ -1555,6 +1556,7 @@ Object.assign(I18N.en, {
   "syn.aiDeckTitle": "Suggest cards for the whole deck via AI — including implicit synergies",
   "syn.aiLoading": "The AI is looking for matching cards…",
   "syn.aiNote": "AI suggestions (cards verified against Scryfall; the reasons may be off):",
+  "syn.aiCost": "This query: ≈ {cost} · {in} → {out} tokens",
   "syn.aiError": "The AI search isn't available right now.",
 });
 Object.assign(I18N.fr, {
@@ -1563,6 +1565,7 @@ Object.assign(I18N.fr, {
   "syn.aiDeckTitle": "Proposer des cartes pour tout le deck via l'IA — y compris des synergies implicites",
   "syn.aiLoading": "L'IA cherche des cartes assorties…",
   "syn.aiNote": "Suggestions de l'IA (cartes vérifiées via Scryfall ; les justifications peuvent se tromper) :",
+  "syn.aiCost": "Cette requête : ≈ {cost} · {in} → {out} jetons",
   "syn.aiError": "La recherche IA n'est pas disponible pour le moment.",
 });
 Object.assign(I18N.es, {
@@ -1571,6 +1574,7 @@ Object.assign(I18N.es, {
   "syn.aiDeckTitle": "Sugerir cartas para todo el mazo con IA — incluidas sinergias implícitas",
   "syn.aiLoading": "La IA está buscando cartas afines…",
   "syn.aiNote": "Sugerencias de la IA (cartas verificadas con Scryfall; las razones pueden fallar):",
+  "syn.aiCost": "Esta consulta: ≈ {cost} · {in} → {out} tokens",
   "syn.aiError": "La búsqueda con IA no está disponible ahora mismo.",
 });
 Object.assign(I18N.it, {
@@ -1579,6 +1583,7 @@ Object.assign(I18N.it, {
   "syn.aiDeckTitle": "Suggerisci carte per tutto il mazzo con l'IA — anche sinergie implicite",
   "syn.aiLoading": "L'IA sta cercando carte affini…",
   "syn.aiNote": "Suggerimenti dell'IA (carte verificate su Scryfall; le motivazioni possono sbagliare):",
+  "syn.aiCost": "Questa richiesta: ≈ {cost} · {in} → {out} token",
   "syn.aiError": "La ricerca IA non è disponibile al momento.",
 });
 

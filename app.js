@@ -2154,6 +2154,30 @@ async function kiSynergienDeck(deck, cards, box, opts = {}) {
   });
 }
 
+/* Anthropic-Listenpreise in USD je 1 Mio. Tokens [Input, Output]. Nur zur
+   groben Kostenanzeige — Prompt-Caching o. Ä. nutzt die Function nicht. */
+const KI_PREISE = {
+  "claude-sonnet-4-6": [3, 15], "claude-sonnet-5": [3, 15],
+  "claude-haiku-4-5": [1, 5], "claude-opus-4-8": [5, 25],
+};
+
+/* Kosten einer KI-Abfrage aus dem usage-Feld der Function schätzen. */
+function kiKosten(u) {
+  if (!u || u.input == null || u.output == null) return null;
+  const [pin, pout] = KI_PREISE[u.model] || [3, 15];   // Fallback: Sonnet-Preise
+  return { usd: u.input / 1e6 * pin + u.output / 1e6 * pout, input: u.input, output: u.output };
+}
+
+/* Kostenzeile fürs Ergebnis: „Diese Abfrage: ≈ $0,0176 · 2.148 → 782 Tokens". */
+function kiKostenHtml(usage) {
+  const k = kiKosten(usage);
+  if (!k) return "";
+  const usd = "$" + k.usd.toFixed(4).replace(".", ",");
+  const zahl = n => (n || 0).toLocaleString(LANG);
+  return `<div class="hint" style="margin:2px 0 8px">${
+    esc(t("syn.aiCost", { cost: usd, in: zahl(k.input), out: zahl(k.output) }))}</div>`;
+}
+
 /* Gemeinsamer Kern: Edge Function „card-synergy" rufen, Namen gegen Scryfall
    prüfen (ein Sammel-Request; erfundene fallen raus) und die geprüften Karten
    als Kacheln zeigen. cfg: { body, selfName?, colors?, maxPrice? }. */
@@ -2210,9 +2234,10 @@ async function kiSynergieLauf(box, cfg) {
     gesehen.add(c.oracle_id);
     treffer.push(vorschlagCardHtml(c, s.reason));
   }
+  const kosten = kiKostenHtml(data?.usage);   // die Abfrage kostete unabhängig von der Trefferzahl
   box.innerHTML = treffer.length
-    ? `<div class="meta">${esc(t("syn.aiNote"))}</div><div class="syn-grid">${treffer.join("")}</div>`
-    : `<div class="empty">${esc(t("syn.none"))}</div>`;
+    ? `<div class="meta">${esc(t("syn.aiNote"))}</div>${kosten}<div class="syn-grid">${treffer.join("")}</div>`
+    : `${kosten}<div class="empty">${esc(t("syn.none"))}</div>`;
 }
 
 /* Haken eines ganzen Decks: über alle Karten sammeln, dann nach Häufigkeit MAL
