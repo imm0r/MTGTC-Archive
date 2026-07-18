@@ -160,6 +160,10 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .syn-why{font-size:10px;padding:1px 6px;border-radius:999px;background:var(--panel);
   border:1px solid var(--line);color:var(--dim)}
 .syn-price{font-size:12px;color:var(--acc);font-weight:600;margin-top:auto}
+/* Sich drehendes Zahnrad, solange die Synergie-Suche läuft. */
+@keyframes syn-spin{to{transform:rotate(360deg)}}
+.syn-spin{display:inline-block;animation:syn-spin 1.1s linear infinite}
+@media (prefers-reduced-motion:reduce){.syn-spin{animation-duration:2.6s}}
 .pill.foil{border-color:var(--acc);color:var(--acc)}
 .pill.fmt{border-color:var(--acc);color:var(--acc)}
 .pill.ok{border-color:var(--ok);color:var(--ok)}

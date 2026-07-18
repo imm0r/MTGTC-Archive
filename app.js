@@ -1869,11 +1869,12 @@ function showCardDetail(id) {
   // Synergien: passende NEUE Karten zu dieser Karte (besessene ausgeschlossen).
   const yb = $("#dt-syn");
   if (yb) yb.onclick = () => {
-    yb.disabled = true;
+    const lbl = t("syn.find");
+    synBtnBusy(yb, lbl, true);
     const weg = ownedExclude();
     synergieAnzeigen($("#syn-box"), synergyHooks(c),
       { excludeIds: weg.ids, excludeNames: weg.names, limit: 18 })
-      .finally(() => { yb.disabled = false; });
+      .finally(() => synBtnBusy(yb, lbl, false));
   };
 }
 
@@ -2013,12 +2014,20 @@ function synergyCardHtml(e) {
   </a>`;
 }
 
+/* Synergie-Knopf in den Ladezustand versetzen: Lupe → drehendes Zahnrad,
+   Knopf gesperrt. Zurück auf die Lupe, wenn die Suche fertig ist. */
+function synBtnBusy(btn, label, busy) {
+  if (!btn) return;
+  btn.disabled = busy;
+  btn.innerHTML = (busy ? `<span class="syn-spin">&#9881;</span>` : "&#128269;") + " " + esc(label);
+}
+
 /* Vorschläge in einen Container zeichnen (Lade-/Leer-Zustand inklusive). */
 async function synergieAnzeigen(box, hooks, opts) {
   if (!box) return;
   const lauf = ++synergyLauf;
   if (!hooks.length) { box.innerHTML = `<div class="empty">${esc(t("syn.noHooks"))}</div>`; return; }
-  box.innerHTML = `<div class="meta">${esc(t("syn.loading"))}</div>`;
+  box.innerHTML = `<div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("syn.loading"))}</div>`;
   const res = await synergieSuchen(hooks, opts);
   if (lauf !== synergyLauf) return;                  // ein neuerer Lauf hat übernommen
   box.innerHTML = res.length
@@ -2437,12 +2446,15 @@ function renderDecks() {
     const cards = (d.entries || []).map(e => CARDS.find(x => x.id === e.cardId)).filter(Boolean);
     const box = $(`.deck-syn[data-synbox="${id}"]`);
     if (!cards.length || !box) return;
-    b.disabled = true;
+    const lbl = t("syn.deckBtn");
+    synBtnBusy(b, lbl, true);
     const weg = ownedExclude();
+    // Erst wenn die Suche fertig ist, nach unten zu den Ergebnissen springen —
+    // vorher dreht sich das Zahnrad am Knopf, wo der Blick gerade ist.
     synergieAnzeigen(box, deckHooks(cards.map(c => ({ c }))),
       { excludeIds: weg.ids, excludeNames: weg.names, colors: farbIdentitaet(cards), maxHooks: 5, limit: 20 })
-      .finally(() => { b.disabled = false; });
-    box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
+      .finally(() => synBtnBusy(b, lbl, false));
   });
 
   // Sortier-Handler je Deck. renderDecks() baut alles neu, aber der
