@@ -936,13 +936,13 @@ function cardRow(c, o = {}) {
   return `
     <tr data-id="${c.id}"${imDeck ? ` data-deck="${esc(o.deckId)}"` : ""}>
       <td class="hide-s">${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy" data-view
-             style="cursor:pointer" title="Großansicht &amp; Preisverlauf">` : ""}</td>
-      <td><div data-view style="cursor:pointer" title="Großansicht &amp; Preisverlauf">${esc(c.disp)}</div>
+             style="cursor:pointer" title="${esc(t("row.viewTitle"))}">` : ""}</td>
+      <td><div data-view style="cursor:pointer" title="${esc(t("row.viewTitle"))}">${esc(c.disp)}</div>
           <div style="font-size:12px;color:var(--dim)">
             ${c.printed_name && c.printed_name !== c.name ? esc(c.name) + " &middot; " : ""}
             ${c.foil ? '<span class="pill foil">Foil</span> ' : ""}#${esc(c.cn)}</div></td>
-      <td class="num mana-spalte" title="${c.mana_cost == null ? "Manakosten nicht erfasst"
-        : `Manawert ${c.cmc ?? "?"}`}">${manaHtml(c.mana_cost)}</td>
+      <td class="num mana-spalte" title="${c.mana_cost == null ? esc(t("row.manaNone"))
+        : esc(t("row.manaValue", { n: c.cmc ?? "?" }))}">${manaHtml(c.mana_cost)}</td>
       <td class="hide-s">${esc(c.set_name || c.set || "")}
           ${c.rarity ? `<div style="margin-top:3px">${rarityPill(c.rarity)}</div>` : ""}</td>
       <td class="hide-s">${langHtml(c.lang)}</td>
@@ -956,14 +956,14 @@ function cardRow(c, o = {}) {
       <td class="num"><input type="number" min="0" value="${qty}" data-qty
              style="width:54px;padding:4px 6px;text-align:right"></td>
       ${imDeck ? `<td class="num">${fehlt
-        ? `<span class="pill err">${fehlt} fehlen</span>`
-        : '<span class="pill ok">vorhanden</span>'}</td>`
+        ? `<span class="pill err">${esc(t("row.missing", { n: fehlt }))}</span>`
+        : `<span class="pill ok">${esc(t("row.present"))}</span>`}</td>`
       : `<td class="num">${eur(c.price)} ${spark(c.hist)}</td>`}
       <td class="num" style="white-space:nowrap">${cmLink(c.cm_id)
         ? `<a class="cm" href="${esc(cmLink(c.cm_id))}" target="_blank" rel="noopener noreferrer"
-             title="Angebote auf Cardmarket ansehen">CM</a>` : ""}${sfLink(c)
+             title="${esc(t("row.cmTitle"))}">CM</a>` : ""}${sfLink(c)
         ? ` <a class="cm" href="${esc(sfLink(c))}" target="_blank" rel="noopener noreferrer"
-             title="Kartentext und alle Auflagen auf Scryfall">SF</a>` : ""}</td>
+             title="${esc(t("row.sfTitle"))}">SF</a>` : ""}</td>
       <td class="num" style="white-space:nowrap">
         ${imDeck
           // Bearbeiten und Preis stehen im Deck in der Detailansicht — hier
@@ -972,13 +972,13 @@ function cardRow(c, o = {}) {
           // erzwingt ein Trigger in der Datenbank.
           ? (istCommanderFaehig(c)
             ? `<button class="btn ghost sm${o.istHaupt ? " star-on" : ""}" data-main
-              title="${o.istHaupt ? "Ist die Hauptkarte — nochmal klicken zum Entfernen"
-                                  : "Als Hauptkarte des Decks setzen"}">${o.istHaupt ? "&#9733;" : "&#9734;"}</button>`
+              title="${o.istHaupt ? esc(t("row.mainIsTitle"))
+                                  : esc(t("row.mainSetTitle"))}">${o.istHaupt ? "&#9733;" : "&#9734;"}</button>`
             : "")
-          : `<button class="btn ghost sm" data-edit title="Sprache, Zustand oder Ausführung ändern">&#9998;</button>
-        <button class="btn ghost sm" data-price title="Preis dieser Karte neu von Scryfall holen">&#8635;</button>`}
+          : `<button class="btn ghost sm" data-edit title="${esc(t("row.editTitle"))}">&#9998;</button>
+        <button class="btn ghost sm" data-price title="${esc(t("row.priceTitle"))}">&#8635;</button>`}
         <button class="btn ghost sm" data-del title="${imDeck
-          ? "Aus dem Deck entfernen (Karte bleibt in der Sammlung)" : "Zeile löschen"}">&times;</button>
+          ? esc(t("row.removeFromDeck")) : esc(t("row.removeRow"))}">&times;</button>
       </td>
     </tr>`;
 }
@@ -1167,15 +1167,15 @@ function renderDash(rows, ziel = $("#dash"), gefiltert = false) {
   const teuerste = [...rows].filter(c => c.price != null).sort((a, b) => b.price - a.price);
 
   const kennzahlen = [
-    ["Karten gesamt", n],
-    ["Verschiedene", new Set(rows.map(c => c.oracle_id)).size],
-    ["Marktwert", eur(gesamtwert)],
-    ["Ø je Karte", eur(n ? gesamtwert / n : 0)],
-    ["Foils", stueck(rows.filter(c => c.foil))],
-    ["Sets", new Set(rows.map(c => c.set)).size],
+    [t("dash.total"), n],
+    [t("dash.distinct"), new Set(rows.map(c => c.oracle_id)).size],
+    [t("dash.marketValue"), eur(gesamtwert)],
+    [t("dash.avgPerCard"), eur(n ? gesamtwert / n : 0)],
+    [t("dash.foils"), stueck(rows.filter(c => c.foil))],
+    [t("dash.sets"), new Set(rows.map(c => c.set)).size],
     // toFixed gibt "3.64" — im Deutschen gehört da ein Komma hin.
-    ["Ø Manawert", mwAnzahl ? (mwSumme / mwAnzahl).toFixed(2).replace(".", ",") : "–"],
-    ["Jahrgänge", jahre.length ? `${jahre[0]}–${jahre[jahre.length - 1]}` : "–"],
+    [t("dash.avgMv"), mwAnzahl ? (mwSumme / mwAnzahl).toFixed(2).replace(".", ",") : "–"],
+    [t("dash.years"), jahre.length ? `${jahre[0]}–${jahre[jahre.length - 1]}` : "–"],
   ];
 
   // ---- Manakurve: ohne Länder, denn die kosten nichts und würden die
@@ -1245,20 +1245,17 @@ function renderDash(rows, ziel = $("#dash"), gefiltert = false) {
         `<div class="stat"><div class="v">${esc(String(v))}</div><div class="k">${esc(k)}</div></div>`).join("")}
     </div>
     ${gefiltert ? `<p class="hint" style="margin:-6px 0 12px">
-      &#9432; Alle Auswertungen zeigen nur die ${n} gefilterten Karten — Filter leeren für die ganze Sammlung.</p>` : ""}
+      &#9432; ${esc(t("dash.filteredHint", { n }))}</p>` : ""}
     <div class="dash-raster">
-      ${karte("Manakurve", saeulenHtml(kurve,
-        "Ohne Länder — sie kosten nichts und würden die Null aufblähen. X zählt als 0."))}
-      ${karte("Farben", tortenHtml(farbTorte,
-        "Nach Farbidentität — jede Karte zählt einmal, ab zwei Farben als „Mehrfarbig“."))}
-      ${karte("Seltenheit", tortenHtml(seltenheit))}
-      ${karte("Kartentypen", tortenHtml(typen,
-        "Anteil an allen Typnennungen: eine Karte mit mehreren Typen (z.&nbsp;B. Artefaktkreatur) zählt in jedem Segment."))}
-      ${karte("Wertvollste Karten", balkenHtml(topWert))}
-      ${karte("Erscheinungsjahre", saeulenHtml(proJahr, "", true))}
-      ${karte("Größte Sets", balkenHtml(topSets))}
-      ${karte("Sprachen", balkenHtml(sprachen))}
-      ${karte("Zustand", balkenHtml(zustand))}
+      ${karte(t("dash.manaCurve"), saeulenHtml(kurve, t("dash.manaCurveHint")))}
+      ${karte(t("dash.colors"), tortenHtml(farbTorte, t("dash.colorsHint")))}
+      ${karte(t("dash.rarity"), tortenHtml(seltenheit))}
+      ${karte(t("dash.cardTypes"), tortenHtml(typen, t("dash.typesHint")))}
+      ${karte(t("dash.topValue"), balkenHtml(topWert))}
+      ${karte(t("dash.yearsChart"), saeulenHtml(proJahr, "", true))}
+      ${karte(t("dash.topSets"), balkenHtml(topSets))}
+      ${karte(t("dash.languages"), balkenHtml(sprachen))}
+      ${karte(t("dash.conditionChart"), balkenHtml(zustand))}
     </div>`;
 
   // Muss nach dem Einhängen passieren: vorher hat der Kasten keine Breite
@@ -1289,12 +1286,12 @@ function renderCollection() {
 
   const sets = [...new Set(besessen.map(c => c.set))].filter(Boolean).sort();
   const cur = $("#f-set").value;
-  $("#f-set").innerHTML = '<option value="">Alle</option>' +
+  $("#f-set").innerHTML = `<option value="">${esc(t("coll.all"))}</option>` +
     sets.map(s => `<option value="${esc(s)}"${s === cur ? " selected" : ""}>${esc(s)}</option>`).join("");
 
   $("#coll-empty").textContent = besessen.length
-    ? "Keine Karte passt zu diesem Filter."
-    : "Noch keine Karten. Fotografiere deine erste Karte unter „Card Management“.";
+    ? t("coll.emptyFilter")
+    : t("coll.empty");
   $("#coll-empty").style.display = rows.length ? "none" : "block";
   $("#tbl").style.display = rows.length ? "" : "none";
 
@@ -1339,10 +1336,10 @@ function renderPager(gesamt, seiten) {
     prev = n;
   }
   el.innerHTML = `
-    <button class="btn ghost sm" data-page="${collPage - 1}"${collPage === 0 ? " disabled" : ""}>&lsaquo; Zurück</button>
+    <button class="btn ghost sm" data-page="${collPage - 1}"${collPage === 0 ? " disabled" : ""}>&lsaquo; ${esc(t("pager.back"))}</button>
     ${knoepfe}
-    <button class="btn ghost sm" data-page="${collPage + 1}"${collPage >= seiten - 1 ? " disabled" : ""}>Weiter &rsaquo;</button>
-    <span class="hint" style="margin-left:auto">${von}&ndash;${bis} von ${gesamt}</span>`;
+    <button class="btn ghost sm" data-page="${collPage + 1}"${collPage >= seiten - 1 ? " disabled" : ""}>${esc(t("pager.next"))} &rsaquo;</button>
+    <span class="hint" style="margin-left:auto">${esc(t("pager.range", { von, bis, gesamt }))}</span>`;
   el.querySelectorAll("[data-page]").forEach(b => b.onclick = () => {
     collPage = Math.max(0, Math.min(seiten - 1, parseInt(b.dataset.page)));
     renderCollection();
@@ -2119,8 +2116,8 @@ function deckFilterUi() {
   if (deckFilter.format && !fmt.includes(deckFilter.format)) deckFilter.format = "";
   if (deckFilter.archetype && !arc.includes(deckFilter.archetype)) deckFilter.archetype = "";
   const ff = $("#fd-format"), fa = $("#fd-arch");
-  ff.innerHTML = deckOptions(fmt, deckFilter.format, "Alle Formate");
-  fa.innerHTML = deckOptions(arc, deckFilter.archetype, "Alle Archetypen");
+  ff.innerHTML = deckOptions(fmt, deckFilter.format, t("decks.allFormats"));
+  fa.innerHTML = deckOptions(arc, deckFilter.archetype, t("decks.allArch"));
   ff.onchange = () => { deckFilter.format = ff.value; renderDecks(); };
   fa.onchange = () => { deckFilter.archetype = fa.value; renderDecks(); };
   karte.style.display = "";
@@ -2128,7 +2125,7 @@ function deckFilterUi() {
 
 function renderDecks() {
   if (!DECKS.length) {
-    $("#deck-list").innerHTML = '<div class="card"><div class="empty">Noch keine Decks angelegt.</div></div>';
+    $("#deck-list").innerHTML = `<div class="card"><div class="empty">${esc(t("deck.none"))}</div></div>`;
     deckFilterUi();
     return;
   }
@@ -2166,43 +2163,43 @@ function renderDecks() {
     const haupt = d.main_card_id ? CARDS.find(c => c.id === d.main_card_id) : null;
 
     return `<div class="card">
-      <div class="deck-kopf" data-toggle="${d.id}" title="${offen ? "Zuklappen" : "Aufklappen"}">
+      <div class="deck-kopf" data-toggle="${d.id}" title="${offen ? t("common.collapse") : t("common.expand")}">
         <span class="deck-pfeil">${offen ? "&#9660;" : "&#9654;"}</span>
         ${haupt?.img ? `<img class="deck-haupt" src="${esc(haupt.img)}" alt=""
-             title="Hauptkarte: ${esc(haupt.disp)}">` : ""}
+             title="${esc(haupt.disp)}">` : ""}
         <div style="flex:1;min-width:0">
           <h3 style="margin:0">${esc(d.name)}</h3>
           ${d.format || d.archetype ? `<div class="deck-tags">${
             d.format ? `<span class="pill fmt">${esc(d.format)}</span>` : ""}${
             d.archetype ? `<span class="pill">${esc(d.archetype)}</span>` : ""}</div>` : ""}
-          <div class="hint" style="margin:2px 0 0">${n} Karten &middot; ${eur(v)}${
-            d.shared ? ` &middot; <span style="color:var(--ok)">geteilt</span>` : ""}${
-            fehlt ? ` &middot; <span style="color:var(--err)">${fehlt} unvollständig</span>` : ""}</div>
+          <div class="hint" style="margin:2px 0 0">${n} ${esc(t("common.cards"))} &middot; ${eur(v)}${
+            d.shared ? ` &middot; <span style="color:var(--ok)">${esc(t("deck.shared"))}</span>` : ""}${
+            fehlt ? ` &middot; <span style="color:var(--err)">${esc(t("deck.incomplete", { n: fehlt }))}</span>` : ""}</div>
         </div>
         <button class="btn ghost sm" data-share="${d.id}" style="flex:none"
-          title="${d.shared ? "Für Freunde freigegeben — klicken zum Zurücknehmen" : "Für Freunde freigeben"}">${d.shared ? "&#128101; Geteilt" : "Teilen"}</button>
+          title="${d.shared ? esc(t("deck.unshareTitle")) : esc(t("deck.shareTitle"))}">${d.shared ? "&#128101; " + esc(t("deck.sharedBtn")) : esc(t("deck.share"))}</button>
         <button class="btn ghost sm" data-ded="${d.id}" style="flex:none"
-          title="Deck bearbeiten">&#9998;</button>
-        <button class="btn danger sm" data-dx="${d.id}" style="flex:none">Deck löschen</button>
+          title="${esc(t("deck.editTitle"))}">&#9998;</button>
+        <button class="btn danger sm" data-dx="${d.id}" style="flex:none">${esc(t("deck.delete"))}</button>
       </div>
       <div class="deck-inhalt" style="display:${offen ? "block" : "none"}">
         <div class="row" style="margin-top:10px">
-          <div class="sugg"><input type="text" data-dadd="${d.id}" placeholder="Karte aus der Sammlung hinzufügen…"></div>
+          <div class="sugg"><input type="text" data-dadd="${d.id}" placeholder="${esc(t("deck.addCardPh"))}"></div>
           <div style="flex:none;min-width:80px"><input type="number" min="1" value="1" data-dqty="${d.id}"></div>
           ${rows ? `<div style="flex:none"><button class="btn ghost" data-dashtoggle="${d.id}"
-            >&#128202; Statistik ${dashOffen ? "ausblenden" : "anzeigen"}</button></div>` : ""}
+            >&#128202; ${esc(dashOffen ? t("deck.statsHide") : t("deck.statsShow"))}</button></div>` : ""}
         </div>
         <div class="deck-dash" data-dash="${d.id}" style="margin-top:12px"></div>
         ${rows ? `<div class="xscroll" style="overflow-x:auto"><table class="deck-tbl" style="margin-top:10px">
                     <thead>${cardHead(true)}</thead><tbody>${rows}</tbody></table></div>`
-               : '<div class="empty">Noch keine Karten in diesem Deck.</div>'}
+               : `<div class="empty">${esc(t("deck.emptyDeck"))}</div>`}
       </div>
     </div>`;
   }).join("");
   // Bei aktivem Filter kann die Auswahl leer sein — dann ein Hinweis statt
   // einer blanken Fläche.
   $("#deck-list").innerHTML = html ||
-    '<div class="card"><div class="empty">Kein Deck passt zum Filter.</div></div>';
+    `<div class="card"><div class="empty">${esc(t("deck.noMatch"))}</div></div>`;
 
   $$("#deck-list .deck-kopf").forEach(k => k.onclick = ev => {
     // Im Kopf sitzen Knöpfe (Umbenennen, Löschen) — ihr Klick darf nicht
@@ -2750,7 +2747,7 @@ function renderWho() {
   const el = $("#who");
   if (!el) return;
   el.innerHTML = `${avatarHtml(26)}<span>${esc(profilName())}</span><span class="who-caret">&#9662;</span>`;
-  el.title = "Menü";
+  el.title = t("who.menu");
   el.onclick = ev => { ev.stopPropagation(); $("#who-menu")?.classList.toggle("open"); };
 }
 
@@ -2765,7 +2762,7 @@ function profilHighlightsHtml() {
   // added ist ein ISO-Zeitstempel — String-Vergleich reicht für "das späteste".
   const neueste = mitDatum.length ? mitDatum.reduce((a, b) => (b.added > a.added ? b : a)) : null;
   const kachel = (label, c, sub) => c ? `
-    <div class="profil-hl-item" data-hl="${c.id}" title="Großansicht &amp; Preisverlauf">
+    <div class="profil-hl-item" data-hl="${c.id}" title="${esc(t("row.viewTitle"))}">
       ${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy">`
               : '<div class="profil-hl-noimg">&#9670;</div>'}
       <div class="profil-hl-txt">
@@ -2775,8 +2772,8 @@ function profilHighlightsHtml() {
       </div>
     </div>` : "";
   const tiles = [
-    kachel("Wertvollste Karte", wertvollste, wertvollste ? eur(wertvollste.price) : ""),
-    kachel("Neueste Errungenschaft", neueste, neueste ? datShort(neueste.added) : ""),
+    kachel(t("profile.hlValuable"), wertvollste, wertvollste ? eur(wertvollste.price) : ""),
+    kachel(t("profile.hlNewest"), neueste, neueste ? datShort(neueste.added) : ""),
   ].filter(Boolean).join("");
   return tiles ? `<div class="profil-hl">${tiles}</div>` : "";
 }
@@ -2791,39 +2788,39 @@ function renderProfile() {
       <div class="profil-avatar">
         ${avatarHtml(96)}
         <div class="row" style="justify-content:center">
-          <div style="flex:none"><button class="btn ghost sm" id="pf-avatar-btn">Bild ändern</button></div>
-          ${PROFILE?.avatar_url ? '<div style="flex:none"><button class="btn ghost sm" id="pf-avatar-del">Entfernen</button></div>' : ""}
+          <div style="flex:none"><button class="btn ghost sm" id="pf-avatar-btn">${esc(t("profile.avatarChange"))}</button></div>
+          ${PROFILE?.avatar_url ? `<div style="flex:none"><button class="btn ghost sm" id="pf-avatar-del">${esc(t("profile.avatarRemove"))}</button></div>` : ""}
         </div>
         <input type="file" id="pf-avatar-file" accept="image/*" hidden>
       </div>
       <div class="profil-ident">
-        <label>Anzeigename</label>
+        <label>${esc(t("profile.displayName"))}</label>
         <div class="row" style="margin-bottom:8px">
           <div style="flex:1"><input type="text" id="pf-name" maxlength="40"
-            value="${esc(PROFILE?.display_name || "")}" placeholder="z. B. Benjamin"></div>
-          <div style="flex:none"><button class="btn" id="pf-name-save">Speichern</button></div>
+            value="${esc(PROFILE?.display_name || "")}" placeholder="${esc(t("profile.namePh"))}"></div>
+          <div style="flex:none"><button class="btn" id="pf-name-save">${esc(t("common.save"))}</button></div>
         </div>
-        <p class="hint" style="margin:0">Angemeldet als <b>${esc(USER?.email || "")}</b> &middot; Mitglied seit ${esc(seit)}</p>
+        <p class="hint" style="margin:0">${esc(t("profile.loggedInAs"))} <b>${esc(USER?.email || "")}</b> &middot; ${esc(t("profile.memberSince"))} ${esc(seit)}</p>
       </div>
     </div>
 
     <div class="card">
-      <h3 style="margin-top:0">Deine Sammlung</h3>
-      <p class="hint" style="margin-top:-4px">${decks} ${decks === 1 ? "Deck" : "Decks"} &middot; Statistik über den gesamten Bestand.</p>
+      <h3 style="margin-top:0">${esc(t("profile.yourCollection"))}</h3>
+      <p class="hint" style="margin-top:-4px">${decks} ${esc(decks === 1 ? t("common.deckOne") : t("common.deckMany"))} &middot; ${esc(t("profile.statAll"))}</p>
       ${profilHighlightsHtml()}
       <div id="profile-dash" style="margin-top:12px"></div>
     </div>
 
     <div class="card">
-      <h3 style="margin-top:0">Konto</h3>
-      <label>Neues Passwort</label>
+      <h3 style="margin-top:0">${esc(t("profile.account"))}</h3>
+      <label>${esc(t("profile.newPassword"))}</label>
       <div class="row" style="margin-bottom:6px">
-        <div><input type="password" id="pf-pw1" autocomplete="new-password" placeholder="mind. 8 Zeichen"></div>
-        <div><input type="password" id="pf-pw2" autocomplete="new-password" placeholder="wiederholen"></div>
-        <div style="flex:none"><button class="btn ghost" id="pf-pw-save">Passwort ändern</button></div>
+        <div><input type="password" id="pf-pw1" autocomplete="new-password" placeholder="${esc(t("profile.pwMin"))}"></div>
+        <div><input type="password" id="pf-pw2" autocomplete="new-password" placeholder="${esc(t("profile.pwRepeat"))}"></div>
+        <div style="flex:none"><button class="btn ghost" id="pf-pw-save">${esc(t("profile.pwSave"))}</button></div>
       </div>
       <div class="msg" id="pf-pw-msg"></div>
-      <div style="margin-top:14px"><button class="btn danger" id="pf-logout">Abmelden</button></div>
+      <div style="margin-top:14px"><button class="btn danger" id="pf-logout">${esc(t("nav.logout"))}</button></div>
     </div>`;
 
   // Statistik über den GESAMTEN Bestand — dieselbe Funktion wie das
@@ -2997,44 +2994,44 @@ function renderFriends() {
   const zeile = (f, actions) => `
     <div class="freund-zeile">
       ${avatarHtml(34, f.other)}
-      <div style="flex:1;min-width:0"><b>${esc(f.other?.display_name || "Unbekannt")}</b></div>
+      <div style="flex:1;min-width:0"><b>${esc(f.other?.display_name || t("friends.unknown"))}</b></div>
       ${actions}
     </div>`;
   el.innerHTML = `
     <div class="card">
-      <h3 style="margin-top:0">Dein Freundescode</h3>
+      <h3 style="margin-top:0">${esc(t("friends.yourCode"))}</h3>
       <div class="row" style="align-items:center">
         <div style="flex:none"><span class="freund-code" id="my-code">${esc(code)}</span></div>
-        <div style="flex:none"><button class="btn ghost sm" id="code-copy">Kopieren</button></div>
+        <div style="flex:none"><button class="btn ghost sm" id="code-copy">${esc(t("common.copy"))}</button></div>
       </div>
-      <p class="hint" style="margin-bottom:10px">Gib diesen Code an Freunde weiter — damit können sie dir eine Anfrage schicken.</p>
-      <label>Freund hinzufügen</label>
+      <p class="hint" style="margin-bottom:10px">${esc(t("friends.codeHint"))}</p>
+      <label>${esc(t("friends.add"))}</label>
       <div class="row">
-        <div style="flex:1"><input type="text" id="add-code" maxlength="6" placeholder="Code des Freundes, z. B. AB2CD9" style="text-transform:uppercase"></div>
-        <div style="flex:none"><button class="btn" id="add-go">Anfrage senden</button></div>
+        <div style="flex:1"><input type="text" id="add-code" maxlength="6" placeholder="${esc(t("friends.addPh"))}" style="text-transform:uppercase"></div>
+        <div style="flex:none"><button class="btn" id="add-go">${esc(t("friends.sendReq"))}</button></div>
       </div>
     </div>
 
     ${FRIENDS.incoming.length ? `<div class="card">
-      <h3 style="margin-top:0">Anfragen an dich</h3>
+      <h3 style="margin-top:0">${esc(t("friends.incoming"))}</h3>
       ${FRIENDS.incoming.map(f => zeile(f, `
-        <div style="flex:none"><button class="btn sm" data-accept="${esc(f.requester)}">Annehmen</button></div>
-        <div style="flex:none"><button class="btn ghost sm" data-decline="${esc(f.requester)}">Ablehnen</button></div>`)).join("")}
+        <div style="flex:none"><button class="btn sm" data-accept="${esc(f.requester)}">${esc(t("friends.accept"))}</button></div>
+        <div style="flex:none"><button class="btn ghost sm" data-decline="${esc(f.requester)}">${esc(t("friends.decline"))}</button></div>`)).join("")}
     </div>` : ""}
 
     ${FRIENDS.outgoing.length ? `<div class="card">
-      <h3 style="margin-top:0">Gesendete Anfragen</h3>
+      <h3 style="margin-top:0">${esc(t("friends.outgoing"))}</h3>
       ${FRIENDS.outgoing.map(f => zeile(f, `
-        <div style="flex:none"><span class="pill">wartet</span></div>
-        <div style="flex:none"><button class="btn ghost sm" data-cancel="${esc(f.other.id)}">Zurückziehen</button></div>`)).join("")}
+        <div style="flex:none"><span class="pill">${esc(t("friends.waiting"))}</span></div>
+        <div style="flex:none"><button class="btn ghost sm" data-cancel="${esc(f.other.id)}">${esc(t("friends.withdraw"))}</button></div>`)).join("")}
     </div>` : ""}
 
     <div class="card">
-      <h3 style="margin-top:0">Freunde${FRIENDS.accepted.length ? ` (${FRIENDS.accepted.length})` : ""}</h3>
+      <h3 style="margin-top:0">${esc(t("friends.title"))}${FRIENDS.accepted.length ? ` (${FRIENDS.accepted.length})` : ""}</h3>
       ${FRIENDS.accepted.length ? FRIENDS.accepted.map(f => zeile(f, `
-        <div style="flex:none"><button class="btn ghost sm" data-viewdecks="${esc(f.other.id)}">Geteilte Decks</button></div>
-        <div style="flex:none"><button class="btn ghost sm" data-unfriend="${esc(f.other.id)}">Entfernen</button></div>`)).join("")
-        : '<div class="empty">Noch keine Freunde. Teile deinen Code oder gib den eines Freundes ein.</div>'}
+        <div style="flex:none"><button class="btn ghost sm" data-viewdecks="${esc(f.other.id)}">${esc(t("friends.sharedDecks"))}</button></div>
+        <div style="flex:none"><button class="btn ghost sm" data-unfriend="${esc(f.other.id)}">${esc(t("friends.remove"))}</button></div>`)).join("")
+        : `<div class="empty">${esc(t("friends.none"))}</div>`}
     </div>
 
     <div id="friend-decks"></div>`;
@@ -3094,16 +3091,16 @@ async function freundEntfernen(otherId) {
 async function zeigeFreundDecks(friendId) {
   const ziel = $("#friend-decks");
   if (!ziel) return;
-  const name = FRIENDS.accepted.find(f => f.other.id === friendId)?.other?.display_name || "Freund";
-  ziel.innerHTML = '<div class="card"><div class="meta">Lade geteilte Decks…</div></div>';
+  const name = FRIENDS.accepted.find(f => f.other.id === friendId)?.other?.display_name || t("friends.friendFallback");
+  ziel.innerHTML = `<div class="card"><div class="meta">${esc(t("friends.loadingShared"))}</div></div>`;
   ziel.scrollIntoView({ behavior: "smooth", block: "nearest" });
   try {
     const { data: decks, error } = await sb.from("decks").select("*")
       .eq("user_id", friendId).eq("shared", true).order("created");
     if (error) throw error;
     if (!decks || !decks.length) {
-      ziel.innerHTML = `<div class="card"><h3 style="margin-top:0">Geteilte Decks von ${esc(name)}</h3>
-        <div class="empty">Dieser Freund teilt gerade keine Decks.</div></div>`;
+      ziel.innerHTML = `<div class="card"><h3 style="margin-top:0">${esc(t("deck.sharedFrom", { name }))}</h3>
+        <div class="empty">${esc(t("deck.noShared"))}</div></div>`;
       return;
     }
     const deckIds = decks.map(d => d.id);
@@ -3114,7 +3111,7 @@ async function zeigeFreundDecks(friendId) {
       const { data: cards } = await sb.from("cards").select("*").in("id", cardIds);
       (cards || []).forEach(c => cardsById[c.id] = { ...c, set: c.set_code, disp: c.printed_name || c.name });
     }
-    ziel.innerHTML = `<h3 style="margin:14px 2px 4px">Geteilte Decks von ${esc(name)}</h3>` +
+    ziel.innerHTML = `<h3 style="margin:14px 2px 4px">${esc(t("deck.sharedFrom", { name }))}</h3>` +
       decks.map(d => friendDeckHtml(d, (entries || []).filter(e => e.deck_id === d.id), cardsById)).join("");
     // Auf-/Zuklappen (der Import-Knopf im Kopf darf nicht mit-toggeln) + Import.
     ziel.querySelectorAll(".deck-kopf[data-ftoggle]").forEach(k => k.onclick = ev => {
@@ -3124,7 +3121,7 @@ async function zeigeFreundDecks(friendId) {
       const auf = freundDeckOffen.has(id);
       k.parentElement.querySelector(".deck-inhalt").style.display = auf ? "block" : "none";
       k.querySelector(".deck-pfeil").innerHTML = auf ? "&#9660;" : "&#9654;";
-      k.title = auf ? "Zuklappen" : "Aufklappen";
+      k.title = auf ? t("common.collapse") : t("common.expand");
     });
     ziel.querySelectorAll("[data-fimport]").forEach(b => b.onclick = () => importFriendDeck(b.dataset.fimport));
   } catch (e) {
@@ -3155,7 +3152,7 @@ function friendDeckHtml(d, entries, cardsById) {
       <td class="num">${eur(c.price)}</td>
     </tr>`).join("");
   return `<div class="card">
-    <div class="deck-kopf" data-ftoggle="${esc(d.id)}" title="${offen ? "Zuklappen" : "Aufklappen"}">
+    <div class="deck-kopf" data-ftoggle="${esc(d.id)}" title="${offen ? t("common.collapse") : t("common.expand")}">
       <span class="deck-pfeil">${offen ? "&#9660;" : "&#9654;"}</span>
       ${haupt?.img ? `<img class="deck-haupt" src="${esc(haupt.img)}" alt="">` : ""}
       <div style="flex:1;min-width:0">
@@ -3163,10 +3160,10 @@ function friendDeckHtml(d, entries, cardsById) {
         ${d.format || d.archetype ? `<div class="deck-tags">${
           d.format ? `<span class="pill fmt">${esc(d.format)}</span>` : ""}${
           d.archetype ? `<span class="pill">${esc(d.archetype)}</span>` : ""}</div>` : ""}
-        <div class="hint" style="margin:2px 0 0">${n} Karten &middot; ${eur(v)}</div>
+        <div class="hint" style="margin:2px 0 0">${n} ${esc(t("common.cards"))} &middot; ${eur(v)}</div>
       </div>
       <button class="btn ghost sm" data-fimport="${esc(d.id)}" style="flex:none"
-        title="Dieses Deck in deine Decks übernehmen">In meine Decks</button>
+        title="${esc(t("deck.importTitle"))}">${esc(t("deck.importBtn"))}</button>
     </div>
     <div class="deck-inhalt" style="display:${offen ? "block" : "none"}">
       <div class="xscroll" style="overflow-x:auto"><table class="deck-tbl" style="margin-top:10px">
