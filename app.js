@@ -448,6 +448,50 @@ function langName(code) {
   return tr === key ? (LANG_NAMES[c] || c.toUpperCase()) : tr;
 }
 
+/* ---------------------------------------------- Kartenzustand -------- */
+/* Cardmarket-Skala, sieben Stufen von best (MT) bis schlecht (PO), jede mit
+   eigener Farbe wie das Badge-System auf cardmarket.com. Angezeigt wird ein
+   farbiges Kürzel-Badge, der volle Name steht im Tooltip. Der Zustand ist
+   Kartendatum — die Codes sind Fachtaxonomie und bleiben unübersetzt. */
+const CONDITIONS = [
+  { code: "MT", name: "Mint",         color: "#16b1c2" },
+  { code: "NM", name: "Near Mint",    color: "#46a750" },
+  { code: "EX", name: "Excellent",    color: "#7f8a33" },
+  { code: "GD", name: "Good",         color: "#f0c018", dunkel: true },
+  { code: "LP", name: "Light Played", color: "#f0911e" },
+  { code: "PL", name: "Played",       color: "#e389a0" },
+  { code: "PO", name: "Poor",         color: "#d43f54" },
+];
+const CONDITION_CODES = CONDITIONS.map(c => c.code);
+const CONDITION_BY = Object.fromEntries(CONDITIONS.map(c => [c.code, c]));
+const CONDITION_RANK = Object.fromEntries(CONDITIONS.map((c, i) => [c.code, i]));
+
+/* Farbiges Zustands-Badge. Unbekannte Codes bekommen ein neutrales Grau,
+   damit fremde/alte Werte sichtbar bleiben statt zu verschwinden. */
+function condBadge(code) {
+  const k = (code || "").toUpperCase();
+  if (!k) return "";
+  const c = CONDITION_BY[k];
+  if (!c) return `<span class="cond-badge" style="background:#5b6070" title="${esc(k)}">${esc(k)}</span>`;
+  return `<span class="cond-badge${c.dunkel ? " dunkel" : ""}" style="background:${c.color}" title="${esc(c.name)}">${c.code}</span>`;
+}
+
+/* Fremde Zustandsangaben (TCGplayer-Kürzel MP/HP/DMG, ausgeschriebene Namen)
+   auf die Cardmarket-Skala normalisieren — vor allem für den CSV-Import. */
+function normCond(raw) {
+  const s = (raw || "").trim().toLowerCase();
+  if (!s) return "NM";
+  const up = s.toUpperCase();
+  if (CONDITION_BY[up]) return up;
+  const map = {
+    mp: "GD", hp: "PL", dmg: "PO", dm: "PO", nmmt: "NM", "nm/m": "NM",
+    mint: "MT", "near mint": "NM", excellent: "EX", good: "GD",
+    "light played": "LP", "lightly played": "LP", "moderately played": "GD",
+    "heavily played": "PL", played: "PL", poor: "PO", damaged: "PO",
+  };
+  return map[s] || "NM";
+}
+
 /* Der auf die Karte GEDRUCKTE Sprachcode ist nicht immer Scryfalls Code.
    Belegt an Scryfall selbst: "lang:jp" und "lang:ja" liefern dieselben 30049
    Karten, "lang:cs" und "lang:zhs" dieselben 23988, "lang:ct" und "lang:zht"
@@ -717,7 +761,7 @@ async function addToCollection(card, el, detected) {
     <div class="meta" style="margin-top:6px">
       <span class="pill ok">${before ? esc(t("common.qtyLabel")) + ": " + (row?.qty ?? "+1") : esc(t("detail.added"))}</span>
       ${foil ? '<span class="pill foil">Foil</span>' : ""}
-      <span class="pill">${esc(lang.toUpperCase())}</span><span class="pill">${esc(cond)}</span>
+      <span class="pill">${esc(lang.toUpperCase())}</span>${condBadge(cond)}
       <button class="btn ghost sm" data-fix style="margin-left:6px">${esc(t("scan.wrongCard"))}</button>
     </div>`;
   el.querySelector("[data-fix]").onclick = () => renderManual(el, card.name);
@@ -868,6 +912,8 @@ function sortWert(key, c, e) {
   // Das || "" hält den Typ stabil: mischten sich null und Zeichenkette,
   // liefen die beiden Zweige von cmpWert durcheinander.
   if (key === "released") return c.released || "";
+  // Zustand nach Qualität sortieren (MT best … PO schlecht), nicht alphabetisch.
+  if (key === "condition") return CONDITION_RANK[(c.condition || "").toUpperCase()] ?? 99;
   return c[key];
 }
 
@@ -954,7 +1000,7 @@ function cardRow(c, o = {}) {
       <td class="hide-s">${esc(c.set_name || c.set || "")}
           ${c.rarity ? `<div style="margin-top:3px">${rarityPill(c.rarity)}</div>` : ""}</td>
       <td class="hide-s">${langHtml(c.lang)}</td>
-      ${imDeck ? "" : `<td class="hide-s">${esc(c.condition || "")}</td>
+      ${imDeck ? "" : `<td class="hide-s">${condBadge(c.condition)}</td>
       <td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap">${esc(datShort(c.released))}</td>
       <td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap">${dtShort(c.added)}</td>`}
       <!-- 54 px ist die schmalste Breite, bei der drei Stellen noch ganz
@@ -1228,8 +1274,11 @@ function renderDash(rows, ziel = $("#dash"), gefiltert = false) {
                  wert: stueck(rows.filter(c => c.lang === l)) }))
     .sort((a, b) => b.wert - a.wert);
 
-  const zustand = ["NM", "LP", "MP", "HP", "DMG"]
-    .map(z => ({ label: z, wert: stueck(rows.filter(c => c.condition === z)) })).filter(d => d.wert);
+  const zustand = CONDITION_CODES
+    .map(code => ({ code, wert: stueck(rows.filter(c => (c.condition || "").toUpperCase() === code)) }))
+    .filter(d => d.wert)
+    .map(d => ({ label: CONDITION_BY[d.code].name, icon: condBadge(d.code),
+                 farbe: CONDITION_BY[d.code].color, wert: d.wert }));
 
   const topSets = Object.entries(rows.reduce((m, c) => {
       const k = c.set_name || c.set || "?"; m[k] = (m[k] || 0) + c.qty; return m;
@@ -1770,7 +1819,7 @@ function detailHtml(c, hover) {
           ${rarityPill(c.rarity)}
           ${c.foil ? '<span class="pill foil">Foil</span> ' : ""}
           <span class="pill">${flaggeHtml(c.lang, true)} ${esc(langName(c.lang))}</span>
-          <span class="pill">${esc(c.condition || "")}</span>
+          ${condBadge(c.condition)}
           <span class="pill">${esc(t("common.qtyLabel"))} ${c.qty}</span>
         </div>
         <div>${esc(t("detail.price"))}: <b>${eur(c.price)}</b></div>
@@ -1849,7 +1898,6 @@ async function editCard(id) {
   const c = CARDS.find(x => x.id === id);
   if (!c) return;
   const langs = LANG_NAMES[c.lang] ? Object.keys(LANG_NAMES) : [c.lang, ...Object.keys(LANG_NAMES)];
-  const CONDS = ["NM", "LP", "MP", "HP", "DMG"];
   const ok = await confirmDlg(`
     <b>${esc(c.disp)}</b>
     <p class="hint" style="margin:2px 0 10px">${esc(c.set_name || c.set)} · #${esc(c.cn)} · ${esc(t("common.qtyLabel"))} ${c.qty}</p>
@@ -1861,8 +1909,8 @@ async function editCard(id) {
     <div class="row">
       <div><label>${esc(t("cm.language"))}</label><select id="ed-lang">${langs.map(l =>
         `<option value="${esc(l)}"${l === c.lang ? " selected" : ""}>${esc(langName(l))}</option>`).join("")}</select></div>
-      <div><label>${esc(t("cm.condition"))}</label><select id="ed-cond">${CONDS.map(x =>
-        `<option${x === c.condition ? " selected" : ""}>${x}</option>`).join("")}</select></div>
+      <div><label>${esc(t("cm.condition"))}</label><select id="ed-cond">${CONDITION_CODES.map(x =>
+        `<option value="${x}"${x === c.condition ? " selected" : ""}>${x} · ${esc(CONDITION_BY[x].name)}</option>`).join("")}</select></div>
       <div><label>${esc(t("edit.finish"))}</label><select id="ed-foil">
         <option value="0"${!c.foil ? " selected" : ""}>${esc(t("edit.normal"))}</option>
         <option value="1"${c.foil ? " selected" : ""}>Foil</option></select></div>
@@ -2446,7 +2494,6 @@ async function importCsv(file) {
   const known = new Map();
   for (const c of CARDS) known.set(key(c.scryfall_id, c.foil, c.lang, c.condition), c.id);
 
-  const CONDS = ["NM", "LP", "MP", "HP", "DMG"];
   let imported = 0, skipped = 0;
   const failed = [];
   const deckWants = [];   // { name, cardId, qty }
@@ -2456,7 +2503,7 @@ async function importCsv(file) {
     const g = k => (col[k] >= 0 ? (r[col[k]] || "").trim() : "");
     const csvName = g("name");
     const lang = (g("lang") || "en").toLowerCase();
-    const cond = (() => { const c = g("condition").toUpperCase(); return CONDS.includes(c) ? c : "NM"; })();
+    const cond = normCond(g("condition"));
     // Exakt vergleichen: "nonfoil" enthält "foil" als Teilstring — ein
     // Substring-Test hielte deshalb JEDE Zeile für Foil. Scryfall kennt
     // genau drei Finishes: nonfoil, foil, etched.
