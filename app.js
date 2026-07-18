@@ -2089,10 +2089,10 @@ function synergyCardHtml(e) {
 
 /* Synergie-Knopf in den Ladezustand versetzen: Lupe → drehendes Zahnrad,
    Knopf gesperrt. Zurück auf die Lupe, wenn die Suche fertig ist. */
-function synBtnBusy(btn, label, busy) {
+function synBtnBusy(btn, label, busy, icon) {
   if (!btn) return;
   btn.disabled = busy;
-  btn.innerHTML = (busy ? `<span class="syn-spin">&#9881;</span>` : "&#128269;") + " " + esc(label);
+  btn.innerHTML = (busy ? `<span class="syn-spin">&#9881;</span>` : (icon || "&#128269;")) + " " + esc(label);
 }
 
 /* Vorschläge in einen Container zeichnen (Lade-/Leer-Zustand inklusive). */
@@ -2126,6 +2126,107 @@ function deckHooks(eintraege) {
   return [...zaehler.values()]
     .sort((a, b) => b.n * hookGewicht(b.hook.kind) - a.n * hookGewicht(a.hook.kind))
     .map(x => x.hook);
+}
+
+/* ===================== Deck-Analyse („was fehlt?") ====================
+   Grobe Funktions-Inventur nach dem 7-Kategorien-Gedanken aus „Building for
+   Synergy": zählt (heuristisch am Regeltext) Ramp, Kartenvorteil, Entfernung und
+   Boardwipes, vergleicht mit einer an die Deckgröße skalierten Richtzahl und
+   schlägt für zu dünne Kategorien Karten in der Farbidentität vor (Scryfall-
+   Funktionstags otag:). Die Zählung ist bewusst eine Schätzung. */
+const AN_KATEGORIEN = [
+  // Negativfilter halten die Kategorien sauber getrennt: Scryfalls Tagger führt
+  // z. B. Path to Exile unter otag:ramp (verschafft dem Gegner ein Land), es ist
+  // aber Entfernung — daher „-otag:removal" bei Ramp; Boardwipes zählen nicht als
+  // einzelne Entfernung.
+  { key: "ramp", ziel: 10, otag: "otag:ramp -otag:removal",
+    test: c => !/\bland\b/i.test(c.type_line || "") &&
+      /(\badd \{[wubrgc]|\{t\}:\s*add\b|search your library for (?:a|up to \w+|one|two|basic|any number of)[^.]{0,50}\bland|create[^.]{0,20}treasure)/i.test(c.oracle_text || "") },
+  { key: "draw", ziel: 10, otag: "otag:card-advantage -otag:ramp",
+    test: c => /(draw (?:two|three|four|five|six|seven|\w+) cards|(?:whenever|at the beginning of|\{t\}:)[^.]{0,80}draw)/i.test(c.oracle_text || "") },
+  { key: "removal", ziel: 8, otag: "otag:removal -otag:board-wipe",
+    test: c => /(destroy target|exile target|counter target|deals? \d+ damage to (?:target|any target|target creature|target planeswalker)|fights? target|target creature gets -\d)/i.test(c.oracle_text || "") },
+  { key: "wipe", ziel: 3, otag: "otag:board-wipe",
+    test: c => /(destroy all|exile all|destroy each|deals? \d+ damage to each|all creatures get -\d|each player sacrifices)/i.test(c.oracle_text || "") },
+];
+
+/* Anzahl einer Deckzeile (Platzhalter zählt als 1). */
+function anzahlVon(c) { return Math.max(c.qty || 0, 1); }
+
+/* Deck nach Kategorien inventarisieren; Richtzahl an die Deckgröße anpassen. */
+function deckAnalyse(cards) {
+  const groesse = cards.reduce((s, c) => s + anzahlVon(c), 0);
+  const skala = Math.max(0.5, Math.min(1.2, groesse / 100));
+  return AN_KATEGORIEN.map(k => {
+    const ist = cards.filter(k.test).reduce((s, c) => s + anzahlVon(c), 0);
+    const ziel = Math.max(k.key === "wipe" ? 1 : 3, Math.round(k.ziel * skala));
+    return { key: k.key, otag: k.otag, ist, ziel };
+  });
+}
+
+/* Kachel für einen Vorschlag ohne Synergie-Erklärung — stattdessen das
+   Kategorie-Etikett (Ramp, Entfernung …). */
+function vorschlagCardHtml(card, etikett) {
+  const img = card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small || "";
+  const p = synPreis(card);
+  return `<a class="syn-card" href="${esc(card.scryfall_uri || "#")}" target="_blank" rel="noopener noreferrer">
+    ${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : `<div class="syn-noimg">&#9670;</div>`}
+    <div class="syn-name">${esc(card.name)}</div>
+    <div class="syn-type">${esc(card.type_line || "")}</div>
+    <div class="syn-exp">${esc(etikett)}</div>
+    <div class="syn-price">${p == null ? "–" : eur(p)}</div>
+  </a>`;
+}
+
+/* Analyse in einen Container zeichnen: Balken je Kategorie, darunter Vorschläge
+   für die zu dünnen Kategorien (in Deckfarben, nicht besessen). */
+async function deckAnalyseAnzeigen(box, cards, colors) {
+  if (!box) return;
+  const lauf = ++synergyLauf;   // teilt den Lauf-Zähler mit der Synergiesuche
+  box.innerHTML = `<div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("an.loading"))}</div>`;
+  const analyse = deckAnalyse(cards);
+
+  const zeilen = analyse.map(a => {
+    const pct = Math.min(100, Math.round(a.ist / a.ziel * 100));
+    const klasse = a.ist >= a.ziel ? "gut" : a.ist >= a.ziel * 0.6 ? "ok" : "wenig";
+    return `<div class="an-row">
+      <span class="an-name">${esc(t("an.cat." + a.key))}</span>
+      <span class="an-bar"><span class="an-fill ${klasse}" style="width:${pct}%"></span></span>
+      <span class="an-count ${klasse}">${a.ist} / ${a.ziel}</span>
+    </div>`;
+  }).join("");
+
+  box.innerHTML = `<div class="analyse">
+    <div class="meta">${esc(t("an.intro"))}</div>
+    ${zeilen}
+    <div id="an-sugg" style="margin-top:6px"><div class="meta"><span class="syn-spin">&#9881;</span></div></div>
+    <p class="hint" style="margin-top:8px">${esc(t("an.estimate"))}</p>
+  </div>`;
+
+  const duenn = analyse.filter(a => a.ist < a.ziel);
+  const suggBox = box.querySelector("#an-sugg");
+  if (!duenn.length) { suggBox.innerHTML = `<div class="meta ok">${esc(t("an.allGood"))}</div>`; return; }
+
+  const weg = ownedExclude();
+  const teile = [];
+  for (const a of duenn) {
+    const q = `${a.otag} id<=${colors} -is:token -is:funny game:paper`;
+    let data = [];
+    try {
+      const r = await fetch("https://api.scryfall.com/cards/search?order=edhrec&q=" + encodeURIComponent(q), { headers: { Accept: "application/json" } });
+      if (r.ok) data = (await r.json()).data || [];
+    } catch { /* Kategorie darf scheitern */ }
+    if (lauf !== synergyLauf) return;   // ein neuerer Lauf hat übernommen
+    const label = t("an.cat." + a.key);
+    const treffer = data.filter(c => c.oracle_id && !weg.ids.has(c.oracle_id) && !weg.names.has((c.name || "").toLowerCase())).slice(0, 6);
+    if (treffer.length) teile.push(`<div class="an-block">
+      <h4>${esc(t("an.needMore", { cat: label }))}</h4>
+      <div class="syn-grid">${treffer.map(c => vorschlagCardHtml(c, label)).join("")}</div>
+    </div>`);
+    await new Promise(res => setTimeout(res, 110));
+  }
+  if (lauf !== synergyLauf) return;
+  suggBox.innerHTML = teile.join("") || `<div class="meta">${esc(t("syn.none"))}</div>`;
 }
 
 /* ---------------------------------------------- Karte bearbeiten ----- */
@@ -2479,7 +2580,9 @@ function renderDecks() {
           <div style="flex:none"><input type="number" data-synbudget="${d.id}" min="0" step="1"
             placeholder="${esc(t("syn.budgetPh"))}" title="${esc(t("syn.budgetTitle"))}" style="width:104px"></div>
           <div style="flex:none"><button class="btn ghost" data-synbtn="${d.id}"
-            title="${esc(t("syn.deckTitle"))}">&#128269; ${esc(t("syn.deckBtn"))}</button></div>` : ""}
+            title="${esc(t("syn.deckTitle"))}">&#128269; ${esc(t("syn.deckBtn"))}</button></div>
+          <div style="flex:none"><button class="btn ghost" data-analysebtn="${d.id}"
+            title="${esc(t("an.btnTitle"))}">&#128295; ${esc(t("an.btn"))}</button></div>` : ""}
         </div>
         <div class="deck-dash" data-dash="${d.id}" style="margin-top:12px"></div>
         ${rows ? `<div class="xscroll" style="overflow-x:auto"><table class="deck-tbl" style="margin-top:10px">
@@ -2542,6 +2645,25 @@ function renderDecks() {
         maxPrice: numVal($(`[data-syncap="${id}"]`)), totalBudget: numVal($(`[data-synbudget="${id}"]`)) })
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
       .finally(() => synBtnBusy(b, lbl, false));
+  });
+
+  // Deck-Analyse: welche Funktionsbausteine (Ramp, Kartenvorteil, Entfernung,
+  // Boardwipes) fehlen? Ergebnis in denselben Kasten wie die Synergien.
+  $$("[data-analysebtn]").forEach(b => b.onclick = () => {
+    const id = b.dataset.analysebtn;
+    const d = DECKS.find(x => x.id === id);
+    if (!d) return;
+    const cards = (d.entries || []).map(e => {
+      const c = CARDS.find(x => x.id === e.cardId);
+      return c ? { ...c, qty: e.qty } : null;
+    }).filter(Boolean);
+    const box = $(`.deck-syn[data-synbox="${id}"]`);
+    if (!cards.length || !box) return;
+    const lbl = t("an.btn");
+    synBtnBusy(b, lbl, true, "&#128295;");
+    deckAnalyseAnzeigen(box, cards, farbIdentitaet(cards))
+      .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
+      .finally(() => synBtnBusy(b, lbl, false, "&#128295;"));
   });
 
   // Sortier-Handler je Deck. renderDecks() baut alles neu, aber der

@@ -1483,4 +1483,56 @@ Object.assign(I18N.it, {
   "syn.exp.popular": "Inoltre, molto giocata.",
 });
 
+/* ---- Teil 7: Deck-Analyse („was fehlt?") ---- */
+Object.assign(I18N.de, {
+  "an.btn": "Deck-Analyse",
+  "an.btnTitle": "Prüfen, welche Funktionsbausteine fehlen (Ramp, Kartenvorteil, Entfernung, Boardwipes)",
+  "an.loading": "Analysiere Deck…",
+  "an.intro": "Funktions-Inventur (Richtwerte für Commander, an die Deckgröße angepasst):",
+  "an.cat.ramp": "Ramp", "an.cat.draw": "Kartenvorteil", "an.cat.removal": "Entfernung", "an.cat.wipe": "Boardwipes",
+  "an.needMore": "Zu wenig {cat} — Vorschläge",
+  "an.allGood": "Dein Deck ist in allen Kategorien solide aufgestellt. 👍",
+  "an.estimate": "Grobe Schätzung anhand des Regeltexts — als Anhaltspunkt, nicht als exakte Zählung.",
+});
+Object.assign(I18N.en, {
+  "an.btn": "Deck analysis",
+  "an.btnTitle": "Check which functional building blocks are missing (ramp, card advantage, removal, board wipes)",
+  "an.loading": "Analysing deck…",
+  "an.intro": "Function inventory (guideline values for Commander, scaled to deck size):",
+  "an.cat.ramp": "Ramp", "an.cat.draw": "Card advantage", "an.cat.removal": "Removal", "an.cat.wipe": "Board wipes",
+  "an.needMore": "Too little {cat} — suggestions",
+  "an.allGood": "Your deck is solid in every category. 👍",
+  "an.estimate": "Rough estimate from the rules text — a pointer, not an exact count.",
+});
+Object.assign(I18N.fr, {
+  "an.btn": "Analyse du deck",
+  "an.btnTitle": "Vérifier quels blocs fonctionnels manquent (rampe, avantage de cartes, removal, board wipes)",
+  "an.loading": "Analyse du deck…",
+  "an.intro": "Inventaire fonctionnel (valeurs indicatives pour Commander, ajustées à la taille du deck) :",
+  "an.cat.ramp": "Rampe", "an.cat.draw": "Avantage de cartes", "an.cat.removal": "Removal", "an.cat.wipe": "Board wipes",
+  "an.needMore": "Trop peu de {cat} — suggestions",
+  "an.allGood": "Ton deck est solide dans toutes les catégories. 👍",
+  "an.estimate": "Estimation approximative d'après le texte des règles — un repère, pas un compte exact.",
+});
+Object.assign(I18N.es, {
+  "an.btn": "Análisis del mazo",
+  "an.btnTitle": "Comprobar qué bloques funcionales faltan (ramp, ventaja de cartas, remoción, barridos)",
+  "an.loading": "Analizando el mazo…",
+  "an.intro": "Inventario funcional (valores orientativos para Commander, ajustados al tamaño del mazo):",
+  "an.cat.ramp": "Ramp", "an.cat.draw": "Ventaja de cartas", "an.cat.removal": "Remoción", "an.cat.wipe": "Barridos",
+  "an.needMore": "Poco {cat} — sugerencias",
+  "an.allGood": "Tu mazo está bien cubierto en todas las categorías. 👍",
+  "an.estimate": "Estimación aproximada según el texto de reglas — una orientación, no un recuento exacto.",
+});
+Object.assign(I18N.it, {
+  "an.btn": "Analisi del mazzo",
+  "an.btnTitle": "Verifica quali blocchi funzionali mancano (ramp, vantaggio di carte, rimozione, board wipe)",
+  "an.loading": "Analisi del mazzo…",
+  "an.intro": "Inventario funzionale (valori indicativi per Commander, adattati alla dimensione del mazzo):",
+  "an.cat.ramp": "Ramp", "an.cat.draw": "Vantaggio di carte", "an.cat.removal": "Rimozione", "an.cat.wipe": "Board wipe",
+  "an.needMore": "Troppo poco {cat} — suggerimenti",
+  "an.allGood": "Il tuo mazzo è solido in ogni categoria. 👍",
+  "an.estimate": "Stima approssimativa dal testo delle regole — un'indicazione, non un conteggio esatto.",
+});
+
 initLang();
