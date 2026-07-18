@@ -4009,6 +4009,7 @@ async function ladeLog() {
 }
 
 async function oeffneSession() {
+  DiceGL.load();   // three.js im Hintergrund holen, damit der erste 3D-Wurf bereit ist
   try { await ladeFreunde(); } catch { /* Freundeliste ist nur fürs Einladen */ }
   try { await ladeSession(); } catch (e) { toast(dbErr(e)); }
   if (SESSION) subscribeSession();
@@ -4311,6 +4312,113 @@ function lebenAendern(userId, delta) {
 const DICE_PIPS = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];   // ⚀⚁⚂⚃⚄⚅
 const diceFace = (sides, v) => (sides === 6 && DICE_PIPS[v]) ? DICE_PIPS[v] : String(v);
 
+/* ============================ 3D-Würfel (three.js) ====================
+   Echte 3D-Würfel für W6 & W20: three.js wird beim Öffnen der Spielrunde per
+   dynamischem import() nachgeladen (nur dann, ~1× je Sitzung). Der Würfel taumelt
+   und dreht dann auf die ERGEBNIS-Fläche. Nicht geladen / andere Seitenzahl →
+   2D-Rückfall (CSS-Würfel / SVG-W20). */
+const DiceGL = {
+  ready: false, THREE: null, renderer: null, scene: null, cam: null,
+  cube: null, ico: null, canvas: null, _raf: null, _loading: null,
+
+  load() {
+    if (this._loading) return this._loading;
+    this._loading = (async () => {
+      try {
+        const T = await import("https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js");
+        this.THREE = T;
+        this.renderer = new T.WebGLRenderer({ alpha: true, antialias: true });
+        this.renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1));
+        this.renderer.setSize(140, 140);
+        this.canvas = this.renderer.domElement; this.canvas.className = "dice-gl";
+        this.scene = new T.Scene();
+        this.cam = new T.PerspectiveCamera(32, 1, 0.1, 100); this.cam.position.set(0, 0, 6);
+        this.scene.add(new T.AmbientLight(0xffffff, 0.85));
+        const d1 = new T.DirectionalLight(0xffffff, 1.2); d1.position.set(3, 5, 6); this.scene.add(d1);
+        const d2 = new T.DirectionalLight(0xffe9c0, 0.5); d2.position.set(-4, -2, 3); this.scene.add(d2);
+        this.cube = this._buildCube(); this.cube.visible = false; this.scene.add(this.cube);
+        this.ico = this._buildIco(); this.ico.visible = false; this.scene.add(this.ico);
+        this.ready = true;
+      } catch { this.ready = false; }
+    })();
+    return this._loading;
+  },
+  supports(sides) { return this.ready && (sides === 6 || sides === 20); },
+
+  _faceTex(draw) {
+    const c = document.createElement("canvas"); c.width = c.height = 160;
+    const x = c.getContext("2d"); x.fillStyle = "#d9a52e"; x.fillRect(0, 0, 160, 160); draw(x);
+    return new this.THREE.CanvasTexture(c);
+  },
+  _buildCube() {
+    const T = this.THREE;
+    const pip = v => this._faceTex(x => { x.fillStyle = "#241a00";
+      const P = { TL: [45, 45], TR: [115, 45], ML: [45, 80], C: [80, 80], MR: [115, 80], BL: [45, 115], BR: [115, 115] };
+      const L = { 1: ["C"], 2: ["TL", "BR"], 3: ["TL", "C", "BR"], 4: ["TL", "TR", "BL", "BR"], 5: ["TL", "TR", "C", "BL", "BR"], 6: ["TL", "TR", "ML", "MR", "BL", "BR"] };
+      (L[v] || []).forEach(k => { x.beginPath(); x.arc(P[k][0], P[k][1], 15, 0, 7); x.fill(); }); });
+    const mats = [3, 4, 2, 5, 1, 6].map(v => new T.MeshStandardMaterial({ map: pip(v), metalness: 0.25, roughness: 0.55 }));
+    const m = new T.Mesh(new T.BoxGeometry(2.1, 2.1, 2.1), mats);
+    m.userData.norm = { 1: [0, 0, 1], 6: [0, 0, -1], 3: [1, 0, 0], 4: [-1, 0, 0], 2: [0, 1, 0], 5: [0, -1, 0] };
+    return m;
+  },
+  _buildIco() {
+    const T = this.THREE;
+    const numTex = n => this._faceTex(x => { x.fillStyle = "#241a00"; x.font = "bold 84px sans-serif";
+      x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(String(n), 80, 88);
+      if (n === 6 || n === 9) x.fillRect(52, 120, 56, 7); });
+    const g = new T.IcosahedronGeometry(1.7, 0); g.computeVertexNormals();
+    const grp = new T.Group();
+    grp.add(new T.Mesh(g, new T.MeshStandardMaterial({ color: 0xc9962b, metalness: 0.3, roughness: 0.5, flatShading: true })));
+    const pos = g.getAttribute("position"), norm = {};
+    for (let f = 0; f < pos.count; f += 3) {
+      const a = new T.Vector3().fromBufferAttribute(pos, f), b = new T.Vector3().fromBufferAttribute(pos, f + 1), c = new T.Vector3().fromBufferAttribute(pos, f + 2);
+      const cen = new T.Vector3().add(a).add(b).add(c).multiplyScalar(1 / 3), num = (f / 3) + 1;
+      norm[num] = cen.clone().normalize().toArray();
+      const pl = new T.Mesh(new T.PlaneGeometry(0.9, 0.9), new T.MeshBasicMaterial({ map: numTex(num), transparent: true }));
+      pl.position.copy(cen.clone().multiplyScalar(1.03)); pl.lookAt(cen.clone().multiplyScalar(3)); grp.add(pl);
+    }
+    grp.userData.norm = norm;
+    return grp;
+  },
+  _targetQuat(die, result) {
+    const T = this.THREE, view = new T.Vector3(0.12, 0.2, 1).normalize();
+    const n = new T.Vector3().fromArray(die.userData.norm[result]).normalize();
+    return new T.Quaternion().setFromUnitVectors(n, view);
+  },
+
+  /* Taumeln → auf die Ergebnis-Fläche einrasten. */
+  roll(sides, result) {
+    if (!this.supports(sides)) return;
+    const T = this.THREE;
+    this.cube.visible = sides === 6; this.ico.visible = sides === 20;
+    const die = sides === 6 ? this.cube : this.ico;
+    const target = this._targetQuat(die, result);
+    cancelAnimationFrame(this._raf); clearTimeout(this._safety);
+    const t0 = performance.now(), tumble = 750, settle = 700;
+    const axis = new T.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
+    let q0 = null, settling = false;
+    const step = now => {
+      const el = now - t0;
+      if (el < tumble) { die.rotateOnWorldAxis(axis, 0.3); }
+      else {
+        if (!settling) { settling = true; q0 = die.quaternion.clone(); }
+        const p = Math.min(1, (el - tumble) / settle), e = 1 - Math.pow(1 - p, 3);
+        die.quaternion.copy(q0).slerp(target, e);
+        if (p >= 1) { clearTimeout(this._safety); this.renderer.render(this.scene, this.cam); this._raf = null; return; }
+      }
+      this.renderer.render(this.scene, this.cam);
+      this._raf = requestAnimationFrame(step);
+    };
+    this._raf = requestAnimationFrame(step);
+    // Sicherheitsnetz: falls requestAnimationFrame gedrosselt wird (Tab im
+    // Hintergrund), sitzt die Ergebnis-Fläche trotzdem garantiert vorn.
+    this._safety = setTimeout(() => {
+      cancelAnimationFrame(this._raf); this._raf = null;
+      die.quaternion.copy(target); this.renderer.render(this.scene, this.cam);
+    }, tumble + settle + 350);
+  },
+};
+
 /* Pips einer W6-Fläche als Punkte im 3×3-Raster. */
 function pipDots(v) {
   const P = { TL: [27, 27], TR: [73, 27], ML: [27, 50], C: [50, 50], MR: [73, 50], BL: [27, 73], BR: [73, 73] };
@@ -4377,7 +4485,19 @@ function zeigeWurf(sides, result, name) {
   const stage = $("#dice-stage");
   if (!stage) return;
   const s = Math.max(2, sides | 0);
-  if (diceAnim) { clearInterval(diceAnim.iv); clearTimeout(diceAnim.to); }
+  if (diceAnim) { clearInterval(diceAnim.iv); clearTimeout(diceAnim.to); diceAnim = null; }
+
+  // Echte 3D-Würfel (three.js) für W6 & W20, sobald geladen — sonst 2D-Rückfall.
+  if (DiceGL.supports(s)) {
+    stage.innerHTML = "";
+    stage.appendChild(DiceGL.canvas);
+    const cap = document.createElement("div"); cap.className = "dice-cap";
+    cap.innerHTML = `<b>${esc(name || "?")}</b> · W${s}`;
+    stage.appendChild(cap);
+    DiceGL.roll(s, result);
+    return;
+  }
+
   stage.innerHTML = `${diceObjHtml(s, 1)}<div class="dice-cap"><b>${esc(name || "?")}</b> · W${s}</div>`;
   const dieEl = stage.querySelector(".dice-obj");
 
