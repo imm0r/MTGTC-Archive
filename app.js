@@ -1838,6 +1838,8 @@ function detailHtml(c, hover) {
             placeholder="${esc(t("syn.capPh"))}" title="${esc(t("syn.capTitle"))}" style="width:92px"></div>
           <div style="flex:none"><button class="btn ghost sm" id="dt-syn"
             title="${esc(t("syn.findTitle"))}">&#128269; ${esc(t("syn.find"))}</button></div>
+          <div style="flex:none"><button class="btn ghost sm" id="dt-syn-ai"
+            title="${esc(t("syn.aiTitle"))}">&#10024; ${esc(t("syn.ai"))}</button></div>
         </div>` : ""}
         <div class="hint" style="margin-top:10px">${esc(t("detail.added"))}: ${dtShort(c.added)} ${esc(t("detail.addedSuffix"))}</div>
         ${!hover ? `<div id="syn-box" style="margin-top:12px"></div>` : ""}
@@ -1877,6 +1879,14 @@ function showCardDetail(id) {
     synergieAnzeigen($("#syn-box"), synergyHooks(c),
       { excludeIds: weg.ids, excludeNames: weg.names, limit: 18, maxPrice: numVal($("#syn-cap")) })
       .finally(() => synBtnBusy(yb, lbl, false));
+  };
+  // KI-Synergien: implizite Vorschläge über die Edge Function.
+  const ab = $("#dt-syn-ai");
+  if (ab) ab.onclick = () => {
+    const lbl = t("syn.ai");
+    synBtnBusy(ab, lbl, true, "&#10024;");
+    kiSynergien(c, $("#syn-box"), { maxPrice: numVal($("#syn-cap")) })
+      .finally(() => synBtnBusy(ab, lbl, false, "&#10024;"));
   };
 }
 
@@ -2110,6 +2120,70 @@ async function synergieAnzeigen(box, hooks, opts = {}) {
     kopf = `<div class="meta">${esc(t("syn.budgetLine", { sum: eur(summe), budget: eur(opts.totalBudget) }))}</div>`;
   }
   box.innerHTML = kopf + `<div class="syn-grid">${res.map(synergyCardHtml).join("")}</div>`;
+}
+
+/* KI-Synergien: die Edge Function „card-synergy" fragt Claude nach — auch
+   IMPLIZITEN — Synergien. Das Modell liefert nur Namen + Begründung; jeden Namen
+   prüfen wir hier gegen Scryfall (ein Sammel-Request), erfundene fallen raus.
+   opts.maxPrice filtert wie bei der heuristischen Suche. */
+async function kiSynergien(card, box, opts = {}) {
+  if (!box) return;
+  const lauf = ++synergyLauf;
+  box.innerHTML = `<div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("syn.aiLoading"))}</div>`;
+
+  let data, error;
+  try {
+    ({ data, error } = await sb.functions.invoke("card-synergy", {
+      body: {
+        card: { name: card.name, type_line: card.type_line, oracle_text: card.oracle_text },
+        lang: LANG, n: 10,
+      },
+    }));
+  } catch (e) { error = e; }
+  if (lauf !== synergyLauf) return;
+
+  if (error) {
+    // supabase-js verpackt Non-2xx-Antworten in error; die Klartext-Meldung der
+    // Function steckt in error.context (der rohen Response).
+    let msg = t("syn.aiError");
+    try { const ctx = await error.context?.json?.(); if (ctx?.error) msg = ctx.error; } catch { /* generisch */ }
+    box.innerHTML = `<div class="empty">${esc(msg)}</div>`;
+    return;
+  }
+  if (data?.error) { box.innerHTML = `<div class="empty">${esc(data.error)}</div>`; return; }
+
+  const sugg = (data?.suggestions || []).filter(s => s && s.name);
+  if (!sugg.length) { box.innerHTML = `<div class="empty">${esc(t("syn.none"))}</div>`; return; }
+
+  // Namen gegen Scryfall prüfen (POST /cards/collection, ein Request bis 75 Namen).
+  let karten = [];
+  try {
+    const r = await fetch("https://api.scryfall.com/cards/collection", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ identifiers: sugg.slice(0, 20).map(s => ({ name: s.name })) }),
+    });
+    if (r.ok) karten = (await r.json()).data || [];
+  } catch { /* ohne Prüfung keine Anzeige */ }
+  if (lauf !== synergyLauf) return;
+
+  const byName = new Map(karten.map(c => [c.name.toLowerCase(), c]));
+  const weg = ownedExclude();
+  const cap = opts.maxPrice;
+  const gesehen = new Set();
+  const treffer = [];
+  for (const s of sugg) {                       // Reihenfolge des Modells behalten
+    const c = byName.get(s.name.toLowerCase());
+    if (!c || !c.oracle_id || gesehen.has(c.oracle_id)) continue;
+    if (weg.ids.has(c.oracle_id) || weg.names.has((c.name || "").toLowerCase())) continue;
+    if ((c.name || "").toLowerCase() === (card.name || "").toLowerCase()) continue;
+    if (cap && (synPreis(c) ?? 9e9) > cap) continue;
+    gesehen.add(c.oracle_id);
+    treffer.push(vorschlagCardHtml(c, s.reason));
+  }
+  box.innerHTML = treffer.length
+    ? `<div class="meta">${esc(t("syn.aiNote"))}</div><div class="syn-grid">${treffer.join("")}</div>`
+    : `<div class="empty">${esc(t("syn.none"))}</div>`;
 }
 
 /* Haken eines ganzen Decks: über alle Karten sammeln, dann nach Häufigkeit MAL
