@@ -1548,6 +1548,9 @@ Object.assign(I18N.de, {
   "syn.aiLoading": "Die KI sucht passende Karten…",
   "syn.aiNote": "KI-Vorschläge (Karten gegen Scryfall geprüft; die Begründungen können irren):",
   "syn.aiCost": "Diese Abfrage: ≈ {cost} · {in} → {out} Tokens",
+  "syn.addWish": "Wunsch",
+  "syn.addWishTitle": "Als Wunschkarte ins Deck (nicht besessen → Bestand 0)",
+  "syn.addedWish": "„{name}“ als Wunschkarte zu {deck} hinzugefügt",
   "syn.aiError": "Die KI-Suche ist gerade nicht möglich.",
 });
 Object.assign(I18N.en, {
@@ -1557,6 +1560,9 @@ Object.assign(I18N.en, {
   "syn.aiLoading": "The AI is looking for matching cards…",
   "syn.aiNote": "AI suggestions (cards verified against Scryfall; the reasons may be off):",
   "syn.aiCost": "This query: ≈ {cost} · {in} → {out} tokens",
+  "syn.addWish": "Wish",
+  "syn.addWishTitle": "Add to deck as a wish card (not owned → stock 0)",
+  "syn.addedWish": "Added \"{name}\" to {deck} as a wish card",
   "syn.aiError": "The AI search isn't available right now.",
 });
 Object.assign(I18N.fr, {
@@ -1566,6 +1572,9 @@ Object.assign(I18N.fr, {
   "syn.aiLoading": "L'IA cherche des cartes assorties…",
   "syn.aiNote": "Suggestions de l'IA (cartes vérifiées via Scryfall ; les justifications peuvent se tromper) :",
   "syn.aiCost": "Cette requête : ≈ {cost} · {in} → {out} jetons",
+  "syn.addWish": "Souhait",
+  "syn.addWishTitle": "Ajouter au deck comme carte souhaitée (non possédée → stock 0)",
+  "syn.addedWish": "« {name} » ajoutée à {deck} comme carte souhaitée",
   "syn.aiError": "La recherche IA n'est pas disponible pour le moment.",
 });
 Object.assign(I18N.es, {
@@ -1575,6 +1584,9 @@ Object.assign(I18N.es, {
   "syn.aiLoading": "La IA está buscando cartas afines…",
   "syn.aiNote": "Sugerencias de la IA (cartas verificadas con Scryfall; las razones pueden fallar):",
   "syn.aiCost": "Esta consulta: ≈ {cost} · {in} → {out} tokens",
+  "syn.addWish": "Deseada",
+  "syn.addWishTitle": "Añadir al mazo como carta deseada (no en tu colección → existencias 0)",
+  "syn.addedWish": "«{name}» añadida a {deck} como carta deseada",
   "syn.aiError": "La búsqueda con IA no está disponible ahora mismo.",
 });
 Object.assign(I18N.it, {
@@ -1584,6 +1596,9 @@ Object.assign(I18N.it, {
   "syn.aiLoading": "L'IA sta cercando carte affini…",
   "syn.aiNote": "Suggerimenti dell'IA (carte verificate su Scryfall; le motivazioni possono sbagliare):",
   "syn.aiCost": "Questa richiesta: ≈ {cost} · {in} → {out} token",
+  "syn.addWish": "Desiderata",
+  "syn.addWishTitle": "Aggiungi al mazzo come carta desiderata (non posseduta → scorte 0)",
+  "syn.addedWish": "«{name}» aggiunta a {deck} come carta desiderata",
   "syn.aiError": "La ricerca IA non è disponibile al momento.",
 });
 

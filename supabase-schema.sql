@@ -554,3 +554,63 @@ begin
   return newid;
 end $$;
 revoke execute on function public.import_shared_deck(uuid) from anon;
+
+-- ---------------- Wunschkarte aus einem Synergie-Vorschlag ins Deck ------
+-- Eine (Scryfall-)Vorschlagskarte einem Deck hinzufügen. Zuerst die eigene
+-- Karte verknüpfen — exakte Auflage über scryfall_id, sonst dieselbe Karte über
+-- oracle_id (besessene zuerst) —, damit keine Dublette entsteht, wenn man die
+-- Karte schon in anderer Auflage hat. Fehlt sie ganz, wird sie mit BESTAND 0
+-- angelegt (qty 0 = „im Deck, aber nicht besessen"). Danach Deck-Eintrag (+1).
+create or replace function public.add_wish_to_deck(
+  p_deck uuid,
+  p_scryfall_id text, p_oracle_id text, p_name text, p_printed_name text,
+  p_set_code text, p_set_name text, p_cn text, p_img text,
+  p_lang text, p_price numeric,
+  p_type_line text default null, p_rarity text default null,
+  p_mana_cost text default null, p_cmc numeric default null,
+  p_released date default null, p_colors text[] default null,
+  p_keywords text[] default null, p_oracle_text text default null
+) returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+  mycard uuid;
+begin
+  if me is null then raise exception 'Nicht angemeldet'; end if;
+  if not exists (select 1 from public.decks where id = p_deck and user_id = me) then
+    raise exception 'Deck nicht gefunden';
+  end if;
+
+  select id into mycard from public.cards
+   where user_id = me and scryfall_id = p_scryfall_id
+   limit 1;
+  if mycard is null and p_oracle_id is not null then
+    select id into mycard from public.cards
+     where user_id = me and oracle_id = p_oracle_id
+     order by (qty > 0) desc, qty desc
+     limit 1;
+  end if;
+  if mycard is null then
+    insert into public.cards (user_id, scryfall_id, oracle_id, name, printed_name,
+      set_code, set_name, cn, img, cm_id, lang, condition, foil, qty, price, hist,
+      type_line, rarity, mana_cost, cmc, released, colors, keywords, oracle_text)
+    values (me, p_scryfall_id, p_oracle_id, p_name, p_printed_name,
+      p_set_code, p_set_name, p_cn, p_img, null, coalesce(p_lang,'en'), 'NM', false, 0, p_price,
+      case when p_price is null then '[]'::jsonb
+           else jsonb_build_array(jsonb_build_object('d', to_char(current_date,'YYYY-MM-DD'), 'v', p_price)) end,
+      p_type_line, p_rarity, p_mana_cost, p_cmc, p_released, p_colors, p_keywords, p_oracle_text)
+    returning id into mycard;
+  end if;
+
+  insert into public.deck_entries (deck_id, card_id, user_id, qty)
+    values (p_deck, mycard, me, 1)
+    on conflict (deck_id, card_id) do update set qty = public.deck_entries.qty + 1;
+
+  return mycard;
+end $$;
+revoke execute on function public.add_wish_to_deck(
+  uuid, text, text, text, text, text, text, text, text, text, numeric,
+  text, text, text, numeric, date, text[], text[], text) from anon;

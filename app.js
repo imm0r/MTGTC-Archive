@@ -1872,7 +1872,7 @@ function showCardDetail(id) {
   if (yb) yb.onclick = () => {
     const lbl = t("syn.find");
     synBtnBusy(yb, lbl, true);
-    const weg = ownedExclude();
+    const weg = excludeVon([c]);   // nur die Ausgangskarte selbst raus, Besessenes darf auftauchen
     synergieAnzeigen($("#syn-box"), synergyHooks(c),
       { excludeIds: weg.ids, excludeNames: weg.names, limit: 18, maxPrice: numVal($("#syn-cap")) })
       .finally(() => synBtnBusy(yb, lbl, false));
@@ -1977,11 +1977,13 @@ function synergyHooks(card) {
    Themen werden übersetzt. */
 function hookLabel(h) { return h.kind === "theme" ? t("syn.theme." + h.label) : h.label; }
 
-/* Ausschlussmengen aus dem eigenen Bestand (plus optionale Extra-Karten):
-   was man schon hat, wird nicht als „neu" vorgeschlagen. */
-function ownedExclude(extra = []) {
+/* Ausschlussmengen (oracle_id + Kleinschrift-Name) aus einer Kartenliste.
+   Vorschläge dürfen jetzt AUCH besessene Karten enthalten — ausgeschlossen wird
+   nur noch, was ohnehin schon da ist: bei Deck-Suchen die Karten DIESES Decks,
+   bei der Kartensuche die Ausgangskarte selbst. */
+function excludeVon(cards) {
   const ids = new Set(), names = new Set();
-  for (const c of CARDS.concat(extra)) {
+  for (const c of cards) {
     if (c && c.oracle_id) ids.add(c.oracle_id);
     if (c && c.name) names.add(c.name.toLowerCase());
   }
@@ -2080,18 +2082,56 @@ function synergyErklaerung(e) {
 }
 
 /* Eine Vorschlagskarte als Kachel: Bild, Name, Typ, Erklärung, Preis. */
-function synergyCardHtml(e) {
-  const card = e.card;
+/* Zuletzt gezeigte Vorschlags-Karten (Scryfall-Objekte, id→Objekt), damit der
+   „Als Wunschkarte"-Knopf die vollen Daten zum Anlegen hat. */
+const SYN_CACHE = new Map();
+
+/* Eine Vorschlagskachel. Bild/Name/Typ/Grund verlinken auf Scryfall; darunter
+   der Preis und — NUR bei Deck-Vorschlägen (deckId gesetzt) — ein Knopf, der die
+   Karte als Wunschkarte ins Deck legt (fehlt sie in der Sammlung: Bestand 0). */
+function synKachel(card, grundText, deckId) {
   const img = card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small || "";
   const p = synPreis(card);
-  const grund = synergyErklaerung(e);
-  return `<a class="syn-card" href="${esc(card.scryfall_uri || "#")}" target="_blank" rel="noopener noreferrer">
-    ${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : `<div class="syn-noimg">&#9670;</div>`}
-    <div class="syn-name">${esc(card.name)}</div>
-    <div class="syn-type">${esc(card.type_line || "")}</div>
-    <div class="syn-exp" title="${esc(grund)}">${esc(grund)}</div>
-    <div class="syn-price">${p == null ? "–" : eur(p)}</div>
-  </a>`;
+  let addBtn = "";
+  if (deckId && card.id) {
+    SYN_CACHE.set(card.id, card);
+    addBtn = `<button class="syn-add" data-deck="${esc(deckId)}" data-sid="${esc(card.id)}"
+      title="${esc(t("syn.addWishTitle"))}">&#43;&#160;${esc(t("syn.addWish"))}</button>`;
+  }
+  return `<div class="syn-card">
+    <a class="syn-card-link" href="${esc(card.scryfall_uri || "#")}" target="_blank" rel="noopener noreferrer">
+      ${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : `<div class="syn-noimg">&#9670;</div>`}
+      <div class="syn-name">${esc(card.name)}</div>
+      <div class="syn-type">${esc(card.type_line || "")}</div>
+      <div class="syn-exp" title="${esc(grundText)}">${esc(grundText)}</div>
+    </a>
+    <div class="syn-foot"><span class="syn-price">${p == null ? "–" : eur(p)}</span>${addBtn}</div>
+  </div>`;
+}
+
+function synergyCardHtml(e, deckId) { return synKachel(e.card, synergyErklaerung(e), deckId); }
+
+/* Eine Vorschlags-Scryfall-Karte als Wunschkarte ins Deck legen (RPC
+   add_wish_to_deck): fehlt sie in der Sammlung, wird sie mit Bestand 0 angelegt,
+   sonst die eigene Karte verknüpft. Gibt die verknüpfte card_id zurück. */
+async function wunschkarteZumDeck(deckId, c) {
+  const face = c.card_faces?.[0] || {};
+  const { data, error } = await sb.rpc("add_wish_to_deck", {
+    p_deck: deckId,
+    p_scryfall_id: c.id, p_oracle_id: c.oracle_id || null, p_name: c.name,
+    p_printed_name: c.printed_name || null,
+    p_set_code: c.set || null, p_set_name: c.set_name || null, p_cn: c.collector_number || null,
+    p_img: c.image_uris?.normal || c.image_uris?.small || face.image_uris?.normal || null,
+    p_lang: c.lang || "en",
+    p_price: c.prices?.eur ? parseFloat(c.prices.eur) : null,
+    p_type_line: c.type_line || null, p_rarity: c.rarity || null,
+    p_mana_cost: c.mana_cost ?? face.mana_cost ?? null,
+    p_cmc: c.cmc ?? null, p_released: c.released_at || null,
+    p_colors: c.colors || null, p_keywords: c.keywords || null,
+    p_oracle_text: c.oracle_text ?? face.oracle_text ?? null,
+  });
+  if (error) throw error;
+  return data;
 }
 
 /* Synergie-Knopf in den Ladezustand versetzen: Lupe → drehendes Zahnrad,
@@ -2116,7 +2156,7 @@ async function synergieAnzeigen(box, hooks, opts = {}) {
     const summe = res.reduce((s, e) => s + (synPreis(e.card) || 0), 0);
     kopf = `<div class="meta">${esc(t("syn.budgetLine", { sum: eur(summe), budget: eur(opts.totalBudget) }))}</div>`;
   }
-  box.innerHTML = kopf + `<div class="syn-grid">${res.map(synergyCardHtml).join("")}</div>`;
+  box.innerHTML = kopf + `<div class="syn-grid">${res.map(e => synergyCardHtml(e, opts.deckId)).join("")}</div>`;
 }
 
 /* KI-Synergien: die Edge Function „card-synergy" fragt Claude nach — auch
@@ -2150,6 +2190,8 @@ async function kiSynergienDeck(deck, cards, box, opts = {}) {
       lang: LANG, n: 12,
     },
     colors,
+    exclude: excludeVon(cards),   // nur Karten DIESES Decks raus, Besessenes darf auftauchen
+    deckId: deck.id,              // ermöglicht den „Als Wunschkarte"-Knopf je Vorschlag
     maxPrice: opts.maxPrice,
   });
 }
@@ -2218,7 +2260,7 @@ async function kiSynergieLauf(box, cfg) {
   if (lauf !== synergyLauf) return;
 
   const byName = new Map(karten.map(c => [c.name.toLowerCase(), c]));
-  const weg = ownedExclude();
+  const weg = cfg.exclude || { ids: new Set(), names: new Set() };   // Besessenes darf auftauchen
   const cap = cfg.maxPrice;
   const selfLower = (cfg.selfName || "").toLowerCase();
   const farbSet = cfg.colors ? new Set(cfg.colors.replace(/c/gi, "").toUpperCase().split("").filter(Boolean)) : null;
@@ -2232,7 +2274,7 @@ async function kiSynergieLauf(box, cfg) {
     if (farbSet && !farbIdentPasst(c.color_identity, farbSet)) continue;   // außerhalb der Deckfarben
     if (cap && (synPreis(c) ?? 9e9) > cap) continue;
     gesehen.add(c.oracle_id);
-    treffer.push(vorschlagCardHtml(c, s.reason));
+    treffer.push(vorschlagCardHtml(c, s.reason, cfg.deckId));
   }
   const kosten = kiKostenHtml(data?.usage);   // die Abfrage kostete unabhängig von der Trefferzahl
   box.innerHTML = treffer.length
@@ -2292,23 +2334,13 @@ function deckAnalyse(cards) {
   });
 }
 
-/* Kachel für einen Vorschlag ohne Synergie-Erklärung — stattdessen das
-   Kategorie-Etikett (Ramp, Entfernung …). */
-function vorschlagCardHtml(card, etikett) {
-  const img = card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small || "";
-  const p = synPreis(card);
-  return `<a class="syn-card" href="${esc(card.scryfall_uri || "#")}" target="_blank" rel="noopener noreferrer">
-    ${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : `<div class="syn-noimg">&#9670;</div>`}
-    <div class="syn-name">${esc(card.name)}</div>
-    <div class="syn-type">${esc(card.type_line || "")}</div>
-    <div class="syn-exp">${esc(etikett)}</div>
-    <div class="syn-price">${p == null ? "–" : eur(p)}</div>
-  </a>`;
-}
+/* Kachel für einen Vorschlag mit Kategorie-Etikett (Ramp, Entfernung …) oder
+   KI-Begründung statt Synergie-Erklärung. */
+function vorschlagCardHtml(card, etikett, deckId) { return synKachel(card, etikett, deckId); }
 
 /* Analyse in einen Container zeichnen: Balken je Kategorie, darunter Vorschläge
    für die zu dünnen Kategorien (in Deckfarben, nicht besessen). */
-async function deckAnalyseAnzeigen(box, cards, colors) {
+async function deckAnalyseAnzeigen(box, cards, colors, deckId) {
   if (!box) return;
   const lauf = ++synergyLauf;   // teilt den Lauf-Zähler mit der Synergiesuche
   box.innerHTML = `<div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("an.loading"))}</div>`;
@@ -2335,7 +2367,7 @@ async function deckAnalyseAnzeigen(box, cards, colors) {
   const suggBox = box.querySelector("#an-sugg");
   if (!duenn.length) { suggBox.innerHTML = `<div class="meta ok">${esc(t("an.allGood"))}</div>`; return; }
 
-  const weg = ownedExclude();
+  const weg = excludeVon(cards);   // nur Karten DIESES Decks raus, Besessenes darf auftauchen
   const teile = [];
   for (const a of duenn) {
     const q = `${a.otag} id<=${colors} -is:token -is:funny game:paper`;
@@ -2349,7 +2381,7 @@ async function deckAnalyseAnzeigen(box, cards, colors) {
     const treffer = data.filter(c => c.oracle_id && !weg.ids.has(c.oracle_id) && !weg.names.has((c.name || "").toLowerCase())).slice(0, 6);
     if (treffer.length) teile.push(`<div class="an-block">
       <h4>${esc(t("an.needMore", { cat: label }))}</h4>
-      <div class="syn-grid">${treffer.map(c => vorschlagCardHtml(c, label)).join("")}</div>
+      <div class="syn-grid">${treffer.map(c => vorschlagCardHtml(c, label, deckId)).join("")}</div>
     </div>`);
     await new Promise(res => setTimeout(res, 110));
   }
@@ -2766,12 +2798,12 @@ function renderDecks() {
     if (!cards.length || !box) return;
     const lbl = t("syn.deckBtn");
     synBtnBusy(b, lbl, true);
-    const weg = ownedExclude();
+    const weg = excludeVon(cards);   // nur Karten DIESES Decks raus, Besessenes darf auftauchen
     // Erst wenn die Suche fertig ist, nach unten zu den Ergebnissen springen —
     // vorher dreht sich das Zahnrad am Knopf, wo der Blick gerade ist.
     synergieAnzeigen(box, deckHooks(cards.map(c => ({ c }))),
       { excludeIds: weg.ids, excludeNames: weg.names, colors: farbIdentitaet(cards),
-        maxHooks: 5, limit: 20,
+        maxHooks: 5, limit: 20, deckId: id,
         maxPrice: numVal($(`[data-syncap="${id}"]`)), totalBudget: numVal($(`[data-synbudget="${id}"]`)) })
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
       .finally(() => synBtnBusy(b, lbl, false));
@@ -2791,7 +2823,7 @@ function renderDecks() {
     if (!cards.length || !box) return;
     const lbl = t("an.btn");
     synBtnBusy(b, lbl, true, "&#128295;");
-    deckAnalyseAnzeigen(box, cards, farbIdentitaet(cards))
+    deckAnalyseAnzeigen(box, cards, farbIdentitaet(cards), id)
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
       .finally(() => synBtnBusy(b, lbl, false, "&#128295;"));
   });
@@ -3809,6 +3841,28 @@ function wireApp() {
     if (m && !m.contains(e.target)) m.classList.remove("open");
     const ls = $("#lang-select");
     if (ls && !ls.contains(e.target)) ls.classList.remove("open");
+  });
+
+  // „Als Wunschkarte ins Deck" bei Synergie-/Analyse-Vorschlägen. Delegation, weil
+  // die Kacheln bei jeder Suche neu entstehen. Nach dem Anlegen NICHT neu zeichnen,
+  // damit die (teils bezahlten KI-) Vorschläge stehen bleiben — nur reload() für
+  // frische Daten und ein Häkchen am Knopf.
+  document.addEventListener("click", async e => {
+    const btn = e.target.closest(".syn-add");
+    if (!btn || btn.disabled) return;
+    e.preventDefault();
+    const card = SYN_CACHE.get(btn.dataset.sid);
+    const deckId = btn.dataset.deck;
+    if (!card || !deckId) return;
+    btn.disabled = true;
+    try {
+      await wunschkarteZumDeck(deckId, card);
+      await reload();
+      btn.classList.add("done");
+      btn.innerHTML = "&#10003;";
+      const d = DECKS.find(x => x.id === deckId);
+      toast(t("syn.addedWish", { name: card.name, deck: d?.name || "" }));
+    } catch (err) { btn.disabled = false; toast(dbErr(err)); }
   });
 
   $("#drop").onclick = () => $("#file").click();
