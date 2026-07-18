@@ -60,7 +60,10 @@ create table if not exists public.cards (
   lang        text not null default 'en',
   condition   text not null default 'NM',
   foil        boolean not null default false,
-  qty         integer not null default 1 check (qty > 0),
+  -- qty 0 ist erlaubt und bedeutet „im Deck, aber nicht besessen" (aus einem
+  -- Deck-Import, siehe import_shared_deck). Die Sammlungsansicht blendet solche
+  -- Zeilen aus (Filter qty > 0), im Deck erscheinen sie als „fehlen".
+  qty         integer not null default 1 check (qty >= 0),
   price       numeric(10,2),
   hist        jsonb not null default '[]'::jsonb,
   added       timestamptz not null default now(),
@@ -474,3 +477,58 @@ begin
   return 'sent';
 end $$;
 revoke execute on function public.send_friend_request(text) from anon;
+
+-- Bestehende DB: qty-Check von "> 0" auf ">= 0" lockern (siehe cards.qty).
+alter table public.cards drop constraint if exists cards_qty_check;
+alter table public.cards add constraint cards_qty_check check (qty >= 0);
+
+-- Ein geteiltes Freund-Deck als neues, privates Deck übernehmen — NUR das Deck.
+-- Fehlende Karten kommen als Bestand-0-Zeilen (im Deck „fehlen", nicht in der
+-- Sammlung). Prüft geteilt + befreundet; schreibt nur eigene Zeilen.
+create or replace function public.import_shared_deck(p_deck uuid) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  me uuid := auth.uid();
+  src public.decks%rowtype;
+  fname text; newid uuid; e record; mycard uuid; mymain uuid;
+begin
+  if me is null then raise exception 'Nicht angemeldet'; end if;
+  select * into src from public.decks where id = p_deck;
+  if not found then raise exception 'Deck nicht gefunden'; end if;
+  if not (src.shared and public.are_friends(me, src.user_id)) then
+    raise exception 'Kein Zugriff auf dieses Deck';
+  end if;
+  select display_name into fname from public.profiles where id = src.user_id;
+
+  insert into public.decks (user_id, name, format, archetype, shared)
+    values (me, left(src.name || ' (von ' || coalesce(fname, 'Freund') || ')', 120),
+            src.format, src.archetype, false)
+    returning id into newid;
+
+  for e in
+    select de.qty as deck_qty, c.*
+    from public.deck_entries de join public.cards c on c.id = de.card_id
+    where de.deck_id = p_deck
+  loop
+    select id into mycard from public.cards
+      where user_id = me and scryfall_id = e.scryfall_id and foil = e.foil
+        and lang = e.lang and condition = e.condition;
+    if mycard is null then
+      insert into public.cards (user_id, scryfall_id, oracle_id, name, printed_name, set_code,
+        set_name, cn, img, cm_id, type_line, rarity, mana_cost, cmc, released, colors,
+        keywords, oracle_text, lang, condition, foil, qty, price)
+      values (me, e.scryfall_id, e.oracle_id, e.name, e.printed_name, e.set_code,
+        e.set_name, e.cn, e.img, e.cm_id, e.type_line, e.rarity, e.mana_cost, e.cmc, e.released, e.colors,
+        e.keywords, e.oracle_text, e.lang, e.condition, e.foil, 0, e.price)
+      returning id into mycard;
+    end if;
+    if e.id = src.main_card_id then mymain := mycard; end if;
+    insert into public.deck_entries (deck_id, card_id, user_id, qty)
+      values (newid, mycard, me, e.deck_qty)
+      on conflict (deck_id, card_id) do update set qty = excluded.qty;
+  end loop;
+
+  if mymain is not null then update public.decks set main_card_id = mymain where id = newid; end if;
+  return newid;
+end $$;
+revoke execute on function public.import_shared_deck(uuid) from anon;

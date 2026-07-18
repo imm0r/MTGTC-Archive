@@ -867,6 +867,9 @@ function filtered() {
   const q = $("#q").value.trim().toLowerCase();
   const fs = $("#f-set").value, ff = $("#f-foil").value;
   return CARDS.filter(c =>
+    // qty 0 = „im Deck, aber nicht besessen" (aus einem Deck-Import). Gehört
+    // NICHT in die Sammlung — nur ins Deck, wo es als „fehlen" erscheint.
+    c.qty > 0 &&
     (!q || c.name.toLowerCase().includes(q) || c.disp.toLowerCase().includes(q) ||
            (c.set_name || "").toLowerCase().includes(q)) &&
     (!fs || c.set === fs) &&
@@ -2684,9 +2687,10 @@ function renderWho() {
    Karte und die neueste Errungenschaft — je mit Mini-Bild und klickbar zur
    Detailansicht. Beides sind Einzel-Callouts, die das Dashboard so nicht zeigt. */
 function profilHighlightsHtml() {
-  const mitPreis = CARDS.filter(c => c.price != null);
+  const owned = CARDS.filter(c => c.qty > 0);   // nicht besessene Deck-Karten (qty 0) zählen nicht
+  const mitPreis = owned.filter(c => c.price != null);
   const wertvollste = mitPreis.length ? mitPreis.reduce((a, b) => (b.price > a.price ? b : a)) : null;
-  const mitDatum = CARDS.filter(c => c.added);
+  const mitDatum = owned.filter(c => c.added);
   // added ist ein ISO-Zeitstempel — String-Vergleich reicht für "das späteste".
   const neueste = mitDatum.length ? mitDatum.reduce((a, b) => (b.added > a.added ? b : a)) : null;
   const kachel = (label, c, sub) => c ? `
@@ -2752,8 +2756,9 @@ function renderProfile() {
     </div>`;
 
   // Statistik über den GESAMTEN Bestand — dieselbe Funktion wie das
-  // Sammlungs-Dashboard, nur ungefiltert und in ein eigenes Ziel.
-  renderDash(CARDS, $("#profile-dash"), false);
+  // Sammlungs-Dashboard, nur in ein eigenes Ziel. qty 0 (nicht besessene
+  // Deck-Karten aus einem Import) zählt nicht zur Sammlung.
+  renderDash(CARDS.filter(c => c.qty > 0), $("#profile-dash"), false);
 
   // Highlight-Kacheln öffnen die Detailansicht der jeweiligen Karte.
   $$("#v-profile [data-hl]").forEach(k => k.onclick = () => showCardDetail(k.dataset.hl));
@@ -2994,19 +2999,36 @@ async function zeigeFreundDecks(friendId) {
     }
     ziel.innerHTML = `<h3 style="margin:14px 2px 4px">Geteilte Decks von ${esc(name)}</h3>` +
       decks.map(d => friendDeckHtml(d, (entries || []).filter(e => e.deck_id === d.id), cardsById)).join("");
+    // Auf-/Zuklappen (der Import-Knopf im Kopf darf nicht mit-toggeln) + Import.
+    ziel.querySelectorAll(".deck-kopf[data-ftoggle]").forEach(k => k.onclick = ev => {
+      if (ev.target.closest("button")) return;
+      const id = k.dataset.ftoggle;
+      freundDeckOffen.has(id) ? freundDeckOffen.delete(id) : freundDeckOffen.add(id);
+      const auf = freundDeckOffen.has(id);
+      k.parentElement.querySelector(".deck-inhalt").style.display = auf ? "block" : "none";
+      k.querySelector(".deck-pfeil").innerHTML = auf ? "&#9660;" : "&#9654;";
+      k.title = auf ? "Zuklappen" : "Aufklappen";
+    });
+    ziel.querySelectorAll("[data-fimport]").forEach(b => b.onclick = () => importFriendDeck(b.dataset.fimport));
   } catch (e) {
     ziel.innerHTML = `<div class="card"><div class="meta"><span class="pill err">${esc(e.message)}</span></div></div>`;
   }
 }
 
-/* Read-only Deck eines Freundes: Kopf mit Kennzahlen und eine einfache
-   Kartenliste (Bild, Name, Set·#, Deckmenge, Preis). Keine Bearbeitung. */
+/* Welche Freund-Decks aufgeklappt sind — nur im Speicher, wie deckDashOffen.
+   Read-only-Blick, kein Dauerzustand. */
+const freundDeckOffen = new Set();
+
+/* Read-only Deck eines Freundes: auf-/zuklappbarer Kopf mit Kennzahlen (wie in
+   der eigenen Deckliste) und eine einfache Kartenliste (Bild, Name, Set·#,
+   Deckmenge, Preis). Keine Bearbeitung; ein Knopf übernimmt das Deck. */
 function friendDeckHtml(d, entries, cardsById) {
   const rows = entries.map(e => ({ e, c: cardsById[e.card_id] })).filter(x => x.c)
     .sort((a, b) => a.c.disp.localeCompare(b.c.disp));
   const n = rows.reduce((s, x) => s + x.e.qty, 0);
   const v = rows.reduce((s, x) => s + (x.c.price || 0) * x.e.qty, 0);
   const haupt = d.main_card_id ? cardsById[d.main_card_id] : null;
+  const offen = freundDeckOffen.has(d.id);
   const list = rows.map(({ e, c }) => `
     <tr>
       <td style="width:40px">${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy" style="width:34px;border-radius:3px;display:block">` : ""}</td>
@@ -3016,7 +3038,8 @@ function friendDeckHtml(d, entries, cardsById) {
       <td class="num">${eur(c.price)}</td>
     </tr>`).join("");
   return `<div class="card">
-    <div class="deck-kopf" style="cursor:default">
+    <div class="deck-kopf" data-ftoggle="${esc(d.id)}" title="${offen ? "Zuklappen" : "Aufklappen"}">
+      <span class="deck-pfeil">${offen ? "&#9660;" : "&#9654;"}</span>
       ${haupt?.img ? `<img class="deck-haupt" src="${esc(haupt.img)}" alt="">` : ""}
       <div style="flex:1;min-width:0">
         <h3 style="margin:0">${esc(d.name)}</h3>
@@ -3025,10 +3048,30 @@ function friendDeckHtml(d, entries, cardsById) {
           d.archetype ? `<span class="pill">${esc(d.archetype)}</span>` : ""}</div>` : ""}
         <div class="hint" style="margin:2px 0 0">${n} Karten &middot; ${eur(v)}</div>
       </div>
+      <button class="btn ghost sm" data-fimport="${esc(d.id)}" style="flex:none"
+        title="Dieses Deck in deine Decks übernehmen">In meine Decks</button>
     </div>
-    <div class="xscroll" style="overflow-x:auto"><table class="deck-tbl" style="margin-top:10px">
-      <tbody>${list}</tbody></table></div>
+    <div class="deck-inhalt" style="display:${offen ? "block" : "none"}">
+      <div class="xscroll" style="overflow-x:auto"><table class="deck-tbl" style="margin-top:10px">
+        <tbody>${list}</tbody></table></div>
+    </div>
   </div>`;
+}
+
+/* Ein geteiltes Freund-Deck als neues, PRIVATES Deck in die eigenen übernehmen.
+   Karten, die man nicht besitzt, kommen als Bestand-0-Zeilen ins Deck (dort
+   „fehlen") — die eigene Sammlung ändert sich nicht. Macht die RPC atomar. */
+async function importFriendDeck(deckId) {
+  if (!await confirmDlg(`<b>Deck übernehmen?</b>
+    <p class="hint">Es wird als neues, privates Deck in deine Decks kopiert. Karten,
+    die du nicht besitzt, erscheinen darin als „fehlen“ — deine Sammlung ändert sich nicht.</p>`)) return;
+  try {
+    const { error } = await sb.rpc("import_shared_deck", { p_deck: deckId });
+    if (error) throw error;
+    await reload(); renderAll();
+    toast("Deck in deine Decks übernommen");
+    const b = $('nav button[data-v="decks"]'); if (b) b.click();
+  } catch (e) { toast(dbErr(e)); }
 }
 
 function wireApp() {
