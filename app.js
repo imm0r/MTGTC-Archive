@@ -62,12 +62,12 @@ function connect(c) {
 function dbErr(e) {
   if (!e) return "";
   if (e.message?.includes("Failed to fetch"))
-    return "Keine Verbindung zur Datenbank. Internet prüfen.";
+    return t("err.noConn");
   if (e.code === "42P01" || e.message?.includes("does not exist"))
-    return "Tabellen fehlen — bitte supabase-schema.sql im SQL Editor ausführen.";
+    return t("err.noTables");
   if (e.code === "PGRST301" || e.code === "42501")
-    return "Keine Berechtigung. Bist du noch angemeldet?";
-  return e.message || "Unbekannter Datenbankfehler";
+    return t("err.noPerm");
+  return e.message || t("err.unknown");
 }
 
 /* ------------------------------------------------------------ Datenlage */
@@ -361,7 +361,7 @@ async function readWithVision(img) {
 
     if (s === 429) {
       // Vorübergehend — nicht abschalten, nur diese Karte anders lösen.
-      toast(msg || "Zu viele Anfragen — diese Karte über Texterkennung.");
+      toast(msg || t("scan.tooMany"));
       return null;
     }
     // Alles andere ändert sich nicht von allein: für die Sitzung abschalten.
@@ -369,9 +369,9 @@ async function readWithVision(img) {
     // er bedeutet CORS oder Netzwerk. Genau der ist mir hier stumm
     // durchgerutscht, weil ich nur bekannte Statuscodes behandelt habe.
     visionAus = true;
-    toast(msg ? msg + " Weiter mit Texterkennung."
-      : s ? `Bilderkennung nicht verfügbar (Fehler ${s}) — weiter mit Texterkennung.`
-          : "Bilderkennung nicht erreichbar (CORS oder Netzwerk) — weiter mit Texterkennung.");
+    toast(msg ? msg + t("scan.fallbackSuffix")
+      : s ? t("scan.visionErr", { s })
+          : t("scan.visionUnreach"));
     return null;
   }
   return data?.card || null;
@@ -511,7 +511,7 @@ async function identify(img, lang, onStep) {
   // 1. Bildmodell: liefert eine wörtliche Abschrift der beiden Eckzeilen.
   //    Zerlegt wird sie hier mit parseCorner — dieselbe geprüfte Regel wie
   //    beim Tesseract-Weg. Das Modell soll lesen, nicht deuten.
-  onStep("Karte wird gelesen…");
+  onStep(t("scan.reading"));
   try {
     const v = await readWithVision(img);
     if (v) {
@@ -522,12 +522,12 @@ async function identify(img, lang, onStep) {
         // Die Typzeile ist ein zweiter, unabhängiger Token-Hinweis: steht dort
         // "Spielsteinkreatur", ist es eines, auch wenn das winzige T entging.
         const token = c.token || /spielstein|\btoken\b|emblem/i.test(v.type_line || "");
-        onStep(`Suche ${c.set} #${c.num}${token ? " (Token)" : ""}…`);
+        onStep(t("scan.searchingCode", { set: c.set, num: c.num, token: token ? t("scan.tokenSuffix") : "" }));
         const hit = await findByCode(c.set, c.num, l, token);
         if (hit) return { card: hit, guess: hit.printed_name || hit.name, candidates: [], vision: v, lang: l };
       }
       if (v.printed_name) {
-        onStep(`Suche „${v.printed_name}“…`);
+        onStep(t("scan.searchingName", { name: v.printed_name }));
         const { card, candidates: cs } = await findCard(v.printed_name, l);
         if (card) return { card, guess: v.printed_name, candidates: [], vision: v, lang: l };
         if (cs.length) { best = cs; firstGuess = v.printed_name; }
@@ -538,24 +538,24 @@ async function identify(img, lang, onStep) {
   const w = await ocrWorker();
 
   // 2. Auffangnetz: Setcode + Sammlernummer per Zeichenerkennung.
-  onStep("Lese Setcode und Nummer…");
+  onStep(t("scan.readingCode"));
   try {
     const { data } = await w.recognize(preprocessCorner(img));
     const c = parseCorner(data.text);
     if (c) {
-      onStep(`Suche ${c.set} #${c.num}${c.token ? " (Token)" : ""}…`);
+      onStep(t("scan.searchingCode", { set: c.set, num: c.num, token: c.token ? t("scan.tokenSuffix") : "" }));
       const hit = await findByCode(c.set, c.num, lang, c.token);
       if (hit) return { card: hit, guess: hit.printed_name || hit.name, candidates: [] };
     }
   } catch { /* Ecke unlesbar — weiter über den Namen */ }
 
   for (const topOnly of [true, false]) {
-    onStep(topOnly ? "Lese Kartennamen…" : "Zweiter Versuch am ganzen Bild…");
+    onStep(topOnly ? t("scan.readingName") : t("scan.secondTry"));
     const { data } = await w.recognize(preprocess(img, topOnly));
     const lines = candidates(data.text);
     if (topOnly) firstGuess = lines[0] || "";
     for (const line of lines) {
-      onStep("Suche „" + line + "“…");
+      onStep(t("scan.searchingName", { name: line }));
       const { card, candidates: cs } = await findCard(line, lang);
       if (card) return { card, guess: line, candidates: [] };
       // Mehrdeutig: merken, aber weitersuchen — vielleicht trifft eine
@@ -570,7 +570,7 @@ async function identify(img, lang, onStep) {
 const loadImg = file => new Promise((res, rej) => {
   const im = new Image();
   im.onload = () => res(im);
-  im.onerror = () => rej(new Error("Bild nicht lesbar"));
+  im.onerror = () => rej(new Error(t("scan.imgUnreadable")));
   im.src = URL.createObjectURL(file);
 });
 
@@ -582,8 +582,8 @@ async function scanBild(img, thumbSrc, lang) {
   const el = document.createElement("div");
   el.className = "job";
   el.innerHTML = `<img class="thumb" src="${esc(thumbSrc)}" alt="">
-    <div class="body"><div class="title">Wird verarbeitet…</div>
-    <div class="meta" data-step>Karte wird gelesen…</div>
+    <div class="body"><div class="title">${esc(t("scan.processing"))}</div>
+    <div class="meta" data-step>${esc(t("scan.reading"))}</div>
     <div class="bar"><i style="width:35%"></i></div></div>`;
   $("#queue").prepend(el);
   const step = t => { const n = el.querySelector("[data-step]"); if (n) n.textContent = t; };
@@ -597,7 +597,7 @@ async function scanBild(img, thumbSrc, lang) {
     else renderManual(el, r.guess, r.candidates);
   } catch (e) {
     el.querySelector(".body").innerHTML =
-      `<div class="title">Fehlgeschlagen</div>
+      `<div class="title">${esc(t("scan.failed"))}</div>
        <div class="meta"><span class="pill err">${esc(e.message)}</span></div>`;
   }
 }
@@ -606,7 +606,7 @@ async function scanFile(file) {
   try {
     const img = await loadImg(file);
     await scanBild(img, URL.createObjectURL(file), $("#d-lang").value);
-  } catch { toast("Bild nicht lesbar"); }
+  } catch { toast(t("scan.imgUnreadable")); }
 }
 
 /* Ein Foto mit MEHREREN Karten: erst die Rechtecke vom Modell holen (detect),
@@ -616,13 +616,13 @@ async function scanFile(file) {
    Ausreißer korrigiert man je Karte in der Warteschlange. */
 async function scanMultiFile(file) {
   let img;
-  try { img = await loadImg(file); } catch { return toast("Bild nicht lesbar"); }
-  toast("Karten werden gesucht…");
+  try { img = await loadImg(file); } catch { return toast(t("scan.imgUnreadable")); }
+  toast(t("scan.searching"));
   let boxes;
   try { boxes = await detectCards(img); }
-  catch (e) { return toast(e.message || "Karten konnten nicht gefunden werden."); }
-  if (!boxes.length) return toast("Keine Karten erkannt — näher/heller fotografieren oder einzeln scannen.");
-  toast(`${boxes.length} ${boxes.length === 1 ? "Karte" : "Karten"} erkannt — werden gelesen…`);
+  catch (e) { return toast(e.message || t("scan.notFound")); }
+  if (!boxes.length) return toast(t("scan.noneDetected"));
+  toast(t("scan.detected", { n: boxes.length }));
   const lang = $("#d-lang").value;
   for (const box of boxes) {
     const cv = cropCanvas(img, box, 0.06);
@@ -633,7 +633,7 @@ async function scanMultiFile(file) {
 /* Kartenrechtecke (Anteile 0..1) für ein Foto über die "detect"-Betriebsart.
    Unplausible/leere Rechtecke fliegen gleich raus. */
 async function detectCards(img) {
-  if (visionAus) throw new Error("Bilderkennung ist für diese Sitzung deaktiviert.");
+  if (visionAus) throw new Error(t("scan.visionDisabled"));
   const ganz = { x: 0, y: 0, w: img.width, h: img.height };
   const { data, error } = await sb.functions.invoke("scan-card", {
     body: { mode: "detect", images: [{ b64: toJpegBase64(img, ganz, 1600), media_type: "image/jpeg" }] },
@@ -641,7 +641,7 @@ async function detectCards(img) {
   if (error) {
     let msg = "";
     try { msg = (await error.context.json()).error; } catch { /* kein JSON-Körper */ }
-    throw new Error(msg || "Bilderkennung nicht erreichbar (CORS oder Netzwerk).");
+    throw new Error(msg || t("scan.detectUnreach"));
   }
   const cards = Array.isArray(data?.detect?.cards) ? data.detect.cards : [];
   return cards
@@ -704,10 +704,10 @@ async function addToCollection(card, el, detected) {
     ${card.printed_name ? `<div class="meta">${esc(card.name)}</div>` : ""}
     <div class="meta">${esc(card.set_name)} &middot; #${esc(card.collector_number)} &middot; ${eur(price)}</div>
     <div class="meta" style="margin-top:6px">
-      <span class="pill ok">${before ? "Anzahl: " + (row?.qty ?? "+1") : "Hinzugefügt"}</span>
+      <span class="pill ok">${before ? esc(t("common.qtyLabel")) + ": " + (row?.qty ?? "+1") : esc(t("detail.added"))}</span>
       ${foil ? '<span class="pill foil">Foil</span>' : ""}
       <span class="pill">${esc(lang.toUpperCase())}</span><span class="pill">${esc(cond)}</span>
-      <button class="btn ghost sm" data-fix style="margin-left:6px">Falsche Karte?</button>
+      <button class="btn ghost sm" data-fix style="margin-left:6px">${esc(t("scan.wrongCard"))}</button>
     </div>`;
   el.querySelector("[data-fix]").onclick = () => renderManual(el, card.name);
 }
@@ -724,19 +724,16 @@ function renderManual(el, guess, candidates) {
       </button>`).join("")}</div>` : "";
 
   el.querySelector(".body").innerHTML = `
-    <div class="title">${cs.length ? "Welche Karte ist es?" : "Nicht sicher erkannt"}</div>
+    <div class="title">${esc(cs.length ? t("scan.whichCard") : t("scan.notSure"))}</div>
     <div class="meta">${cs.length
-      ? `Gelesen wurde „${esc(guess)}“ — das passt auf mehrere Karten.`
-      : "Kartenname eingeben — Vorschläge erscheinen beim Tippen."}</div>
+      ? t("scan.readMultiple", { guess: esc(guess) })
+      : esc(t("scan.manualNameHint"))}</div>
     ${list}
     <div class="row" style="margin-top:8px">
-      <div class="sugg"><input type="text" data-name value="${esc(guess)}" placeholder="Kartenname oder z. B. „MKM 8 T“"></div>
-      <div style="flex:none"><button class="btn sm" data-go>Suchen</button></div>
+      <div class="sugg"><input type="text" data-name value="${esc(guess)}" placeholder="${esc(t("scan.namePh"))}"></div>
+      <div style="flex:none"><button class="btn sm" data-go>${esc(t("scan.search"))}</button></div>
     </div>
-    <p class="hint" style="margin-top:6px">Immer eindeutig: Setcode und Sammlernummer von unten
-      links auf der Karte, z. B. <code>MKM 8</code> — bei einem Token ein <code>T</code> anhängen
-      (<code>FIN 9 T</code>), bei Promos den Setcode mit <code>P</code> davor (<code>PEMN 1Z</code>).
-      Der Setcode steht in der Zeile mit dem Sprachkürzel.</p>`;
+    <p class="hint" style="margin-top:6px">${t("scan.codeHint")}</p>`;
 
   el.querySelectorAll("[data-pick]").forEach(b => b.onclick = async () => {
     try { await addToCollection(cs[+b.dataset.pick], el); }
@@ -748,7 +745,7 @@ function renderManual(el, guess, candidates) {
   const go = async () => {
     const v = inp.value.trim();
     if (!v) return;
-    el.querySelector(".meta").textContent = "Suche…";
+    el.querySelector(".meta").textContent = t("scan.searchingShort");
     try {
       // "MKM 8", "FIN 9 T" oder "PEMN 1Z": Eingabe von Setcode und Nummer,
       // wie sie unten links auf der Karte stehen. Die Nummer darf einen
@@ -763,13 +760,13 @@ function renderManual(el, guess, candidates) {
         card = await findByCode(m[1], m[2].slice(0, -1), $("#d-lang").value, true);
       if (card) return addToCollection(card, el);
       if (m) return el.querySelector(".meta").innerHTML =
-        `<span class="pill err">${esc(m[1].toUpperCase())} #${esc(m[2])} gibt es nicht${m[3] ? " als Token" : ""}</span>`;
+        `<span class="pill err">${esc(t("scan.notExist", { set: m[1].toUpperCase(), num: m[2], token: m[3] ? t("scan.asToken") : "" }))}</span>`;
 
       const r = await findCard(v, $("#d-lang").value);
       if (r.card) await addToCollection(r.card, el);
       else if (r.candidates.length) renderManual(el, v, r.candidates);
       else el.querySelector(".meta").innerHTML =
-        '<span class="pill err">Keine Karte mit diesem Namen gefunden</span>';
+        `<span class="pill err">${esc(t("scan.noNameMatch"))}</span>`;
     } catch (e) {
       el.querySelector(".meta").innerHTML = `<span class="pill err">${esc(e.message)}</span>`;
     }
@@ -1012,7 +1009,7 @@ function wireCardRows(root) {
       try {
         const p = await preisNeuZiehen(c);
         await reload(); renderAll();
-        toast(p == null ? "Scryfall führt keinen Preis für diese Auflage" : "Preis aktualisiert: " + eur(p));
+        toast(p == null ? t("toast.noPrice") : t("toast.priceUpdated", { p: eur(p) }));
       } catch (e) { pb.disabled = false; toast(e.message); }
     };
 
@@ -1042,7 +1039,7 @@ function wireCardRows(root) {
           : await sb.from("cards").delete().eq("id", id);
         if (error) throw error;
         await reload(); renderAll();
-        toast(deck ? "Aus dem Deck entfernt" : "Karte entfernt");
+        toast(deck ? t("toast.removedFromDeck") : t("toast.cardRemoved"));
       } catch (e) { toast(dbErr(e)); }
     };
   });
@@ -1452,7 +1449,7 @@ async function nachtragen(c, fresh) {
    diesen Weg — sonst füllt nur einer von beiden die Lücken nach. */
 async function preisNeuZiehen(c) {
   const fresh = await withPrice(await sfById(c.scryfall_id));
-  if (!fresh) throw new Error("Karte bei Scryfall nicht gefunden");
+  if (!fresh) throw new Error(t("err.cardNotFound"));
   const p = priceOf(fresh, c.foil);
   // set_price schreibt in die Preishistorie: ein Punkt pro Tag, 60 bleiben.
   const { error } = await sb.rpc("set_price", { p_card_id: c.id, p_price: p });
@@ -1467,7 +1464,7 @@ async function updatePrices() {
   const uniq = [...new Set(CARDS.map(c => c.scryfall_id))];
   let done = 0, failed = 0;
   for (const sid of uniq) {
-    btn.textContent = `Preise… ${++done}/${uniq.length}`;
+    btn.textContent = t("coll.updatingProgress", { done: ++done, total: uniq.length });
     let fresh = null;
     try { fresh = await sfById(sid); } catch { failed++; continue; }
     if (!fresh) { failed++; continue; }
@@ -1478,8 +1475,8 @@ async function updatePrices() {
     }
   }
   try { await reload(); renderAll(); } catch (e) { toast(dbErr(e)); }
-  btn.disabled = false; btn.textContent = "Preise aktualisieren";
-  toast(failed ? `Preise aktualisiert, ${failed} nicht abrufbar` : "Preise aktualisiert");
+  btn.disabled = false; btn.textContent = t("coll.updatePrices");
+  toast(failed ? t("toast.pricesUpdatedSome", { n: failed }) : t("toast.pricesUpdated"));
 }
 
 /* ---------------------------------------------------- Seltenheit ----- */
@@ -1585,9 +1582,9 @@ function langHtml(lang) {
   const flagge = flaggeHtml(l);
   if (flagge) return flagge;
   const name = LANG_NAMES[l];
-  if (name) return `<span class="pill" title="${esc(name)} — dafür haben wir keine Flagge"
+  if (name) return `<span class="pill" title="${esc(name)} ${esc(t("flag.noFlagSuffix"))}"
                           >${esc(l.toUpperCase())}</span>`;
-  return `<span class="pill err" title="Kein Scryfall-Sprachcode: ${esc(l.toUpperCase())}"
+  return `<span class="pill err" title="${esc(t("flag.noLangCode", { code: l.toUpperCase() }))}"
                 >${esc(l.toUpperCase() || "?")}</span>`;
 }
 
@@ -1642,7 +1639,7 @@ const dtShort = iso => {
    Grün bei gestiegenem, rot bei gefallenem Kurs — wie die Mini-Kurve. */
 function priceChart(hist, w = 560, h = 200) {
   const H = (hist || []).map(p => ({ d: p.d, v: Number(p.v) })).filter(p => !isNaN(p.v));
-  if (!H.length) return '<p class="hint">Noch keine Preishistorie — sie wächst mit jedem Preis-Update um einen Punkt pro Tag.</p>';
+  if (!H.length) return `<p class="hint">${esc(t("detail.noHistory"))}</p>`;
   const pl = w > 400 ? 62 : 54, pr = 14, pt = 12, pb = 26;
   let min = Math.min(...H.map(p => p.v)), max = Math.max(...H.map(p => p.v));
   if (min === max) { const d = Math.max(0.05, min * 0.1); min -= d; max += d; }
@@ -1681,7 +1678,7 @@ function parseAbilities(text, keywords) {
   return text.split("\n").map(z => z.trim()).filter(Boolean).map(z => {
     // Loyalität: +N / −N / −X / 0. Scryfall nutzt das echte Minus (U+2212).
     let m = z.match(/^([+−][0-9X]+|0):\s+(.+)$/);
-    if (m) return { typ: "Loyalität", name: "", kosten: m[1], effekt: m[2] };
+    if (m) return { typ: "loyalty", name: "", kosten: m[1], effekt: m[2] };
 
     // Schlüsselwort: das erste Wort steht in der verbürgten Liste. Wert wie
     // "Ward {2}" wird als Kosten mitgenommen, Erinnerungstext als Wirkung.
@@ -1693,7 +1690,7 @@ function parseAbilities(text, keywords) {
     if (treffer && ohneKlammer.length < 40) {
       const symbole = ohneKlammer.match(/\{[^}]+\}/g);
       const rem = z.match(/\(([^)]*)\)\s*$/);
-      return { typ: "Schlüsselwort", name: treffer,
+      return { typ: "keyword", name: treffer,
                kosten: symbole ? symbole.join("") : "",
                effekt: rem ? rem[1] : "" };
     }
@@ -1704,12 +1701,12 @@ function parseAbilities(text, keywords) {
     m = z.match(/^([^:]{1,60}):\s+(.+)$/);
     if (m && (/\{[^}]+\}/.test(m[1]) ||
               /^(Tap|Untap|Sacrifice|Discard|Pay|Exile|Remove|Return|Reveal)\b/i.test(m[1])))
-      return { typ: "Aktiviert", name: "", kosten: m[1].trim(), effekt: m[2] };
+      return { typ: "activated", name: "", kosten: m[1].trim(), effekt: m[2] };
 
     // Ausgelöst
-    if (/^(When|Whenever|At )/i.test(z)) return { typ: "Ausgelöst", name: "", kosten: "", effekt: z };
+    if (/^(When|Whenever|At )/i.test(z)) return { typ: "triggered", name: "", kosten: "", effekt: z };
 
-    return { typ: "Statisch", name: "", kosten: "", effekt: z };
+    return { typ: "static", name: "", kosten: "", effekt: z };
   });
 }
 
@@ -1727,18 +1724,18 @@ function faehigkeitenHtml(c, kompakt) {
     const ab = parseAbilities(c.oracle_text, c.keywords) || [];
     if (ab.length) teile.push(`
       <details class="faehig">
-        <summary>Aufgeschlüsselt <span class="hint" style="display:inline">(automatisch bestimmt)</span></summary>
+        <summary>${esc(t("detail.abBreakdown"))} <span class="hint" style="display:inline">${esc(t("detail.abAuto"))}</span></summary>
         <table class="faehig-tbl"><thead><tr>
-          <th>Name</th><th>Typ</th><th>Kosten</th><th>Wirkung</th></tr></thead>
+          <th>${esc(t("common.name"))}</th><th>${esc(t("detail.abType"))}</th><th>${esc(t("detail.abCost"))}</th><th>${esc(t("detail.abEffect"))}</th></tr></thead>
         <tbody>${ab.map(a => `<tr>
           <td>${a.name ? esc(a.name) : "—"}</td>
-          <td>${esc(a.typ)}</td>
+          <td>${esc(t("ab." + a.typ))}</td>
           <td class="num" style="white-space:nowrap">${a.kosten ? mitSymbolen(a.kosten) : "—"}</td>
           <td>${a.effekt ? mitSymbolen(a.effekt) : "—"}</td></tr>`).join("")}</tbody></table>
       </details>`);
   }
   if (!teile.length) return "";
-  return `<div style="margin-top:10px"><label style="margin-bottom:4px">Fähigkeiten</label>${teile.join("")}</div>`;
+  return `<div style="margin-top:10px"><label style="margin-bottom:4px">${esc(t("detail.abilities"))}</label>${teile.join("")}</div>`;
 }
 
 /* Gemeinsame Vorlage für Dialog und Hover-Vorschau. Der Preisgraph sitzt in
@@ -1765,24 +1762,24 @@ function detailHtml(c, hover) {
           <span class="pill">${flaggeHtml(c.lang, true)} ${esc(LANG_NAMES[c.lang]
             || (c.lang || "").toUpperCase() || "?")}</span>
           <span class="pill">${esc(c.condition || "")}</span>
-          <span class="pill">Anzahl ${c.qty}</span>
+          <span class="pill">${esc(t("common.qtyLabel"))} ${c.qty}</span>
         </div>
-        <div>Preis: <b>${eur(c.price)}</b></div>
+        <div>${esc(t("detail.price"))}: <b>${eur(c.price)}</b></div>
         ${!hover ? `<div style="margin-top:8px">
           ${cmLink(c.cm_id) ? `<a class="cm" href="${esc(cmLink(c.cm_id))}" target="_blank"
-            rel="noopener noreferrer" title="Angebote auf Cardmarket">CM</a> ` : ""}
+            rel="noopener noreferrer" title="${esc(t("row.cmTitle"))}">CM</a> ` : ""}
           ${sfLink(c) ? `<a class="cm" href="${esc(sfLink(c))}" target="_blank"
-            rel="noopener noreferrer" title="Kartentext und alle Auflagen auf Scryfall">SF</a>` : ""}
+            rel="noopener noreferrer" title="${esc(t("row.sfTitle"))}">SF</a>` : ""}
         </div>
         <div class="row" style="margin-top:10px">
           <div style="flex:none"><button class="btn ghost sm" id="dt-edit"
-            title="Sprache, Zustand oder Ausführung ändern">&#9998; Bearbeiten</button></div>
+            title="${esc(t("row.editTitle"))}">&#9998; ${esc(t("detail.edit"))}</button></div>
           <div style="flex:none"><button class="btn ghost sm" id="dt-price"
-            title="Preis neu von Scryfall holen">&#8635; Preis</button></div>
+            title="${esc(t("detail.priceBtnTitle"))}">&#8635; ${esc(t("detail.priceBtn"))}</button></div>
         </div>` : ""}
-        <div class="hint" style="margin-top:10px">Hinzugefügt: ${dtShort(c.added)} Uhr</div>
+        <div class="hint" style="margin-top:10px">${esc(t("detail.added"))}: ${dtShort(c.added)} ${esc(t("detail.addedSuffix"))}</div>
         <div style="margin-top:10px">
-          <label style="margin-bottom:2px">Preisverlauf</label>
+          <label style="margin-bottom:2px">${esc(t("detail.priceHistory"))}</label>
           ${priceChart(c.hist, 320, 150)}
         </div>
       </div>
@@ -1803,7 +1800,7 @@ function showCardDetail(id) {
     try {
       const p = await preisNeuZiehen(c);
       await reload(); renderAll();
-      toast(p == null ? "Scryfall führt keinen Preis für diese Auflage" : "Preis aktualisiert: " + eur(p));
+      toast(p == null ? t("toast.noPrice") : t("toast.priceUpdated", { p: eur(p) }));
       // Ansicht mit dem frischen Preis und dem neuen Kurvenpunkt neu zeichnen.
       if ($("#detail-dlg").open) showCardDetail(id);
     } catch (e) { pb.disabled = false; toast(e.message); }
@@ -1846,32 +1843,29 @@ async function editCard(id) {
   const CONDS = ["NM", "LP", "MP", "HP", "DMG"];
   const ok = await confirmDlg(`
     <b>${esc(c.disp)}</b>
-    <p class="hint" style="margin:2px 0 10px">${esc(c.set_name || c.set)} · #${esc(c.cn)} · Anzahl ${c.qty}</p>
+    <p class="hint" style="margin:2px 0 10px">${esc(c.set_name || c.set)} · #${esc(c.cn)} · ${esc(t("common.qtyLabel"))} ${c.qty}</p>
     <div class="row" style="margin-bottom:8px">
-      <div><label>Set-Code</label><input type="text" id="ed-set" value="${esc(c.set || "")}"
+      <div><label>${esc(t("edit.setCode"))}</label><input type="text" id="ed-set" value="${esc(c.set || "")}"
         style="text-transform:uppercase" placeholder="MKM"></div>
-      <div><label>Nummer</label><input type="text" id="ed-cn" value="${esc(c.cn || "")}" placeholder="8"></div>
+      <div><label>${esc(t("edit.number"))}</label><input type="text" id="ed-cn" value="${esc(c.cn || "")}" placeholder="8"></div>
     </div>
     <div class="row">
-      <div><label>Sprache</label><select id="ed-lang">${langs.map(l =>
+      <div><label>${esc(t("cm.language"))}</label><select id="ed-lang">${langs.map(l =>
         `<option value="${esc(l)}"${l === c.lang ? " selected" : ""}>${esc(LANG_NAMES[l] || l)}</option>`).join("")}</select></div>
-      <div><label>Zustand</label><select id="ed-cond">${CONDS.map(x =>
+      <div><label>${esc(t("cm.condition"))}</label><select id="ed-cond">${CONDS.map(x =>
         `<option${x === c.condition ? " selected" : ""}>${x}</option>`).join("")}</select></div>
-      <div><label>Ausführung</label><select id="ed-foil">
-        <option value="0"${!c.foil ? " selected" : ""}>Normal</option>
+      <div><label>${esc(t("edit.finish"))}</label><select id="ed-foil">
+        <option value="0"${!c.foil ? " selected" : ""}>${esc(t("edit.normal"))}</option>
         <option value="1"${c.foil ? " selected" : ""}>Foil</option></select></div>
     </div>
-    <p class="hint">Geänderter Set-Code oder Nummer löst die Karte neu auf — Name, Bild und Preis
-      kommen dann von der neuen Auflage; Anzahl, Zustand und Deck-Zuordnung bleiben.
-      Bei Tokens beginnt der Set-Code mit T (z.&nbsp;B. TFIN), bei Promos mit P (PEMN).
-      Gibt es dieselbe Karte in der Ziel-Ausprägung schon, werden die Anzahlen zusammengelegt.</p>`);
+    <p class="hint">${t("edit.hint")}</p>`);
   if (!ok) return;
   const lang = $("#ed-lang").value, cond = $("#ed-cond").value, foil = $("#ed-foil").value === "1";
   const setIn = $("#ed-set").value.trim().toUpperCase();
   const cnIn  = $("#ed-cn").value.trim();
   const auflageNeu = setIn !== (c.set || "").toUpperCase() || cnIn !== String(c.cn || "");
   if (!auflageNeu && lang === c.lang && cond === c.condition && foil === c.foil) return;
-  if (auflageNeu && (!setIn || !cnIn)) return toast("Set-Code und Nummer dürfen nicht leer sein");
+  if (auflageNeu && (!setIn || !cnIn)) return toast(t("toast.setCnRequired"));
   try { await applyCardEdit(c, lang, cond, foil, auflageNeu ? { set: setIn, cn: cnIn } : null); }
   catch (e) { toast(e.message); }
 }
@@ -1884,7 +1878,7 @@ async function applyCardEdit(c, lang, cond, foil, neu) {
     // Andere Auflage: komplett neu auflösen. findByCode probiert den Code
     // wörtlich und mit t-Präfix, tippt man TFIN direkt ein, trifft es sofort.
     fresh = await findByCode(neu.set, neu.cn, lang, false);
-    if (!fresh) throw new Error(`${neu.set} #${neu.cn} bei Scryfall nicht gefunden`);
+    if (!fresh) throw new Error(t("err.printingNotFound", { set: neu.set, cn: neu.cn }));
     patch.scryfall_id = fresh.id;
     patch.name = fresh.name;
     patch.printed_name = fresh.printed_name || null;
@@ -1948,13 +1942,13 @@ async function applyCardEdit(c, lang, cond, foil, neu) {
     }
     const del = await sb.from("cards").delete().eq("id", c.id);
     if (del.error) throw new Error(dbErr(del.error));
-    toast(`Mit vorhandener Zeile zusammengelegt — Anzahl jetzt ${twin.qty + c.qty}`);
+    toast(t("toast.mergedQty", { n: twin.qty + c.qty }));
   } else {
     const { error } = await sb.from("cards").update(patch).eq("id", c.id);
     if (error) throw new Error(dbErr(error));
     toast(neu
-      ? `Jetzt: ${fresh.printed_name || fresh.name} · ${patch.set_code} #${patch.cn}`
-      : "Karte aktualisiert");
+      ? t("toast.cardNow", { name: fresh.printed_name || fresh.name, set: patch.set_code, cn: patch.cn })
+      : t("toast.cardUpdated"));
   }
   await reload(); renderAll();
 }
@@ -2029,7 +2023,7 @@ async function setMainCard(deckId, cardId) {
   if (error) {
     // Fehlt die Spalte, ist das Schema älter als die App.
     if (error.code === "42703" || /main_card_id/.test(error.message || ""))
-      return toast("Spalte fehlt — bitte supabase-schema.sql neu ausführen.");
+      return toast(t("toast.columnMissing"));
     // Der Trigger lehnt ungeeignete Karten ab; seine Meldung ist bereits
     // für Menschen geschrieben, also unverändert durchreichen. (Sie enthält
     // selbst einen Doppelpunkt — ein Präfix-Abschneider fräße den halben Satz.)
@@ -2038,7 +2032,7 @@ async function setMainCard(deckId, cardId) {
     return toast(dbErr(error));
   }
   await reload(); renderDecks();
-  toast(neu ? "Als Hauptkarte gesetzt" : "Hauptkarte entfernt");
+  toast(neu ? t("toast.mainSet") : t("toast.mainUnset"));
 }
 
 /* ============================= Decks-Ansicht ========================== */
@@ -2052,19 +2046,19 @@ async function editDeck(id) {
   const d = DECKS.find(x => x.id === id);
   if (!d) return;
   const ok = await confirmDlg(`
-    <b>Deck bearbeiten</b>
+    <b>${esc(t("deck.editTitle"))}</b>
     <div style="margin-top:10px">
-      <label>Name</label>
+      <label>${esc(t("common.name"))}</label>
       <input type="text" id="dn-name" value="${esc(d.name)}" autofocus>
     </div>
     <div class="row" style="margin-top:10px">
-      <div><label>Format</label><select id="dn-format">${deckOptions(DECK_FORMATE, d.format, "—")}</select></div>
-      <div><label>Archetyp</label><select id="dn-arch">${deckOptions(DECK_ARCHETYPEN, d.archetype, "—")}</select></div>
+      <div><label>${esc(t("decks.format"))}</label><select id="dn-format">${deckOptions(DECK_FORMATE, d.format, "—")}</select></div>
+      <div><label>${esc(t("decks.archetype"))}</label><select id="dn-arch">${deckOptions(DECK_ARCHETYPEN, d.archetype, "—")}</select></div>
     </div>
-    <p class="hint">Die Karten im Deck bleiben unverändert.</p>`);
+    <p class="hint">${esc(t("edit.deckHint"))}</p>`);
   if (!ok) return;
   const name = $("#dn-name").value.trim();
-  if (!name) return toast("Bitte einen Decknamen eingeben");
+  if (!name) return toast(t("toast.deckNameRequired"));
   const format    = $("#dn-format").value || null;
   const archetype = $("#dn-arch").value   || null;
   // Nichts geändert? Dann nicht schreiben. NULL und "" gelten als gleich.
@@ -2073,7 +2067,7 @@ async function editDeck(id) {
     const { error } = await sb.from("decks").update({ name, format, archetype }).eq("id", d.id);
     if (error) throw error;
     await reload(); renderDecks();
-    toast("Deck gespeichert");
+    toast(t("toast.deckSaved"));
   } catch (e) { toast(dbErr(e)); }
 }
 
@@ -2087,7 +2081,7 @@ async function shareDeck(id) {
     const { error } = await sb.from("decks").update({ shared: !d.shared }).eq("id", id);
     if (error) throw error;
     d.shared = !d.shared;
-    toast(d.shared ? "Deck für Freunde freigegeben" : "Freigabe zurückgenommen");
+    toast(d.shared ? t("toast.deckShared") : t("toast.deckUnshared"));
     renderDecks();
   } catch (e) { toast(dbErr(e)); }
 }
@@ -2245,8 +2239,7 @@ function renderDecks() {
 
   $$("[data-dx]").forEach(b => b.onclick = async () => {
     const d = DECKS.find(x => x.id === b.dataset.dx);
-    if (!await confirmDlg(`<b>Deck „${esc(d.name)}“ löschen?</b>
-      <p class="hint">Die Karten selbst bleiben in deiner Sammlung.</p>`)) return;
+    if (!await confirmDlg(t("dlg.deckDelete", { name: esc(d.name) }))) return;
     try {
       const { error } = await sb.from("decks").delete().eq("id", d.id);
       if (error) throw error;
@@ -2324,10 +2317,8 @@ function exportCsv() {
 /* Einspielen einer alten lokalen Sicherung (aus der IndexedDB-Fassung). */
 async function importJson(file) {
   const data = JSON.parse(await file.text());
-  if (!Array.isArray(data.cards)) throw new Error("Keine gültige Sicherungsdatei");
-  if (!await confirmDlg(`<b>${data.cards.length} Karten einspielen?</b>
-    <p class="hint">Sie werden zu deiner Sammlung <b>hinzugefügt</b>. Bereits vorhandene
-    Karten erhöhen ihre Anzahl statt doppelt aufzutauchen.</p>`)) return;
+  if (!Array.isArray(data.cards)) throw new Error(t("imp.badBackup"));
+  if (!await confirmDlg(t("dlg.importCards", { n: data.cards.length }))) return;
 
   let ok = 0, bad = 0;
   for (const c of data.cards) {
@@ -2350,7 +2341,7 @@ async function importJson(file) {
     }
   }
   await reload(); renderAll();
-  toast(bad ? `${ok} Karten eingespielt, ${bad} fehlgeschlagen` : `${ok} Karten eingespielt`);
+  toast(bad ? t("toast.importedCardsSome", { ok, bad }) : t("toast.importedCards", { ok }));
 }
 
 /* ==================== Import aus Mythic Tools (CSV) ===================
@@ -2421,21 +2412,20 @@ async function importCsv(file) {
   const first = text.replace(/^﻿/, "").split("\n")[0] || "";
   const delim = (first.split(";").length > first.split(",").length) ? ";" : ",";
   const rows = parseCsv(text, delim);
-  if (rows.length < 2) throw new Error("Die Datei enthält keine Kartenzeilen.");
+  if (rows.length < 2) throw new Error(t("imp.noCardRows"));
 
   const col = csvColumns(rows[0]);
   if (col.name < 0 || (col.scryfall_id < 0 && (col.set_code < 0 || col.cn < 0)))
-    throw new Error("Unbekanntes CSV-Format — weder Scryfall-ID noch Setcode/Nummer gefunden.");
+    throw new Error(t("imp.unknownCsv"));
 
   const data = rows.slice(1).filter(r => r.some(c => c.trim()));
   const decks = col.cname >= 0
     ? [...new Set(data.map(r => (r[col.cname] || "").trim()).filter(Boolean))] : [];
 
-  const ok = await confirmDlg(`<b>${data.length} Zeilen aus „${esc(file.name)}“ importieren?</b>
-    <p class="hint">Karten werden zu deiner Sammlung hinzugefügt; bereits vorhandene
-    werden <b>übersprungen</b>. Preise kommen frisch von Scryfall.
-    ${decks.length ? `Angelegt wird außerdem das Deck „${esc(decks.join("“, „"))}“.` : ""}
-    Das dauert einen Moment.</p>`);
+  const ok = await confirmDlg(t("dlg.importRows", {
+    n: data.length, file: esc(file.name),
+    deck: decks.length ? t("dlg.importRowsDeck", { names: esc(decks.join("“, „")) }) : ""
+  }));
   if (!ok) return;
 
   const box = $("#import-status");
@@ -2465,8 +2455,8 @@ async function importCsv(file) {
     const foil = fin === "foil" || fin === "etched";
     const qty = Math.max(1, parseInt(g("qty")) || 1);
 
-    say(`<p class="hint">Karte ${i + 1} von ${data.length} … ${esc(csvName)}
-      <br>${imported} neu · ${skipped} schon vorhanden · ${failed.length} nicht gefunden</p>`);
+    say(t("imp.progress", { i: i + 1, n: data.length, name: esc(csvName),
+      imported, skipped, failed: failed.length }));
 
     let card;
     try { card = await resolveImportCard(g("set_code"), g("cn"), lang, g("scryfall_id")); }
@@ -2506,7 +2496,7 @@ async function importCsv(file) {
   // Decks anlegen (bestehende gleichen Namens wiederverwenden) und zuordnen.
   let deckMsg = "";
   if (deckWants.length) {
-    say(`<p class="hint">Decks werden angelegt …</p>`);
+    say(t("imp.creatingDecks"));
     const idByName = new Map();
     for (const name of new Set(deckWants.map(w => w.name))) {
       let d = DECKS.find(x => x.name === name);
@@ -2527,16 +2517,21 @@ async function importCsv(file) {
     const entries = [...merged.values()];
     if (entries.length) {
       const { error } = await sb.from("deck_entries").upsert(entries, { onConflict: "deck_id,card_id" });
-      deckMsg = error ? " · Deck-Zuordnung teilweise fehlgeschlagen"
-                      : ` · Deck „${[...idByName.keys()].join("“, „")}“ angelegt`;
+      deckMsg = error ? t("imp.deckPartFail")
+                      : t("imp.deckCreated", { names: esc([...idByName.keys()].join("“, „")) });
     }
   }
 
   await reload(); renderAll();
-  say(`<p class="hint"><b>Fertig.</b> ${imported} neu importiert,
-    ${skipped} schon vorhanden${deckMsg}.
-    ${failed.length ? `<br>${failed.length} nicht gefunden: ${esc(failed.slice(0, 8).join(", "))}${failed.length > 8 ? " …" : ""}` : ""}</p>`);
-  toast(`${imported} Karten importiert${skipped ? `, ${skipped} übersprungen` : ""}`);
+  say(t("imp.done", {
+    imported, skipped, deckMsg,
+    failedLine: failed.length ? t("imp.failedList", {
+      n: failed.length,
+      list: esc(failed.slice(0, 8).join(", ")) + (failed.length > 8 ? " …" : "")
+    }) : ""
+  }));
+  toast(t("toast.importedN", { n: imported }) +
+        (skipped ? t("toast.importedSkippedSuffix", { n: skipped }) : ""));
 }
 
 /* ================= Manueller Import (Set + Nummer) ====================
@@ -2558,10 +2553,10 @@ function miAddRow() {
     <td><input type="text" data-mi-set placeholder="MKM" style="width:80px;text-transform:uppercase"></td>
     <td><input type="text" data-mi-num placeholder="8" style="width:72px"></td>
     <td><input type="text" data-mi-let placeholder="T" maxlength="2" style="width:52px;text-transform:uppercase"></td>
-    <td><select data-mi-foil><option value="0">Normal</option><option value="1">Foil</option></select></td>
+    <td><select data-mi-foil><option value="0">${esc(t("edit.normal"))}</option><option value="1">Foil</option></select></td>
     <td><select data-mi-lang>${MI_LANGS.map(l =>
       `<option value="${l}">${l.toUpperCase()}</option>`).join("")}</select></td>
-    <td class="num"><button class="btn ghost sm" data-mi-del title="Zeile entfernen">&times;</button></td>
+    <td class="num"><button class="btn ghost sm" data-mi-del title="${esc(t("mi.delRow"))}">&times;</button></td>
     <td data-mi-status style="white-space:nowrap;font-size:13px"></td>`;
   tr.querySelector("[data-mi-foil]").value = pFoil;
   tr.querySelector("[data-mi-lang]").value = pLang;
@@ -2595,12 +2590,12 @@ async function miImport() {
       const sag = (t, farbe) => { status.textContent = t; status.style.color = farbe || ""; };
 
       if (!set && !num) continue;                          // leere Zeile
-      if (!set || !num) { sag("✗ Set und Nummer nötig", "var(--err)"); fail++; continue; }
+      if (!set || !num) { sag("✗ " + t("mi.needSetNum"), "var(--err)"); fail++; continue; }
 
-      sag("sucht…");
+      sag(t("mi.searching"));
       let card = null;
       try { card = await findByCode(set, num, lang, zei === "T"); } catch { /* unten melden */ }
-      if (!card) { sag(`✗ ${set.toUpperCase()} #${num} nicht gefunden`, "var(--err)"); fail++; continue; }
+      if (!card) { sag("✗ " + t("mi.notFound", { set: set.toUpperCase(), num }), "var(--err)"); fail++; continue; }
 
       const price = priceOf(card, foil);
       const { error } = await sb.rpc("add_card", {
@@ -2615,7 +2610,7 @@ async function miImport() {
         p_released: card.released_at ?? null, p_colors: farbenOf(card),
         p_keywords: keywordsOf(card), p_oracle_text: oracleOf(card),
       });
-      if (error) { sag("✗ " + dbErr(error), "var(--err)"); fail++; continue; }
+      if (error) { sag("✗ " + dbErr(error), "var(--err)"); fail++; continue; }   // dbErr ist bereits übersetzt
 
       // Erfolgreiche Zeilen bleiben sichtbar stehen (man sieht, was aus der
       // Eingabe wurde), sind aber gesperrt — ein zweites "Importieren"
@@ -2626,7 +2621,7 @@ async function miImport() {
       ok++;
     }
     await reload(); renderAll();
-    toast(`${ok} Karten importiert${fail ? `, ${fail} fehlgeschlagen` : ""}`);
+    toast(t("toast.importedN", { n: ok }) + (fail ? t("toast.importedFailedSuffix", { n: fail }) : ""));
   } finally { btn.disabled = false; }
 }
 
@@ -2661,31 +2656,31 @@ function wireAuth() {
   $$("#auth-tabs button").forEach(b => b.onclick = () => {
     mode = b.dataset.mode;
     $$("#auth-tabs button").forEach(x => x.classList.toggle("on", x === b));
-    $("#auth-go").textContent = mode === "in" ? "Anmelden" : "Konto anlegen";
+    $("#auth-go").textContent = mode === "in" ? t("auth.signin") : t("auth.signup");
     msg("");
   });
 
   $("#auth-form").onsubmit = async ev => {
     ev.preventDefault();
     const email = $("#auth-email").value.trim(), pw = $("#auth-pw").value;
-    if (!email || !pw) return msg("Bitte E-Mail und Passwort eingeben.", "err");
-    if (mode === "up" && pw.length < 8) return msg("Das Passwort braucht mindestens 8 Zeichen.", "err");
-    $("#auth-go").disabled = true; msg("Moment…");
+    if (!email || !pw) return msg(t("auth.emailPwRequired"), "err");
+    if (mode === "up" && pw.length < 8) return msg(t("auth.pwMin8"), "err");
+    $("#auth-go").disabled = true; msg(t("auth.moment"));
     try {
       const { data, error } = mode === "in"
         ? await sb.auth.signInWithPassword({ email, password: pw })
         : await sb.auth.signUp({ email, password: pw });
       if (error) throw error;
       if (!data.session) {
-        msg("Konto angelegt. Bitte bestätige zuerst die E-Mail, dann anmelden.", "ok");
+        msg(t("auth.accountCreated"), "ok");
       } else {
         await afterLogin(data.user);
       }
     } catch (e) {
       const m = e.message || "";
-      msg(m.includes("Invalid login") ? "E-Mail oder Passwort stimmt nicht."
-        : m.includes("already registered") ? "Für diese E-Mail gibt es schon ein Konto — bitte anmelden."
-        : m.includes("Failed to fetch") ? "Keine Verbindung. Stimmen Project URL und Schlüssel?"
+      msg(m.includes("Invalid login") ? t("auth.badLogin")
+        : m.includes("already registered") ? t("auth.alreadyReg")
+        : m.includes("Failed to fetch") ? t("auth.noConn")
         : m, "err");
     } finally { $("#auth-go").disabled = false; }
   };
@@ -2698,9 +2693,9 @@ function wireSetup() {
     ev.preventDefault();
     const url = $("#cfg-url").value.trim().replace(/\/+$/, ""), key = $("#cfg-key").value.trim();
     if (!/^https:\/\/.+\.supabase\.(co|in)$/.test(url))
-      return $("#setup-msg").textContent = "Die Project URL sieht so aus: https://xxxx.supabase.co";
+      return $("#setup-msg").textContent = t("setup.urlFormat");
     if (key.length < 20)
-      return $("#setup-msg").textContent = "Der Schlüssel sieht zu kurz aus.";
+      return $("#setup-msg").textContent = t("setup.keyShort");
     localStorage.setItem("mtg-cfg", JSON.stringify({ url, key }));
     location.reload();
   };
@@ -2882,7 +2877,7 @@ async function pageSizeSpeichern(n) {
     PROFILE.page_size = n;
     collPage = 0;
     renderCollection();
-    toast(n ? `Sammlung zeigt jetzt ${n} Karten je Seite` : "Sammlung zeigt wieder alles in einer Liste");
+    toast(n ? t("toast.pageSetN", { n }) : t("toast.pageSetAll"));
   } catch (e) { toast(dbErr(e)); }
 }
 
@@ -2893,7 +2888,7 @@ async function nameSpeichern() {
     if (error) throw error;
     PROFILE.display_name = name || null;
     renderWho();
-    toast("Name gespeichert");
+    toast(t("toast.nameSaved"));
   } catch (e) { toast(dbErr(e)); }
 }
 
@@ -2904,15 +2899,15 @@ async function nameSpeichern() {
    funktionierende Anmeldung läuft wie der ganze Rest der App. Ein 256er-JPEG
    ist mit ~20–30 KB klein genug für die Spalte. */
 async function avatarHochladen(file) {
-  if (!file.type.startsWith("image/")) return toast("Bitte ein Bild wählen.");
-  if (file.size > 12 * 1024 * 1024) return toast("Bild ist zu groß (max. 12 MB).");
+  if (!file.type.startsWith("image/")) return toast(t("toast.pickImage"));
+  if (file.size > 12 * 1024 * 1024) return toast(t("toast.imgTooBig"));
   try {
     const dataUrl = await bildDataUrl(file, 256);
     const { error } = await sb.from("profiles").update({ avatar_url: dataUrl }).eq("id", USER.id);
     if (error) throw error;
     PROFILE.avatar_url = dataUrl;
     renderWho(); renderProfile();
-    toast("Avatar aktualisiert");
+    toast(t("toast.avatarUpdated"));
   } catch (e) { toast(dbErr(e)); }
 }
 
@@ -2922,7 +2917,7 @@ async function avatarEntfernen() {
     if (error) throw error;
     PROFILE.avatar_url = null;
     renderWho(); renderProfile();
-    toast("Avatar entfernt");
+    toast(t("toast.avatarRemoved"));
   } catch (e) { toast(dbErr(e)); }
 }
 
@@ -2940,7 +2935,7 @@ function bildDataUrl(file, kante) {
       cv.getContext("2d").drawImage(img, sx, sy, seite, seite, 0, 0, kante, kante);
       res(cv.toDataURL("image/jpeg", 0.85));
     };
-    img.onerror = () => rej(new Error("Bild konnte nicht gelesen werden."));
+    img.onerror = () => rej(new Error(t("scan.imgUnreadable")));
     img.src = URL.createObjectURL(file);
   });
 }
@@ -2948,15 +2943,15 @@ function bildDataUrl(file, kante) {
 async function passwortAendern() {
   const msg = (t, cls) => { const m = $("#pf-pw-msg"); m.textContent = t; m.className = "msg " + (cls || ""); };
   const a = $("#pf-pw1").value, b = $("#pf-pw2").value;
-  if (a.length < 8) return msg("Das Passwort braucht mindestens 8 Zeichen.", "err");
-  if (a !== b) return msg("Die Passwörter stimmen nicht überein.", "err");
-  $("#pf-pw-save").disabled = true; msg("Moment…");
+  if (a.length < 8) return msg(t("auth.pwMin8"), "err");
+  if (a !== b) return msg(t("pw.mismatch"), "err");
+  $("#pf-pw-save").disabled = true; msg(t("auth.moment"));
   try {
     const { error } = await sb.auth.updateUser({ password: a });
     if (error) throw error;
     $("#pf-pw1").value = ""; $("#pf-pw2").value = "";
-    msg("Passwort geändert.", "ok");
-  } catch (e) { msg(e.message || "Änderung fehlgeschlagen.", "err"); }
+    msg(t("pw.changed"), "ok");
+  } catch (e) { msg(e.message || t("pw.failed"), "err"); }
   finally { $("#pf-pw-save").disabled = false; }
 }
 
@@ -3048,15 +3043,15 @@ function renderFriends() {
 
 async function freundAnfragen() {
   const code = ($("#add-code").value || "").trim().toUpperCase();
-  if (code.length < 6) return toast("Bitte den 6-stelligen Code eingeben.");
+  if (code.length < 6) return toast(t("toast.enterCode"));
   try {
     const { data, error } = await sb.rpc("send_friend_request", { p_code: code });
     if (error) throw error;
     toast({
-      sent: "Anfrage gesendet", accepted: "Freund hinzugefügt 🎉", pending: "Anfrage läuft schon",
-      already: "Ihr seid bereits befreundet", self: "Das ist dein eigener Code",
-      notfound: "Kein Profil mit diesem Code", unauth: "Nicht angemeldet",
-    }[data] || "Erledigt");
+      sent: t("fr.sent"), accepted: t("fr.accepted"), pending: t("fr.pending"),
+      already: t("fr.already"), self: t("fr.self"),
+      notfound: t("fr.notfound"), unauth: t("fr.unauth"),
+    }[data] || t("fr.done"));
     $("#add-code").value = "";
     await ladeFreunde(); renderFriends();
   } catch (e) { toast(dbErr(e)); }
@@ -3069,7 +3064,7 @@ async function freundAntwort(requesterId, annehmen) {
       ? await q.update({ status: "accepted" }).eq("requester", requesterId).eq("addressee", USER.id)
       : await q.delete().eq("requester", requesterId).eq("addressee", USER.id);
     if (error) throw error;
-    toast(annehmen ? "Angenommen" : "Abgelehnt");
+    toast(annehmen ? t("toast.accepted") : t("toast.declined"));
     await ladeFreunde(); renderFriends();
   } catch (e) { toast(dbErr(e)); }
 }
@@ -3081,7 +3076,7 @@ async function freundEntfernen(otherId) {
     const { error } = await sb.from("friendships").delete().or(
       `and(requester.eq.${USER.id},addressee.eq.${otherId}),and(requester.eq.${otherId},addressee.eq.${USER.id})`);
     if (error) throw error;
-    toast("Entfernt");
+    toast(t("toast.removed"));
     await ladeFreunde(); renderFriends();
   } catch (e) { toast(dbErr(e)); }
 }
@@ -3176,14 +3171,12 @@ function friendDeckHtml(d, entries, cardsById) {
    Karten, die man nicht besitzt, kommen als Bestand-0-Zeilen ins Deck (dort
    „fehlen") — die eigene Sammlung ändert sich nicht. Macht die RPC atomar. */
 async function importFriendDeck(deckId) {
-  if (!await confirmDlg(`<b>Deck übernehmen?</b>
-    <p class="hint">Es wird als neues, privates Deck in deine Decks kopiert. Karten,
-    die du nicht besitzt, erscheinen darin als „fehlen“ — deine Sammlung ändert sich nicht.</p>`)) return;
+  if (!await confirmDlg(t("dlg.importDeck"))) return;
   try {
     const { error } = await sb.rpc("import_shared_deck", { p_deck: deckId });
     if (error) throw error;
     await reload(); renderAll();
-    toast("Deck in deine Decks übernommen");
+    toast(t("toast.deckImported"));
     const b = $('nav button[data-v="decks"]'); if (b) b.click();
   } catch (e) { toast(dbErr(e)); }
 }
@@ -3227,7 +3220,7 @@ function wireApp() {
   $("#deck-arch").innerHTML   = deckOptions(DECK_ARCHETYPEN, "", "—");
   $("#deck-add").onclick = async () => {
     const name = $("#deck-name").value.trim();
-    if (!name) return toast("Bitte einen Decknamen eingeben");
+    if (!name) return toast(t("toast.deckNameRequired"));
     const format    = $("#deck-format").value || null;
     const archetype = $("#deck-arch").value   || null;
     try {
@@ -3248,7 +3241,7 @@ function wireApp() {
   $("#im-file").onchange = async e => {
     const f = e.target.files[0]; e.target.value = "";
     if (!f) return;
-    try { await importJson(f); } catch (err) { toast("Import fehlgeschlagen: " + err.message); }
+    try { await importJson(f); } catch (err) { toast(t("toast.importFailed", { msg: err.message })); }
   };
   $("#detail-close").onclick = () => $("#detail-dlg").close();
   // Beim Scrollen (auch innerhalb der Tabelle) verrutscht die Vorschau —
@@ -3269,13 +3262,11 @@ function wireApp() {
     try { await importCsv(f); }
     catch (err) {
       $("#import-status").innerHTML = `<span class="pill err">${esc(err.message)}</span>`;
-      toast("Import fehlgeschlagen: " + err.message);
+      toast(t("toast.importFailed", { msg: err.message }));
     }
   };
   $("#reset-cfg").onclick = async () => {
-    if (!await confirmDlg(`<b>Verbindung zurücksetzen?</b>
-      <p class="hint">Nur die Zugangsdaten zur Datenbank werden aus diesem Browser entfernt.
-      Deine Sammlung bleibt in Supabase unangetastet.</p>`)) return;
+    if (!await confirmDlg(t("dlg.resetConn"))) return;
     localStorage.removeItem("mtg-cfg"); location.reload();
   };
 }
