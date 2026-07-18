@@ -1834,6 +1834,8 @@ function detailHtml(c, hover) {
             title="${esc(t("row.editTitle"))}">&#9998; ${esc(t("detail.edit"))}</button></div>
           <div style="flex:none"><button class="btn ghost sm" id="dt-price"
             title="${esc(t("detail.priceBtnTitle"))}">&#8635; ${esc(t("detail.priceBtn"))}</button></div>
+          <div style="flex:none"><input type="number" id="syn-cap" min="0" step="0.5"
+            placeholder="${esc(t("syn.capPh"))}" title="${esc(t("syn.capTitle"))}" style="width:92px"></div>
           <div style="flex:none"><button class="btn ghost sm" id="dt-syn"
             title="${esc(t("syn.findTitle"))}">&#128269; ${esc(t("syn.find"))}</button></div>
         </div>` : ""}
@@ -1873,7 +1875,7 @@ function showCardDetail(id) {
     synBtnBusy(yb, lbl, true);
     const weg = ownedExclude();
     synergieAnzeigen($("#syn-box"), synergyHooks(c),
-      { excludeIds: weg.ids, excludeNames: weg.names, limit: 18 })
+      { excludeIds: weg.ids, excludeNames: weg.names, limit: 18, maxPrice: numVal($("#syn-cap")) })
       .finally(() => synBtnBusy(yb, lbl, false));
   };
 }
@@ -1967,17 +1969,32 @@ function farbIdentitaet(cards) {
   return s || "c";
 }
 
+/* Preis einer Scryfall-Karte in Euro (Normal, sonst Foil), sonst null. */
+function synPreis(card) {
+  const r = card.prices?.eur || card.prices?.eur_foil;
+  const n = r ? parseFloat(r) : NaN;
+  return isFinite(n) ? n : null;
+}
+
+/* Positive Euro-Zahl aus einem Eingabefeld (Komma erlaubt), sonst null. */
+function numVal(input) {
+  if (!input) return null;
+  const n = parseFloat(String(input.value || "").replace(",", "."));
+  return isFinite(n) && n > 0 ? n : null;
+}
+
 let synergyLauf = 0;   // gegen veraltete Antworten bei schnellem erneuten Klick
 
 /* Für eine Hakenliste die besten passenden Karten holen und mischen.
-   opts: { excludeIds, excludeNames, colors, maxHooks, limit } */
+   opts: { excludeIds, excludeNames, colors, maxHooks, limit, maxPrice, totalBudget } */
 async function synergieSuchen(hooks, opts = {}) {
   const excludeIds = opts.excludeIds || new Set();
   const excludeNames = opts.excludeNames || new Set();
   const idFilter = opts.colors ? ` id<=${opts.colors}` : "";
-  const treffer = new Map();   // oracle_id -> { card, hooks:Set }
+  const preisFilter = opts.maxPrice ? ` eur<=${opts.maxPrice}` : "";   // Höchstpreis je Karte
+  const treffer = new Map();   // oracle_id -> { card, hooks:Map<label,kind> }
   for (const h of hooks.slice(0, opts.maxHooks || 6)) {
-    const q = `${h.q} -is:token -is:funny game:paper${idFilter}`;
+    const q = `${h.q} -is:token -is:funny game:paper${idFilter}${preisFilter}`;
     let data = [];
     try {
       const r = await fetch("https://api.scryfall.com/cards/search?order=edhrec&q=" + encodeURIComponent(q),
@@ -1986,31 +2003,59 @@ async function synergieSuchen(hooks, opts = {}) {
     } catch { /* ein einzelner Haken darf scheitern */ }
     data.slice(0, 14).forEach(c => {
       if (!c.oracle_id || excludeIds.has(c.oracle_id) || excludeNames.has((c.name || "").toLowerCase())) return;
-      const e = treffer.get(c.oracle_id) || { card: c, hooks: new Set() };
-      e.hooks.add(hookLabel(h));
+      const e = treffer.get(c.oracle_id) || { card: c, hooks: new Map() };
+      e.hooks.set(hookLabel(h), h.kind);   // Label → Art (keyword/tribe/theme) für die Erklärung
       treffer.set(c.oracle_id, e);
     });
     await new Promise(res => setTimeout(res, 110));   // Scryfall schonen
   }
-  return [...treffer.values()]
+  let rang = [...treffer.values()]
     .sort((a, b) => (b.hooks.size - a.hooks.size) ||
                     ((a.card.edhrec_rank ?? 9e9) - (b.card.edhrec_rank ?? 9e9)))
     .slice(0, opts.limit || 18);
+  // Gesamtbudget (Deck): beste Synergien zuerst aufnehmen, bis das Geld reicht.
+  // Zu teure werden übersprungen (billigere weiter unten kommen noch rein);
+  // Karten ohne Preis lassen sich nicht budgetieren und fallen dabei raus.
+  if (opts.totalBudget) {
+    let summe = 0; const gewaehlt = [];
+    for (const e of rang) {
+      const p = synPreis(e.card);
+      if (p == null || summe + p > opts.totalBudget) continue;
+      gewaehlt.push(e); summe += p;
+    }
+    rang = gewaehlt;
+  }
+  return rang;
 }
 
-/* Eine Vorschlagskarte als Kachel: Bild, Name, Typ, Preis, „Warum"-Chips. */
+/* Kurze Erklärung, warum die Karte passt: aus den getroffenen Haken (Typ,
+   Schlüsselwort, Thema) plus einem Hinweis, wenn sie häufig gespielt wird. */
+function synergyErklaerung(e) {
+  const kw = [], tr = [], th = [];
+  for (const [label, kind] of e.hooks)
+    (kind === "keyword" ? kw : kind === "tribe" ? tr : th).push(label);
+  const gruende = [];
+  if (tr.length) gruende.push(t("syn.exp.tribe", { list: tr.join(", ") }));
+  if (kw.length) gruende.push(t("syn.exp.keyword", { list: kw.join(", ") }));
+  if (th.length) gruende.push(t("syn.exp.theme", { list: th.join(", ") }));
+  const reasons = gruende.length <= 1 ? (gruende[0] || "")
+    : gruende.slice(0, -1).join(", ") + " " + t("syn.exp.and") + " " + gruende[gruende.length - 1];
+  const kopf = t(e.hooks.size >= 2 ? "syn.exp.multi" : "syn.exp.single", { reasons });
+  return kopf + ((e.card.edhrec_rank ?? 9e9) < 600 ? " " + t("syn.exp.popular") : "");
+}
+
+/* Eine Vorschlagskarte als Kachel: Bild, Name, Typ, Erklärung, Preis. */
 function synergyCardHtml(e) {
   const card = e.card;
   const img = card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small || "";
-  const roh = card.prices?.eur || card.prices?.eur_foil;
-  const preis = roh ? eur(parseFloat(roh)) : "–";
-  const chips = [...e.hooks].slice(0, 4).map(w => `<span class="syn-why">${esc(w)}</span>`).join("");
+  const p = synPreis(card);
+  const grund = synergyErklaerung(e);
   return `<a class="syn-card" href="${esc(card.scryfall_uri || "#")}" target="_blank" rel="noopener noreferrer">
     ${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : `<div class="syn-noimg">&#9670;</div>`}
     <div class="syn-name">${esc(card.name)}</div>
     <div class="syn-type">${esc(card.type_line || "")}</div>
-    <div class="syn-chips">${chips}</div>
-    <div class="syn-price">${preis}</div>
+    <div class="syn-exp" title="${esc(grund)}">${esc(grund)}</div>
+    <div class="syn-price">${p == null ? "–" : eur(p)}</div>
   </a>`;
 }
 
@@ -2023,16 +2068,20 @@ function synBtnBusy(btn, label, busy) {
 }
 
 /* Vorschläge in einen Container zeichnen (Lade-/Leer-Zustand inklusive). */
-async function synergieAnzeigen(box, hooks, opts) {
+async function synergieAnzeigen(box, hooks, opts = {}) {
   if (!box) return;
   const lauf = ++synergyLauf;
   if (!hooks.length) { box.innerHTML = `<div class="empty">${esc(t("syn.noHooks"))}</div>`; return; }
   box.innerHTML = `<div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("syn.loading"))}</div>`;
   const res = await synergieSuchen(hooks, opts);
   if (lauf !== synergyLauf) return;                  // ein neuerer Lauf hat übernommen
-  box.innerHTML = res.length
-    ? `<div class="syn-grid">${res.map(synergyCardHtml).join("")}</div>`
-    : `<div class="empty">${esc(t("syn.none"))}</div>`;
+  if (!res.length) { box.innerHTML = `<div class="empty">${esc(t("syn.none"))}</div>`; return; }
+  let kopf = "";
+  if (opts.totalBudget) {                            // Summenzeile beim Deck-Budget
+    const summe = res.reduce((s, e) => s + (synPreis(e.card) || 0), 0);
+    kopf = `<div class="meta">${esc(t("syn.budgetLine", { sum: eur(summe), budget: eur(opts.totalBudget) }))}</div>`;
+  }
+  box.innerHTML = kopf + `<div class="syn-grid">${res.map(synergyCardHtml).join("")}</div>`;
 }
 
 /* Haken eines ganzen Decks: über alle Karten sammeln, häufigste zuerst. */
@@ -2393,6 +2442,10 @@ function renderDecks() {
           <div style="flex:none;min-width:80px"><input type="number" min="1" value="1" data-dqty="${d.id}"></div>
           ${rows ? `<div style="flex:none"><button class="btn ghost" data-dashtoggle="${d.id}"
             >&#128202; ${esc(dashOffen ? t("deck.statsHide") : t("deck.statsShow"))}</button></div>
+          <div style="flex:none"><input type="number" data-syncap="${d.id}" min="0" step="0.5"
+            placeholder="${esc(t("syn.capPh"))}" title="${esc(t("syn.capTitle"))}" style="width:92px"></div>
+          <div style="flex:none"><input type="number" data-synbudget="${d.id}" min="0" step="1"
+            placeholder="${esc(t("syn.budgetPh"))}" title="${esc(t("syn.budgetTitle"))}" style="width:104px"></div>
           <div style="flex:none"><button class="btn ghost" data-synbtn="${d.id}"
             title="${esc(t("syn.deckTitle"))}">&#128269; ${esc(t("syn.deckBtn"))}</button></div>` : ""}
         </div>
@@ -2452,7 +2505,9 @@ function renderDecks() {
     // Erst wenn die Suche fertig ist, nach unten zu den Ergebnissen springen —
     // vorher dreht sich das Zahnrad am Knopf, wo der Blick gerade ist.
     synergieAnzeigen(box, deckHooks(cards.map(c => ({ c }))),
-      { excludeIds: weg.ids, excludeNames: weg.names, colors: farbIdentitaet(cards), maxHooks: 5, limit: 20 })
+      { excludeIds: weg.ids, excludeNames: weg.names, colors: farbIdentitaet(cards),
+        maxHooks: 5, limit: 20,
+        maxPrice: numVal($(`[data-syncap="${id}"]`)), totalBudget: numVal($(`[data-synbudget="${id}"]`)) })
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
       .finally(() => synBtnBusy(b, lbl, false));
   });

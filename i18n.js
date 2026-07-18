@@ -1431,4 +1431,51 @@ Object.assign(I18N.it, {
   "syn.theme.equipment": "Equipaggiamento", "syn.theme.artifacts": "Artefatti",
 });
 
+/* ---- Teil 6: Synergie-Erklärung + Preisgrenzen ---- */
+Object.assign(I18N.de, {
+  "syn.capPh": "€ max", "syn.capTitle": "Höchstpreis je Karte (leer = egal)",
+  "syn.budgetPh": "€ gesamt", "syn.budgetTitle": "Gesamtbudget für alle Vorschläge (leer = egal)",
+  "syn.budgetLine": "Zusammen {sum} von {budget}",
+  "syn.exp.and": "und", "syn.exp.tribe": "denselben Typ {list}",
+  "syn.exp.keyword": "das Schlüsselwort {list}", "syn.exp.theme": "das Thema {list}",
+  "syn.exp.single": "Passt über {reasons}.", "syn.exp.multi": "Passt gleich mehrfach: {reasons}.",
+  "syn.exp.popular": "Außerdem häufig gespielt.",
+});
+Object.assign(I18N.en, {
+  "syn.capPh": "€ max", "syn.capTitle": "Max price per card (empty = any)",
+  "syn.budgetPh": "€ total", "syn.budgetTitle": "Total budget for all suggestions (empty = any)",
+  "syn.budgetLine": "Together {sum} of {budget}",
+  "syn.exp.and": "and", "syn.exp.tribe": "the same type {list}",
+  "syn.exp.keyword": "the keyword {list}", "syn.exp.theme": "the {list} theme",
+  "syn.exp.single": "Fits via {reasons}.", "syn.exp.multi": "Fits on several fronts: {reasons}.",
+  "syn.exp.popular": "Also widely played.",
+});
+Object.assign(I18N.fr, {
+  "syn.capPh": "€ max", "syn.capTitle": "Prix max par carte (vide = indifférent)",
+  "syn.budgetPh": "€ total", "syn.budgetTitle": "Budget total pour toutes les suggestions (vide = indifférent)",
+  "syn.budgetLine": "Au total {sum} sur {budget}",
+  "syn.exp.and": "et", "syn.exp.tribe": "le même type {list}",
+  "syn.exp.keyword": "le mot-clé {list}", "syn.exp.theme": "le thème {list}",
+  "syn.exp.single": "Correspond par {reasons}.", "syn.exp.multi": "Correspond à plusieurs titres : {reasons}.",
+  "syn.exp.popular": "De plus, souvent jouée.",
+});
+Object.assign(I18N.es, {
+  "syn.capPh": "€ máx", "syn.capTitle": "Precio máx. por carta (vacío = cualquiera)",
+  "syn.budgetPh": "€ total", "syn.budgetTitle": "Presupuesto total para todas las sugerencias (vacío = cualquiera)",
+  "syn.budgetLine": "En total {sum} de {budget}",
+  "syn.exp.and": "y", "syn.exp.tribe": "el mismo tipo {list}",
+  "syn.exp.keyword": "la palabra clave {list}", "syn.exp.theme": "el tema {list}",
+  "syn.exp.single": "Encaja por {reasons}.", "syn.exp.multi": "Encaja por varios motivos: {reasons}.",
+  "syn.exp.popular": "Además, muy jugada.",
+});
+Object.assign(I18N.it, {
+  "syn.capPh": "€ max", "syn.capTitle": "Prezzo max per carta (vuoto = qualsiasi)",
+  "syn.budgetPh": "€ totale", "syn.budgetTitle": "Budget totale per tutti i suggerimenti (vuoto = qualsiasi)",
+  "syn.budgetLine": "In totale {sum} su {budget}",
+  "syn.exp.and": "e", "syn.exp.tribe": "lo stesso tipo {list}",
+  "syn.exp.keyword": "la parola chiave {list}", "syn.exp.theme": "il tema {list}",
+  "syn.exp.single": "Si abbina tramite {reasons}.", "syn.exp.multi": "Si abbina su più fronti: {reasons}.",
+  "syn.exp.popular": "Inoltre, molto giocata.",
+});
+
 initLang();
