@@ -1935,22 +1935,34 @@ function untertypen(typeLine) {
   return i < 0 ? [] : vorder.slice(i + 1).trim().split(/\s+/).filter(Boolean);
 }
 
-/* Gewicht je Hakenart: Fähigkeiten (Schlüsselwort, Regeltext-Thema) zählen
-   deutlich mehr als bloße Typgleichheit — zwei Karten mit demselben Mechanismus
+/* Gewicht je Hakenart: Fähigkeiten (Schlüsselwort, Regeltext-Thema) und
+   Tribal-Payoffs — Karten, die einen Typ ausdrücklich belohnen („Elfen, die du
+   kontrollierst …", die „wollen deinen Elf"-Richtung) — zählen deutlich mehr als
+   bloße Typgleichheit („ist auch ein Elf"). Zwei Karten mit demselben Mechanismus
    passen besser zusammen als zwei, die nur denselben Kreaturentyp teilen. */
-const HOOK_GEWICHT = { keyword: 3, theme: 3, tribe: 1 };
+const HOOK_GEWICHT = { keyword: 3, theme: 3, payoff: 3, tribe: 1 };
 const hookGewicht = kind => HOOK_GEWICHT[kind] || 1;
 
-/* Synergie-Haken einer Karte: { kind, label, q }. Reihenfolge: erst die
-   Fähigkeiten (Schlüsselwörter, Themen), dann Tribal — so bleiben beim Kappen
-   (maxHooks) die aussagekräftigen Haken erhalten. */
+/* Plural eines Kreaturentyps: Tribal-Payoffs stehen im Text fast immer im Plural
+   („Elves you control"); der Singular ist zu verrauscht (belegt per Scryfall). */
+function pluralTyp(typ) {
+  if (/^merfolk$/i.test(typ)) return typ;                 // unveränderlich
+  if (/(s|x|z|ch|sh)$/i.test(typ)) return typ + "es";
+  if (/f$/i.test(typ)) return typ.replace(/f$/i, "ves");  // Elf→Elves, Dwarf→Dwarves, Wolf→Wolves
+  return typ + "s";
+}
+
+/* Synergie-Haken einer Karte: { kind, label, q }. Reihenfolge nach Aussagekraft
+   (Schlüsselwörter, Themen, Tribal-Payoffs, zuletzt bloße Typgleichheit) — so
+   bleiben beim Kappen (maxHooks) die stärksten Haken erhalten. */
 function synergyHooks(card) {
   const hooks = [];
   (card.keywords || []).forEach(k => hooks.push({ kind: "keyword", label: k, q: `keyword:"${k}"` }));
   const text = card.oracle_text || "";
   SYNERGY_THEMES.forEach(th => { if (th.re.test(text)) hooks.push({ kind: "theme", label: th.key, q: th.q }); });
-  if (/creature/i.test(card.type_line || ""))
-    untertypen(card.type_line).forEach(s => hooks.push({ kind: "tribe", label: s, q: `type:${s.toLowerCase()}` }));
+  const subs = /creature/i.test(card.type_line || "") ? untertypen(card.type_line) : [];
+  subs.forEach(s => hooks.push({ kind: "payoff", label: s, q: `oracle:"${pluralTyp(s)}"` }));  // Karten, die den Typ belohnen
+  subs.forEach(s => hooks.push({ kind: "tribe",  label: s, q: `type:${s.toLowerCase()}` }));     // weitere Karten des Typs
   return hooks;
 }
 
@@ -2012,7 +2024,7 @@ async function synergieSuchen(hooks, opts = {}) {
     data.slice(0, 14).forEach(c => {
       if (!c.oracle_id || excludeIds.has(c.oracle_id) || excludeNames.has((c.name || "").toLowerCase())) return;
       const e = treffer.get(c.oracle_id) || { card: c, hooks: new Map() };
-      e.hooks.set(hookLabel(h), h.kind);   // Label → Art (keyword/tribe/theme) für die Erklärung
+      e.hooks.set(h.kind + "|" + hookLabel(h), { kind: h.kind, label: hookLabel(h) });  // (Art,Label) je Treffer, entprellt
       treffer.set(c.oracle_id, e);
     });
     await new Promise(res => setTimeout(res, 110));   // Scryfall schonen
@@ -2020,7 +2032,7 @@ async function synergieSuchen(hooks, opts = {}) {
   // Bewertung: Summe der Hakengewichte (Fähigkeiten > Tribal), erst danach der
   // EDHREC-Rang als Feinschliff. So steht eine Karte, die dieselbe Fähigkeit
   // teilt, über einer, die nur denselben Kreaturentyp hat.
-  const punkte = e => [...e.hooks.values()].reduce((s, kind) => s + hookGewicht(kind), 0);
+  const punkte = e => [...e.hooks.values()].reduce((s, v) => s + hookGewicht(v.kind), 0);
   let rang = [...treffer.values()]
     .sort((a, b) => (punkte(b) - punkte(a)) ||
                     ((a.card.edhrec_rank ?? 9e9) - (b.card.edhrec_rank ?? 9e9)))
@@ -2043,14 +2055,18 @@ async function synergieSuchen(hooks, opts = {}) {
 /* Kurze Erklärung, warum die Karte passt: aus den getroffenen Haken (Typ,
    Schlüsselwort, Thema) plus einem Hinweis, wenn sie häufig gespielt wird. */
 function synergyErklaerung(e) {
-  const kw = [], tr = [], th = [];
-  for (const [label, kind] of e.hooks)
-    (kind === "keyword" ? kw : kind === "tribe" ? tr : th).push(label);
-  // Fähigkeiten zuerst nennen (Schlüsselwort, Thema), dann den Typ.
+  const kw = [], th = [], po = [], tr = [];
+  for (const { kind, label } of e.hooks.values())
+    (kind === "keyword" ? kw : kind === "theme" ? th : kind === "payoff" ? po : tr).push(label);
+  // „ist auch ein Elf" weglassen, wenn die Karte Elfen ohnehin belohnt.
+  const poSet = new Set(po);
+  const trOnly = tr.filter(l => !poSet.has(l));
+  // Fähigkeiten und Payoffs zuerst nennen, den bloßen Typ zuletzt.
   const gruende = [];
   if (kw.length) gruende.push(t("syn.exp.keyword", { list: kw.join(", ") }));
   if (th.length) gruende.push(t("syn.exp.theme", { list: th.join(", ") }));
-  if (tr.length) gruende.push(t("syn.exp.tribe", { list: tr.join(", ") }));
+  if (po.length) gruende.push(t("syn.exp.payoff", { list: po.join(", ") }));
+  if (trOnly.length) gruende.push(t("syn.exp.tribe", { list: trOnly.join(", ") }));
   const reasons = gruende.length <= 1 ? (gruende[0] || "")
     : gruende.slice(0, -1).join(", ") + " " + t("syn.exp.and") + " " + gruende[gruende.length - 1];
   return t(gruende.length >= 2 ? "syn.exp.multi" : "syn.exp.single", { reasons });
