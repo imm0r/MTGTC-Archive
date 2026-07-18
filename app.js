@@ -1867,7 +1867,7 @@ function showCardDetail(id) {
       if ($("#detail-dlg").open) showCardDetail(id);
     } catch (e) { pb.disabled = false; toast(e.message); }
   };
-  // Synergien: passende NEUE Karten zu dieser Karte (besessene ausgeschlossen).
+  // Synergien: passende Karten zu dieser Karte (nur die Karte selbst raus).
   const yb = $("#dt-syn");
   if (yb) yb.onclick = () => {
     const lbl = t("syn.find");
@@ -1877,13 +1877,15 @@ function showCardDetail(id) {
       { excludeIds: weg.ids, excludeNames: weg.names, limit: 18, maxPrice: numVal($("#syn-cap")) })
       .finally(() => synBtnBusy(yb, lbl, false));
   };
-  // KI-Synergien: implizite Vorschläge über die Edge Function.
+  // KI-Synergien: implizite Vorschläge über die Edge Function. Solange sie läuft,
+  // ist der Standard-Synergien-Knopf gesperrt und ausgeblendet.
   const ab = $("#dt-syn-ai");
   if (ab) ab.onclick = () => {
     const lbl = t("syn.ai");
     synBtnBusy(ab, lbl, true, "&#10024;");
+    stdSynAus(yb, true);
     kiSynergien(c, $("#syn-box"), { maxPrice: numVal($("#syn-cap")) })
-      .finally(() => synBtnBusy(ab, lbl, false, "&#10024;"));
+      .finally(() => { synBtnBusy(ab, lbl, false, "&#10024;"); stdSynAus(yb, false); });
   };
 }
 
@@ -2140,6 +2142,17 @@ function synBtnBusy(btn, label, busy, icon) {
   if (!btn) return;
   btn.disabled = busy;
   btn.innerHTML = (busy ? `<span class="syn-spin">&#9881;</span>` : (icon || "&#128269;")) + " " + esc(label);
+}
+
+/* Standard-Synergien-Knopf sperren + ausblenden, solange die KI-Suche läuft:
+   beide schreiben in denselben Kasten und teilen den Lauf-Zähler, ein Klick
+   während der (langsamen, teils bezahlten) KI-Suche würde deren Ergebnis
+   verwerfen. Versteckt wird der umgebende <div>, damit keine Lücke bleibt. */
+function stdSynAus(stdBtn, aus) {
+  if (!stdBtn) return;
+  stdBtn.disabled = aus;
+  const wrap = stdBtn.closest("div");
+  if (wrap) wrap.style.display = aus ? "none" : "";
 }
 
 /* Vorschläge in einen Container zeichnen (Lade-/Leer-Zustand inklusive). */
@@ -2838,10 +2851,12 @@ function renderDecks() {
     const box = $(`.deck-syn[data-synbox="${id}"]`);
     if (!cards.length || !box) return;
     const lbl = t("syn.ai");
+    const std = $(`[data-synbtn="${id}"]`);   // Standard-Synergien-Knopf dieses Decks
     synBtnBusy(b, lbl, true, "&#10024;");
+    stdSynAus(std, true);
     kiSynergienDeck(d, cards, box, { maxPrice: numVal($(`[data-syncap="${id}"]`)) })
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
-      .finally(() => synBtnBusy(b, lbl, false, "&#10024;"));
+      .finally(() => { synBtnBusy(b, lbl, false, "&#10024;"); stdSynAus(std, false); });
   });
 
   // Sortier-Handler je Deck. renderDecks() baut alles neu, aber der
