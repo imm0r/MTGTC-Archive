@@ -2815,19 +2815,6 @@ function renderProfile() {
     </div>
 
     <div class="card">
-      <h3 style="margin-top:0">Einstellungen</h3>
-      <label>Karten pro Seite in der Sammlung</label>
-      <div class="row">
-        <div style="flex:none;min-width:220px"><select id="pf-pagesize">${
-          [[25, "25"], [50, "50 (Voreinstellung)"], [100, "100"], [250, "250"], [0, "Alle — eine lange Liste"]]
-            .map(([w, t]) => `<option value="${w}"${w === seitenGroesse() ? " selected" : ""}>${esc(t)}</option>`).join("")
-        }</select></div>
-      </div>
-      <p class="hint">Gilt für die Tabelle der Sammlung. Die Auswertung darüber zählt
-        immer alle gefilterten Karten, egal welche Seite gerade offen ist.</p>
-    </div>
-
-    <div class="card">
       <h3 style="margin-top:0">Konto</h3>
       <label>Neues Passwort</label>
       <div class="row" style="margin-bottom:6px">
@@ -2852,9 +2839,29 @@ function renderProfile() {
   const del = $("#pf-avatar-del"); if (del) del.onclick = avatarEntfernen;
   $("#pf-name-save").onclick = nameSpeichern;
   $("#pf-name").addEventListener("keydown", e => { if (e.key === "Enter") nameSpeichern(); });
-  $("#pf-pagesize").onchange = ev => pageSizeSpeichern(parseInt(ev.target.value));
   $("#pf-pw-save").onclick = passwortAendern;
   $("#pf-logout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+}
+
+/* Ansicht „Einstellungen" — eigener Punkt im Benutzermenü hinter Avatar+Name.
+   Baut beim Öffnen frisch; die Werte kommen aus dem Profil. */
+function renderSettings() {
+  const el = $("#v-settings");
+  if (!el) return;
+  el.innerHTML = `
+    <div class="card">
+      <h3 style="margin-top:0">Einstellungen</h3>
+      <label>Karten pro Seite in der Sammlung</label>
+      <div class="row">
+        <div style="flex:none;min-width:220px"><select id="set-pagesize">${
+          [[25, "25"], [50, "50 (Voreinstellung)"], [100, "100"], [250, "250"], [0, "Alle — eine lange Liste"]]
+            .map(([w, t]) => `<option value="${w}"${w === seitenGroesse() ? " selected" : ""}>${esc(t)}</option>`).join("")
+        }</select></div>
+      </div>
+      <p class="hint">Gilt für die Tabelle der Sammlung. Die Auswertung darüber zählt
+        immer alle gefilterten Karten, egal welche Seite gerade offen ist.</p>
+    </div>`;
+  $("#set-pagesize").onchange = ev => pageSizeSpeichern(parseInt(ev.target.value));
 }
 
 /* Karten je Sammlungsseite speichern (Profil-Einstellung, gilt damit auf allen
@@ -3179,6 +3186,7 @@ function wireApp() {
     $("#who-menu")?.classList.remove("open");   // Menüauswahl klappt das Menü zu
     if (b.dataset.v === "profile") renderProfile();
     if (b.dataset.v === "friends") oeffneFreunde();
+    if (b.dataset.v === "settings") renderSettings();
   });
   // Klick irgendwo anders schließt das per Klick geöffnete Benutzermenü (Touch).
   document.addEventListener("click", e => {
