@@ -4050,14 +4050,17 @@ function sessionBoardHtml() {
   const istHost = SESSION.host === USER.id;
   const spieler = SESSION_PLAYERS.map(p => {
     const joined = p.status === "joined";
+    const besiegt = joined && p.life <= 0;   // bei 0 Leben ausgeschieden
     const name = p.profile?.display_name
       || (p.user_id === USER.id ? (PROFILE?.display_name || t("sess.you")) : t("friends.unknown"));
-    return `<div class="sp-card${joined ? "" : " wartet"}">
+    return `<div class="sp-card${joined ? "" : " wartet"}${besiegt ? " besiegt" : ""}">
       ${avatarHtml(48, p.profile)}
       <div class="sp-name">${esc(name)}${p.user_id === SESSION.host ? ` <span class="sp-host" title="${esc(t("sess.host"))}">&#9733;</span>` : ""}</div>
       ${p.deck_name ? `<div class="sp-deck" title="${esc(p.deck_name)}">${p.commander_img ? `<img src="${esc(p.commander_img)}" alt="">` : ""}<span>${esc(p.deck_name)}</span></div>` : ""}
       ${joined
-        ? `<div class="sp-life" data-u="${esc(p.user_id)}">${p.life}</div>
+        ? `<div class="sp-life" data-u="${esc(p.user_id)}">${Math.max(0, p.life)}</div>
+           <div class="sp-besiegt">&#9760; ${esc(t("sess.defeated"))}</div>`
+        + `
            <div class="sp-ctrl">
              <button class="btn ghost sm" data-life="${esc(p.user_id)}" data-d="-5">&minus;5</button>
              <button class="btn ghost sm" data-life="${esc(p.user_id)}" data-d="-1">&minus;1</button>
@@ -4298,8 +4301,9 @@ async function lebenReset() {
 function lebenAendern(userId, delta) {
   const p = SESSION_PLAYERS.find(x => x.user_id === userId);
   if (!p || p.status !== "joined") return;
-  p.life = Math.max(-99, Math.min(999, p.life + delta));
-  const el = $(`.sp-life[data-u="${userId}"]`); if (el) el.textContent = p.life;
+  p.life = Math.max(0, Math.min(999, p.life + delta));   // 0 = besiegt, kein Minus
+  const el = $(`.sp-life[data-u="${userId}"]`);
+  if (el) { el.textContent = p.life; el.closest(".sp-card")?.classList.toggle("besiegt", p.life <= 0); }
   clearTimeout(lifeTimers[userId]);
   lifeTimers[userId] = setTimeout(async () => {
     const wert = p.life; delete lifeTimers[userId];
