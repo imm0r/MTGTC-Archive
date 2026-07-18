@@ -227,7 +227,21 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .d20.rolling{animation:d20-roll .5s linear infinite}
 @keyframes d20-pop{0%{transform:scale(.55) rotate(-14deg)}55%{transform:scale(1.16) rotate(5deg)}100%{transform:scale(1) rotate(0)}}
 .d20.landed{animation:d20-pop .42s cubic-bezier(.2,1.3,.4,1)}
-@media (prefers-reduced-motion:reduce){.dice-die.rolling,.dice-die.landed,.d20.rolling,.d20.landed{animation:none}}
+/* W6 als echter 3D-Würfel: sechs goldene Flächen mit Pips, taumelt im Raum. */
+.cube{width:76px;height:76px;position:relative;transform-style:preserve-3d;transform:rotateX(-18deg) rotateY(22deg)}
+.cf{position:absolute;inset:0;border-radius:12px;background:linear-gradient(145deg,#ecc65f,#c9962b);
+  box-shadow:inset 0 0 0 1.5px rgba(120,90,20,.55);backface-visibility:hidden}
+.cf1{transform:translateZ(38px)}
+.cf6{transform:rotateY(180deg) translateZ(38px)}
+.cf3{transform:rotateY(90deg) translateZ(38px)}
+.cf4{transform:rotateY(-90deg) translateZ(38px)}
+.cf2{transform:rotateX(90deg) translateZ(38px)}
+.cf5{transform:rotateX(-90deg) translateZ(38px)}
+.pip{position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:#2a1f00;
+  box-shadow:inset 0 -1px 1px rgba(255,255,255,.15)}
+@keyframes cube-tumble{0%{transform:rotateX(0) rotateY(0)}100%{transform:rotateX(720deg) rotateY(1080deg)}}
+.cube.rolling{animation:cube-tumble .85s linear infinite}
+@media (prefers-reduced-motion:reduce){.dice-die.rolling,.dice-die.landed,.d20.rolling,.d20.landed,.cube.rolling{animation:none}}
 /* Synergie-Modus (persönliche Einstellung): welche Synergie-Knöpfe erscheinen. */
 html[data-syn-mode="ki"] .syn-std-btn{display:none}
 html[data-syn-mode="standard"] .syn-ai-btn{display:none}

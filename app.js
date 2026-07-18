@@ -4311,9 +4311,34 @@ function lebenAendern(userId, delta) {
 const DICE_PIPS = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];   // ⚀⚁⚂⚃⚄⚅
 const diceFace = (sides, v) => (sides === 6 && DICE_PIPS[v]) ? DICE_PIPS[v] : String(v);
 
-/* Der Würfelkörper: für W20 ein SVG-Icosaeder (echte W20-Silhouette mit
-   Facetten, Zahl in der Frontfläche), sonst der goldene Würfel (W6 mit Augen). */
+/* Pips einer W6-Fläche als Punkte im 3×3-Raster. */
+function pipDots(v) {
+  const P = { TL: [27, 27], TR: [73, 27], ML: [27, 50], C: [50, 50], MR: [73, 50], BL: [27, 73], BR: [73, 73] };
+  const L = { 1: ["C"], 2: ["TL", "BR"], 3: ["TL", "C", "BR"], 4: ["TL", "TR", "BL", "BR"],
+              5: ["TL", "TR", "C", "BL", "BR"], 6: ["TL", "TR", "ML", "MR", "BL", "BR"] };
+  return (L[v] || []).map(k => `<i class="pip" style="left:${P[k][0]}%;top:${P[k][1]}%"></i>`).join("");
+}
+/* Drehung, die die Augenzahl V nach vorne bringt (Flächenlage: 1 vorn, 6 hinten,
+   3 rechts, 4 links, 2 oben, 5 unten). */
+const CUBE_ROT = {
+  1: "rotateX(0deg) rotateY(0deg)", 6: "rotateX(0deg) rotateY(180deg)",
+  3: "rotateX(0deg) rotateY(-90deg)", 4: "rotateX(0deg) rotateY(90deg)",
+  2: "rotateX(-90deg) rotateY(0deg)", 5: "rotateX(90deg) rotateY(0deg)",
+};
+/* Ergebnis-Fläche vorn, aber leicht gekippt — so bleibt der Würfel auch im
+   Ruhezustand als 3D-Körper erkennbar (man sieht einen Streifen der Nachbarflächen). */
+const cubeLand = v => `rotateX(-11deg) rotateY(-15deg) ${CUBE_ROT[v]}`;
+function cubeHtml(faceVal) {
+  const start = CUBE_ROT[faceVal] ? cubeLand(faceVal) : "rotateX(-18deg) rotateY(22deg)";
+  return `<div class="dice-obj cube" style="transform:${start}">${
+    [1, 2, 3, 4, 5, 6].map(v => `<div class="cf cf${v}">${pipDots(v)}</div>`).join("")}</div>`;
+}
+
+/* Der Würfelkörper: W6 als echter 3D-Würfel, W20 als SVG-Icosaeder (echte
+   W20-Silhouette mit Facetten, Zahl in der Frontfläche), sonst der goldene
+   Würfel mit Zahl. */
 function diceObjHtml(sides, faceVal) {
+  if (sides === 6) return cubeHtml(faceVal);
   if (sides === 20)
     return `<svg class="dice-obj d20" viewBox="0 0 100 100" aria-hidden="true">
       <polygon class="d20-body" points="50,3 90.7,26.5 90.7,73.5 50,97 9.3,73.5 9.3,26.5"/>
@@ -4341,15 +4366,36 @@ function diceStageHtml() {
 }
 
 let diceAnim = null;
-/* Wurf animieren: Würfel wackelt, die Zahl flackert kurz, dann rastet das
-   Ergebnis mit einem „Plopp" ein. Das Ergebnis steht schon fest — nur Show. */
+/* Landerotation für echte 3D-Körper (W6-Würfel; W20-Icosaeder folgt): bringt die
+   Ergebnis-Fläche nach vorn. null → Zahl-Flacker-Würfel. */
+function landRot(sides, v) { return sides === 6 ? cubeLand(v) : null; }
+
+/* Wurf animieren. Echter 3D-Körper: taumelt frei, friert kurz ein und dreht dann
+   sanft auf die ERGEBNIS-Fläche. Sonst: Würfel wackelt, Zahl flackert, rastet mit
+   „Plopp" ein. Das Ergebnis steht vorher fest — nur Show. */
 function zeigeWurf(sides, result, name) {
   const stage = $("#dice-stage");
   if (!stage) return;
   const s = Math.max(2, sides | 0);
   if (diceAnim) { clearInterval(diceAnim.iv); clearTimeout(diceAnim.to); }
   stage.innerHTML = `${diceObjHtml(s, 1)}<div class="dice-cap"><b>${esc(name || "?")}</b> · W${s}</div>`;
-  const dieEl = stage.querySelector(".dice-obj"), valEl = stage.querySelector(".dice-val");
+  const dieEl = stage.querySelector(".dice-obj");
+
+  const rot = landRot(s, result);
+  if (rot) {                       // echter 3D-Würfel: taumeln → auf Fläche einrasten
+    dieEl.classList.add("rolling");
+    const to = setTimeout(() => {
+      const jetzt = getComputedStyle(dieEl).transform;   // aktuelle Taumel-Lage einfrieren
+      dieEl.style.transform = jetzt; dieEl.classList.remove("rolling"); void dieEl.offsetWidth;
+      dieEl.style.transition = "transform .6s cubic-bezier(.2,.8,.25,1.25)";
+      dieEl.style.transform = rot;
+      diceAnim = null;
+    }, 850);
+    diceAnim = { iv: null, to };
+    return;
+  }
+
+  const valEl = stage.querySelector(".dice-val");
   dieEl.classList.add("rolling");
   const iv = setInterval(() => { valEl.textContent = diceFace(s, 1 + Math.floor(Math.random() * s)); }, 60);
   const to = setTimeout(() => {
