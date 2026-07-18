@@ -4311,14 +4311,32 @@ function lebenAendern(userId, delta) {
 const DICE_PIPS = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];   // ⚀⚁⚂⚃⚄⚅
 const diceFace = (sides, v) => (sides === 6 && DICE_PIPS[v]) ? DICE_PIPS[v] : String(v);
 
+/* Der Würfelkörper: für W20 ein SVG-Icosaeder (echte W20-Silhouette mit
+   Facetten, Zahl in der Frontfläche), sonst der goldene Würfel (W6 mit Augen). */
+function diceObjHtml(sides, faceVal) {
+  if (sides === 20)
+    return `<svg class="dice-obj d20" viewBox="0 0 100 100" aria-hidden="true">
+      <polygon class="d20-body" points="50,3 90.7,26.5 90.7,73.5 50,97 9.3,73.5 9.3,26.5"/>
+      <g class="d20-facet">
+        <line x1="50" y1="32" x2="50" y2="3"/><line x1="50" y1="32" x2="9.3" y2="26.5"/>
+        <line x1="50" y1="32" x2="90.7" y2="26.5"/><line x1="31" y1="63" x2="9.3" y2="26.5"/>
+        <line x1="31" y1="63" x2="9.3" y2="73.5"/><line x1="31" y1="63" x2="50" y2="97"/>
+        <line x1="69" y1="63" x2="90.7" y2="26.5"/><line x1="69" y1="63" x2="90.7" y2="73.5"/>
+        <line x1="69" y1="63" x2="50" y2="97"/></g>
+      <polygon class="d20-front" points="50,32 69,63 31,63"/>
+      <text class="dice-val" x="50" y="53" text-anchor="middle" dominant-baseline="middle">${esc(String(faceVal ?? ""))}</text>
+    </svg>`;
+  return `<div class="dice-obj dice-die"><span class="dice-val">${esc(diceFace(sides, faceVal))}</span></div>`;
+}
+
 /* Statischer Bühnen-Zustand beim Rendern: letzter Wurf aus dem Log, sonst ruhend. */
 function diceStageHtml() {
   const last = (SESSION_LOG || []).find(e => e.kind === "dice");
-  if (!last) return `<div class="dice-die idle"><span class="dice-val">&#127922;</span></div>`;
+  if (!last) return `<div class="dice-obj dice-die idle"><span class="dice-val">&#127922;</span></div>`;
   const sides = last.data?.sides || 20;
   const p = SESSION_PLAYERS.find(x => x.user_id === last.user_id);
   const name = p?.profile?.display_name || (last.user_id === USER?.id ? t("sess.you") : "?");
-  return `<div class="dice-die"><span class="dice-val">${esc(diceFace(sides, last.data?.result))}</span></div>
+  return `${diceObjHtml(sides, last.data?.result)}
     <div class="dice-cap"><b>${esc(name)}</b> · W${sides}</div>`;
 }
 
@@ -4330,16 +4348,16 @@ function zeigeWurf(sides, result, name) {
   if (!stage) return;
   const s = Math.max(2, sides | 0);
   if (diceAnim) { clearInterval(diceAnim.iv); clearTimeout(diceAnim.to); }
-  stage.innerHTML = `<div class="dice-die rolling"><span class="dice-val">${esc(diceFace(s, 1))}</span></div>
-    <div class="dice-cap"><b>${esc(name || "?")}</b> · W${s}</div>`;
-  const valEl = stage.querySelector(".dice-val"), dieEl = stage.querySelector(".dice-die");
+  stage.innerHTML = `${diceObjHtml(s, 1)}<div class="dice-cap"><b>${esc(name || "?")}</b> · W${s}</div>`;
+  const dieEl = stage.querySelector(".dice-obj"), valEl = stage.querySelector(".dice-val");
+  dieEl.classList.add("rolling");
   const iv = setInterval(() => { valEl.textContent = diceFace(s, 1 + Math.floor(Math.random() * s)); }, 60);
   const to = setTimeout(() => {
     clearInterval(iv);
     valEl.textContent = diceFace(s, result);
     dieEl.classList.remove("rolling"); dieEl.classList.add("landed");
     diceAnim = null;
-  }, 850);
+  }, 900);
   diceAnim = { iv, to };
 }
 

@@ -202,7 +202,7 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .trk-btns{flex:none;display:flex;gap:4px}
 .trk-btns .btn{padding:3px 8px}
 /* Würfel-Bühne mit Animation */
-.dice-stage{display:flex;flex-direction:column;align-items:center;gap:8px;min-height:104px;justify-content:center;margin:12px 0 14px}
+.dice-stage{display:flex;flex-direction:column;align-items:center;gap:8px;min-height:104px;justify-content:center;margin:12px 0 14px;perspective:800px}
 .dice-die{width:74px;height:74px;border-radius:16px;display:grid;place-items:center;font-size:36px;font-weight:800;
   color:#231a00;background:linear-gradient(145deg,#ecc65f,#c9962b);
   box-shadow:0 6px 16px rgba(0,0,0,.45),inset 0 2px 0 rgba(255,255,255,.4)}
@@ -213,7 +213,21 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .dice-die.rolling{animation:dice-roll .24s ease-in-out infinite}
 @keyframes dice-pop{0%{transform:scale(.6) rotate(-8deg)}55%{transform:scale(1.2) rotate(5deg)}100%{transform:scale(1) rotate(0)}}
 .dice-die.landed{animation:dice-pop .4s cubic-bezier(.2,1.3,.4,1)}
-@media (prefers-reduced-motion:reduce){.dice-die.rolling,.dice-die.landed{animation:none}}
+/* W20 als SVG-Icosaeder, taumelt beim Wurf in 3D. */
+.d20{width:88px;height:88px;filter:drop-shadow(0 6px 12px rgba(0,0,0,.5))}
+.d20 .d20-body{fill:#c9962b}
+.d20 .d20-front{fill:#ecc65f}
+.d20 .d20-facet line{stroke:#87661c;stroke-width:1.3;stroke-linecap:round}
+.d20 .dice-val{fill:#231a00;font-size:23px;font-weight:800}
+@keyframes d20-roll{0%{transform:rotateX(0) rotateY(0) rotateZ(0)}
+  25%{transform:rotateX(140deg) rotateY(80deg) rotateZ(70deg)}
+  50%{transform:rotateX(250deg) rotateY(210deg) rotateZ(150deg)}
+  75%{transform:rotateX(400deg) rotateY(300deg) rotateZ(240deg)}
+  100%{transform:rotateX(540deg) rotateY(430deg) rotateZ(360deg)}}
+.d20.rolling{animation:d20-roll .5s linear infinite}
+@keyframes d20-pop{0%{transform:scale(.55) rotate(-14deg)}55%{transform:scale(1.16) rotate(5deg)}100%{transform:scale(1) rotate(0)}}
+.d20.landed{animation:d20-pop .42s cubic-bezier(.2,1.3,.4,1)}
+@media (prefers-reduced-motion:reduce){.dice-die.rolling,.dice-die.landed,.d20.rolling,.d20.landed{animation:none}}
 /* Synergie-Modus (persönliche Einstellung): welche Synergie-Knöpfe erscheinen. */
 html[data-syn-mode="ki"] .syn-std-btn{display:none}
 html[data-syn-mode="standard"] .syn-ai-btn{display:none}
