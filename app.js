@@ -3026,6 +3026,52 @@ function exportCsv() {
     "﻿" + [head, ...rows].map(r => r.map(csvCell).join(";")).join("\r\n"), "text/csv");
 }
 
+/* ---- Cardmarket-Verkaufsexport ------------------------------------------
+   Cardmarkets API ist für neue Zugänge geschlossen (Stand 2026), deshalb der
+   Datei-Weg: eine CSV, die die Erweiterung „Cardmarket Bulk Import" ins
+   Bulk-Listing-Formular einliest (csv-parse, KOMMA-getrennt, Kopfzeile Pflicht;
+   matcht per Name + Set, Zustand/Sprache über tolerante Matcher, Foil = "foil").
+   Deshalb der ENGLISCHE Name (c.name), Cardmarkets englische Sprachnamen und
+   unsere Zustands-Codes (MT/NM/EX/…, sind Cardmarkets eigene) — alles passt
+   unmittelbar. setCode/Nummer/idProduct reisen als Zusatzspalten mit: der
+   Importer ignoriert Unbekanntes, dem Menschen hilft die Referenz. */
+const CM_LANG = { en: "English", de: "German", fr: "French", es: "Spanish",
+  it: "Italian", pt: "Portuguese", ja: "Japanese", ko: "Korean", ru: "Russian",
+  zhs: "S-Chinese", zht: "T-Chinese" };
+const CM_COLS = ["name", "set", "setCode", "collectorNumber", "language",
+  "condition", "isFoil", "isSigned", "quantity", "price", "comment", "idProduct"];
+
+function cmSellRows() {
+  return CARDS.filter(c => (c.qty | 0) > 0)
+    .map(c => ({
+      name: c.name || c.disp || "",
+      set: c.set_name || "",
+      setCode: c.set || "",
+      collectorNumber: c.cn || "",
+      language: CM_LANG[(c.lang || "").toLowerCase()] || "",
+      condition: c.condition || "NM",
+      isFoil: c.foil ? "foil" : "",
+      isSigned: "",
+      quantity: c.qty | 0,
+      price: c.price == null ? "" : Number(c.price).toFixed(2),
+      comment: "",
+      idProduct: c.cm_id ?? "",
+    }))
+    .sort((a, b) => (a.set || "").localeCompare(b.set || "") ||
+                    (a.name || "").localeCompare(b.name || ""));
+}
+
+function exportCardmarket() {
+  const rows = cmSellRows();
+  if (!rows.length) { toast(t("cm.cmNone")); return; }
+  // KEIN BOM: csv-parse strippt keins, sonst wird die erste Überschrift
+  // („﻿name") nicht als Spalte erkannt. Quoting über csvCell (RFC 4180).
+  const csv = CM_COLS.join(",") + "\r\n" +
+    rows.map(r => CM_COLS.map(k => csvCell(r[k])).join(",")).join("\r\n");
+  download(`cardmarket-verkauf-${today()}.csv`, csv, "text/csv");
+  toast(t("cm.cmDone", { n: rows.length }));
+}
+
 /* Einspielen einer alten lokalen Sicherung (aus der IndexedDB-Fassung). */
 async function importJson(file) {
   const data = JSON.parse(await file.text());
@@ -4989,6 +5035,7 @@ function wireApp() {
     JSON.stringify({ v: 2, exported: new Date().toISOString(), cards: CARDS, decks: DECKS }, null, 1),
     "application/json");
   $("#ex-csv").onclick = exportCsv;
+  $("#ex-cardmarket").onclick = exportCardmarket;
   $("#im-json").onclick = () => $("#im-file").click();
   $("#im-file").onchange = async e => {
     const f = e.target.files[0]; e.target.value = "";

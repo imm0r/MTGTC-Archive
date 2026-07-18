@@ -1841,4 +1841,36 @@ Object.assign(I18N.it, {
   "cal.needTitle": "Inserisci un titolo.", "cal.needWhen": "Scegli data e ora.",
 });
 
+/* Cardmarket-Verkaufsexport */
+Object.assign(I18N.de, {
+  "cm.cardmarketExport": "Cardmarket-Verkauf (CSV)",
+  "cm.cardmarketHint": "„Cardmarket-Verkauf (CSV)“ erzeugt eine Datei zum Masseneinstellen aller Karten mit Bestand. Cardmarkets API ist derzeit für neue Zugänge geschlossen, daher der Datei-Weg: die Browser-Erweiterung „Cardmarket Bulk Import“ installieren, auf Cardmarket „Verkaufen → mehrere Artikel einstellen“ öffnen, die CSV importieren und je Durchgang bis zu 100 Zeilen wählen. Die Spalten (Name, Set, Zustand, Sprache, Anzahl, Preis, Foil) sind bereits passend benannt; Preis und Zustand stammen aus deiner Sammlung und lassen sich vor dem Bestätigen anpassen.",
+  "cm.cmDone": "{n} Karten für Cardmarket exportiert.",
+  "cm.cmNone": "Keine verkäuflichen Karten (Bestand über 0) vorhanden.",
+});
+Object.assign(I18N.en, {
+  "cm.cardmarketExport": "Cardmarket sale (CSV)",
+  "cm.cardmarketHint": "“Cardmarket sale (CSV)” builds a file to bulk-list every card you own. Cardmarket’s API is currently closed to new access, hence the file route: install the “Cardmarket Bulk Import” browser extension, open “Sell → list multiple items” on Cardmarket, import the CSV and pick up to 100 rows per run. The columns (name, set, condition, language, quantity, price, foil) are already named to match; price and condition come from your collection and can be adjusted before you confirm.",
+  "cm.cmDone": "Exported {n} cards for Cardmarket.",
+  "cm.cmNone": "No sellable cards (quantity above 0) found.",
+});
+Object.assign(I18N.fr, {
+  "cm.cardmarketExport": "Vente Cardmarket (CSV)",
+  "cm.cardmarketHint": "« Vente Cardmarket (CSV) » crée un fichier pour mettre en vente en masse toutes les cartes que tu possèdes. L’API de Cardmarket est actuellement fermée aux nouveaux accès, d’où la voie par fichier : installe l’extension de navigateur « Cardmarket Bulk Import », ouvre « Vendre → mettre en vente plusieurs articles » sur Cardmarket, importe le CSV et choisis jusqu’à 100 lignes par passage. Les colonnes (nom, édition, état, langue, quantité, prix, foil) sont déjà nommées pour correspondre ; le prix et l’état proviennent de ta collection et peuvent être ajustés avant de confirmer.",
+  "cm.cmDone": "{n} cartes exportées pour Cardmarket.",
+  "cm.cmNone": "Aucune carte vendable (quantité supérieure à 0).",
+});
+Object.assign(I18N.es, {
+  "cm.cardmarketExport": "Venta en Cardmarket (CSV)",
+  "cm.cardmarketHint": "«Venta en Cardmarket (CSV)» genera un archivo para poner a la venta en masa todas las cartas que tienes. La API de Cardmarket está cerrada actualmente a nuevos accesos, de ahí la vía por archivo: instala la extensión de navegador «Cardmarket Bulk Import», abre «Vender → poner varios artículos» en Cardmarket, importa el CSV y elige hasta 100 filas por tanda. Las columnas (nombre, edición, estado, idioma, cantidad, precio, foil) ya están nombradas para coincidir; el precio y el estado proceden de tu colección y se pueden ajustar antes de confirmar.",
+  "cm.cmDone": "{n} cartas exportadas para Cardmarket.",
+  "cm.cmNone": "No hay cartas vendibles (cantidad mayor que 0).",
+});
+Object.assign(I18N.it, {
+  "cm.cardmarketExport": "Vendita su Cardmarket (CSV)",
+  "cm.cardmarketHint": "«Vendita su Cardmarket (CSV)» crea un file per mettere in vendita in blocco tutte le carte che possiedi. L’API di Cardmarket è attualmente chiusa ai nuovi accessi, da qui la via tramite file: installa l’estensione del browser «Cardmarket Bulk Import», apri «Vendi → metti in vendita più articoli» su Cardmarket, importa il CSV e scegli fino a 100 righe per volta. Le colonne (nome, espansione, condizione, lingua, quantità, prezzo, foil) sono già denominate per corrispondere; prezzo e condizione provengono dalla tua collezione e si possono regolare prima di confermare.",
+  "cm.cmDone": "{n} carte esportate per Cardmarket.",
+  "cm.cmNone": "Nessuna carta vendibile (quantità maggiore di 0).",
+});
+
 initLang();
