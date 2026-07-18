@@ -6,7 +6,7 @@
 <title>Arcanum Archive</title>
 <!-- ?v= bei jeder Änderung hochzählen: sonst servieren Browser (und der
      Cache von GitHub Pages) nach einem Push weiter die alten Dateien. -->
-<link rel="stylesheet" href="style.css?v=70">
+<link rel="stylesheet" href="style.css?v=71">
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PGRlZnM+PHJhZGlhbEdyYWRpZW50IGlkPSJsIiBjeD0iNDAlIiBjeT0iMzYlIiByPSI3MiUiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2RjZWZmZiIvPjxzdG9wIG9mZnNldD0iMjYlIiBzdG9wLWNvbG9yPSIjNWY4OGUyIi8+PHN0b3Agb2Zmc2V0PSI2MCUiIHN0b3AtY29sb3I9IiM2ZTM3YTQiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiMxNDBmMmMiLz48L3JhZGlhbEdyYWRpZW50PjwvZGVmcz48cmVjdCB4PSIxLjIiIHk9IjEuMiIgd2lkdGg9IjI5LjYiIGhlaWdodD0iMjkuNiIgcng9IjcuNSIgZmlsbD0iIzIxMWMzZiIgc3Ryb2tlPSIjYzlhMjI3IiBzdHJva2Utd2lkdGg9IjIiLz48bGluZSB4MT0iMTgiIHkxPSIxNy41IiB4Mj0iMjYiIHkyPSIyNS41IiBzdHJva2U9IiNlM2JmNGEiIHN0cm9rZS13aWR0aD0iMy42IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48Y2lyY2xlIGN4PSIxNCIgY3k9IjE0IiByPSI4IiBmaWxsPSJ1cmwoI2wpIiBzdHJva2U9IiNjOWEyMjciIHN0cm9rZS13aWR0aD0iMi40Ii8+PHBhdGggZD0iTTE0IDE0IEMxMSAxMS42IDExLjQgNy44IDE1IDciIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2UyZWVmZiIgc3Ryb2tlLXdpZHRoPSIxLjMiIG9wYWNpdHk9Ii44NSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGNpcmNsZSBjeD0iMTQiIGN5PSIxNCIgcj0iMS43IiBmaWxsPSIjZjJmOGZmIi8+PC9zdmc+">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
@@ -21,7 +21,7 @@
 
   <!-- Erststart: Verbindung zur eigenen Supabase-Datenbank -->
   <div class="pane" data-pane="setup" style="display:none">
-    <p class="hint" style="margin-top:2px">Einmalig: Verbindung zu deiner Datenbank herstellen.
+    <p class="hint" style="margin-top:2px" data-i18n-html="setup.hint1">Einmalig: Verbindung zu deiner Datenbank herstellen.
       Die Werte findest du in Supabase unter <b>Project Settings → API</b>.</p>
     <form class="card" id="setup-form">
       <div style="margin-bottom:10px">
@@ -32,30 +32,30 @@
         <label>Anon / Publishable Key</label>
         <input type="text" id="cfg-key" placeholder="sb_publishable_… oder eyJ…" autocomplete="off">
       </div>
-      <button class="btn" style="width:100%" type="submit">Verbinden</button>
+      <button class="btn" style="width:100%" type="submit" data-i18n="setup.connect">Verbinden</button>
       <div class="msg err" id="setup-msg"></div>
-      <p class="hint">Diese beiden Werte sind für den Browser gedacht und dürfen öffentlich sein.
+      <p class="hint" data-i18n-html="setup.hint2">Diese beiden Werte sind für den Browser gedacht und dürfen öffentlich sein.
         Das Datenbank-Passwort und den <code>service_role</code>-Key trägst du hier <b>nicht</b> ein.</p>
     </form>
   </div>
 
   <!-- Anmeldung -->
   <div class="pane" data-pane="auth" style="display:none">
-    <p class="hint" style="margin-top:2px">Melde dich an, um deine Sammlung auf allen Geräten zu sehen.</p>
+    <p class="hint" style="margin-top:2px" data-i18n="auth.hint">Melde dich an, um deine Sammlung auf allen Geräten zu sehen.</p>
     <form class="card" id="auth-form">
       <div class="tabs" id="auth-tabs">
-        <button type="button" class="on" data-mode="in">Anmelden</button>
-        <button type="button" data-mode="up">Konto anlegen</button>
+        <button type="button" class="on" data-mode="in" data-i18n="auth.signin">Anmelden</button>
+        <button type="button" data-mode="up" data-i18n="auth.signup">Konto anlegen</button>
       </div>
       <div style="margin-bottom:10px">
-        <label>E-Mail</label>
+        <label data-i18n="field.email">E-Mail</label>
         <input type="email" id="auth-email" autocomplete="username" required>
       </div>
       <div style="margin-bottom:12px">
-        <label>Passwort</label>
+        <label data-i18n="field.password">Passwort</label>
         <input type="password" id="auth-pw" autocomplete="current-password" required>
       </div>
-      <button class="btn" style="width:100%" type="submit" id="auth-go">Anmelden</button>
+      <button class="btn" style="width:100%" type="submit" id="auth-go" data-i18n="auth.signin">Anmelden</button>
       <div class="msg" id="auth-msg"></div>
     </form>
   </div>
@@ -68,19 +68,19 @@
     <img class="brand-logo" src="logo-header.png?v=61" alt="Arcanum Archive">
   </h1>
   <nav>
-    <button data-v="coll" class="on">Sammlung</button>
-    <button data-v="decks">Decks</button>
-    <button data-v="more">Card Management</button>
+    <button data-v="coll" class="on" data-i18n="nav.collection">Sammlung</button>
+    <button data-v="decks" data-i18n="nav.decks">Decks</button>
+    <button data-v="more" data-i18n="nav.cardmgmt">Card Management</button>
     <!-- Profil, Freunde und Abmelden wohnen im Menü hinter Avatar + Name:
          aufklappen per Hover (Desktop) bzw. Klick (Touch). Die data-v-Knöpfe
          hier laufen über dieselbe Verdrahtung wie die Haupt-Navigation. -->
     <div class="who-menu" id="who-menu">
       <span id="who"></span>
       <div class="menu">
-        <button data-v="profile">Profil</button>
-        <button data-v="friends">Freunde</button>
-        <button data-v="settings">Einstellungen</button>
-        <button id="logout">Abmelden</button>
+        <button data-v="profile" data-i18n="nav.profile">Profil</button>
+        <button data-v="friends" data-i18n="nav.friends">Freunde</button>
+        <button data-v="settings" data-i18n="nav.settings">Einstellungen</button>
+        <button id="logout" data-i18n="nav.logout">Abmelden</button>
       </div>
     </div>
   </nav>
@@ -95,11 +95,11 @@
   <div id="dash"></div>
   <div class="card">
     <div class="row" style="margin-bottom:12px">
-      <div style="flex:2"><label>Suche</label><input type="text" id="q" placeholder="Name oder Set…"></div>
-      <div><label>Set</label><select id="f-set"><option value="">Alle</option></select></div>
-      <div><label>Ausführung</label><select id="f-foil">
-        <option value="">Alle</option><option value="1">Nur Foil</option><option value="0">Nur Normal</option></select></div>
-      <div style="flex:none"><button class="btn ghost" id="upd">Preise aktualisieren</button></div>
+      <div style="flex:2"><label data-i18n="coll.search">Suche</label><input type="text" id="q" data-i18n-ph="coll.searchPh" placeholder="Name oder Set…"></div>
+      <div><label data-i18n="coll.set">Set</label><select id="f-set"><option value="" data-i18n="coll.all">Alle</option></select></div>
+      <div><label data-i18n="coll.finish">Ausführung</label><select id="f-foil">
+        <option value="" data-i18n="coll.all">Alle</option><option value="1" data-i18n="coll.onlyFoil">Nur Foil</option><option value="0" data-i18n="coll.onlyNormal">Nur Normal</option></select></div>
+      <div style="flex:none"><button class="btn ghost" id="upd" data-i18n="coll.updatePrices">Preise aktualisieren</button></div>
     </div>
     <div class="xscroll" style="overflow-x:auto">
       <!-- Kopf- und Datenzeilen erzeugt cardHead()/cardRow() in app.js —
@@ -117,10 +117,10 @@
 <section class="view" id="v-decks">
   <div class="card">
     <div class="row" style="align-items:flex-end">
-      <div style="flex:2"><label>Neues Deck</label><input type="text" id="deck-name" placeholder="z. B. Mono Red Aggro"></div>
-      <div><label>Format</label><select id="deck-format"></select></div>
-      <div><label>Archetyp</label><select id="deck-arch"></select></div>
-      <div style="flex:none"><button class="btn" id="deck-add">Deck anlegen</button></div>
+      <div style="flex:2"><label data-i18n="decks.new">Neues Deck</label><input type="text" id="deck-name" data-i18n-ph="decks.newPh" placeholder="z. B. Mono Red Aggro"></div>
+      <div><label data-i18n="decks.format">Format</label><select id="deck-format"></select></div>
+      <div><label data-i18n="decks.archetype">Archetyp</label><select id="deck-arch"></select></div>
+      <div style="flex:none"><button class="btn" id="deck-add" data-i18n="decks.create">Deck anlegen</button></div>
     </div>
   </div>
   <!-- Filterleiste nach Klassifizierung. deckFilterUi() befüllt die Auswahlen
@@ -128,9 +128,9 @@
        filtern gibt (ab zwei Decks, sobald mind. eines eingeordnet ist). -->
   <div class="card" id="deck-filter" style="display:none">
     <div class="row" style="align-items:flex-end">
-      <div style="flex:none"><span class="hint" style="font-weight:600">Filtern nach</span></div>
-      <div><label>Format</label><select id="fd-format"></select></div>
-      <div><label>Archetyp</label><select id="fd-arch"></select></div>
+      <div style="flex:none"><span class="hint" style="font-weight:600" data-i18n="decks.filterBy">Filtern nach</span></div>
+      <div><label data-i18n="decks.format">Format</label><select id="fd-format"></select></div>
+      <div><label data-i18n="decks.archetype">Archetyp</label><select id="fd-arch"></select></div>
     </div>
   </div>
   <div id="deck-list"></div>
@@ -141,57 +141,57 @@
 
   <!-- Scannen: der Hauptweg, Karten anzulegen — deshalb ganz oben. -->
   <div class="card">
-    <h3 style="margin-top:0">Karten scannen</h3>
+    <h3 style="margin-top:0" data-i18n="cm.scan">Karten scannen</h3>
     <div class="row" style="margin-bottom:12px">
-      <div><label>Sprache</label>
+      <div><label data-i18n="cm.language">Sprache</label>
         <select id="d-lang">
-          <option value="de">Deutsch</option><option value="en" selected>Englisch</option>
-          <option value="fr">Französisch</option><option value="it">Italienisch</option>
-          <option value="es">Spanisch</option><option value="ja">Japanisch</option>
+          <option value="de" data-i18n="langname.de">Deutsch</option><option value="en" selected data-i18n="langname.en">Englisch</option>
+          <option value="fr" data-i18n="langname.fr">Französisch</option><option value="it" data-i18n="langname.it">Italienisch</option>
+          <option value="es" data-i18n="langname.es">Spanisch</option><option value="ja" data-i18n="langname.ja">Japanisch</option>
         </select></div>
-      <div><label>Zustand</label>
+      <div><label data-i18n="cm.condition">Zustand</label>
         <select id="d-cond">
           <option value="NM" selected>Near Mint</option><option value="LP">Lightly Played</option>
           <option value="MP">Moderately Played</option><option value="HP">Heavily Played</option>
           <option value="DMG">Damaged</option>
         </select></div>
-      <div><label>Ausführung</label>
-        <select id="d-foil"><option value="0" selected>Normal</option><option value="1">Foil</option></select></div>
+      <div><label data-i18n="cm.finish">Ausführung</label>
+        <select id="d-foil"><option value="0" selected data-i18n="cm.normal">Normal</option><option value="1">Foil</option></select></div>
     </div>
     <div class="drop" id="drop">
-      <b>&#128247; Karte fotografieren</b>
-      Tippen zum Aufnehmen &middot; oder Bilder hierher ziehen &middot; mehrere gleichzeitig möglich
+      <b>&#128247; <span data-i18n="cm.dropTitle">Karte fotografieren</span></b>
+      <span data-i18n="cm.dropSub">Tippen zum Aufnehmen &middot; oder Bilder hierher ziehen &middot; mehrere gleichzeitig möglich</span>
     </div>
     <input type="file" id="file" accept="image/*" capture="environment" multiple hidden>
     <input type="file" id="multi-file" accept="image/*" capture="environment" hidden>
     <div class="row" style="margin-top:10px">
-      <div style="flex:none"><button class="btn ghost" id="multi-btn">&#128248; Ein Foto, mehrere Karten</button></div>
+      <div style="flex:none"><button class="btn ghost" id="multi-btn">&#128248; <span data-i18n="cm.multiBtn">Ein Foto, mehrere Karten</span></button></div>
     </div>
-    <p class="hint">Die Einstellungen oben gelten für alle neu gescannten Karten und lassen sich pro Karte nachträglich ändern.
+    <p class="hint" data-i18n-html="cm.scanHint">Die Einstellungen oben gelten für alle neu gescannten Karten und lassen sich pro Karte nachträglich ändern.
       „Ein Foto, mehrere Karten“ liest ein Bild mit mehreren <b>nebeneinander liegenden</b> Karten und legt jede einzeln in die Warteschlange.</p>
   </div>
   <div id="queue"></div>
 
   <div class="card">
-    <h3 style="margin-top:0">Export &amp; Import</h3>
-    <p class="hint" style="margin-top:0">Deine Sammlung liegt in deiner Supabase-Datenbank und ist auf allen
+    <h3 style="margin-top:0" data-i18n="cm.exportImport">Export &amp; Import</h3>
+    <p class="hint" style="margin-top:0" data-i18n="cm.exportHint">Deine Sammlung liegt in deiner Supabase-Datenbank und ist auf allen
       Geräten dieselbe. Ein Export ist trotzdem nützlich — als Sicherung oder zum Weiterverarbeiten in Excel.</p>
     <div class="row" style="margin-top:12px">
-      <div style="flex:none"><button class="btn" id="ex-json">Sicherung (JSON)</button></div>
-      <div style="flex:none"><button class="btn ghost" id="ex-csv">Export (CSV)</button></div>
-      <div style="flex:none"><button class="btn ghost" id="im-json">Sicherung einspielen</button></div>
-      <div style="flex:none"><button class="btn ghost" id="im-csv">Mythic Tools (CSV)</button></div>
-      <div style="flex:none"><button class="btn ghost" id="mi-toggle">Manuell (Set + Nummer)</button></div>
-      <div style="flex:none"><button class="btn ghost" id="reset-cfg">Verbindung zurücksetzen</button></div>
+      <div style="flex:none"><button class="btn" id="ex-json" data-i18n="cm.backupJson">Sicherung (JSON)</button></div>
+      <div style="flex:none"><button class="btn ghost" id="ex-csv" data-i18n="cm.exportCsv">Export (CSV)</button></div>
+      <div style="flex:none"><button class="btn ghost" id="im-json" data-i18n="cm.importBackup">Sicherung einspielen</button></div>
+      <div style="flex:none"><button class="btn ghost" id="im-csv" data-i18n="cm.mythicCsv">Mythic Tools (CSV)</button></div>
+      <div style="flex:none"><button class="btn ghost" id="mi-toggle" data-i18n="cm.manual">Manuell (Set + Nummer)</button></div>
+      <div style="flex:none"><button class="btn ghost" id="reset-cfg" data-i18n="cm.resetConn">Verbindung zurücksetzen</button></div>
     </div>
-    <p class="hint">„Mythic Tools (CSV)“ liest eine Export-Datei aus der Mythic-Tools-App ein:
+    <p class="hint" data-i18n="cm.mythicHint">„Mythic Tools (CSV)“ liest eine Export-Datei aus der Mythic-Tools-App ein:
       Karten kommen in die Sammlung, ein enthaltenes Deck wird angelegt, bereits vorhandene
       Karten werden übersprungen.</p>
     <div id="import-status" style="margin-top:6px"></div>
 
     <div id="manual-import" style="display:none;margin-top:14px">
       <div class="row" style="margin-bottom:10px">
-        <div style="flex:none;min-width:160px"><label>Zustand für alle Zeilen</label>
+        <div style="flex:none;min-width:160px"><label data-i18n="cm.condAllRows">Zustand für alle Zeilen</label>
           <select id="mi-cond">
             <option value="NM" selected>Near Mint</option><option value="LP">Lightly Played</option>
             <option value="MP">Moderately Played</option><option value="HP">Heavily Played</option>
@@ -201,16 +201,16 @@
       <div class="xscroll" style="overflow-x:auto">
         <table id="mi-tbl">
           <thead><tr>
-            <th>Set</th><th>Nummer</th><th>Zeichen</th><th>Ausführung</th><th>Sprache</th><th></th><th></th>
+            <th data-i18n="th.set">Set</th><th data-i18n="th.number">Nummer</th><th data-i18n="th.mark">Zeichen</th><th data-i18n="th.finish">Ausführung</th><th data-i18n="th.language">Sprache</th><th></th><th></th>
           </tr></thead>
           <tbody id="mi-rows"></tbody>
         </table>
       </div>
       <div class="row" style="margin-top:10px">
-        <div style="flex:none"><button class="btn ghost" id="mi-add">+ Zeile</button></div>
-        <div style="flex:none"><button class="btn" id="mi-import">Importieren</button></div>
+        <div style="flex:none"><button class="btn ghost" id="mi-add" data-i18n="cm.addRow">+ Zeile</button></div>
+        <div style="flex:none"><button class="btn" id="mi-import" data-i18n="cm.import">Importieren</button></div>
       </div>
-      <p class="hint">Set und Nummer stehen unten links auf der Karte („MKM • DE“ und „0008/013 T“).
+      <p class="hint" data-i18n-html="cm.manualHint">Set und Nummer stehen unten links auf der Karte („MKM • DE“ und „0008/013 T“).
         Das Zeichen ist der Buchstabe bei der Nummer — wichtig ist <code>T</code> für Token;
         C, U, R oder M kannst du weglassen. Promo-Karten findest du mit <code>P</code> vor dem
         Setcode (<code>PEMN</code>, Nummer <code>1Z</code>); die Nummer darf Buchstaben enthalten.
@@ -221,8 +221,8 @@
     <input type="file" id="csv-file" accept="text/csv,.csv" hidden>
   </div>
   <div class="card">
-    <h3 style="margin-top:0">So funktioniert die Erkennung</h3>
-    <p class="hint" style="margin-top:0">
+    <h3 style="margin-top:0" data-i18n="cm.howTitle">So funktioniert die Erkennung</h3>
+    <p class="hint" style="margin-top:0" data-i18n="cm.howHint">
       Aus dem Foto wird per Texterkennung der Kartenname gelesen und gegen die Scryfall-Datenbank abgeglichen —
       von dort kommen Set, Sammlernummer, Bild und Marktpreis. Wird der Name nicht sicher erkannt, kannst du ihn
       direkt in der Trefferzeile korrigieren; das Eingabefeld schlägt passende Kartennamen vor.
@@ -250,19 +250,20 @@
 
 <dialog id="dlg"><div id="dlg-body"></div>
   <div class="row" style="margin-top:14px;justify-content:flex-end">
-    <div style="flex:none"><button class="btn ghost" id="dlg-no">Abbrechen</button></div>
-    <div style="flex:none"><button class="btn" id="dlg-yes">OK</button></div>
+    <div style="flex:none"><button class="btn ghost" id="dlg-no" data-i18n="dlg.cancel">Abbrechen</button></div>
+    <div style="flex:none"><button class="btn" id="dlg-yes" data-i18n="dlg.ok">OK</button></div>
   </div>
 </dialog>
 
 <dialog id="detail-dlg"><div id="detail-body"></div>
   <div class="row" style="margin-top:12px;justify-content:flex-end">
-    <div style="flex:none"><button class="btn" id="detail-close">Schließen</button></div>
+    <div style="flex:none"><button class="btn" id="detail-close" data-i18n="dlg.close">Schließen</button></div>
   </div>
 </dialog>
 <div id="hovercard"></div>
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=70"></script>
+<script src="i18n.js?v=71"></script>
+<script src="app.js?v=71"></script>
 </body>
 </html>

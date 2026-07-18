@@ -913,16 +913,16 @@ function cardHead(imDeck) {
   const s = k => ` data-s="${k}"`;
   return `<tr>
     <th class="hide-s"></th>
-    <th${s("name")}>Karte</th>
-    <th${s("mana")} class="num">Mana</th>
-    <th${s("set_name")} class="hide-s">Set</th>
-    <th${s("lang")} class="hide-s">Spr.</th>
-    ${imDeck ? "" : `<th${s("condition")} class="hide-s">Zust.</th>
-    <th${s("released")} class="hide-s">Erschienen</th>
-    <th${s("added")} class="hide-s">Hinzugefügt</th>`}
-    <th${s("qty")} class="num">Anz.</th>
-    ${imDeck ? `<th${s("fehlt")} class="num">Bestand</th>`
-             : `<th${s("price")} class="num">Preis</th>`}
+    <th${s("name")}>${esc(t("th.card"))}</th>
+    <th${s("mana")} class="num">${esc(t("th.mana"))}</th>
+    <th${s("set_name")} class="hide-s">${esc(t("th.set"))}</th>
+    <th${s("lang")} class="hide-s">${esc(t("th.langShort"))}</th>
+    ${imDeck ? "" : `<th${s("condition")} class="hide-s">${esc(t("th.condShort"))}</th>
+    <th${s("released")} class="hide-s">${esc(t("th.released"))}</th>
+    <th${s("added")} class="hide-s">${esc(t("th.added"))}</th>`}
+    <th${s("qty")} class="num">${esc(t("th.qty"))}</th>
+    ${imDeck ? `<th${s("fehlt")} class="num">${esc(t("th.stock"))}</th>`
+             : `<th${s("price")} class="num">${esc(t("th.price"))}</th>`}
     <th></th><th></th>
   </tr>`;
 }
@@ -2848,19 +2848,31 @@ function renderProfile() {
 function renderSettings() {
   const el = $("#v-settings");
   if (!el) return;
+  const pageOpt = ([w, label]) =>
+    `<option value="${w}"${w === seitenGroesse() ? " selected" : ""}>${esc(label)}</option>`;
   el.innerHTML = `
     <div class="card">
-      <h3 style="margin-top:0">Einstellungen</h3>
-      <label>Karten pro Seite in der Sammlung</label>
+      <h3 style="margin-top:0">${esc(t("settings.title"))}</h3>
+      <label>${esc(t("settings.language"))}</label>
       <div class="row">
-        <div style="flex:none;min-width:220px"><select id="set-pagesize">${
-          [[25, "25"], [50, "50 (Voreinstellung)"], [100, "100"], [250, "250"], [0, "Alle — eine lange Liste"]]
-            .map(([w, t]) => `<option value="${w}"${w === seitenGroesse() ? " selected" : ""}>${esc(t)}</option>`).join("")
+        <div style="flex:none;min-width:220px"><select id="set-lang">${
+          Object.entries(UI_LANGS).map(([code, name]) =>
+            `<option value="${code}"${code === LANG ? " selected" : ""}>${esc(name)}</option>`).join("")
         }</select></div>
       </div>
-      <p class="hint">Gilt für die Tabelle der Sammlung. Die Auswertung darüber zählt
-        immer alle gefilterten Karten, egal welche Seite gerade offen ist.</p>
+      <p class="hint">${esc(t("settings.langHint"))}</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">${esc(t("settings.pageSize"))}</h3>
+      <div class="row">
+        <div style="flex:none;min-width:220px"><select id="set-pagesize">${
+          [[25, "25"], [50, t("settings.pageDefault")], [100, "100"], [250, "250"], [0, t("settings.pageAll")]]
+            .map(pageOpt).join("")
+        }</select></div>
+      </div>
+      <p class="hint">${esc(t("settings.pageHint"))}</p>
     </div>`;
+  $("#set-lang").onchange = ev => setLang(ev.target.value);
   $("#set-pagesize").onchange = ev => pageSizeSpeichern(parseInt(ev.target.value));
 }
 
@@ -3271,8 +3283,21 @@ function wireApp() {
   };
 }
 
+/* Nach einem Sprachwechsel (Einstellungen): statischen Text hat i18n.js schon
+   gesetzt, hier die dynamisch gebauten Ansichten neu zeichnen. */
+function onLangChange() {
+  if (typeof USER === "undefined" || !USER) return;   // vor Login nur statischer Text
+  renderWho();
+  renderAll();
+  const aktiv = $(".view.on")?.id;
+  if (aktiv === "v-profile") renderProfile();
+  else if (aktiv === "v-friends") renderFriends();
+  else if (aktiv === "v-settings") renderSettings();
+}
+
 /* ================================ Start =============================== */
 (async () => {
+  applyI18n();          // statische Oberfläche in der gewählten Sprache
   wireSetup();
   const c = cfg();
   if (!c) return showGate("setup");
