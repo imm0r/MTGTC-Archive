@@ -1347,4 +1347,31 @@ Object.assign(I18N.it, {
   "detail.noHistory": "Ancora nessuno storico prezzi — cresce a ogni aggiornamento di prezzo di un punto al giorno.",
 });
 
+/* ---- Teil 4: restliche Kartensprachen (Anzeige folgt der Oberfläche) ---- */
+Object.assign(I18N.de, {
+  "langname.pt": "Portugiesisch", "langname.ru": "Russisch", "langname.ko": "Koreanisch",
+  "langname.zhs": "Chinesisch (vereinfacht)", "langname.zht": "Chinesisch (traditionell)",
+  "langname.ph": "Phyrexianisch",
+});
+Object.assign(I18N.en, {
+  "langname.pt": "Portuguese", "langname.ru": "Russian", "langname.ko": "Korean",
+  "langname.zhs": "Chinese (Simplified)", "langname.zht": "Chinese (Traditional)",
+  "langname.ph": "Phyrexian",
+});
+Object.assign(I18N.fr, {
+  "langname.pt": "Portugais", "langname.ru": "Russe", "langname.ko": "Coréen",
+  "langname.zhs": "Chinois (simplifié)", "langname.zht": "Chinois (traditionnel)",
+  "langname.ph": "Phyrexian",
+});
+Object.assign(I18N.es, {
+  "langname.pt": "Portugués", "langname.ru": "Ruso", "langname.ko": "Coreano",
+  "langname.zhs": "Chino (simplificado)", "langname.zht": "Chino (tradicional)",
+  "langname.ph": "Phyrexiano",
+});
+Object.assign(I18N.it, {
+  "langname.pt": "Portoghese", "langname.ru": "Russo", "langname.ko": "Coreano",
+  "langname.zhs": "Cinese (semplificato)", "langname.zht": "Cinese (tradizionale)",
+  "langname.ph": "Phyrexian",
+});
+
 initLang();

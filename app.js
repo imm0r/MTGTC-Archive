@@ -437,6 +437,17 @@ const LANG_NAMES = { de: "Deutsch", en: "Englisch", fr: "Französisch", it: "Ita
   // Ein Land ist Phyrexia nicht, ein Wappen hat es trotzdem: siehe FLAGGEN.
   ph: "Phyrexianisch" };
 
+/* Der Name einer KARTENSPRACHE in der Oberflächensprache (langname.<code>).
+   Fällt auf den statischen deutschen Namen und zuletzt den Großcode zurück,
+   falls keine Übersetzung vorliegt. Bewusst NUR für die Anzeige — die
+   Kartensprache selbst (der Code) bleibt Kartendatum. */
+function langName(code) {
+  const c = (code || "").toLowerCase();
+  if (!c) return "?";
+  const key = "langname." + c, tr = t(key);
+  return tr === key ? (LANG_NAMES[c] || c.toUpperCase()) : tr;
+}
+
 /* Der auf die Karte GEDRUCKTE Sprachcode ist nicht immer Scryfalls Code.
    Belegt an Scryfall selbst: "lang:jp" und "lang:ja" liefern dieselben 30049
    Karten, "lang:cs" und "lang:zhs" dieselben 23988, "lang:ct" und "lang:zht"
@@ -1213,7 +1224,7 @@ function renderDash(rows, ziel = $("#dash"), gefiltert = false) {
     .map((d, i) => ({ ...d, farbe: TORTE_PALETTE[i % TORTE_PALETTE.length] }));
 
   const sprachen = [...new Set(rows.map(c => c.lang))]
-    .map(l => ({ label: LANG_NAMES[l] || (l || "?").toUpperCase(), icon: flaggeHtml(l, true),
+    .map(l => ({ label: langName(l), icon: flaggeHtml(l, true),
                  wert: stueck(rows.filter(c => c.lang === l)) }))
     .sort((a, b) => b.wert - a.wert);
 
@@ -1563,7 +1574,7 @@ function flaggeHtml(lang, dekorativ = false) {
   if (!f) return "";
   if (dekorativ)
     return `<svg class="flagge" viewBox="0 0 60 40" aria-hidden="true">${f}</svg>`;
-  const name = LANG_NAMES[l] || l.toUpperCase();
+  const name = langName(l);
   return `<svg class="flagge" viewBox="0 0 60 40" role="img"
                aria-label="${esc(name)}"><title>${esc(name)}</title>${f}</svg>`;
 }
@@ -1581,8 +1592,7 @@ function langHtml(lang) {
   const l = (lang || "").toLowerCase();
   const flagge = flaggeHtml(l);
   if (flagge) return flagge;
-  const name = LANG_NAMES[l];
-  if (name) return `<span class="pill" title="${esc(name)} ${esc(t("flag.noFlagSuffix"))}"
+  if (LANG_NAMES[l]) return `<span class="pill" title="${esc(langName(l))} ${esc(t("flag.noFlagSuffix"))}"
                           >${esc(l.toUpperCase())}</span>`;
   return `<span class="pill err" title="${esc(t("flag.noLangCode", { code: l.toUpperCase() }))}"
                 >${esc(l.toUpperCase() || "?")}</span>`;
@@ -1759,8 +1769,7 @@ function detailHtml(c, hover) {
         <div style="margin:10px 0">
           ${rarityPill(c.rarity)}
           ${c.foil ? '<span class="pill foil">Foil</span> ' : ""}
-          <span class="pill">${flaggeHtml(c.lang, true)} ${esc(LANG_NAMES[c.lang]
-            || (c.lang || "").toUpperCase() || "?")}</span>
+          <span class="pill">${flaggeHtml(c.lang, true)} ${esc(langName(c.lang))}</span>
           <span class="pill">${esc(c.condition || "")}</span>
           <span class="pill">${esc(t("common.qtyLabel"))} ${c.qty}</span>
         </div>
@@ -1851,7 +1860,7 @@ async function editCard(id) {
     </div>
     <div class="row">
       <div><label>${esc(t("cm.language"))}</label><select id="ed-lang">${langs.map(l =>
-        `<option value="${esc(l)}"${l === c.lang ? " selected" : ""}>${esc(LANG_NAMES[l] || l)}</option>`).join("")}</select></div>
+        `<option value="${esc(l)}"${l === c.lang ? " selected" : ""}>${esc(langName(l))}</option>`).join("")}</select></div>
       <div><label>${esc(t("cm.condition"))}</label><select id="ed-cond">${CONDS.map(x =>
         `<option${x === c.condition ? " selected" : ""}>${x}</option>`).join("")}</select></div>
       <div><label>${esc(t("edit.finish"))}</label><select id="ed-foil">
