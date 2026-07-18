@@ -332,3 +332,145 @@ drop policy if exists profiles_update_own on public.profiles;
 create policy profiles_select_own on public.profiles for select using (id = auth.uid());
 create policy profiles_insert_own on public.profiles for insert with check (id = auth.uid());
 create policy profiles_update_own on public.profiles for update using (id = auth.uid()) with check (id = auth.uid());
+
+-- =====================================================================
+--  Freunde und Deck-Teilen
+--
+--  Befreunden über kurze Freundescodes (beidseitige Zustimmung). Freunde
+--  sehen GETEILTE Decks nur lesend — NICHT die ganze Sammlung, nur die Karten
+--  in geteilten Decks. Umgesetzt über zusätzliche SELECT-Policies (ODER-
+--  verknüpft mit den "eigene …"-Policies) und SECURITY-DEFINER-Helfer, damit
+--  die Cross-User-Prüfung nicht an der RLS der geprüften Tabelle scheitert.
+-- =====================================================================
+
+-- Freundescode je Profil (global eindeutig, ohne 0/O/1/I).
+alter table public.profiles add column if not exists friend_code text unique;
+
+create or replace function public.gen_friend_code() returns text
+language plpgsql security definer set search_path = public as $$
+declare
+  alphabet constant text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  code text;
+begin
+  loop
+    code := '';
+    for i in 1..6 loop
+      code := code || substr(alphabet, 1 + floor(random() * length(alphabet))::int, 1);
+    end loop;
+    exit when not exists (select 1 from public.profiles where friend_code = code);
+  end loop;
+  return code;
+end $$;
+
+create or replace function public.set_friend_code() returns trigger
+language plpgsql as $$
+begin
+  if new.friend_code is null then new.friend_code := public.gen_friend_code(); end if;
+  return new;
+end $$;
+
+drop trigger if exists profiles_friend_code on public.profiles;
+create trigger profiles_friend_code before insert on public.profiles
+  for each row execute function public.set_friend_code();
+
+do $$
+declare r record;
+begin
+  for r in select id from public.profiles where friend_code is null loop
+    update public.profiles set friend_code = public.gen_friend_code() where id = r.id;
+  end loop;
+end $$;
+
+-- Freundschaften: eine Zeile je Beziehung, pending -> accepted.
+create table if not exists public.friendships (
+  requester uuid not null references auth.users(id) on delete cascade,
+  addressee uuid not null references auth.users(id) on delete cascade,
+  status    text not null default 'pending' check (status in ('pending','accepted')),
+  created   timestamptz not null default now(),
+  primary key (requester, addressee),
+  check (requester <> addressee)
+);
+alter table public.friendships enable row level security;
+alter table public.friendships force row level security;
+revoke all on public.friendships from anon;
+
+drop policy if exists friendships_select on public.friendships;
+drop policy if exists friendships_insert on public.friendships;
+drop policy if exists friendships_update on public.friendships;
+drop policy if exists friendships_delete on public.friendships;
+create policy friendships_select on public.friendships for select to authenticated
+  using (auth.uid() = requester or auth.uid() = addressee);
+create policy friendships_insert on public.friendships for insert to authenticated
+  with check (auth.uid() = requester and status = 'pending');
+create policy friendships_update on public.friendships for update to authenticated
+  using (auth.uid() = addressee) with check (auth.uid() = addressee and status = 'accepted');
+create policy friendships_delete on public.friendships for delete to authenticated
+  using (auth.uid() = requester or auth.uid() = addressee);
+
+-- Deck-Freigabe.
+alter table public.decks add column if not exists shared boolean not null default false;
+
+-- Helfer (nur lesend, SECURITY DEFINER gegen RLS-Rekursion).
+create or replace function public.are_friends(a uuid, b uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.friendships
+    where status = 'accepted'
+      and ((requester = a and addressee = b) or (requester = b and addressee = a)));
+$$;
+create or replace function public.has_friend_link(other uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.friendships
+    where (requester = auth.uid() and addressee = other)
+       or (addressee = auth.uid() and requester = other));
+$$;
+create or replace function public.deck_shared(d uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select coalesce((select shared from public.decks where id = d), false);
+$$;
+create or replace function public.card_in_shared_deck(c uuid, viewer uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.deck_entries de
+    join public.decks d on d.id = de.deck_id
+    where de.card_id = c and d.shared and public.are_friends(viewer, d.user_id));
+$$;
+
+-- Zusätzliche SELECT-Policies: Freunde lesen mit (eigene Zeilen deckt jeweils
+-- die bestehende "eigene …"-Policy ab).
+drop policy if exists profiles_select_friends on public.profiles;
+create policy profiles_select_friends on public.profiles for select to authenticated
+  using (public.has_friend_link(id));
+drop policy if exists decks_select_shared on public.decks;
+create policy decks_select_shared on public.decks for select to authenticated
+  using (shared and public.are_friends(auth.uid(), user_id));
+drop policy if exists deck_entries_select_shared on public.deck_entries;
+create policy deck_entries_select_shared on public.deck_entries for select to authenticated
+  using (public.deck_shared(deck_id) and public.are_friends(auth.uid(), user_id));
+drop policy if exists cards_select_shared on public.cards;
+create policy cards_select_shared on public.cards for select to authenticated
+  using (public.card_in_shared_deck(id, auth.uid()));
+
+-- Anfrage per Code: nachschlagen, Selbst-/Doppelanfrage abfangen, Gegenanfrage
+-- automatisch annehmen, sonst pending anlegen. requester ist immer auth.uid().
+create or replace function public.send_friend_request(p_code text) returns text
+language plpgsql security definer set search_path = public as $$
+declare me uuid := auth.uid(); target uuid;
+begin
+  if me is null then return 'unauth'; end if;
+  select id into target from public.profiles where friend_code = upper(trim(p_code));
+  if target is null then return 'notfound'; end if;
+  if target = me then return 'self'; end if;
+  if exists (select 1 from public.friendships where status='accepted'
+      and ((requester=me and addressee=target) or (requester=target and addressee=me)))
+    then return 'already'; end if;
+  if exists (select 1 from public.friendships where requester=target and addressee=me and status='pending') then
+    update public.friendships set status='accepted' where requester=target and addressee=me;
+    return 'accepted';
+  end if;
+  if exists (select 1 from public.friendships where requester=me and addressee=target and status='pending') then
+    return 'pending';
+  end if;
+  insert into public.friendships(requester, addressee, status) values (me, target, 'pending');
+  return 'sent';
+end $$;
+revoke execute on function public.send_friend_request(text) from anon;

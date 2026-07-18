@@ -75,6 +75,15 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .profil-hl-txt .k{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
 .profil-hl-txt .v{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .profil-hl-txt .sub{font-size:13px;color:var(--acc)}
+
+/* Freunde: der eigene Code hervorgehoben (zum Weitergeben), Freundeszeilen
+   mit Avatar + Name + Aktionen. */
+.freund-code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:21px;font-weight:700;
+  letter-spacing:.2em;color:var(--acc);background:var(--panel2);border:1px solid var(--line);
+  border-radius:8px;padding:6px 16px}
+.freund-zeile{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+.freund-zeile:first-of-type{border-top:0}
+.freund-zeile>div:first-of-type{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tabs{display:flex;gap:6px;margin-bottom:12px}
 .tabs button{flex:1;background:transparent;border:1px solid var(--line);color:var(--dim);
              padding:8px;border-radius:8px;cursor:pointer}

@@ -74,10 +74,14 @@ function dbErr(e) {
 let CARDS = [], DECKS = [];
 
 async function reload() {
+  // Ausdrücklich auf die EIGENEN Zeilen filtern. Seit dem Freunde-Feature
+  // erlaubt die RLS auch das Lesen geteilter Freundes-Decks/-Karten — die
+  // dürfen hier aber nicht in die eigene Sammlung/Deckliste sickern. Fremdes
+  // wird nur gezielt beim Ansehen eines Freundes geladen.
   const [c, d, e] = await Promise.all([
-    sb.from("cards").select("*").order("name"),
-    sb.from("decks").select("*").order("created"),
-    sb.from("deck_entries").select("*")
+    sb.from("cards").select("*").eq("user_id", USER.id).order("name"),
+    sb.from("decks").select("*").eq("user_id", USER.id).order("created"),
+    sb.from("deck_entries").select("*").eq("user_id", USER.id)
   ]);
   for (const r of [c, d, e]) if (r.error) throw r.error;
   // disp = was auf der Karte steht; name bleibt der englische Name, unter
@@ -2004,6 +2008,21 @@ async function editDeck(id) {
   } catch (e) { toast(dbErr(e)); }
 }
 
+/* Deck für Freunde freigeben oder die Freigabe zurücknehmen. Nur der Schalter
+   `shared` wird umgelegt; wer das Deck sehen darf, entscheidet die RLS
+   (geteilt + befreundet). */
+async function shareDeck(id) {
+  const d = DECKS.find(x => x.id === id);
+  if (!d) return;
+  try {
+    const { error } = await sb.from("decks").update({ shared: !d.shared }).eq("id", id);
+    if (error) throw error;
+    d.shared = !d.shared;
+    toast(d.shared ? "Deck für Freunde freigegeben" : "Freigabe zurückgenommen");
+    renderDecks();
+  } catch (e) { toast(dbErr(e)); }
+}
+
 /* Füllt die Filterleiste der Deck-Ansicht und blendet sie ein oder aus.
    Angeboten werden nur TATSÄCHLICH vergebene Werte (in kanonischer
    Reihenfolge) — man soll nicht auf ein Format filtern können, das kein Deck
@@ -2085,8 +2104,11 @@ function renderDecks() {
             d.format ? `<span class="pill fmt">${esc(d.format)}</span>` : ""}${
             d.archetype ? `<span class="pill">${esc(d.archetype)}</span>` : ""}</div>` : ""}
           <div class="hint" style="margin:2px 0 0">${n} Karten &middot; ${eur(v)}${
+            d.shared ? ` &middot; <span style="color:var(--ok)">geteilt</span>` : ""}${
             fehlt ? ` &middot; <span style="color:var(--err)">${fehlt} unvollständig</span>` : ""}</div>
         </div>
+        <button class="btn ghost sm" data-share="${d.id}" style="flex:none"
+          title="${d.shared ? "Für Freunde freigegeben — klicken zum Zurücknehmen" : "Für Freunde freigeben"}">${d.shared ? "&#128101; Geteilt" : "Teilen"}</button>
         <button class="btn ghost sm" data-ded="${d.id}" style="flex:none"
           title="Deck bearbeiten">&#9998;</button>
         <button class="btn danger sm" data-dx="${d.id}" style="flex:none">Deck löschen</button>
@@ -2150,6 +2172,7 @@ function renderDecks() {
   });
 
   $$("[data-ded]").forEach(b => b.onclick = () => editDeck(b.dataset.ded));
+  $$("[data-share]").forEach(b => b.onclick = () => shareDeck(b.dataset.share));
 
   $$("[data-dx]").forEach(b => b.onclick = async () => {
     const d = DECKS.find(x => x.id === b.dataset.dx);
@@ -2637,11 +2660,14 @@ function initialen(name) {
   return ((p[0][0] || "") + (p.length > 1 ? p[p.length - 1][0] : "")).toUpperCase();
 }
 
-/* Avatar als Bild (falls hochgeladen) oder als Initialen-Kreis. */
-function avatarHtml(size, name = profilName()) {
+/* Avatar als Bild (falls hochgeladen) oder als Initialen-Kreis. Nimmt ein
+   Profil-Objekt {display_name, avatar_url} — Standard ist das eigene; für
+   Freunde wird deren Profil übergeben. */
+function avatarHtml(size, prof = PROFILE) {
   const s = `width:${size}px;height:${size}px`;
-  if (PROFILE?.avatar_url)
-    return `<img class="avatar" src="${esc(PROFILE.avatar_url)}" alt="" style="${s}">`;
+  const name = prof?.display_name?.trim() || (prof === PROFILE ? USER?.email : "") || "";
+  if (prof?.avatar_url)
+    return `<img class="avatar" src="${esc(prof.avatar_url)}" alt="" style="${s}">`;
   return `<span class="avatar avatar-init" style="${s};font-size:${Math.round(size * 0.4)}px">${esc(initialen(name))}</span>`;
 }
 
@@ -2815,11 +2841,202 @@ async function passwortAendern() {
   finally { $("#pf-pw-save").disabled = false; }
 }
 
+/* ============================== Freunde ==============================
+   Befreunden über Freundescodes (send_friend_request-RPC, beidseitige
+   Zustimmung). Freunde sehen GETEILTE Decks nur lesend; die RLS erlaubt das,
+   geladen wird fremdes Material aber ausschließlich hier gezielt. */
+let FRIENDS = { accepted: [], incoming: [], outgoing: [] };
+
+async function ladeFreunde() {
+  const { data: fr, error } = await sb.from("friendships").select("*");
+  if (error) { FRIENDS = { accepted: [], incoming: [], outgoing: [] }; return; }
+  const anderId = f => (f.requester === USER.id ? f.addressee : f.requester);
+  const ids = [...new Set((fr || []).map(anderId))];
+  const profById = {};
+  if (ids.length) {
+    const { data: profs } = await sb.from("profiles")
+      .select("id, display_name, avatar_url, friend_code").in("id", ids);
+    (profs || []).forEach(p => profById[p.id] = p);
+  }
+  const mit = f => ({ ...f, other: profById[anderId(f)] || { id: anderId(f), display_name: null } });
+  FRIENDS = {
+    accepted: (fr || []).filter(f => f.status === "accepted").map(mit),
+    incoming: (fr || []).filter(f => f.status === "pending" && f.addressee === USER.id).map(mit),
+    outgoing: (fr || []).filter(f => f.status === "pending" && f.requester === USER.id).map(mit),
+  };
+}
+
+async function oeffneFreunde() { await ladeFreunde(); renderFriends(); }
+
+function renderFriends() {
+  const el = $("#v-friends");
+  if (!el) return;
+  const code = PROFILE?.friend_code || "…";
+  const zeile = (f, actions) => `
+    <div class="freund-zeile">
+      ${avatarHtml(34, f.other)}
+      <div style="flex:1;min-width:0"><b>${esc(f.other?.display_name || "Unbekannt")}</b></div>
+      ${actions}
+    </div>`;
+  el.innerHTML = `
+    <div class="card">
+      <h3 style="margin-top:0">Dein Freundescode</h3>
+      <div class="row" style="align-items:center">
+        <div style="flex:none"><span class="freund-code" id="my-code">${esc(code)}</span></div>
+        <div style="flex:none"><button class="btn ghost sm" id="code-copy">Kopieren</button></div>
+      </div>
+      <p class="hint" style="margin-bottom:10px">Gib diesen Code an Freunde weiter — damit können sie dir eine Anfrage schicken.</p>
+      <label>Freund hinzufügen</label>
+      <div class="row">
+        <div style="flex:1"><input type="text" id="add-code" maxlength="6" placeholder="Code des Freundes, z. B. AB2CD9" style="text-transform:uppercase"></div>
+        <div style="flex:none"><button class="btn" id="add-go">Anfrage senden</button></div>
+      </div>
+    </div>
+
+    ${FRIENDS.incoming.length ? `<div class="card">
+      <h3 style="margin-top:0">Anfragen an dich</h3>
+      ${FRIENDS.incoming.map(f => zeile(f, `
+        <div style="flex:none"><button class="btn sm" data-accept="${esc(f.requester)}">Annehmen</button></div>
+        <div style="flex:none"><button class="btn ghost sm" data-decline="${esc(f.requester)}">Ablehnen</button></div>`)).join("")}
+    </div>` : ""}
+
+    ${FRIENDS.outgoing.length ? `<div class="card">
+      <h3 style="margin-top:0">Gesendete Anfragen</h3>
+      ${FRIENDS.outgoing.map(f => zeile(f, `
+        <div style="flex:none"><span class="pill">wartet</span></div>
+        <div style="flex:none"><button class="btn ghost sm" data-cancel="${esc(f.other.id)}">Zurückziehen</button></div>`)).join("")}
+    </div>` : ""}
+
+    <div class="card">
+      <h3 style="margin-top:0">Freunde${FRIENDS.accepted.length ? ` (${FRIENDS.accepted.length})` : ""}</h3>
+      ${FRIENDS.accepted.length ? FRIENDS.accepted.map(f => zeile(f, `
+        <div style="flex:none"><button class="btn ghost sm" data-viewdecks="${esc(f.other.id)}">Geteilte Decks</button></div>
+        <div style="flex:none"><button class="btn ghost sm" data-unfriend="${esc(f.other.id)}">Entfernen</button></div>`)).join("")
+        : '<div class="empty">Noch keine Freunde. Teile deinen Code oder gib den eines Freundes ein.</div>'}
+    </div>
+
+    <div id="friend-decks"></div>`;
+
+  $("#code-copy").onclick = () => { navigator.clipboard?.writeText(code); toast("Code kopiert"); };
+  $("#add-go").onclick = freundAnfragen;
+  $("#add-code").addEventListener("keydown", e => { if (e.key === "Enter") freundAnfragen(); });
+  $$("[data-accept]").forEach(b => b.onclick = () => freundAntwort(b.dataset.accept, true));
+  $$("[data-decline]").forEach(b => b.onclick = () => freundAntwort(b.dataset.decline, false));
+  $$("[data-cancel]").forEach(b => b.onclick = () => freundEntfernen(b.dataset.cancel));
+  $$("[data-unfriend]").forEach(b => b.onclick = () => freundEntfernen(b.dataset.unfriend));
+  $$("[data-viewdecks]").forEach(b => b.onclick = () => zeigeFreundDecks(b.dataset.viewdecks));
+}
+
+async function freundAnfragen() {
+  const code = ($("#add-code").value || "").trim().toUpperCase();
+  if (code.length < 6) return toast("Bitte den 6-stelligen Code eingeben.");
+  try {
+    const { data, error } = await sb.rpc("send_friend_request", { p_code: code });
+    if (error) throw error;
+    toast({
+      sent: "Anfrage gesendet", accepted: "Freund hinzugefügt 🎉", pending: "Anfrage läuft schon",
+      already: "Ihr seid bereits befreundet", self: "Das ist dein eigener Code",
+      notfound: "Kein Profil mit diesem Code", unauth: "Nicht angemeldet",
+    }[data] || "Erledigt");
+    $("#add-code").value = "";
+    await ladeFreunde(); renderFriends();
+  } catch (e) { toast(dbErr(e)); }
+}
+
+async function freundAntwort(requesterId, annehmen) {
+  try {
+    const q = sb.from("friendships");
+    const { error } = annehmen
+      ? await q.update({ status: "accepted" }).eq("requester", requesterId).eq("addressee", USER.id)
+      : await q.delete().eq("requester", requesterId).eq("addressee", USER.id);
+    if (error) throw error;
+    toast(annehmen ? "Angenommen" : "Abgelehnt");
+    await ladeFreunde(); renderFriends();
+  } catch (e) { toast(dbErr(e)); }
+}
+
+/* Freundschaft in beliebiger Richtung lösen (Anfrage zurückziehen oder
+   entfreunden) — die RLS erlaubt beiden Seiten das Löschen. */
+async function freundEntfernen(otherId) {
+  try {
+    const { error } = await sb.from("friendships").delete().or(
+      `and(requester.eq.${USER.id},addressee.eq.${otherId}),and(requester.eq.${otherId},addressee.eq.${USER.id})`);
+    if (error) throw error;
+    toast("Entfernt");
+    await ladeFreunde(); renderFriends();
+  } catch (e) { toast(dbErr(e)); }
+}
+
+/* Geteilte Decks eines Freundes laden und READ-ONLY anzeigen. Decks, Einträge
+   und Karten kommen über die erweiterten SELECT-Policies. */
+async function zeigeFreundDecks(friendId) {
+  const ziel = $("#friend-decks");
+  if (!ziel) return;
+  const name = FRIENDS.accepted.find(f => f.other.id === friendId)?.other?.display_name || "Freund";
+  ziel.innerHTML = '<div class="card"><div class="meta">Lade geteilte Decks…</div></div>';
+  ziel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  try {
+    const { data: decks, error } = await sb.from("decks").select("*")
+      .eq("user_id", friendId).eq("shared", true).order("created");
+    if (error) throw error;
+    if (!decks || !decks.length) {
+      ziel.innerHTML = `<div class="card"><h3 style="margin-top:0">Geteilte Decks von ${esc(name)}</h3>
+        <div class="empty">Dieser Freund teilt gerade keine Decks.</div></div>`;
+      return;
+    }
+    const deckIds = decks.map(d => d.id);
+    const { data: entries } = await sb.from("deck_entries").select("*").in("deck_id", deckIds);
+    const cardIds = [...new Set((entries || []).map(e => e.card_id))];
+    const cardsById = {};
+    if (cardIds.length) {
+      const { data: cards } = await sb.from("cards").select("*").in("id", cardIds);
+      (cards || []).forEach(c => cardsById[c.id] = { ...c, set: c.set_code, disp: c.printed_name || c.name });
+    }
+    ziel.innerHTML = `<h3 style="margin:14px 2px 4px">Geteilte Decks von ${esc(name)}</h3>` +
+      decks.map(d => friendDeckHtml(d, (entries || []).filter(e => e.deck_id === d.id), cardsById)).join("");
+  } catch (e) {
+    ziel.innerHTML = `<div class="card"><div class="meta"><span class="pill err">${esc(e.message)}</span></div></div>`;
+  }
+}
+
+/* Read-only Deck eines Freundes: Kopf mit Kennzahlen und eine einfache
+   Kartenliste (Bild, Name, Set·#, Deckmenge, Preis). Keine Bearbeitung. */
+function friendDeckHtml(d, entries, cardsById) {
+  const rows = entries.map(e => ({ e, c: cardsById[e.card_id] })).filter(x => x.c)
+    .sort((a, b) => a.c.disp.localeCompare(b.c.disp));
+  const n = rows.reduce((s, x) => s + x.e.qty, 0);
+  const v = rows.reduce((s, x) => s + (x.c.price || 0) * x.e.qty, 0);
+  const haupt = d.main_card_id ? cardsById[d.main_card_id] : null;
+  const list = rows.map(({ e, c }) => `
+    <tr>
+      <td style="width:40px">${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy" style="width:34px;border-radius:3px;display:block">` : ""}</td>
+      <td>${esc(c.disp)}</td>
+      <td class="hide-s">${esc(c.set_name || c.set || "")} &middot; #${esc(c.cn)}</td>
+      <td class="num">${e.qty}&times;</td>
+      <td class="num">${eur(c.price)}</td>
+    </tr>`).join("");
+  return `<div class="card">
+    <div class="deck-kopf" style="cursor:default">
+      ${haupt?.img ? `<img class="deck-haupt" src="${esc(haupt.img)}" alt="">` : ""}
+      <div style="flex:1;min-width:0">
+        <h3 style="margin:0">${esc(d.name)}</h3>
+        ${d.format || d.archetype ? `<div class="deck-tags">${
+          d.format ? `<span class="pill fmt">${esc(d.format)}</span>` : ""}${
+          d.archetype ? `<span class="pill">${esc(d.archetype)}</span>` : ""}</div>` : ""}
+        <div class="hint" style="margin:2px 0 0">${n} Karten &middot; ${eur(v)}</div>
+      </div>
+    </div>
+    <div class="xscroll" style="overflow-x:auto"><table class="deck-tbl" style="margin-top:10px">
+      <tbody>${list}</tbody></table></div>
+  </div>`;
+}
+
 function wireApp() {
   $$("nav button[data-v]").forEach(b => b.onclick = () => {
     $$("nav button[data-v]").forEach(x => x.classList.toggle("on", x === b));
     $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + b.dataset.v));
     if (b.dataset.v === "profile") renderProfile();
+    if (b.dataset.v === "friends") oeffneFreunde();
   });
 
   $("#drop").onclick = () => $("#file").click();
