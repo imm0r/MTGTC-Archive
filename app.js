@@ -2090,21 +2090,39 @@ function synergyErklaerung(e) {
    „Als Wunschkarte"-Knopf die vollen Daten zum Anlegen hat. */
 const SYN_CACHE = new Map();
 
+/* Wie oft besitzt man eine (Scryfall-)Karte? Abgleich über die oracle_id, denn
+   alle Sprach-/Druck-/Foil-Fassungen teilen sie — eine deutsche Bolas' Zitadelle
+   zählt also für den englischen Vorschlag. Name als Rückfall. Nur qty>0. */
+function besessenAnzahl(card) {
+  const oid = card.oracle_id, nm = (card.name || "").toLowerCase();
+  let n = 0;
+  for (const c of CARDS)
+    if (c.qty > 0 && ((oid && c.oracle_id === oid) || (c.name || "").toLowerCase() === nm)) n += c.qty;
+  return n;
+}
+
 /* Eine Vorschlagskachel. Bild/Name/Typ/Grund verlinken auf Scryfall; darunter
    der Preis und — NUR bei Deck-Vorschlägen (deckId gesetzt) — ein Knopf, der die
-   Karte als Wunschkarte ins Deck legt (fehlt sie in der Sammlung: Bestand 0). */
+   Karte ins Deck legt. Besitzt man die Karte schon (irgendeine Auflage), zeigt
+   die Kachel ein Häkchen und der Knopf heißt „+ Deck" (die Karte wird verknüpft),
+   sonst „+ Wunsch" (fehlende Karte kommt mit Bestand 0 ins Deck). */
 function synKachel(card, grundText, deckId) {
   const img = card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small || "";
   const p = synPreis(card);
+  const besessen = besessenAnzahl(card);
+  const badge = besessen > 0
+    ? `<span class="syn-owned" title="${esc(t("syn.ownedTitle", { n: besessen }))}">&#10003;</span>` : "";
   let addBtn = "";
   if (deckId && card.id) {
     SYN_CACHE.set(card.id, card);
-    addBtn = `<button class="syn-add" data-deck="${esc(deckId)}" data-sid="${esc(card.id)}"
-      title="${esc(t("syn.addWishTitle"))}">&#43;&#160;${esc(t("syn.addWish"))}</button>`;
+    const owned = besessen > 0;
+    addBtn = `<button class="syn-add${owned ? " owned" : ""}" data-deck="${esc(deckId)}" data-sid="${esc(card.id)}"
+      title="${esc(t(owned ? "syn.addOwnedTitle" : "syn.addWishTitle"))}">&#43;&#160;${
+        esc(t(owned ? "syn.addDeck" : "syn.addWish"))}</button>`;
   }
   return `<div class="syn-card">
     <a class="syn-card-link" href="${esc(card.scryfall_uri || "#")}" target="_blank" rel="noopener noreferrer">
-      ${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : `<div class="syn-noimg">&#9670;</div>`}
+      <div class="syn-img">${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : `<div class="syn-noimg">&#9670;</div>`}${badge}</div>
       <div class="syn-name">${esc(card.name)}</div>
       <div class="syn-type">${esc(card.type_line || "")}</div>
       <div class="syn-exp" title="${esc(grundText)}">${esc(grundText)}</div>

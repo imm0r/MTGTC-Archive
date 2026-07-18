@@ -152,6 +152,9 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
   border-radius:10px;background:var(--panel2);transition:border-color .12s}
 .syn-card:hover{border-color:var(--acc)}
 .syn-card-link{display:flex;flex-direction:column;gap:4px;flex:1;color:var(--txt);text-decoration:none}
+.syn-img{position:relative}
+.syn-owned{position:absolute;top:5px;right:5px;background:var(--ok);color:#08210a;font-size:12px;
+  font-weight:800;line-height:1;padding:3px 6px;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.55)}
 .syn-card img{width:100%;border-radius:6px;display:block}
 .syn-noimg{width:100%;aspect-ratio:5/7;display:flex;align-items:center;justify-content:center;
   color:var(--dim);background:var(--panel);border-radius:6px;font-size:26px}
@@ -166,6 +169,9 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .syn-add:hover{filter:brightness(1.08)}
 .syn-add:disabled{cursor:default}
 .syn-add.done{background:var(--ok);color:#08210a}
+/* Besessene Vorschlagskarte: „+ Deck" dezenter (Ghost) als das goldene „+ Wunsch". */
+.syn-add.owned{background:var(--panel);color:var(--txt);border:1px solid var(--line)}
+.syn-add.owned:hover{border-color:var(--acc);filter:none}
 /* Synergie-Modus (persönliche Einstellung): welche Synergie-Knöpfe erscheinen. */
 html[data-syn-mode="ki"] .syn-std-btn{display:none}
 html[data-syn-mode="standard"] .syn-ai-btn{display:none}

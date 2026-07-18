@@ -1605,6 +1605,9 @@ Object.assign(I18N.de, {
   "syn.aiCost": "Diese Abfrage: ≈ {cost} · {in} → {out} Tokens",
   "syn.addWish": "Wunsch",
   "syn.addWishTitle": "Als Wunschkarte ins Deck (nicht besessen → Bestand 0)",
+  "syn.addDeck": "Deck",
+  "syn.addOwnedTitle": "Besessene Karte ins Deck legen",
+  "syn.ownedTitle": "Im Bestand: {n}×",
   "syn.addedWish": "„{name}“ als Wunschkarte zu {deck} hinzugefügt",
   "syn.aiError": "Die KI-Suche ist gerade nicht möglich.",
 });
@@ -1617,6 +1620,9 @@ Object.assign(I18N.en, {
   "syn.aiCost": "This query: ≈ {cost} · {in} → {out} tokens",
   "syn.addWish": "Wish",
   "syn.addWishTitle": "Add to deck as a wish card (not owned → stock 0)",
+  "syn.addDeck": "Deck",
+  "syn.addOwnedTitle": "Add this owned card to the deck",
+  "syn.ownedTitle": "In your collection: {n}×",
   "syn.addedWish": "Added \"{name}\" to {deck} as a wish card",
   "syn.aiError": "The AI search isn't available right now.",
 });
@@ -1629,6 +1635,9 @@ Object.assign(I18N.fr, {
   "syn.aiCost": "Cette requête : ≈ {cost} · {in} → {out} jetons",
   "syn.addWish": "Souhait",
   "syn.addWishTitle": "Ajouter au deck comme carte souhaitée (non possédée → stock 0)",
+  "syn.addDeck": "Deck",
+  "syn.addOwnedTitle": "Ajouter cette carte possédée au deck",
+  "syn.ownedTitle": "Dans ta collection : {n}×",
   "syn.addedWish": "« {name} » ajoutée à {deck} comme carte souhaitée",
   "syn.aiError": "La recherche IA n'est pas disponible pour le moment.",
 });
@@ -1641,6 +1650,9 @@ Object.assign(I18N.es, {
   "syn.aiCost": "Esta consulta: ≈ {cost} · {in} → {out} tokens",
   "syn.addWish": "Deseada",
   "syn.addWishTitle": "Añadir al mazo como carta deseada (no en tu colección → existencias 0)",
+  "syn.addDeck": "Mazo",
+  "syn.addOwnedTitle": "Añadir esta carta en propiedad al mazo",
+  "syn.ownedTitle": "En tu colección: {n}×",
   "syn.addedWish": "«{name}» añadida a {deck} como carta deseada",
   "syn.aiError": "La búsqueda con IA no está disponible ahora mismo.",
 });
@@ -1653,6 +1665,9 @@ Object.assign(I18N.it, {
   "syn.aiCost": "Questa richiesta: ≈ {cost} · {in} → {out} token",
   "syn.addWish": "Desiderata",
   "syn.addWishTitle": "Aggiungi al mazzo come carta desiderata (non posseduta → scorte 0)",
+  "syn.addDeck": "Mazzo",
+  "syn.addOwnedTitle": "Aggiungi questa carta posseduta al mazzo",
+  "syn.ownedTitle": "Nella tua collezione: {n}×",
   "syn.addedWish": "«{name}» aggiunta a {deck} come carta desiderata",
   "syn.aiError": "La ricerca IA non è disponibile al momento.",
 });
