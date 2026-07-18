@@ -71,6 +71,7 @@ const I18N = {
     "nav.profile": "Profil",
     "nav.friends": "Freunde",
     "nav.settings": "Einstellungen",
+    "nav.dashboard": "Dashboard",
     "nav.logout": "Abmelden",
     "who.menu": "Menü",
 
@@ -220,6 +221,7 @@ const I18N = {
     "nav.profile": "Profile",
     "nav.friends": "Friends",
     "nav.settings": "Settings",
+    "nav.dashboard": "Dashboard",
     "nav.logout": "Sign out",
     "who.menu": "Menu",
 
@@ -369,6 +371,7 @@ const I18N = {
     "nav.profile": "Profil",
     "nav.friends": "Amis",
     "nav.settings": "Paramètres",
+    "nav.dashboard": "Dashboard",
     "nav.logout": "Se déconnecter",
     "who.menu": "Menu",
 
@@ -518,6 +521,7 @@ const I18N = {
     "nav.profile": "Perfil",
     "nav.friends": "Amigos",
     "nav.settings": "Ajustes",
+    "nav.dashboard": "Dashboard",
     "nav.logout": "Cerrar sesión",
     "who.menu": "Menú",
 
@@ -667,6 +671,7 @@ const I18N = {
     "nav.profile": "Profilo",
     "nav.friends": "Amici",
     "nav.settings": "Impostazioni",
+    "nav.dashboard": "Dashboard",
     "nav.logout": "Esci",
     "who.menu": "Menu",
 

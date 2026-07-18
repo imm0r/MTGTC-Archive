@@ -1334,12 +1334,10 @@ function seitenGroesse() {
 
 function renderCollection() {
   const rows = filtered();
-  // Das Dashboard wertet IMMER alle gefilterten Karten aus, nicht nur die
-  // aktuelle Seite. Der „gefiltert"-Hinweis vergleicht gegen die BESESSENEN
-  // Karten — qty-0-Zeilen (Import-Platzhalter) sind nie Teil der Sammlung
-  // und dürfen den Hinweis nicht dauerhaft anschalten.
+  // Das Dashboard sitzt jetzt in einer eigenen Ansicht (renderDashboard) und
+  // nicht mehr über der Sammlungstabelle. qty-0-Zeilen (Import-Platzhalter)
+  // sind nie Teil der Sammlung.
   const besessen = CARDS.filter(c => c.qty > 0);
-  renderDash(rows, $("#dash"), rows.length !== besessen.length);
 
   const sets = [...new Set(besessen.map(c => c.set))].filter(Boolean).sort();
   const cur = $("#f-set").value;
@@ -3293,7 +3291,6 @@ function renderProfile() {
   const el = $("#v-profile");
   if (!el) return;
   const seit = PROFILE?.created ? datShort(PROFILE.created) : "–";
-  const decks = DECKS.length;
   el.innerHTML = `
     <div class="card profil-kopf">
       <div class="profil-avatar">
@@ -3316,13 +3313,6 @@ function renderProfile() {
     </div>
 
     <div class="card">
-      <h3 style="margin-top:0">${esc(t("profile.yourCollection"))}</h3>
-      <p class="hint" style="margin-top:-4px">${decks} ${esc(decks === 1 ? t("common.deckOne") : t("common.deckMany"))} &middot; ${esc(t("profile.statAll"))}</p>
-      ${profilHighlightsHtml()}
-      <div id="profile-dash" style="margin-top:12px"></div>
-    </div>
-
-    <div class="card">
       <h3 style="margin-top:0">${esc(t("profile.account"))}</h3>
       <label>${esc(t("profile.newPassword"))}</label>
       <div class="row" style="margin-bottom:6px">
@@ -3334,14 +3324,6 @@ function renderProfile() {
       <div style="margin-top:14px"><button class="btn danger" id="pf-logout">${esc(t("nav.logout"))}</button></div>
     </div>`;
 
-  // Statistik über den GESAMTEN Bestand — dieselbe Funktion wie das
-  // Sammlungs-Dashboard, nur in ein eigenes Ziel. qty 0 (nicht besessene
-  // Deck-Karten aus einem Import) zählt nicht zur Sammlung.
-  renderDash(CARDS.filter(c => c.qty > 0), $("#profile-dash"), false);
-
-  // Highlight-Kacheln öffnen die Detailansicht der jeweiligen Karte.
-  $$("#v-profile [data-hl]").forEach(k => k.onclick = () => showCardDetail(k.dataset.hl));
-
   $("#pf-avatar-btn").onclick = () => $("#pf-avatar-file").click();
   $("#pf-avatar-file").onchange = e => { const f = e.target.files[0]; e.target.value = ""; if (f) avatarHochladen(f); };
   const del = $("#pf-avatar-del"); if (del) del.onclick = avatarEntfernen;
@@ -3349,6 +3331,27 @@ function renderProfile() {
   $("#pf-name").addEventListener("keydown", e => { if (e.key === "Enter") nameSpeichern(); });
   $("#pf-pw-save").onclick = passwortAendern;
   $("#pf-logout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+}
+
+/* Ansicht „Dashboard" — eigener Punkt im Benutzermenü. Zeigt die Highlights und
+   die Statistik über den GESAMTEN Bestand (qty 0 = Import-Platzhalter zählt
+   nicht). Steckte früher im Profil und über der Sammlungstabelle. */
+function renderDashboard() {
+  const el = $("#v-dashboard");
+  if (!el) return;
+  const decks = DECKS.length;
+  el.innerHTML = `
+    <div class="card">
+      <h3 style="margin-top:0">${esc(t("profile.yourCollection"))}</h3>
+      <p class="hint" style="margin-top:-4px">${decks} ${esc(decks === 1 ? t("common.deckOne") : t("common.deckMany"))} &middot; ${esc(t("profile.statAll"))}</p>
+      ${profilHighlightsHtml()}
+      <div id="dashboard-dash" style="margin-top:12px"></div>
+    </div>`;
+  // Statistik über den GESAMTEN Bestand — dieselbe renderDash wie zuvor, nur in
+  // eigener Ansicht statt im Profil.
+  renderDash(CARDS.filter(c => c.qty > 0), $("#dashboard-dash"), false);
+  // Highlight-Kacheln öffnen die Detailansicht der jeweiligen Karte.
+  $$("#v-dashboard [data-hl]").forEach(k => k.onclick = () => showCardDetail(k.dataset.hl));
 }
 
 /* Ansicht „Einstellungen" — eigener Punkt im Benutzermenü hinter Avatar+Name.
@@ -3721,6 +3724,7 @@ function wireApp() {
     $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + b.dataset.v));
     $("#who-menu")?.classList.remove("open");   // Menüauswahl klappt das Menü zu
     if (b.dataset.v === "profile") renderProfile();
+    if (b.dataset.v === "dashboard") renderDashboard();
     if (b.dataset.v === "friends") oeffneFreunde();
     if (b.dataset.v === "settings") renderSettings();
   });
@@ -3816,6 +3820,7 @@ function onLangChange() {
   renderAll();
   const aktiv = $(".view.on")?.id;
   if (aktiv === "v-profile") renderProfile();
+  else if (aktiv === "v-dashboard") renderDashboard();
   else if (aktiv === "v-friends") renderFriends();
   else if (aktiv === "v-settings") renderSettings();
 }
