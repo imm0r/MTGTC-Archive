@@ -4107,7 +4107,7 @@ function sessionBoardHtml() {
         <div style="flex:none"><button class="btn" id="dice-roll">${esc(t("sess.roll"))}</button></div>
       </div>
       <div class="dice-stage" id="dice-stage">${diceStageHtml()}</div>
-      <div class="sess-log" id="sess-log">${SESSION_LOG.slice(0, 8).map(logZeile).join("")}</div>
+      <div class="sess-log" id="sess-log">${SESSION_LOG.slice(0, 30).map(logZeile).join("")}</div>
     </div>
 
     ${(FRIENDS?.accepted?.length) ? `<div class="card">
@@ -4549,8 +4549,24 @@ function wuerfeln(sides) {
   const s = Math.max(2, Math.min(1000, sides | 0));
   const result = 1 + Math.floor(Math.random() * s);
   zeigeWurf(s, result, meinSpieler()?.profile?.display_name || t("sess.you"));
-  sb.from("session_events").insert({ session_id: SESSION.id, user_id: USER.id, kind: "dice", data: { sides: s, result } })
-    .then(({ error }) => { if (error) toast(dbErr(error)); });
+  // Ergebnis als Event festhalten UND das Log SOFORT lokal ergänzen — NICHT auf
+  // den Realtime-Echo warten: der kann bei wackliger Verbindung ausbleiben, dann
+  // erschiene der eigene Wurf nie im Log. onEvent entprellt den Echo über die id.
+  sb.from("session_events")
+    .insert({ session_id: SESSION.id, user_id: USER.id, kind: "dice", data: { sides: s, result } })
+    .select().single()
+    .then(({ data, error }) => {
+      if (error) { toast(dbErr(error)); return; }
+      if (data && !SESSION_LOG.some(e => e.id === data.id)) logHinzu(data);
+    });
+}
+
+/* Ein Event vorn ins Log hängen und die Anzeige (falls sichtbar) neu zeichnen. */
+function logHinzu(ev) {
+  SESSION_LOG.unshift(ev);
+  SESSION_LOG = SESSION_LOG.slice(0, 30);
+  const box = $("#sess-log");
+  if (box) box.innerHTML = SESSION_LOG.slice(0, 30).map(logZeile).join("");
 }
 
 /* -------- Realtime -------- */
@@ -4593,10 +4609,8 @@ function onEvent(payload) {
     if ($(".view.on")?.id === "v-session") renderTracker();
     return;
   }
-  SESSION_LOG.unshift(ev);
-  SESSION_LOG = SESSION_LOG.slice(0, 30);
-  const box = $("#sess-log");
-  if (box) box.innerHTML = SESSION_LOG.slice(0, 8).map(logZeile).join("");
+  if (ev.id != null && SESSION_LOG.some(e => e.id === ev.id)) return;   // eigener Wurf schon lokal ergänzt
+  logHinzu(ev);
   // Wurf eines MITSPIELERS animieren (den eigenen habe ich lokal schon gezeigt).
   if (ev.kind === "dice" && ev.user_id !== USER?.id && $(".view.on")?.id === "v-session") {
     const p = SESSION_PLAYERS.find(x => x.user_id === ev.user_id);
