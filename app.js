@@ -1919,6 +1919,23 @@ function showHover(id, x, y) {
   hc.style.top = oben + "px";
 }
 
+/* Commander-Vorschau: beim Hover über die kleine Commander-Karte in der
+   Spielrunde eine große Kartenvorschau + Name schweben lassen (eigenes Element,
+   nicht #hovercard — das ist 430px breit für die Sammlungs-Detailkarte). */
+let cmdHoverEl = null;
+function zeigeCmdHover(img, name, x, y) {
+  if (!cmdHoverEl) { cmdHoverEl = document.createElement("div"); cmdHoverEl.className = "cmd-hover"; document.body.appendChild(cmdHoverEl); }
+  const el = cmdHoverEl;
+  el.innerHTML = `<img src="${esc(img)}" alt=""><div class="cmd-hover-nm">${esc(name)}</div>`;
+  el.style.left = "0px"; el.style.top = "0px"; el.style.display = "block";
+  const r = el.getBoundingClientRect();
+  let l = x + 18, o = y + 14;
+  if (l + r.width > innerWidth - 8) l = Math.max(8, x - r.width - 18);
+  if (o + r.height > innerHeight - 8) o = Math.max(8, innerHeight - r.height - 8);
+  el.style.left = l + "px"; el.style.top = o + "px";
+}
+function versteckeCmdHover() { if (cmdHoverEl) cmdHoverEl.style.display = "none"; }
+
 /* ============================ Synergien ==============================
    Zu einer Karte (oder einem Deck) passende Karten über Fähigkeits-Synergien
    vorschlagen. Die „Haken" einer Karte sind ihre Schlüsselwörter, ihre
@@ -4056,7 +4073,7 @@ function sessionBoardHtml() {
     return `<div class="sp-card${joined ? "" : " wartet"}${besiegt ? " besiegt" : ""}">
       ${avatarHtml(48, p.profile)}
       <div class="sp-name">${esc(name)}${p.user_id === SESSION.host ? ` <span class="sp-host" title="${esc(t("sess.host"))}">&#9733;</span>` : ""}</div>
-      ${p.deck_name ? `<div class="sp-deck" title="${esc(p.deck_name)}">${p.commander_img ? `<img src="${esc(p.commander_img)}" alt="">` : ""}<span>${esc(p.deck_name)}</span></div>` : ""}
+      ${p.deck_name ? `<div class="sp-deck"${p.commander_img ? ` data-cmd-img="${esc(p.commander_img)}" data-cmd-name="${esc(p.commander || p.deck_name)}"` : ""} title="${esc(p.commander || p.deck_name)}">${p.commander_img ? `<img class="sp-cmd" src="${esc(p.commander_img)}" alt="">` : ""}<span class="sp-deckname">${esc(p.deck_name)}</span></div>` : ""}
       ${joined
         ? `<div class="sp-life" data-u="${esc(p.user_id)}">${Math.max(0, p.life)}</div>
            <div class="sp-besiegt">&#9760; ${esc(t("sess.defeated"))}</div>`
@@ -4248,6 +4265,11 @@ function wireSession() {
     const play = e.target.closest("[data-trk-play]"); if (play) return trackerMark(play.dataset.trkPlay, 1);
     const undo = e.target.closest("[data-trk-undo]"); if (undo) return trackerMark(undo.dataset.trkUndo, -1);
   };
+  // Commander-Karten: beim Hover große Vorschau + Name.
+  if (HOVER_OK) $$("#v-session .sp-deck[data-cmd-img]").forEach(el => {
+    el.addEventListener("mousemove", e => zeigeCmdHover(el.dataset.cmdImg, el.dataset.cmdName, e.clientX, e.clientY));
+    el.addEventListener("mouseleave", versteckeCmdHover);
+  });
 }
 
 async function sessionErstellen(life) {

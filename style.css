@@ -195,9 +195,16 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .dice-result{font-size:24px;font-weight:800}
 .sess-log{margin-top:10px;display:flex;flex-direction:column;gap:3px;max-height:150px;overflow-y:auto}
 .log-zeile{font-size:13px;color:var(--dim)}
-.sp-deck{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--dim);max-width:100%;margin-top:-2px}
-.sp-deck img{width:15px;height:21px;border-radius:2px;object-fit:cover;flex:none}
-.sp-deck span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp-deck{display:flex;flex-direction:column;align-items:center;gap:3px;max-width:100%;margin-top:2px;cursor:help}
+.sp-cmd{width:46px;height:64px;object-fit:cover;border-radius:4px;border:1px solid var(--line);
+  box-shadow:0 2px 6px rgba(0,0,0,.45);transition:transform .12s}
+.sp-deck:hover .sp-cmd{transform:scale(1.08)}
+.sp-deckname{font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+/* Schwebende Commander-Vorschau beim Hover (eigenes Element, nicht #hovercard) */
+.cmd-hover{position:fixed;z-index:95;display:none;pointer-events:none;background:var(--panel);
+  border:1px solid var(--line);border-radius:12px;padding:8px;box-shadow:0 10px 34px #000c}
+.cmd-hover img{width:220px;max-width:60vw;border-radius:8px;display:block}
+.cmd-hover-nm{text-align:center;font-weight:600;font-size:14px;color:var(--txt);margin-top:6px;max-width:220px}
 .trk-sum{font-size:13px;color:var(--dim);margin:8px 0}
 .trk-list{display:flex;flex-direction:column;gap:2px;max-height:340px;overflow:auto}
 .trk-row{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;font-size:13px}
