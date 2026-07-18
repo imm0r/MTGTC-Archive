@@ -1833,9 +1833,9 @@ function detailHtml(c, hover) {
             title="${esc(t("detail.priceBtnTitle"))}">&#8635; ${esc(t("detail.priceBtn"))}</button></div>
           <div style="flex:none"><input type="number" id="syn-cap" min="0" step="0.5"
             placeholder="${esc(t("syn.capPh"))}" title="${esc(t("syn.capTitle"))}" style="width:92px"></div>
-          <div style="flex:none"><button class="btn ghost sm" id="dt-syn"
+          <div class="syn-std-btn" style="flex:none"><button class="btn ghost sm" id="dt-syn"
             title="${esc(t("syn.findTitle"))}">&#128269; ${esc(t("syn.find"))}</button></div>
-          <div style="flex:none"><button class="btn ghost sm" id="dt-syn-ai"
+          <div class="syn-ai-btn" style="flex:none"><button class="btn ghost sm" id="dt-syn-ai"
             title="${esc(t("syn.aiTitle"))}">&#10024; ${esc(t("syn.ai"))}</button></div>
         </div>` : ""}
         <div class="hint" style="margin-top:10px">${esc(t("detail.added"))}: ${dtShort(c.added)} ${esc(t("detail.addedSuffix"))}</div>
@@ -1872,20 +1872,21 @@ function showCardDetail(id) {
   if (yb) yb.onclick = () => {
     const lbl = t("syn.find");
     synBtnBusy(yb, lbl, true);
+    synGeschwister([$("#dt-syn-ai")], true);
     const weg = excludeVon([c]);   // nur die Ausgangskarte selbst raus, Besessenes darf auftauchen
     synergieAnzeigen($("#syn-box"), synergyHooks(c),
       { excludeIds: weg.ids, excludeNames: weg.names, limit: 18, maxPrice: numVal($("#syn-cap")) })
-      .finally(() => synBtnBusy(yb, lbl, false));
+      .finally(() => { synBtnBusy(yb, lbl, false); synGeschwister([$("#dt-syn-ai")], false); });
   };
   // KI-Synergien: implizite Vorschläge über die Edge Function. Solange sie läuft,
-  // ist der Standard-Synergien-Knopf gesperrt und ausgeblendet.
+  // ist der Standard-Synergien-Knopf gesperrt (Konflikt um denselben Kasten).
   const ab = $("#dt-syn-ai");
   if (ab) ab.onclick = () => {
     const lbl = t("syn.ai");
     synBtnBusy(ab, lbl, true, "&#10024;");
-    stdSynAus(yb, true);
+    synGeschwister([$("#dt-syn")], true);
     kiSynergien(c, $("#syn-box"), { maxPrice: numVal($("#syn-cap")) })
-      .finally(() => { synBtnBusy(ab, lbl, false, "&#10024;"); stdSynAus(yb, false); });
+      .finally(() => { synBtnBusy(ab, lbl, false, "&#10024;"); synGeschwister([$("#dt-syn")], false); });
   };
 }
 
@@ -2144,15 +2145,27 @@ function synBtnBusy(btn, label, busy, icon) {
   btn.innerHTML = (busy ? `<span class="syn-spin">&#9881;</span>` : (icon || "&#128269;")) + " " + esc(label);
 }
 
-/* Standard-Synergien-Knopf sperren + ausblenden, solange die KI-Suche läuft:
-   beide schreiben in denselben Kasten und teilen den Lauf-Zähler, ein Klick
-   während der (langsamen, teils bezahlten) KI-Suche würde deren Ergebnis
-   verwerfen. Versteckt wird der umgebende <div>, damit keine Lücke bleibt. */
-function stdSynAus(stdBtn, aus) {
-  if (!stdBtn) return;
-  stdBtn.disabled = aus;
-  const wrap = stdBtn.closest("div");
-  if (wrap) wrap.style.display = aus ? "none" : "";
+/* Konkurrierende Geschwister-Knöpfe während einer Suche sperren (Standard-,
+   KI-Synergien und Deck-Analyse schreiben in denselben Kasten und teilen den
+   Lauf-Zähler — ein Klick auf einen anderen würde das laufende, teils bezahlte
+   Ergebnis verwerfen). Nur SPERREN, nicht verstecken; das dauerhafte
+   Ein-/Ausblenden regelt der Synergie-Modus. */
+function synGeschwister(btns, sperren) {
+  for (const b of btns) if (b) b.disabled = sperren;
+}
+
+/* Synergie-Modus: welche Synergie-Suche überhaupt angezeigt wird. Gerätelokal
+   (localStorage), wirkt über ein Attribut an <html> + CSS (keine Neuzeichnung
+   nötig). "beide" = Standard und KI, "standard" = nur heuristisch, "ki" = nur KI. */
+const SYN_MODES = ["beide", "standard", "ki"];
+function synModus() {
+  const m = localStorage.getItem("mtg-syn-mode");
+  return SYN_MODES.includes(m) ? m : "beide";
+}
+function synModusAnwenden() { document.documentElement.dataset.synMode = synModus(); }
+function synModusSetzen(m) {
+  localStorage.setItem("mtg-syn-mode", SYN_MODES.includes(m) ? m : "beide");
+  synModusAnwenden();
 }
 
 /* Vorschläge in einen Container zeichnen (Lade-/Leer-Zustand inklusive). */
@@ -2750,13 +2763,13 @@ function renderDecks() {
             >&#128202; ${esc(dashOffen ? t("deck.statsHide") : t("deck.statsShow"))}</button></div>
           <div style="flex:none"><input type="number" data-syncap="${d.id}" min="0" step="0.5"
             placeholder="${esc(t("syn.capPh"))}" title="${esc(t("syn.capTitle"))}" style="width:92px"></div>
-          <div style="flex:none"><input type="number" data-synbudget="${d.id}" min="0" step="1"
+          <div class="syn-std-btn" style="flex:none"><input type="number" data-synbudget="${d.id}" min="0" step="1"
             placeholder="${esc(t("syn.budgetPh"))}" title="${esc(t("syn.budgetTitle"))}" style="width:104px"></div>
-          <div style="flex:none"><button class="btn ghost" data-synbtn="${d.id}"
+          <div class="syn-std-btn" style="flex:none"><button class="btn ghost" data-synbtn="${d.id}"
             title="${esc(t("syn.deckTitle"))}">&#128269; ${esc(t("syn.deckBtn"))}</button></div>
           <div style="flex:none"><button class="btn ghost" data-analysebtn="${d.id}"
             title="${esc(t("an.btnTitle"))}">&#128295; ${esc(t("an.btn"))}</button></div>
-          <div style="flex:none"><button class="btn ghost" data-synaibtn="${d.id}"
+          <div class="syn-ai-btn" style="flex:none"><button class="btn ghost" data-synaibtn="${d.id}"
             title="${esc(t("syn.aiDeckTitle"))}">&#10024; ${esc(t("syn.ai"))}</button></div>` : ""}
         </div>
         <div class="deck-dash" data-dash="${d.id}" style="margin-top:12px"></div>
@@ -2810,7 +2823,9 @@ function renderDecks() {
     const box = $(`.deck-syn[data-synbox="${id}"]`);
     if (!cards.length || !box) return;
     const lbl = t("syn.deckBtn");
+    const gsw = [$(`[data-analysebtn="${id}"]`), $(`[data-synaibtn="${id}"]`)];
     synBtnBusy(b, lbl, true);
+    synGeschwister(gsw, true);
     const weg = excludeVon(cards);   // nur Karten DIESES Decks raus, Besessenes darf auftauchen
     // Erst wenn die Suche fertig ist, nach unten zu den Ergebnissen springen —
     // vorher dreht sich das Zahnrad am Knopf, wo der Blick gerade ist.
@@ -2819,7 +2834,7 @@ function renderDecks() {
         maxHooks: 5, limit: 20, deckId: id,
         maxPrice: numVal($(`[data-syncap="${id}"]`)), totalBudget: numVal($(`[data-synbudget="${id}"]`)) })
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
-      .finally(() => synBtnBusy(b, lbl, false));
+      .finally(() => { synBtnBusy(b, lbl, false); synGeschwister(gsw, false); });
   });
 
   // Deck-Analyse: welche Funktionsbausteine (Ramp, Kartenvorteil, Entfernung,
@@ -2835,10 +2850,12 @@ function renderDecks() {
     const box = $(`.deck-syn[data-synbox="${id}"]`);
     if (!cards.length || !box) return;
     const lbl = t("an.btn");
+    const gsw = [$(`[data-synbtn="${id}"]`), $(`[data-synaibtn="${id}"]`)];
     synBtnBusy(b, lbl, true, "&#128295;");
+    synGeschwister(gsw, true);
     deckAnalyseAnzeigen(box, cards, farbIdentitaet(cards), id)
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
-      .finally(() => synBtnBusy(b, lbl, false, "&#128295;"));
+      .finally(() => { synBtnBusy(b, lbl, false, "&#128295;"); synGeschwister(gsw, false); });
   });
 
   // KI-Synergien fürs ganze Deck: die Deckliste als Kontext an Claude (implizite
@@ -2851,12 +2868,14 @@ function renderDecks() {
     const box = $(`.deck-syn[data-synbox="${id}"]`);
     if (!cards.length || !box) return;
     const lbl = t("syn.ai");
-    const std = $(`[data-synbtn="${id}"]`);   // Standard-Synergien-Knopf dieses Decks
+    // Standard-Synergien UND Deck-Analyse sperren, solange die (langsame, teils
+    // bezahlte) KI-Suche läuft — sie würden denselben Kasten überschreiben.
+    const gsw = [$(`[data-synbtn="${id}"]`), $(`[data-analysebtn="${id}"]`)];
     synBtnBusy(b, lbl, true, "&#10024;");
-    stdSynAus(std, true);
+    synGeschwister(gsw, true);
     kiSynergienDeck(d, cards, box, { maxPrice: numVal($(`[data-syncap="${id}"]`)) })
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
-      .finally(() => { synBtnBusy(b, lbl, false, "&#10024;"); stdSynAus(std, false); });
+      .finally(() => { synBtnBusy(b, lbl, false, "&#10024;"); synGeschwister(gsw, false); });
   });
 
   // Sortier-Handler je Deck. renderDecks() baut alles neu, aber der
@@ -3482,6 +3501,8 @@ function renderSettings() {
   if (!el) return;
   const pageOpt = ([w, label]) =>
     `<option value="${w}"${w === seitenGroesse() ? " selected" : ""}>${esc(label)}</option>`;
+  const synOpt = ([v, label]) =>
+    `<option value="${v}"${v === synModus() ? " selected" : ""}>${esc(label)}</option>`;
   el.innerHTML = `
     <div class="card">
       <h3 style="margin-top:0">${esc(t("settings.title"))}</h3>
@@ -3512,6 +3533,17 @@ function renderSettings() {
         }</select></div>
       </div>
       <p class="hint">${esc(t("settings.pageHint"))}</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">${esc(t("settings.synTitle"))}</h3>
+      <label>${esc(t("settings.synMode"))}</label>
+      <div class="row">
+        <div style="flex:none;min-width:220px"><select id="set-synmode">${
+          [["beide", t("settings.synBoth")], ["standard", t("settings.synStandard")], ["ki", t("settings.synKi")]]
+            .map(synOpt).join("")
+        }</select></div>
+      </div>
+      <p class="hint">${esc(t("settings.synHint"))}</p>
     </div>`;
   // Eigenes Sprach-Dropdown mit Flaggen (ein natives <option> kann kein SVG
   // tragen, und Windows zeigt Flaggen-Emoji nur als Buchstaben). Öffnen/Schließen
@@ -3524,6 +3556,7 @@ function renderSettings() {
     if (code !== LANG) setLang(code);   // setLang → onLangChange → renderSettings baut neu
   });
   $("#set-pagesize").onchange = ev => pageSizeSpeichern(parseInt(ev.target.value));
+  $("#set-synmode").onchange = ev => synModusSetzen(ev.target.value);
 }
 
 /* Karten je Sammlungsseite speichern (Profil-Einstellung, gilt damit auf allen
@@ -3971,6 +4004,7 @@ function onLangChange() {
 /* ================================ Start =============================== */
 (async () => {
   applyI18n();          // statische Oberfläche in der gewählten Sprache
+  synModusAnwenden();   // Synergie-Modus (welche Knöpfe sichtbar sind) früh setzen
   wireSetup();
   const c = cfg();
   if (!c) return showGate("setup");
