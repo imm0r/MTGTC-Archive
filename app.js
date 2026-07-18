@@ -4102,10 +4102,10 @@ function sessionBoardHtml() {
       <h3 style="margin-top:0">${esc(t("sess.dice"))}</h3>
       <div class="row" style="align-items:center">
         <div style="flex:none"><input type="number" id="dice-sides" min="2" max="1000" value="20" style="width:90px"></div>
-        <div style="flex:none">${[6, 20].map(s => `<button class="btn ghost sm" data-dice="${s}">W${s}</button>`).join(" ")}</div>
+        <div style="flex:none">${[4, 6, 8, 10, 12, 20].map(s => `<button class="btn ghost sm" data-dice="${s}">W${s}</button>`).join(" ")}</div>
         <div style="flex:none"><button class="btn" id="dice-roll">${esc(t("sess.roll"))}</button></div>
-        <div style="flex:1;text-align:right"><span class="dice-result" id="dice-result"></span></div>
       </div>
+      <div class="dice-stage" id="dice-stage">${diceStageHtml()}</div>
       <div class="sess-log" id="sess-log">${SESSION_LOG.slice(0, 8).map(logZeile).join("")}</div>
     </div>
 
@@ -4307,13 +4307,49 @@ function lebenAendern(userId, delta) {
   }, 400);
 }
 
-/* Würfel: Ergebnis lokal (Math.random) sofort zeigen, als Event einfügen — die
-   Runde sieht den Wurf über Realtime. */
+/* Würfelanzeige: bei W6 die Augen-Glyphen, sonst die Zahl. */
+const DICE_PIPS = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];   // ⚀⚁⚂⚃⚄⚅
+const diceFace = (sides, v) => (sides === 6 && DICE_PIPS[v]) ? DICE_PIPS[v] : String(v);
+
+/* Statischer Bühnen-Zustand beim Rendern: letzter Wurf aus dem Log, sonst ruhend. */
+function diceStageHtml() {
+  const last = (SESSION_LOG || []).find(e => e.kind === "dice");
+  if (!last) return `<div class="dice-die idle"><span class="dice-val">&#127922;</span></div>`;
+  const sides = last.data?.sides || 20;
+  const p = SESSION_PLAYERS.find(x => x.user_id === last.user_id);
+  const name = p?.profile?.display_name || (last.user_id === USER?.id ? t("sess.you") : "?");
+  return `<div class="dice-die"><span class="dice-val">${esc(diceFace(sides, last.data?.result))}</span></div>
+    <div class="dice-cap"><b>${esc(name)}</b> · W${sides}</div>`;
+}
+
+let diceAnim = null;
+/* Wurf animieren: Würfel wackelt, die Zahl flackert kurz, dann rastet das
+   Ergebnis mit einem „Plopp" ein. Das Ergebnis steht schon fest — nur Show. */
+function zeigeWurf(sides, result, name) {
+  const stage = $("#dice-stage");
+  if (!stage) return;
+  const s = Math.max(2, sides | 0);
+  if (diceAnim) { clearInterval(diceAnim.iv); clearTimeout(diceAnim.to); }
+  stage.innerHTML = `<div class="dice-die rolling"><span class="dice-val">${esc(diceFace(s, 1))}</span></div>
+    <div class="dice-cap"><b>${esc(name || "?")}</b> · W${s}</div>`;
+  const valEl = stage.querySelector(".dice-val"), dieEl = stage.querySelector(".dice-die");
+  const iv = setInterval(() => { valEl.textContent = diceFace(s, 1 + Math.floor(Math.random() * s)); }, 60);
+  const to = setTimeout(() => {
+    clearInterval(iv);
+    valEl.textContent = diceFace(s, result);
+    dieEl.classList.remove("rolling"); dieEl.classList.add("landed");
+    diceAnim = null;
+  }, 850);
+  diceAnim = { iv, to };
+}
+
+/* Würfel: Ergebnis lokal (Math.random) festlegen und animiert zeigen, als Event
+   einfügen — die Runde sieht den Wurf (samt Animation) über Realtime. */
 function wuerfeln(sides) {
   if (!SESSION) return;
   const s = Math.max(2, Math.min(1000, sides | 0));
   const result = 1 + Math.floor(Math.random() * s);
-  const rd = $("#dice-result"); if (rd) rd.textContent = `\u{1F3B2} ${result}`;
+  zeigeWurf(s, result, meinSpieler()?.profile?.display_name || t("sess.you"));
   sb.from("session_events").insert({ session_id: SESSION.id, user_id: USER.id, kind: "dice", data: { sides: s, result } })
     .then(({ error }) => { if (error) toast(dbErr(error)); });
 }
@@ -4362,6 +4398,11 @@ function onEvent(payload) {
   SESSION_LOG = SESSION_LOG.slice(0, 30);
   const box = $("#sess-log");
   if (box) box.innerHTML = SESSION_LOG.slice(0, 8).map(logZeile).join("");
+  // Wurf eines MITSPIELERS animieren (den eigenen habe ich lokal schon gezeigt).
+  if (ev.kind === "dice" && ev.user_id !== USER?.id && $(".view.on")?.id === "v-session") {
+    const p = SESSION_PLAYERS.find(x => x.user_id === ev.user_id);
+    zeigeWurf(ev.data?.sides, ev.data?.result, p?.profile?.display_name || "?");
+  }
 }
 function onSessionChange(payload) {
   if (payload.new && payload.new.status === "ended") {
