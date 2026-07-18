@@ -1374,4 +1374,61 @@ Object.assign(I18N.it, {
   "langname.ph": "Phyrexian",
 });
 
+/* ---- Teil 5: Synergien (Kartendetail + Deck) ---- */
+Object.assign(I18N.de, {
+  "syn.find": "Synergien", "syn.findTitle": "Passende neue Karten zu dieser Karte finden",
+  "syn.deckBtn": "Synergien", "syn.deckTitle": "Passende neue Karten fürs ganze Deck finden",
+  "syn.loading": "Suche passende Karten…", "syn.none": "Keine passenden Vorschläge gefunden.",
+  "syn.noHooks": "Zu dieser Karte lassen sich keine Synergien ableiten.",
+  "syn.theme.sacrifice": "Opfern", "syn.theme.counters": "+1/+1-Marken",
+  "syn.theme.graveyard": "Friedhof", "syn.theme.tokens": "Tokens",
+  "syn.theme.lifegain": "Lebenspunkte", "syn.theme.mill": "Mühle",
+  "syn.theme.discard": "Abwerfen", "syn.theme.ramp": "Ramp",
+  "syn.theme.equipment": "Ausrüstung", "syn.theme.artifacts": "Artefakte",
+});
+Object.assign(I18N.en, {
+  "syn.find": "Synergies", "syn.findTitle": "Find matching new cards for this card",
+  "syn.deckBtn": "Synergies", "syn.deckTitle": "Find matching new cards for the whole deck",
+  "syn.loading": "Searching for matching cards…", "syn.none": "No matching suggestions found.",
+  "syn.noHooks": "No synergies can be derived from this card.",
+  "syn.theme.sacrifice": "Sacrifice", "syn.theme.counters": "+1/+1 counters",
+  "syn.theme.graveyard": "Graveyard", "syn.theme.tokens": "Tokens",
+  "syn.theme.lifegain": "Lifegain", "syn.theme.mill": "Mill",
+  "syn.theme.discard": "Discard", "syn.theme.ramp": "Ramp",
+  "syn.theme.equipment": "Equipment", "syn.theme.artifacts": "Artifacts",
+});
+Object.assign(I18N.fr, {
+  "syn.find": "Synergies", "syn.findTitle": "Trouver des cartes assorties pour cette carte",
+  "syn.deckBtn": "Synergies", "syn.deckTitle": "Trouver des cartes assorties pour tout le deck",
+  "syn.loading": "Recherche de cartes assorties…", "syn.none": "Aucune suggestion trouvée.",
+  "syn.noHooks": "Aucune synergie ne peut être déduite de cette carte.",
+  "syn.theme.sacrifice": "Sacrifice", "syn.theme.counters": "Marqueurs +1/+1",
+  "syn.theme.graveyard": "Cimetière", "syn.theme.tokens": "Jetons",
+  "syn.theme.lifegain": "Gain de vie", "syn.theme.mill": "Meule",
+  "syn.theme.discard": "Défausse", "syn.theme.ramp": "Ramp",
+  "syn.theme.equipment": "Équipement", "syn.theme.artifacts": "Artefacts",
+});
+Object.assign(I18N.es, {
+  "syn.find": "Sinergias", "syn.findTitle": "Encontrar cartas nuevas afines a esta carta",
+  "syn.deckBtn": "Sinergias", "syn.deckTitle": "Encontrar cartas nuevas afines para todo el mazo",
+  "syn.loading": "Buscando cartas afines…", "syn.none": "No se encontraron sugerencias.",
+  "syn.noHooks": "No se pueden deducir sinergias de esta carta.",
+  "syn.theme.sacrifice": "Sacrificio", "syn.theme.counters": "Contadores +1/+1",
+  "syn.theme.graveyard": "Cementerio", "syn.theme.tokens": "Fichas",
+  "syn.theme.lifegain": "Ganar vida", "syn.theme.mill": "Molienda",
+  "syn.theme.discard": "Descartar", "syn.theme.ramp": "Ramp",
+  "syn.theme.equipment": "Equipo", "syn.theme.artifacts": "Artefactos",
+});
+Object.assign(I18N.it, {
+  "syn.find": "Sinergie", "syn.findTitle": "Trova nuove carte affini a questa carta",
+  "syn.deckBtn": "Sinergie", "syn.deckTitle": "Trova nuove carte affini per tutto il mazzo",
+  "syn.loading": "Ricerca di carte affini…", "syn.none": "Nessun suggerimento trovato.",
+  "syn.noHooks": "Non è possibile dedurre sinergie da questa carta.",
+  "syn.theme.sacrifice": "Sacrificio", "syn.theme.counters": "Segnalini +1/+1",
+  "syn.theme.graveyard": "Cimitero", "syn.theme.tokens": "Pedine",
+  "syn.theme.lifegain": "Guadagno di vita", "syn.theme.mill": "Mulino",
+  "syn.theme.discard": "Scarto", "syn.theme.ramp": "Ramp",
+  "syn.theme.equipment": "Equipaggiamento", "syn.theme.artifacts": "Artefatti",
+});
+
 initLang();

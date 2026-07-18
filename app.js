@@ -1834,8 +1834,11 @@ function detailHtml(c, hover) {
             title="${esc(t("row.editTitle"))}">&#9998; ${esc(t("detail.edit"))}</button></div>
           <div style="flex:none"><button class="btn ghost sm" id="dt-price"
             title="${esc(t("detail.priceBtnTitle"))}">&#8635; ${esc(t("detail.priceBtn"))}</button></div>
+          <div style="flex:none"><button class="btn ghost sm" id="dt-syn"
+            title="${esc(t("syn.findTitle"))}">&#128269; ${esc(t("syn.find"))}</button></div>
         </div>` : ""}
         <div class="hint" style="margin-top:10px">${esc(t("detail.added"))}: ${dtShort(c.added)} ${esc(t("detail.addedSuffix"))}</div>
+        ${!hover ? `<div id="syn-box" style="margin-top:12px"></div>` : ""}
         <div style="margin-top:10px">
           <label style="margin-bottom:2px">${esc(t("detail.priceHistory"))}</label>
           ${priceChart(c.hist, 320, 150)}
@@ -1862,6 +1865,15 @@ function showCardDetail(id) {
       // Ansicht mit dem frischen Preis und dem neuen Kurvenpunkt neu zeichnen.
       if ($("#detail-dlg").open) showCardDetail(id);
     } catch (e) { pb.disabled = false; toast(e.message); }
+  };
+  // Synergien: passende NEUE Karten zu dieser Karte (besessene ausgeschlossen).
+  const yb = $("#dt-syn");
+  if (yb) yb.onclick = () => {
+    yb.disabled = true;
+    const weg = ownedExclude();
+    synergieAnzeigen($("#syn-box"), synergyHooks(c),
+      { excludeIds: weg.ids, excludeNames: weg.names, limit: 18 })
+      .finally(() => { yb.disabled = false; });
   };
 }
 
@@ -1891,6 +1903,139 @@ function showHover(id, x, y) {
   if (oben + r.height > innerHeight - 8) oben = Math.max(8, innerHeight - r.height - 8);
   hc.style.left = links + "px";
   hc.style.top = oben + "px";
+}
+
+/* ============================ Synergien ==============================
+   Zu einer Karte (oder einem Deck) passende Karten über Fähigkeits-Synergien
+   vorschlagen. Die „Haken" einer Karte sind ihre Schlüsselwörter, ihre
+   Kreaturentypen (Tribal) und grobe Regeltext-Themen. Je Haken fragt Scryfall
+   nach den beliebtesten passenden Karten (order:edhrec); wer von mehreren
+   Haken getroffen wird, passt besser und steht oben. Bereits besessene Karten
+   (und die Ausgangskarte) fallen raus — gesucht sind NEUE Karten. */
+const SYNERGY_THEMES = [
+  { key: "sacrifice", re: /\bsacrifice\b/i,                          q: "otag:sacrifice-outlet" },
+  { key: "counters",  re: /\+1\/\+1 counter/i,                       q: "otag:counters-matter" },
+  { key: "graveyard", re: /\bgraveyard\b/i,                          q: 'oracle:"from your graveyard"' },
+  { key: "tokens",    re: /\bcreate\b[^.]*\btoken/i,                 q: 'oracle:"create" oracle:"token"' },
+  { key: "lifegain",  re: /(gain[^.]*\blife\b|lifelink)/i,           q: "otag:lifegain" },
+  { key: "mill",      re: /\bmill/i,                                 q: "oracle:mill" },
+  { key: "discard",   re: /\bdiscard/i,                              q: "otag:discard-outlet" },
+  { key: "ramp",      re: /(search your library for[^.]*\bland|add \{)/i, q: "otag:ramp" },
+  { key: "equipment", re: /\bequip\b|\bequipment\b/i,                q: "type:equipment" },
+  { key: "artifacts", re: /\bartifact\b/i,                           q: "oracle:artifact" },
+];
+
+/* Permanenten-Untertypen aus der Typzeile (nach dem Halbgeviertstrich „—"). */
+function untertypen(typeLine) {
+  const vorder = (typeLine || "").split("//")[0];
+  const i = vorder.indexOf("—");
+  return i < 0 ? [] : vorder.slice(i + 1).trim().split(/\s+/).filter(Boolean);
+}
+
+/* Synergie-Haken einer Karte: { kind, label, q }. */
+function synergyHooks(card) {
+  const hooks = [];
+  (card.keywords || []).forEach(k => hooks.push({ kind: "keyword", label: k, q: `keyword:"${k}"` }));
+  if (/creature/i.test(card.type_line || ""))
+    untertypen(card.type_line).forEach(s => hooks.push({ kind: "tribe", label: s, q: `type:${s.toLowerCase()}` }));
+  const text = card.oracle_text || "";
+  SYNERGY_THEMES.forEach(th => { if (th.re.test(text)) hooks.push({ kind: "theme", label: th.key, q: th.q }); });
+  return hooks;
+}
+
+/* Anzeige-Chip eines Hakens: Schlüsselwort/Tribe sind Kartendaten (bleiben),
+   Themen werden übersetzt. */
+function hookLabel(h) { return h.kind === "theme" ? t("syn.theme." + h.label) : h.label; }
+
+/* Ausschlussmengen aus dem eigenen Bestand (plus optionale Extra-Karten):
+   was man schon hat, wird nicht als „neu" vorgeschlagen. */
+function ownedExclude(extra = []) {
+  const ids = new Set(), names = new Set();
+  for (const c of CARDS.concat(extra)) {
+    if (c && c.oracle_id) ids.add(c.oracle_id);
+    if (c && c.name) names.add(c.name.toLowerCase());
+  }
+  return { ids, names };
+}
+
+/* Farbidentität einer Kartenliste als „WUBRG"-Teilmenge (für id<= bei Decks). */
+function farbIdentitaet(cards) {
+  const set = new Set();
+  cards.forEach(c => (c.colors || []).forEach(f => set.add(f)));
+  const s = ["W", "U", "B", "R", "G"].filter(f => set.has(f)).join("");
+  return s || "c";
+}
+
+let synergyLauf = 0;   // gegen veraltete Antworten bei schnellem erneuten Klick
+
+/* Für eine Hakenliste die besten passenden Karten holen und mischen.
+   opts: { excludeIds, excludeNames, colors, maxHooks, limit } */
+async function synergieSuchen(hooks, opts = {}) {
+  const excludeIds = opts.excludeIds || new Set();
+  const excludeNames = opts.excludeNames || new Set();
+  const idFilter = opts.colors ? ` id<=${opts.colors}` : "";
+  const treffer = new Map();   // oracle_id -> { card, hooks:Set }
+  for (const h of hooks.slice(0, opts.maxHooks || 6)) {
+    const q = `${h.q} -is:token -is:funny game:paper${idFilter}`;
+    let data = [];
+    try {
+      const r = await fetch("https://api.scryfall.com/cards/search?order=edhrec&q=" + encodeURIComponent(q),
+                            { headers: { Accept: "application/json" } });
+      if (r.ok) data = (await r.json()).data || [];
+    } catch { /* ein einzelner Haken darf scheitern */ }
+    data.slice(0, 14).forEach(c => {
+      if (!c.oracle_id || excludeIds.has(c.oracle_id) || excludeNames.has((c.name || "").toLowerCase())) return;
+      const e = treffer.get(c.oracle_id) || { card: c, hooks: new Set() };
+      e.hooks.add(hookLabel(h));
+      treffer.set(c.oracle_id, e);
+    });
+    await new Promise(res => setTimeout(res, 110));   // Scryfall schonen
+  }
+  return [...treffer.values()]
+    .sort((a, b) => (b.hooks.size - a.hooks.size) ||
+                    ((a.card.edhrec_rank ?? 9e9) - (b.card.edhrec_rank ?? 9e9)))
+    .slice(0, opts.limit || 18);
+}
+
+/* Eine Vorschlagskarte als Kachel: Bild, Name, Typ, Preis, „Warum"-Chips. */
+function synergyCardHtml(e) {
+  const card = e.card;
+  const img = card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small || "";
+  const roh = card.prices?.eur || card.prices?.eur_foil;
+  const preis = roh ? eur(parseFloat(roh)) : "–";
+  const chips = [...e.hooks].slice(0, 4).map(w => `<span class="syn-why">${esc(w)}</span>`).join("");
+  return `<a class="syn-card" href="${esc(card.scryfall_uri || "#")}" target="_blank" rel="noopener noreferrer">
+    ${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : `<div class="syn-noimg">&#9670;</div>`}
+    <div class="syn-name">${esc(card.name)}</div>
+    <div class="syn-type">${esc(card.type_line || "")}</div>
+    <div class="syn-chips">${chips}</div>
+    <div class="syn-price">${preis}</div>
+  </a>`;
+}
+
+/* Vorschläge in einen Container zeichnen (Lade-/Leer-Zustand inklusive). */
+async function synergieAnzeigen(box, hooks, opts) {
+  if (!box) return;
+  const lauf = ++synergyLauf;
+  if (!hooks.length) { box.innerHTML = `<div class="empty">${esc(t("syn.noHooks"))}</div>`; return; }
+  box.innerHTML = `<div class="meta">${esc(t("syn.loading"))}</div>`;
+  const res = await synergieSuchen(hooks, opts);
+  if (lauf !== synergyLauf) return;                  // ein neuerer Lauf hat übernommen
+  box.innerHTML = res.length
+    ? `<div class="syn-grid">${res.map(synergyCardHtml).join("")}</div>`
+    : `<div class="empty">${esc(t("syn.none"))}</div>`;
+}
+
+/* Haken eines ganzen Decks: über alle Karten sammeln, häufigste zuerst. */
+function deckHooks(eintraege) {
+  const zaehler = new Map();
+  for (const { c } of eintraege)
+    for (const h of synergyHooks(c)) {
+      const k = h.kind + "|" + h.q;
+      const cur = zaehler.get(k) || { hook: h, n: 0 };
+      cur.n++; zaehler.set(k, cur);
+    }
+  return [...zaehler.values()].sort((a, b) => b.n - a.n).map(x => x.hook);
 }
 
 /* ---------------------------------------------- Karte bearbeiten ----- */
@@ -2238,12 +2383,15 @@ function renderDecks() {
           <div class="sugg"><input type="text" data-dadd="${d.id}" placeholder="${esc(t("deck.addCardPh"))}"></div>
           <div style="flex:none;min-width:80px"><input type="number" min="1" value="1" data-dqty="${d.id}"></div>
           ${rows ? `<div style="flex:none"><button class="btn ghost" data-dashtoggle="${d.id}"
-            >&#128202; ${esc(dashOffen ? t("deck.statsHide") : t("deck.statsShow"))}</button></div>` : ""}
+            >&#128202; ${esc(dashOffen ? t("deck.statsHide") : t("deck.statsShow"))}</button></div>
+          <div style="flex:none"><button class="btn ghost" data-synbtn="${d.id}"
+            title="${esc(t("syn.deckTitle"))}">&#128269; ${esc(t("syn.deckBtn"))}</button></div>` : ""}
         </div>
         <div class="deck-dash" data-dash="${d.id}" style="margin-top:12px"></div>
         ${rows ? `<div class="xscroll" style="overflow-x:auto"><table class="deck-tbl" style="margin-top:10px">
                     <thead>${cardHead(true)}</thead><tbody>${rows}</tbody></table></div>`
                : `<div class="empty">${esc(t("deck.emptyDeck"))}</div>`}
+        <div class="deck-syn" data-synbox="${d.id}" style="margin-top:12px"></div>
       </div>
     </div>`;
   }).join("");
@@ -2261,7 +2409,7 @@ function renderDecks() {
     const karte = k.parentElement;
     karte.querySelector(".deck-inhalt").style.display = offen ? "block" : "none";
     k.querySelector(".deck-pfeil").innerHTML = offen ? "&#9660;" : "&#9654;";
-    k.title = offen ? "Zuklappen" : "Aufklappen";
+    k.title = offen ? t("common.collapse") : t("common.expand");
   });
 
   $$("#deck-list .deck-tbl").forEach(t => wireCardRows(t));
@@ -2278,6 +2426,23 @@ function renderDecks() {
     const id = b.dataset.dashtoggle;
     deckDashOffen.has(id) ? deckDashOffen.delete(id) : deckDashOffen.add(id);
     renderDecks();
+  });
+
+  // Synergien fürs Deck: häufigste Haken über alle Deckkarten, gefiltert auf
+  // die Farbidentität des Decks; besessene/enthaltene Karten fallen raus.
+  $$("[data-synbtn]").forEach(b => b.onclick = () => {
+    const id = b.dataset.synbtn;
+    const d = DECKS.find(x => x.id === id);
+    if (!d) return;
+    const cards = (d.entries || []).map(e => CARDS.find(x => x.id === e.cardId)).filter(Boolean);
+    const box = $(`.deck-syn[data-synbox="${id}"]`);
+    if (!cards.length || !box) return;
+    b.disabled = true;
+    const weg = ownedExclude();
+    synergieAnzeigen(box, deckHooks(cards.map(c => ({ c }))),
+      { excludeIds: weg.ids, excludeNames: weg.names, colors: farbIdentitaet(cards), maxHooks: 5, limit: 20 })
+      .finally(() => { b.disabled = false; });
+    box.scrollIntoView({ behavior: "smooth", block: "nearest" });
   });
 
   // Sortier-Handler je Deck. renderDecks() baut alles neu, aber der

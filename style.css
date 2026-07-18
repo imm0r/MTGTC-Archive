@@ -144,6 +144,22 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
   font-size:11px;font-weight:700;letter-spacing:.4px;line-height:1.45;color:#fff;vertical-align:middle;
   font-variant:normal}
 .cond-badge.dunkel{color:#231a00}
+
+/* Synergie-Vorschläge (Kartendetail + Deck): Kachelraster mit Bild, Name,
+   „Warum"-Chips und Preis. */
+.syn-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(138px,1fr));gap:10px;margin-top:4px}
+.syn-card{display:flex;flex-direction:column;gap:4px;padding:8px;border:1px solid var(--line);
+  border-radius:10px;background:var(--panel2);color:var(--txt);text-decoration:none;transition:border-color .12s}
+.syn-card:hover{border-color:var(--acc)}
+.syn-card img{width:100%;border-radius:6px;display:block}
+.syn-noimg{width:100%;aspect-ratio:5/7;display:flex;align-items:center;justify-content:center;
+  color:var(--dim);background:var(--panel);border-radius:6px;font-size:26px}
+.syn-name{font-size:13px;font-weight:600;line-height:1.2}
+.syn-type{font-size:11px;color:var(--dim);line-height:1.15}
+.syn-chips{display:flex;flex-wrap:wrap;gap:3px;margin-top:2px}
+.syn-why{font-size:10px;padding:1px 6px;border-radius:999px;background:var(--panel);
+  border:1px solid var(--line);color:var(--dim)}
+.syn-price{font-size:12px;color:var(--acc);font-weight:600;margin-top:auto}
 .pill.foil{border-color:var(--acc);color:var(--acc)}
 .pill.fmt{border-color:var(--acc);color:var(--acc)}
 .pill.ok{border-color:var(--ok);color:var(--ok)}
