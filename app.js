@@ -2124,18 +2124,47 @@ async function synergieAnzeigen(box, hooks, opts = {}) {
    prüfen wir hier gegen Scryfall (ein Sammel-Request), erfundene fallen raus.
    opts.maxPrice filtert wie bei der heuristischen Suche. */
 async function kiSynergien(card, box, opts = {}) {
+  return kiSynergieLauf(box, {
+    body: { card: { name: card.name, type_line: card.type_line, oracle_text: card.oracle_text }, lang: LANG, n: 10 },
+    selfName: card.name,
+    maxPrice: opts.maxPrice,
+  });
+}
+
+/* Passt die Farbidentität einer Karte in die erlaubten Deckfarben (Teilmenge)? */
+function farbIdentPasst(ci, erlaubt) { return (ci || []).every(f => erlaubt.has(f)); }
+
+/* KI-Synergien fürs GANZE Deck: die Deckliste geht als Kontext an Claude, das
+   auch implizite, aufs Deck bezogene Synergien vorschlägt. Zusätzlich filtern
+   wir clientseitig auf die Farbidentität des Decks (falls das Modell danebenlangt)
+   und auf Besessenes/Enthaltenes. */
+async function kiSynergienDeck(deck, cards, box, opts = {}) {
+  const colors = farbIdentitaet(cards);
+  const commander = deck.main_card_id ? (CARDS.find(c => c.id === deck.main_card_id)?.name || "") : "";
+  return kiSynergieLauf(box, {
+    body: {
+      deck: {
+        name: deck.name, format: deck.format || "", commander, colorIdentity: colors,
+        cards: [...new Set(cards.map(c => c.name).filter(Boolean))].slice(0, 120),
+      },
+      lang: LANG, n: 12,
+    },
+    colors,
+    maxPrice: opts.maxPrice,
+  });
+}
+
+/* Gemeinsamer Kern: Edge Function „card-synergy" rufen, Namen gegen Scryfall
+   prüfen (ein Sammel-Request; erfundene fallen raus) und die geprüften Karten
+   als Kacheln zeigen. cfg: { body, selfName?, colors?, maxPrice? }. */
+async function kiSynergieLauf(box, cfg) {
   if (!box) return;
   const lauf = ++synergyLauf;
   box.innerHTML = `<div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("syn.aiLoading"))}</div>`;
 
   let data, error;
   try {
-    ({ data, error } = await sb.functions.invoke("card-synergy", {
-      body: {
-        card: { name: card.name, type_line: card.type_line, oracle_text: card.oracle_text },
-        lang: LANG, n: 10,
-      },
-    }));
+    ({ data, error } = await sb.functions.invoke("card-synergy", { body: cfg.body }));
   } catch (e) { error = e; }
   if (lauf !== synergyLauf) return;
 
@@ -2166,14 +2195,17 @@ async function kiSynergien(card, box, opts = {}) {
 
   const byName = new Map(karten.map(c => [c.name.toLowerCase(), c]));
   const weg = ownedExclude();
-  const cap = opts.maxPrice;
+  const cap = cfg.maxPrice;
+  const selfLower = (cfg.selfName || "").toLowerCase();
+  const farbSet = cfg.colors ? new Set(cfg.colors.replace(/c/gi, "").toUpperCase().split("").filter(Boolean)) : null;
   const gesehen = new Set();
   const treffer = [];
   for (const s of sugg) {                       // Reihenfolge des Modells behalten
     const c = byName.get(s.name.toLowerCase());
     if (!c || !c.oracle_id || gesehen.has(c.oracle_id)) continue;
     if (weg.ids.has(c.oracle_id) || weg.names.has((c.name || "").toLowerCase())) continue;
-    if ((c.name || "").toLowerCase() === (card.name || "").toLowerCase()) continue;
+    if (selfLower && (c.name || "").toLowerCase() === selfLower) continue;
+    if (farbSet && !farbIdentPasst(c.color_identity, farbSet)) continue;   // außerhalb der Deckfarben
     if (cap && (synPreis(c) ?? 9e9) > cap) continue;
     gesehen.add(c.oracle_id);
     treffer.push(vorschlagCardHtml(c, s.reason));
@@ -2653,7 +2685,9 @@ function renderDecks() {
           <div style="flex:none"><button class="btn ghost" data-synbtn="${d.id}"
             title="${esc(t("syn.deckTitle"))}">&#128269; ${esc(t("syn.deckBtn"))}</button></div>
           <div style="flex:none"><button class="btn ghost" data-analysebtn="${d.id}"
-            title="${esc(t("an.btnTitle"))}">&#128295; ${esc(t("an.btn"))}</button></div>` : ""}
+            title="${esc(t("an.btnTitle"))}">&#128295; ${esc(t("an.btn"))}</button></div>
+          <div style="flex:none"><button class="btn ghost" data-synaibtn="${d.id}"
+            title="${esc(t("syn.aiDeckTitle"))}">&#10024; ${esc(t("syn.ai"))}</button></div>` : ""}
         </div>
         <div class="deck-dash" data-dash="${d.id}" style="margin-top:12px"></div>
         ${rows ? `<div class="xscroll" style="overflow-x:auto"><table class="deck-tbl" style="margin-top:10px">
@@ -2735,6 +2769,22 @@ function renderDecks() {
     deckAnalyseAnzeigen(box, cards, farbIdentitaet(cards))
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
       .finally(() => synBtnBusy(b, lbl, false, "&#128295;"));
+  });
+
+  // KI-Synergien fürs ganze Deck: die Deckliste als Kontext an Claude (implizite
+  // Synergien), Vorschläge gegen Scryfall geprüft und auf die Deckfarben gefiltert.
+  $$("[data-synaibtn]").forEach(b => b.onclick = () => {
+    const id = b.dataset.synaibtn;
+    const d = DECKS.find(x => x.id === id);
+    if (!d) return;
+    const cards = (d.entries || []).map(e => CARDS.find(x => x.id === e.cardId)).filter(Boolean);
+    const box = $(`.deck-syn[data-synbox="${id}"]`);
+    if (!cards.length || !box) return;
+    const lbl = t("syn.ai");
+    synBtnBusy(b, lbl, true, "&#10024;");
+    kiSynergienDeck(d, cards, box, { maxPrice: numVal($(`[data-syncap="${id}"]`)) })
+      .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
+      .finally(() => synBtnBusy(b, lbl, false, "&#10024;"));
   });
 
   // Sortier-Handler je Deck. renderDecks() baut alles neu, aber der

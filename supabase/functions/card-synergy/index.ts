@@ -77,17 +77,33 @@ Deno.serve(async (req) => {
   const key = Deno.env.get("ANTHROPIC_API_KEY");
   if (!key) return json({ error: "ANTHROPIC_API_KEY ist nicht gesetzt" }, 500);
 
-  let name = "", typeLine = "", oracle = "", colors = "", lang = "de", n = 10;
+  let mode = "card", lang = "de", n = 10, colors = "";
+  let name = "", typeLine = "", oracle = "";
+  let deckName = "", deckFormat = "", commander = "", deckCards: string[] = [];
   try {
     const body = await req.json();
-    const c = body.card ?? {};
-    name = String(c.name ?? "").slice(0, 120);
-    typeLine = String(c.type_line ?? "").slice(0, 200);
-    oracle = String(c.oracle_text ?? "").slice(0, 1200);
-    colors = String(body.colorIdentity ?? "").replace(/[^WUBRGC]/gi, "").toUpperCase();
     lang = SPRACHE[body.lang] ? String(body.lang) : "de";
     n = Math.max(3, Math.min(15, Number(body.n) || 10));
-    if (!name) throw new Error("Keine Karte übergeben");
+    if (body.deck) {
+      // Deck-global: die ganze Deckliste ist der Kontext.
+      mode = "deck";
+      const d = body.deck;
+      deckName = String(d.name ?? "").slice(0, 120);
+      deckFormat = String(d.format ?? "").slice(0, 60);
+      commander = String(d.commander ?? "").slice(0, 120);
+      colors = String(d.colorIdentity ?? "").replace(/[^WUBRGC]/gi, "").toUpperCase();
+      deckCards = Array.isArray(d.cards)
+        ? d.cards.map((x: unknown) => String(x).slice(0, 80)).filter(Boolean).slice(0, 120)
+        : [];
+      if (!deckCards.length) throw new Error("Leere Deckliste");
+    } else {
+      const c = body.card ?? {};
+      name = String(c.name ?? "").slice(0, 120);
+      typeLine = String(c.type_line ?? "").slice(0, 200);
+      oracle = String(c.oracle_text ?? "").slice(0, 1200);
+      colors = String(body.colorIdentity ?? "").replace(/[^WUBRGC]/gi, "").toUpperCase();
+      if (!name) throw new Error("Keine Karte übergeben");
+    }
   } catch (e) {
     return json({ error: (e as Error).message }, 400);
   }
@@ -96,7 +112,16 @@ Deno.serve(async (req) => {
     ? `\n- Farbidentität: Jede genannte Karte muss in die Farbidentität {${colors}} passen (alle Mana-Symbole und Farbidentitäts-Anteile liegen innerhalb dieser Farben).`
     : "";
 
-  const SYSTEM = `Du bist ein Deckbau-Experte für Magic: The Gathering mit enzyklopädischer Kartenkenntnis. Zu einer gegebenen Karte nennst du Karten, die besonders gut mit ihr zusammenspielen — mit ausdrücklichem Schwerpunkt auf NICHT offensichtlichen, IMPLIZITEN Synergien: Karten, die keine Schlüsselwörter oder Kreaturentypen teilen, aber mechanisch hervorragend zusammenwirken (Enabler, Payoffs, Combos, Schutz für die Schlüsselkarte, Value-Engines, Kombinationen, die zusammen mehr sind als einzeln).
+  const SYSTEM = mode === "deck"
+    ? `Du bist ein Deckbau-Experte für Magic: The Gathering mit enzyklopädischer Kartenkenntnis. Zu einem gegebenen Deck nennst du Karten, die die GESAMTSTRATEGIE des Decks am besten ergänzen — mit ausdrücklichem Schwerpunkt auf NICHT offensichtlichen, IMPLIZITEN Synergien: Karten, die keine Schlüsselwörter teilen, aber mechanisch hervorragend ins Deck greifen (Enabler, Payoffs, Combos, Value-Engines, Schutz für Schlüsselkarten).
+
+Strikte Regeln:
+- Nenne ausschließlich ECHTE, existierende Magic-Karten mit ihrem exakten englischen Namen. Erfinde nichts. Bist du dir bei Existenz oder Schreibweise unsicher, lass die Karte weg.
+- Keine Standardländer (Basic Lands). Schlage keine Karte vor, die bereits im Deck ist.${farbHinweis}
+- Erkenne zuerst die Strategie und die Themen des Decks (Commander/Schlüsselkarten, wiederkehrende Mechaniken) und schlage Karten vor, die genau darauf einzahlen.
+- Je Karte eine EINZIGE, konkrete Begründung, die den Synergie-Mechanismus MIT DEM DECK benennt, nicht bloß "gute Karte". Formuliere die Begründung auf ${SPRACHE[lang]}.
+- Bevorzuge kluge, unerwartete Synergien. Sortiere die überzeugendsten nach oben.`
+    : `Du bist ein Deckbau-Experte für Magic: The Gathering mit enzyklopädischer Kartenkenntnis. Zu einer gegebenen Karte nennst du Karten, die besonders gut mit ihr zusammenspielen — mit ausdrücklichem Schwerpunkt auf NICHT offensichtlichen, IMPLIZITEN Synergien: Karten, die keine Schlüsselwörter oder Kreaturentypen teilen, aber mechanisch hervorragend zusammenwirken (Enabler, Payoffs, Combos, Schutz für die Schlüsselkarte, Value-Engines, Kombinationen, die zusammen mehr sind als einzeln).
 
 Strikte Regeln:
 - Nenne ausschließlich ECHTE, existierende Magic-Karten mit ihrem exakten englischen Namen. Erfinde nichts. Bist du dir bei Existenz oder Schreibweise unsicher, lass die Karte weg — eine weggelassene Karte ist besser als eine erfundene.
@@ -104,7 +129,13 @@ Strikte Regeln:
 - Je Karte eine EINZIGE, konkrete Begründung, die den Synergie-Mechanismus benennt (WARUM sie zusammen stark sind), nicht bloß "gute Karte". Formuliere die Begründung auf ${SPRACHE[lang]}.
 - Bevorzuge unerwartete, kluge Synergien gegenüber offensichtlichen Kopien desselben Schlüsselworts. Sortiere die überzeugendsten Synergien nach oben.`;
 
-  const USER = `Ausgangskarte:
+  const USER = mode === "deck"
+    ? `Deck: ${deckName || "(ohne Namen)"}${deckFormat ? ` — Format: ${deckFormat}` : ""}${commander ? `\nCommander/Schlüsselkarte: ${commander}` : ""}${colors ? `\nFarbidentität: {${colors}}` : ""}
+Kartenliste (${deckCards.length}):
+${deckCards.join(", ")}
+
+Nenne ${n} Karten, die die Strategie dieses Decks am besten ergänzen.`
+    : `Ausgangskarte:
 Name: ${name}
 Typzeile: ${typeLine}
 Regeltext: ${oracle || "(kein Regeltext)"}
