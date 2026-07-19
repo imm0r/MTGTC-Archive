@@ -432,6 +432,17 @@ td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000
    Nur hier, nicht in der Detailansicht (dort bleiben sie in einer Reihe). */
 .cm-cell .cm{display:block;width:fit-content;margin-left:auto}
 .cm-cell .cm + .cm{margin-top:4px}
+/* Statt der Kürzel „CM"/„SF" die offiziellen Marken-Logos. Scryfall bleibt sein
+   natives Farb-<img> (assets/); Cardmarket ist einfarbig navy und auf dem dunklen
+   Grund unsichtbar → weiß dargestellt, und zwar als Inline-SVG über fill, NICHT
+   per CSS-filter auf einem <img>: ein gefiltertes SVG-<img> wird in der Tabellen-
+   Zelle der Liste von Chromium zu einem weißen Klotz gerastert. Pillenrahmen +
+   Gold-Hover (.cm:hover) bleiben unverändert; line-height:0 nimmt der Inline-Zeile
+   die Extra-Höhe. Feste, quadratische Maße (die SVGs tragen nur eine viewBox). */
+.cm-logo,.sf-logo{padding:3px 6px;line-height:0}
+.cm-logo .brandlogo,.sf-logo .brandlogo{display:block;vertical-align:middle}
+.sf-logo .brandlogo{width:15px;height:15px}
+.cm-logo .brandlogo{width:14px;height:14px;fill:#fff}
 /* Manakosten: die Symbole kommen als SVG von Scryfall. Feste Größe in em,
    damit sie mit der Schrift der Zeile mitwachsen — in der Tabelle stehen sie
    neben dem Namen, in der Detailansicht neben der größeren Überschrift.
