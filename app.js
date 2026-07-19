@@ -3010,6 +3010,10 @@ function renderDecks() {
             d.shared ? ` &middot; <span style="color:var(--ok)">${esc(t("deck.shared"))}</span>` : ""}${
             fehlt ? ` &middot; <span style="color:var(--err)">${esc(t("deck.incomplete", { n: fehlt }))}</span>` : ""}</div>
         </div>
+        ${rows ? `<button class="btn ghost sm" data-dashtoggle="${d.id}" style="flex:none"
+          title="${esc(dashOffen ? t("deck.statsHide") : t("deck.statsShow"))}">&#128202; ${esc(dashOffen ? t("deck.statsHide") : t("deck.statsShow"))}</button>
+        <button class="btn ghost sm" data-bracketbtn="${d.id}" style="flex:none"
+          title="${esc(t("bracket.title"))}">&#9878; ${esc(t("bracket.btn"))}</button>` : ""}
         <button class="btn ghost sm" data-share="${d.id}" style="flex:none"
           title="${d.shared ? esc(t("deck.unshareTitle")) : esc(t("deck.shareTitle"))}">${d.shared ? "&#128101; " + esc(t("deck.sharedBtn")) : esc(t("deck.share"))}</button>
         <button class="btn ghost sm" data-ded="${d.id}" style="flex:none"
@@ -3020,9 +3024,7 @@ function renderDecks() {
         <div class="row" style="margin-top:10px">
           <div class="sugg"><input type="text" data-dadd="${d.id}" placeholder="${esc(t("deck.addCardPh"))}"></div>
           <div style="flex:none;min-width:80px"><input type="number" min="1" value="1" data-dqty="${d.id}"></div>
-          ${rows ? `<div style="flex:none"><button class="btn ghost" data-dashtoggle="${d.id}"
-            >&#128202; ${esc(dashOffen ? t("deck.statsHide") : t("deck.statsShow"))}</button></div>
-          <div style="flex:none"><input type="number" data-syncap="${d.id}" min="0" step="0.5"
+          ${rows ? `<div style="flex:none"><input type="number" data-syncap="${d.id}" min="0" step="0.5"
             placeholder="${esc(t("syn.capPh"))}" title="${esc(t("syn.capTitle"))}" style="width:92px"></div>
           <div class="syn-std-btn" style="flex:none"><input type="number" data-synbudget="${d.id}" min="0" step="1"
             placeholder="${esc(t("syn.budgetPh"))}" title="${esc(t("syn.budgetTitle"))}" style="width:104px"></div>
@@ -3033,9 +3035,7 @@ function renderDecks() {
           <div class="syn-ai-btn" style="flex:none"><button class="btn ghost" data-synaibtn="${d.id}"
             title="${esc(t("syn.aiDeckTitle"))}">&#10024; ${esc(t("syn.ai"))}</button></div>
           <div style="flex:none"><button class="btn ghost" data-combobtn="${d.id}"
-            title="${esc(t("combo.deckTitle"))}">&#128279; ${esc(t("combo.btn"))}</button></div>
-          <div style="flex:none"><button class="btn ghost" data-bracketbtn="${d.id}"
-            title="${esc(t("bracket.title"))}">&#9878; ${esc(t("bracket.btn"))}</button></div>` : ""}
+            title="${esc(t("combo.deckTitle"))}">&#128279; ${esc(t("combo.btn"))}</button></div>` : ""}
         </div>
         <div class="deck-dash" data-dash="${d.id}" style="margin-top:12px"></div>
         ${rows ? `<div class="xscroll" style="overflow-x:auto"><table class="deck-tbl" style="margin-top:10px">
@@ -3075,7 +3075,11 @@ function renderDecks() {
 
   $$("[data-dashtoggle]").forEach(b => b.onclick = () => {
     const id = b.dataset.dashtoggle;
-    deckDashOffen.has(id) ? deckDashOffen.delete(id) : deckDashOffen.add(id);
+    const an = !deckDashOffen.has(id);
+    an ? deckDashOffen.add(id) : deckDashOffen.delete(id);
+    // Der Knopf sitzt jetzt im Deck-Kopf, die Statistik rendert aber im Körper.
+    // Beim Einschalten das Deck aufklappen, sonst bliebe sie unsichtbar.
+    if (an && !deckOffen.ist(id)) deckOffen.schalte(id);
     renderDecks();
   });
 
