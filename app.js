@@ -2541,6 +2541,15 @@ function wireComboHover(box) {
   });
 }
 
+/* „Komplett"/„Fast komplett" als Akkordeon: immer nur EINE Kategorie offen —
+   klappt man eine auf, schließt sich die andere automatisch. */
+function wireComboKategorien(box) {
+  const kats = [...box.querySelectorAll(".combo-cat")];
+  kats.forEach(det => det.addEventListener("toggle", () => {
+    if (det.open) kats.forEach(o => { if (o !== det) o.open = false; });
+  }));
+}
+
 /* Eine Combo als kompakter Block: Ergebnisse als Liste, die beteiligten Karten
    als reine Kartenbilder (✓ / „+ Deck" / „+ Wunsch"; volle Karte + Name per
    Hover), Details aufklappbar mit Ausgangszustand, Voraussetzungen und Ablauf.
@@ -2607,12 +2616,16 @@ async function deckCombosAnzeigen(box, cards, deckId) {
   if (lauf !== combosLauf) return;
 
   const teile = [`<div class="meta">${esc(t("combo.deckNote"))}</div>`];
-  if (included.length)
-    teile.push(`<div class="combo-h">${esc(t("combo.have", { n: included.length }))}</div><div class="combo-grid">${included.map(c => comboKachel(c, deckId, cardByName)).join("")}</div>`);
-  if (almost.length)
-    teile.push(`<div class="combo-h">${esc(t("combo.almost", { n: almost.length }))}</div><div class="combo-grid">${almost.map(c => comboKachel(c, deckId, cardByName)).join("")}</div>`);
+  const kats = [];
+  if (included.length) kats.push([t("combo.have", { n: included.length }), included]);
+  if (almost.length) kats.push([t("combo.almost", { n: almost.length }), almost]);
+  // Kategorien als aufklappbare Blöcke: die erste (Komplett) offen, die andere zu.
+  kats.forEach(([label, combos], i) => teile.push(`<details class="combo-cat"${i === 0 ? " open" : ""}>
+    <summary class="combo-h">${esc(label)}</summary>
+    <div class="combo-grid">${combos.map(c => comboKachel(c, deckId, cardByName)).join("")}</div></details>`));
   box.innerHTML = teile.join("");
   wireComboHover(box);
+  wireComboKategorien(box);
 }
 
 /* Combos in der GESAMTEN Sammlung: alle besessenen Karten (nach Name
