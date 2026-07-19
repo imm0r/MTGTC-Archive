@@ -2510,20 +2510,29 @@ async function comboFehlkartenLaden(namen) {
    Scryfall die Karte kennt), und ein Link auf die Combo-Seite von CSB. */
 function comboKachel(combo, deckId, sidByName) {
   const fehlt = new Set((combo.missing || []).map(m => (m.name || "").toLowerCase()));
-  const karten = (combo.uses || []).map(u =>
-    `<span class="combo-card${fehlt.has((u.name || "").toLowerCase()) ? " missing" : ""}">${esc(u.name)}</span>`).join("");
+  // Fehlt eine Karte IM DECK, heißt das nicht, dass man sie nicht BESITZT: hat
+  // man sie (irgendeine Auflage — Abgleich über oracle_id, also Sprache/Foil
+  // egal), ist sie nur „nicht in diesem Deck" (gold), sonst wirklich fehlt (rot).
+  const besitzt = (name, oracleId) => besessenAnzahl({ oracle_id: oracleId, name }) > 0;
+  const karten = (combo.uses || []).map(u => {
+    if (!fehlt.has((u.name || "").toLowerCase())) return `<span class="combo-card">${esc(u.name)}</span>`;
+    const have = besitzt(u.name, u.oracleId);
+    return `<span class="combo-card ${have ? "have" : "missing"}" title="${
+      esc(t(have ? "combo.haveTitle" : "combo.missTitle"))}">${esc(u.name)}</span>`;
+  }).join("");
   const payoff = (combo.produces || []).slice(0, 4).map(esc).join(" &middot; ") || esc(t("combo.result"));
-  // Nur AKTIONierbare Fehlkarten (von Scryfall aufgelöst) bekommen einen
-  // „+ Wunsch"-Knopf; nicht auflösbare stehen ohnehin schon rot oben in den
-  // Karten — kein zweites Mal darunter wiederholen.
+  // Nur AKTIONierbare Fehlkarten (von Scryfall aufgelöst) bekommen einen Knopf;
+  // nicht auflösbare stehen ohnehin schon oben in den Karten. Besitzt man die
+  // Karte, heißt der Knopf „ins Deck" (verknüpft die eigene Karte, gedämpfter
+  // Stil), sonst „als Wunsch" (Bestand 0, Goldakzent) — wie bei den Synergien.
   let wunsch = "";
   if (deckId && combo.missing?.length) {
     const btns = combo.missing.map(m => {
       const sid = sidByName && sidByName.get((m.name || "").toLowerCase());
-      return sid
-        ? `<button class="syn-add" data-deck="${esc(deckId)}" data-sid="${esc(sid)}"
-             title="${esc(t("combo.addWishTitle", { name: m.name }))}">&#43;&#160;${esc(m.name)}</button>`
-        : "";
+      if (!sid) return "";
+      const owned = besitzt(m.name, m.oracleId);
+      return `<button class="syn-add${owned ? " owned" : ""}" data-deck="${esc(deckId)}" data-sid="${esc(sid)}"
+        title="${esc(owned ? t("syn.addOwnedTitle") : t("combo.addWishTitle", { name: m.name }))}">&#43;&#160;${esc(m.name)}</button>`;
     }).filter(Boolean).join("");
     if (btns) wunsch = `<div class="combo-missing">${btns}</div>`;
   }

@@ -200,6 +200,7 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .combo-cards{display:flex;flex-wrap:wrap;gap:4px}
 .combo-card{font-size:12px;padding:2px 8px;border-radius:6px;border:1px solid var(--line);color:var(--txt)}
 .combo-card.missing{border-color:var(--err);color:var(--err)}
+.combo-card.have{border-color:var(--acc);color:var(--acc2)}
 .combo-missing{display:flex;flex-wrap:wrap;gap:6px}
 .combo-link{font-size:12px;color:var(--dim);text-decoration:none;align-self:flex-start}
 .combo-link:hover{color:var(--acc)}
