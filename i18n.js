@@ -1743,6 +1743,31 @@ Object.assign(I18N.it, {
   "combo.details": "Dettagli",
   "combo.addWishTitle": "Aggiungi «{name}» al mazzo come carta desiderata",
 });
+Object.assign(I18N.de, {
+  "combo.cardTitle": "Combos mit dieser Karte (Commander Spellbook)",
+  "combo.cardNone": "Diese Karte ist in keiner bekannten Combo.",
+  "combo.cardNote": "Combos mit dieser Karte ({n}) — Daten von",
+});
+Object.assign(I18N.en, {
+  "combo.cardTitle": "Combos with this card (Commander Spellbook)",
+  "combo.cardNone": "This card isn’t in any known combo.",
+  "combo.cardNote": "Combos with this card ({n}) — data from",
+});
+Object.assign(I18N.fr, {
+  "combo.cardTitle": "Combos avec cette carte (Commander Spellbook)",
+  "combo.cardNone": "Cette carte n’apparaît dans aucun combo connu.",
+  "combo.cardNote": "Combos avec cette carte ({n}) — données de",
+});
+Object.assign(I18N.es, {
+  "combo.cardTitle": "Combos con esta carta (Commander Spellbook)",
+  "combo.cardNone": "Esta carta no está en ningún combo conocido.",
+  "combo.cardNote": "Combos con esta carta ({n}) — datos de",
+});
+Object.assign(I18N.it, {
+  "combo.cardTitle": "Combo con questa carta (Commander Spellbook)",
+  "combo.cardNone": "Questa carta non è in nessuna combo nota.",
+  "combo.cardNote": "Combo con questa carta ({n}) — dati da",
+});
 
 /* ---- Teil 7: Spielrunde (live) ---- */
 Object.assign(I18N.de, {
