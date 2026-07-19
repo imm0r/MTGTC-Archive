@@ -2176,6 +2176,73 @@ Object.assign(I18N.it, {
   "deck.priceHint": "Limite di prezzo per suggerimenti sinergia/IA",
 });
 
+/* ---- Teil 21: Bracket-Begründung (Stufe, Signale, Legende) ---- */
+Object.assign(I18N.de, {
+  "bracket.badge": "Bracket {stufe} · {name}", "bracket.badgeBanned": "Banned (gebannte Karte)",
+  "bracket.rowCombos": "Combos im Deck", "bracket.rowTwoCard": "{n} als Zwei-Karten-Combo",
+  "bracket.rowGC": "Game Changers", "bracket.rowBanned": "Gebannte Karten",
+  "bracket.rowMLD": "Mass Land Denial", "bracket.rowExtra": "Extra-Turns",
+  "bracket.legendTitle": "Was bedeuten die Stufen?",
+  "bracket.legend1": "Exhibition — bewusst schwach, Themen-Deck, keine Game Changers.",
+  "bracket.legend2": "Core — Precon-Niveau, unoptimiert.",
+  "bracket.legend3": "Upgraded — aufgewertet, bis ~3 Game Changers, späte Combos.",
+  "bracket.legend4": "Optimized — hochkonsequent, keine Beschränkungen.",
+  "bracket.legend5": "cEDH — auf schnellen Sieg gebaut, Turnierumfeld.",
+  "bracket.footer": "Einschätzung von Commander Spellbook nach dem offiziellen Bracket-System (1–5).",
+});
+Object.assign(I18N.en, {
+  "bracket.badge": "Bracket {stufe} · {name}", "bracket.badgeBanned": "Banned (has a banned card)",
+  "bracket.rowCombos": "combos in the deck", "bracket.rowTwoCard": "{n} as a two-card combo",
+  "bracket.rowGC": "Game Changers", "bracket.rowBanned": "Banned cards",
+  "bracket.rowMLD": "Mass land denial", "bracket.rowExtra": "Extra turns",
+  "bracket.legendTitle": "What do the tiers mean?",
+  "bracket.legend1": "Exhibition — intentionally weak, themed, no Game Changers.",
+  "bracket.legend2": "Core — precon level, unoptimized.",
+  "bracket.legend3": "Upgraded — up to ~3 Game Changers, late-game combos.",
+  "bracket.legend4": "Optimized — highly consistent, no restrictions.",
+  "bracket.legend5": "cEDH — built to win fast, tournament level.",
+  "bracket.footer": "Estimated by Commander Spellbook using the official bracket system (1–5).",
+});
+Object.assign(I18N.fr, {
+  "bracket.badge": "Bracket {stufe} · {name}", "bracket.badgeBanned": "Banned (carte bannie)",
+  "bracket.rowCombos": "combos dans le deck", "bracket.rowTwoCard": "{n} en combo à deux cartes",
+  "bracket.rowGC": "Game Changers", "bracket.rowBanned": "Cartes bannies",
+  "bracket.rowMLD": "Destruction massive de terrains", "bracket.rowExtra": "Tours supplémentaires",
+  "bracket.legendTitle": "Que signifient les niveaux ?",
+  "bracket.legend1": "Exhibition — volontairement faible, thématique, sans Game Changers.",
+  "bracket.legend2": "Core — niveau precon, non optimisé.",
+  "bracket.legend3": "Upgraded — jusqu'à ~3 Game Changers, combos tardifs.",
+  "bracket.legend4": "Optimized — très régulier, sans restrictions.",
+  "bracket.legend5": "cEDH — conçu pour gagner vite, niveau tournoi.",
+  "bracket.footer": "Estimation de Commander Spellbook selon le système officiel de brackets (1–5).",
+});
+Object.assign(I18N.es, {
+  "bracket.badge": "Bracket {stufe} · {name}", "bracket.badgeBanned": "Banned (carta prohibida)",
+  "bracket.rowCombos": "combos en el mazo", "bracket.rowTwoCard": "{n} como combo de dos cartas",
+  "bracket.rowGC": "Game Changers", "bracket.rowBanned": "Cartas prohibidas",
+  "bracket.rowMLD": "Destrucción masiva de tierras", "bracket.rowExtra": "Turnos extra",
+  "bracket.legendTitle": "¿Qué significan los niveles?",
+  "bracket.legend1": "Exhibition — deliberadamente débil, temático, sin Game Changers.",
+  "bracket.legend2": "Core — nivel precon, sin optimizar.",
+  "bracket.legend3": "Upgraded — hasta ~3 Game Changers, combos tardíos.",
+  "bracket.legend4": "Optimized — muy consistente, sin restricciones.",
+  "bracket.legend5": "cEDH — hecho para ganar rápido, nivel torneo.",
+  "bracket.footer": "Estimado por Commander Spellbook con el sistema oficial de brackets (1–5).",
+});
+Object.assign(I18N.it, {
+  "bracket.badge": "Bracket {stufe} · {name}", "bracket.badgeBanned": "Banned (carta bandita)",
+  "bracket.rowCombos": "combo nel mazzo", "bracket.rowTwoCard": "{n} come combo a due carte",
+  "bracket.rowGC": "Game Changers", "bracket.rowBanned": "Carte bandite",
+  "bracket.rowMLD": "Mass land denial", "bracket.rowExtra": "Turni extra",
+  "bracket.legendTitle": "Cosa significano i livelli?",
+  "bracket.legend1": "Exhibition — volutamente debole, a tema, senza Game Changers.",
+  "bracket.legend2": "Core — livello precon, non ottimizzato.",
+  "bracket.legend3": "Upgraded — fino a ~3 Game Changers, combo tardive.",
+  "bracket.legend4": "Optimized — molto costante, senza restrizioni.",
+  "bracket.legend5": "cEDH — costruito per vincere in fretta, livello torneo.",
+  "bracket.footer": "Stima di Commander Spellbook secondo il sistema ufficiale dei bracket (1–5).",
+});
+
 /* ---- Teil 7: Spielrunde (live) ---- */
 Object.assign(I18N.de, {
   "nav.session": "Spielrunde",
