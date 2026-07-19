@@ -1863,9 +1863,12 @@ function detailHtml(c, hover) {
             title="${esc(t("syn.findTitle"))}">&#128269; ${esc(t("syn.find"))}</button></div>
           <div class="syn-ai-btn" style="flex:none"><button class="btn ghost sm" id="dt-syn-ai"
             title="${esc(t("syn.aiTitle"))}">&#10024; ${esc(t("syn.ai"))}</button></div>
+          <div style="flex:none"><button class="btn ghost sm" id="dt-combos"
+            title="${esc(t("combo.cardTitle"))}">&#128279; ${esc(t("combo.btn"))}</button></div>
         </div>` : ""}
         <div class="hint" style="margin-top:10px">${esc(t("detail.added"))}: ${dtShort(c.added)} ${esc(t("detail.addedSuffix"))}</div>
         ${!hover ? `<div id="syn-box" style="margin-top:12px"></div>` : ""}
+        ${!hover ? `<div id="card-combo-box" style="margin-top:12px"></div>` : ""}
         <div style="margin-top:10px">
           <label style="margin-bottom:2px">${esc(t("detail.priceHistory"))}</label>
           ${priceChart(c.hist, 320, 150)}
@@ -1913,6 +1916,15 @@ function showCardDetail(id) {
     synGeschwister([$("#dt-syn")], true);
     kiSynergien(c, $("#syn-box"), { maxPrice: numVal($("#syn-cap")) })
       .finally(() => { synBtnBusy(ab, lbl, false, "&#10024;"); synGeschwister([$("#dt-syn")], false); });
+  };
+  // Combos, in denen diese Karte vorkommt (Commander Spellbook) — eigener
+  // Kasten, unabhängig von den Synergie-Knöpfen.
+  const cb = $("#dt-combos");
+  if (cb) cb.onclick = () => {
+    const lbl = t("combo.btn");
+    synBtnBusy(cb, lbl, true, "&#128279;");
+    karteCombosAnzeigen($("#card-combo-box"), c)
+      .finally(() => synBtnBusy(cb, lbl, false, "&#128279;"));
   };
 }
 
@@ -2548,6 +2560,28 @@ async function deckCombosAnzeigen(box, cards, deckId) {
   if (almost.length)
     teile.push(`<div class="combo-h">${esc(t("combo.almost", { n: almost.length }))}</div><div class="combo-grid">${almost.map(c => comboKachel(c, deckId, sidByName)).join("")}</div>`);
   box.innerHTML = teile.join("");
+}
+
+/* Combos, in denen eine einzelne Karte vorkommt (Modus variants). Kein
+   Deck-Kontext → ohne „+ Wunsch". Teilt sich den Lauf-Zähler mit den
+   Deck-Combos; parallel läuft ohnehin höchstens eine Combo-Suche. */
+async function karteCombosAnzeigen(box, card) {
+  if (!box) return;
+  const lauf = ++combosLauf;
+  box.innerHTML = `<div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("combo.loading"))}</div>`;
+  let data;
+  try {
+    // Anführungszeichen im Namen raus, sonst bricht die CSB-Suche card:"…".
+    const q = `card:"${(card.name || "").replace(/"/g, "")}"`;
+    data = await combosApi({ mode: "variants", q, limit: 12 });
+  } catch (e) {
+    if (lauf === combosLauf) box.innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+    return;
+  }
+  if (lauf !== combosLauf) return;
+  const combos = data.combos || [];
+  if (!combos.length) { box.innerHTML = `<div class="empty">${esc(t("combo.cardNone"))}</div>`; return; }
+  box.innerHTML = `<div class="meta">${esc(t("combo.cardNote", { n: combos.length }))} <a href="https://commanderspellbook.com/" target="_blank" rel="noopener noreferrer">Commander Spellbook</a></div><div class="combo-grid">${combos.map(c => comboKachel(c, null, null)).join("")}</div>`;
 }
 
 /* Analyse in einen Container zeichnen: Balken je Kategorie, darunter Vorschläge
