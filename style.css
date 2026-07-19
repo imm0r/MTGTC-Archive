@@ -206,6 +206,22 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .cmd-hover img{width:220px;max-width:60vw;border-radius:8px;display:block}
 .cmd-hover-nm{text-align:center;font-weight:600;font-size:14px;color:var(--txt);margin-top:6px;max-width:220px}
 /* ===== Termine / Kalender ===== */
+.kal-kopf{display:flex;align-items:center;gap:8px}
+.kal-titel{flex:1;min-width:0;margin:0;text-align:center;text-transform:capitalize;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kal-neu{flex:none;white-space:nowrap}
+.ev-serie-check{display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:12px;
+  font-size:14px;color:var(--txt);text-transform:none;letter-spacing:normal}
+.ev-serie-check input{flex:none;margin:0}
+.ev-serie-opts{margin-top:6px}
+/* Mobil (hochkant): Monat und kommende Termine untereinander; Desktop (quer): nebeneinander */
+.termin-cols{display:flex;flex-direction:column}
+@media (orientation:landscape){
+  .termin-cols{flex-direction:row;align-items:flex-start;gap:14px}
+  .termin-cols>.card{min-width:0}
+  .termin-cols>.kal-card{flex:3 1 0}
+  .termin-cols>.termin-upcoming{flex:2 1 0}
+}
 .kal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:10px}
 .kal-head{margin-top:8px}
 .kal-wt{text-align:center;font-size:11px;color:var(--dim);padding:2px 0;font-weight:600}
