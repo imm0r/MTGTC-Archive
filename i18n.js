@@ -2023,6 +2023,53 @@ Object.assign(I18N.it, {
   "legal.warnTitle": "Questa combo non è legale in {fmt} (carta bandita o non legale).",
 });
 
+/* ---- Teil 17: Deck-Legalität (ganzes Deck prüfen) ---- */
+Object.assign(I18N.de, {
+  "legal.deckBtn": "Legalität prüfen",
+  "legal.deckTitle": "Alle Deckkarten gegen die Bannliste des Deck-Formats prüfen",
+  "legal.deckChecking": "Prüfe Deck gegen {fmt}…",
+  "legal.deckAllLegal": "Keine gebannten oder nicht legalen Karten in {fmt} ({n} geprüft).",
+  "legal.deckProblems": "{m} von {n} Karten in {fmt} gebannt oder nicht legal:",
+  "legal.deckUnknown": "{u} Karten konnten nicht geprüft werden.",
+  "legal.tooMany": "mehrfach",
+});
+Object.assign(I18N.en, {
+  "legal.deckBtn": "Check legality",
+  "legal.deckTitle": "Check every deck card against the deck format’s ban list",
+  "legal.deckChecking": "Checking deck against {fmt}…",
+  "legal.deckAllLegal": "No banned or non-legal cards in {fmt} ({n} checked).",
+  "legal.deckProblems": "{m} of {n} cards banned or not legal in {fmt}:",
+  "legal.deckUnknown": "{u} cards couldn’t be checked.",
+  "legal.tooMany": "multiple copies",
+});
+Object.assign(I18N.fr, {
+  "legal.deckBtn": "Vérifier la légalité",
+  "legal.deckTitle": "Vérifier toutes les cartes du deck contre la liste des cartes bannies du format",
+  "legal.deckChecking": "Vérification du deck en {fmt}…",
+  "legal.deckAllLegal": "Aucune carte bannie ou non légale en {fmt} ({n} vérifiées).",
+  "legal.deckProblems": "{m} des {n} cartes bannies ou non légales en {fmt} :",
+  "legal.deckUnknown": "{u} cartes n'ont pas pu être vérifiées.",
+  "legal.tooMany": "plusieurs exemplaires",
+});
+Object.assign(I18N.es, {
+  "legal.deckBtn": "Comprobar legalidad",
+  "legal.deckTitle": "Comprobar todas las cartas del mazo contra la lista de prohibidas del formato",
+  "legal.deckChecking": "Comprobando el mazo en {fmt}…",
+  "legal.deckAllLegal": "Sin cartas prohibidas o no legales en {fmt} ({n} comprobadas).",
+  "legal.deckProblems": "{m} de {n} cartas prohibidas o no legales en {fmt}:",
+  "legal.deckUnknown": "{u} cartas no se pudieron comprobar.",
+  "legal.tooMany": "varias copias",
+});
+Object.assign(I18N.it, {
+  "legal.deckBtn": "Verifica legalità",
+  "legal.deckTitle": "Verifica tutte le carte del mazzo rispetto alla lista bandite del formato",
+  "legal.deckChecking": "Verifica del mazzo in {fmt}…",
+  "legal.deckAllLegal": "Nessuna carta bandita o non legale in {fmt} ({n} verificate).",
+  "legal.deckProblems": "{m} di {n} carte bandite o non legali in {fmt}:",
+  "legal.deckUnknown": "{u} carte non è stato possibile verificarle.",
+  "legal.tooMany": "più copie",
+});
+
 /* ---- Teil 7: Spielrunde (live) ---- */
 Object.assign(I18N.de, {
   "nav.session": "Spielrunde",

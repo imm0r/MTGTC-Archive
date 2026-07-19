@@ -2579,6 +2579,72 @@ function legalGridHtml(leg) {
     `<span class="legal-item">${esc(name)} ${legalPill(leg[k] || "not_legal")}</span>`).join("")}</div>`;
 }
 
+/* Legalitäten fürs ganze Deck in einem Rutsch: Sammel-Request an Scryfall
+   (POST /cards/collection, je 75 scryfall_id). Was zurückkommt, landet im selben
+   LEGAL_CACHE wie die Detail-Ansicht — ein zweiter Lauf und die Karten-Panels
+   kommen dann ohne Netz aus. Rückgabe: Map scryfall_id → legalities | null. */
+async function deckLegalitaeten(sids) {
+  const uniq = [...new Set(sids.filter(Boolean))];
+  const fehlend = uniq.filter(id => !LEGAL_CACHE.has(id));
+  for (let i = 0; i < fehlend.length; i += 75) {
+    try {
+      const r = await fetch("https://api.scryfall.com/cards/collection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ identifiers: fehlend.slice(i, i + 75).map(id => ({ id })) }),
+      });
+      if (r.ok) for (const c of (await r.json()).data || []) if (c.id) LEGAL_CACHE.set(c.id, c.legalities || {});
+    } catch { /* Block fehlgeschlagen → diese Karten bleiben ungeprüft (null) */ }
+  }
+  return new Map(uniq.map(id => [id, LEGAL_CACHE.get(id) ?? null]));
+}
+
+/* „Deck-Legalität prüfen": jede Deckkarte gegen das Deck-Format (Fallback
+   Commander, wie bei den Combos). Meldet gebannte und nicht-legale Karten sowie
+   restricted-Karten (nur Vintage) mit mehr als einem Exemplar. Bewusst NICHT
+   geprüft: Bau-Regeln wie Singleton, Farbidentität oder Deckgröße — daher spricht
+   der Befund präzise von „gebannt/nicht legal", nicht von „Deck ist legal". */
+async function deckLegalPruefen(box, karten, deck) {
+  const key = comboLegalKey(deck?.format);
+  const fmt = legalFmtName(key);
+  box.innerHTML = `<div class="legal-note">${esc(t("legal.deckChecking", { fmt }))}</div>`;
+  let legMap;
+  try { legMap = await deckLegalitaeten(karten.map(c => c.scryfall_id)); }
+  catch { box.innerHTML = `<div class="legal-note bad">${esc(t("legal.error"))}</div>`; return; }
+
+  const probleme = [];
+  let ungeprueft = 0;
+  for (const c of karten) {
+    const leg = legMap.get(c.scryfall_id);
+    if (!leg) { ungeprueft++; continue; }
+    const st = leg[key] || "not_legal";
+    if (st === "banned") probleme.push({ c, st, rang: 0 });
+    else if (st === "not_legal") probleme.push({ c, st, rang: 1 });
+    else if (st === "restricted" && (c.qty || 1) > 1) probleme.push({ c, st, rang: 2, tooMany: true });
+  }
+  probleme.sort((a, b) => a.rang - b.rang);
+
+  const gesamt = karten.length;
+  const geprueft = gesamt - ungeprueft;
+  if (!probleme.length && !geprueft) {   // nichts prüfbar (z. B. Netzfehler)
+    box.innerHTML = `<div class="legal-note bad">${esc(t("legal.error"))}</div>`;
+    return;
+  }
+  const kopf = probleme.length
+    ? `<div class="legal-note bad">&#9888; ${esc(t("legal.deckProblems", { m: probleme.length, n: gesamt, fmt }))}</div>`
+    : `<div class="legal-note good">&#10004; ${esc(t("legal.deckAllLegal", { n: geprueft, fmt }))}</div>`;
+  const liste = probleme.map(p => {
+    const menge = (p.c.qty || 1) > 1 ? ` <span class="legal-qty">&times;${p.c.qty}</span>` : "";
+    const pill = p.tooMany
+      ? `<span class="pill warn">${esc(t("legal.restricted"))} &middot; ${esc(t("legal.tooMany"))}</span>`
+      : legalPill(p.st);
+    return `<div class="legal-row"><span class="legal-name">${esc(p.c.disp || p.c.name)}${menge}</span>${pill}</div>`;
+  }).join("");
+  const rest = ungeprueft
+    ? `<div class="legal-note">${esc(t("legal.deckUnknown", { u: ungeprueft }))}</div>` : "";
+  box.innerHTML = kopf + (liste ? `<div class="legal-decklist">${liste}</div>` : "") + rest;
+}
+
 /* Eine Combo-Karte als reines Bild — mit ✓-Badge, falls besessen, und (nur bei
    im Deck fehlender Karte) dem „+ Deck"/„+ Wunsch"-Knopf. Volle Karte + Name
    erscheinen per Hover-Vorschau (data-cmd-img, siehe wireComboHover). Der
@@ -3206,7 +3272,9 @@ function renderDecks() {
           <div class="syn-ai-btn" style="flex:none"><button class="btn ghost" data-synaibtn="${d.id}"
             title="${esc(t("syn.aiDeckTitle"))}">&#10024; ${esc(t("syn.ai"))}</button></div>
           <div style="flex:none"><button class="btn ghost" data-combobtn="${d.id}"
-            title="${esc(t("combo.deckTitle"))}">&#128279; ${esc(t("combo.btn"))}</button></div>` : ""}
+            title="${esc(t("combo.deckTitle"))}">&#128279; ${esc(t("combo.btn"))}</button></div>
+          <div style="flex:none"><button class="btn ghost" data-legalbtn="${d.id}"
+            title="${esc(t("legal.deckTitle"))}">&#9878; ${esc(t("legal.deckBtn"))}</button></div>` : ""}
         </div>
         <div class="deck-dash" data-dash="${d.id}" style="margin-top:12px"></div>
         ${rows ? `<div class="xscroll" style="overflow-x:auto"><table class="deck-tbl" style="margin-top:10px">
@@ -3214,6 +3282,7 @@ function renderDecks() {
                : `<div class="empty">${esc(t("deck.emptyDeck"))}</div>`}
         <div class="deck-syn" data-synbox="${d.id}" style="margin-top:12px"></div>
         <div class="deck-combos" data-combobox="${d.id}" style="margin-top:12px"></div>
+        <div class="deck-legal" data-legalbox="${d.id}" style="margin-top:12px"></div>
       </div>
     </div>`;
   }).join("");
@@ -3342,6 +3411,26 @@ function renderDecks() {
     deckCombosAnzeigen(box, cards, id)
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
       .finally(() => synBtnBusy(b, lbl, false, "&#128279;"));
+  });
+
+  // Deck-Legalität: jede Deckkarte gegen das Deck-Format prüfen (gebannt /
+  // nicht legal, Vintage-restricted mehrfach). Eigener Kasten, Karten MIT Menge
+  // (die Mengen braucht die restricted-Prüfung).
+  $$("[data-legalbtn]").forEach(b => b.onclick = () => {
+    const id = b.dataset.legalbtn;
+    const d = DECKS.find(x => x.id === id);
+    if (!d) return;
+    const cards = (d.entries || []).map(e => {
+      const c = CARDS.find(x => x.id === e.cardId);
+      return c ? { ...c, qty: e.qty } : null;
+    }).filter(Boolean);
+    const box = $(`.deck-legal[data-legalbox="${id}"]`);
+    if (!cards.length || !box) return;
+    const lbl = t("legal.deckBtn");
+    synBtnBusy(b, lbl, true, "&#9878;");
+    deckLegalPruefen(box, cards, d)
+      .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
+      .finally(() => synBtnBusy(b, lbl, false, "&#9878;"));
   });
 
   // Deck-Bracket (Power-Level) über Commander Spellbook (estimate-bracket mit
