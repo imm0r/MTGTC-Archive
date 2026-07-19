@@ -4352,10 +4352,18 @@ function terminFormHtml() {
       <div id="ev-serie-opts" class="ev-serie-opts" hidden>
         <div class="row" style="gap:8px">
           <div><label>${esc(t("cal.recurFreq"))}</label>
-            <select id="ev-serie-freq"><option value="weekly">${esc(t("cal.freqWeekly"))}</option><option value="biweekly">${esc(t("cal.freqBiweekly"))}</option><option value="monthly">${esc(t("cal.freqMonthly"))}</option></select></div>
+            <select id="ev-serie-freq">
+              <option value="weekly">${esc(t("cal.freqWeekly"))}</option>
+              <option value="biweekly">${esc(t("cal.freqBiweekly"))}</option>
+              <option value="monthly-date">${esc(t("cal.freqMonthly"))}</option>
+              <option value="monthly-last">${esc(t("cal.freqMonthlyLast"))}</option>
+              <option value="monthly-weekday">${esc(t("cal.freqMonthlyWeekday"))}</option>
+              <option value="monthly-last-weekday">${esc(t("cal.freqMonthlyLastWeekday"))}</option>
+            </select></div>
           <div><label>${esc(t("cal.recurCount"))}</label>
             <input type="number" id="ev-serie-count" min="2" max="52" value="4"></div>
         </div>
+        <div id="ev-serie-preview" class="ev-serie-preview hint"></div>
       </div>` : ""}
     <div class="row" style="margin-top:12px;gap:8px">
       <div style="flex:none"><button class="btn" id="ev-save">${esc(ed ? t("common.save") : t("cal.create"))}</button></div>
@@ -4402,7 +4410,8 @@ function kalenderHtml() {
 function terminListeHtml() {
   const grenze = Date.now() - 3 * 3600 * 1000;   // 3h Kulanz für laufende Runden
   const kommend = EVENTS.filter(e => new Date(e.starts_at).getTime() >= grenze)
-    .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+    .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at))
+    .slice(0, 10);                               // höchstens die nächsten 10 Termine
   return `<div class="card termin-upcoming"><h3 style="margin-top:0">${esc(t("cal.upcoming"))}</h3>
     ${kommend.length ? kommend.map(terminRowHtml).join("") : `<div class="empty">${esc(t("cal.noneUpcoming"))}</div>`}</div>`;
 }
@@ -4452,7 +4461,8 @@ function wireTermine() {
   const neu = $("#ev-neu"); if (neu) neu.onclick = () => { eventForm.offen = true; eventForm.editId = null; renderTermine(); };
   const cancel = $("#ev-cancel"); if (cancel) cancel.onclick = () => { eventForm.offen = false; eventForm.editId = null; renderTermine(); };
   const save = $("#ev-save"); if (save) save.onclick = terminSpeichern;
-  const serie = $("#ev-serie"); if (serie) serie.onchange = () => { const o = $("#ev-serie-opts"); if (o) o.hidden = !serie.checked; };
+  const serie = $("#ev-serie"); if (serie) serie.onchange = () => { const o = $("#ev-serie-opts"); if (o) o.hidden = !serie.checked; serieVorschauUpdate(); };
+  ["ev-serie-freq", "ev-serie-count", "ev-when"].forEach(id => { const e = $("#" + id); if (e) e.addEventListener("input", serieVorschauUpdate); });
   const prev = $("#kal-prev"); if (prev) prev.onclick = () => { const m = kalAktuell(); kalMonat = new Date(m.getFullYear(), m.getMonth() - 1, 1); renderTermine(); };
   const next = $("#kal-next"); if (next) next.onclick = () => { const m = kalAktuell(); kalMonat = new Date(m.getFullYear(), m.getMonth() + 1, 1); renderTermine(); };
 
@@ -4471,17 +4481,60 @@ function wireTermine() {
   $$("#v-events [data-ev-invsave]").forEach(b => b.onclick = () => terminEinladen(b.dataset.evInvsave));
 }
 
-/* Serientermin: erzeugt die Startzeitpunkte ausgehend vom ersten Termin. */
+/* N-ter (oder letzter) Wochentag in dem Monat, der `monthsAhead` nach dem
+   Startmonat liegt — behält Uhrzeit des Starttermins. */
+function nterWochentag(baseIso, monthsAhead, weekday, ord, last) {
+  const base = new Date(baseIso);
+  const anchor = new Date(base.getFullYear(), base.getMonth() + monthsAhead, 1);
+  const y = anchor.getFullYear(), m = anchor.getMonth();
+  const dim = new Date(y, m + 1, 0).getDate();
+  let day;
+  if (last || ord >= 5) {                        // letzter Wochentag des Monats
+    const lastWd = new Date(y, m, dim).getDay();
+    day = dim - ((lastWd - weekday + 7) % 7);
+  } else {                                       // 1.–4. Wochentag (existiert immer)
+    const firstWd = new Date(y, m, 1).getDay();
+    day = 1 + ((weekday - firstWd + 7) % 7) + (ord - 1) * 7;
+  }
+  const d = new Date(base); d.setFullYear(y, m, day);
+  return d;
+}
+
+/* Serientermin: erzeugt die Startzeitpunkte ausgehend vom ersten Termin.
+   freq: weekly | biweekly | monthly-date | monthly-last | monthly-weekday |
+   monthly-last-weekday (Alt-Wert "monthly" == monthly-date). */
 function serienDaten(baseIso, freq, countRaw) {
   const count = Math.max(2, Math.min(52, parseInt(countRaw, 10) || 2));
   const base = new Date(baseIso), out = [];
+  const wd = base.getDay(), ord = Math.ceil(base.getDate() / 7);
   for (let i = 0; i < count; i++) {
-    const d = new Date(base);
-    if (freq === "monthly") d.setMonth(base.getMonth() + i);
-    else d.setDate(base.getDate() + (freq === "biweekly" ? 14 : 7) * i);
+    let d = new Date(base);
+    switch (freq) {
+      case "biweekly": d.setDate(base.getDate() + 14 * i); break;
+      case "monthly-date": case "monthly": {     // gleicher Tag, kurze Monate auf letzten Tag gekappt
+        const dim = new Date(base.getFullYear(), base.getMonth() + i + 1, 0).getDate();
+        d.setFullYear(base.getFullYear(), base.getMonth() + i, Math.min(base.getDate(), dim)); break;
+      }
+      case "monthly-last":                        // letzter Tag des Monats
+        d.setFullYear(base.getFullYear(), base.getMonth() + i + 1, 0); break;
+      case "monthly-weekday": d = nterWochentag(baseIso, i, wd, ord, false); break;
+      case "monthly-last-weekday": d = nterWochentag(baseIso, i, wd, ord, true); break;
+      default: d.setDate(base.getDate() + 7 * i); // weekly, inkl. „jeden <Wochentag>"
+    }
     out.push(d.toISOString());
   }
   return out;
+}
+
+/* Kleine Live-Vorschau der ersten Termine unter den Serien-Optionen. */
+function serieVorschauUpdate() {
+  const el = $("#ev-serie-preview"); if (!el) return;
+  const when = $("#ev-when")?.value;
+  if (!$("#ev-serie")?.checked || !when) { el.textContent = ""; return; }
+  const daten = serienDaten(new Date(when).toISOString(), $("#ev-serie-freq")?.value, $("#ev-serie-count")?.value);
+  const fmt = s => new Date(s).toLocaleDateString(LANG, { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
+  const liste = daten.slice(0, 4).map(fmt).join(" · ") + (daten.length > 4 ? " · +" + (daten.length - 4) : "");
+  el.textContent = t("cal.seriePreview", { list: liste });
 }
 
 async function terminSpeichern() {
