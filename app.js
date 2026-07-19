@@ -4410,7 +4410,8 @@ function kalenderHtml() {
 function terminListeHtml() {
   const grenze = Date.now() - 3 * 3600 * 1000;   // 3h Kulanz für laufende Runden
   const kommend = EVENTS.filter(e => new Date(e.starts_at).getTime() >= grenze)
-    .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+    .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at))
+    .slice(0, 10);                               // höchstens die nächsten 10 Termine
   return `<div class="card termin-upcoming"><h3 style="margin-top:0">${esc(t("cal.upcoming"))}</h3>
     ${kommend.length ? kommend.map(terminRowHtml).join("") : `<div class="empty">${esc(t("cal.noneUpcoming"))}</div>`}</div>`;
 }
