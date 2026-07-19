@@ -2503,23 +2503,55 @@ async function comboKartenLaden(namen) {
   return byLower;
 }
 
-/* Eine Combo als voller Block — im Stil der Synergie-Ansicht:
-   - die Ergebnisse (was die Combo bewirkt) als Liste, Punkt für Punkt,
-   - die beteiligten Karten als kompakte Synergie-Kacheln (Bild/Name/Typ/Preis);
-     fehlt eine im Deck, trägt sie den „+ Deck"/„+ Wunsch"-Knopf (synKachel
-     entscheidet über den Besitz — Abgleich per oracle_id, also Sprache/Foil egal),
-   - die Details (Voraussetzungen + Ablauf mit Mana-Symbolen + CSB-Link)
-     aufklappbar statt als bloßer Link.
+/* Zonen-Kürzel von Commander Spellbook → Klartext (für „Initial Card State").
+   Die Zustandsnotizen selbst (u.state) kommen englisch von CSB. */
+const ZONE_NAMES = { B: "Battlefield", H: "Hand", G: "Graveyard", E: "Exile", L: "Library", C: "Command Zone", S: "Stack" };
+
+/* Eine Combo-Karte als reines Bild — mit ✓-Badge, falls besessen, und (nur bei
+   im Deck fehlender Karte) dem „+ Deck"/„+ Wunsch"-Knopf. Volle Karte + Name
+   erscheinen per Hover-Vorschau (data-cmd-img, siehe wireComboHover). Der
+   Add-Weg ist derselbe wie bei den Synergien (SYN_CACHE + .syn-add). */
+function comboCardMini(card, deckId, alsAktion) {
+  const klein = card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small || "";
+  const gross = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || klein;
+  const besessen = besessenAnzahl(card);
+  const badge = besessen > 0
+    ? `<span class="syn-owned" title="${esc(t("syn.ownedTitle", { n: besessen }))}">&#10003;</span>` : "";
+  let addBtn = "";
+  if (alsAktion && card.id) {
+    SYN_CACHE.set(card.id, card);
+    const owned = besessen > 0;
+    addBtn = `<button class="syn-add${owned ? " owned" : ""}" data-deck="${esc(deckId)}" data-sid="${esc(card.id)}"
+      title="${esc(owned ? t("syn.addOwnedTitle") : t("syn.addWishTitle"))}">&#43;&#160;${esc(t(owned ? "syn.addDeck" : "syn.addWish"))}</button>`;
+  }
+  return `<div class="combo-mini">
+    <div class="combo-mini-card" data-cmd-img="${esc(gross)}" data-cmd-name="${esc(card.name)}">
+      ${klein ? `<img src="${esc(klein)}" alt="${esc(card.name)}" loading="lazy">` : `<div class="syn-noimg">&#9670;</div>`}${badge}
+    </div>${addBtn}
+  </div>`;
+}
+
+/* Die Hover-Vorschau (große Karte + Name) an die Combo-Kartenbilder hängen —
+   dieselbe wie bei den Commander-Karten. Nur auf Hover-fähigen Geräten. */
+function wireComboHover(box) {
+  if (!HOVER_OK || !box) return;
+  box.querySelectorAll(".combo-mini-card[data-cmd-img]").forEach(el => {
+    el.addEventListener("mousemove", e => zeigeCmdHover(el.dataset.cmdImg, el.dataset.cmdName, e.clientX, e.clientY));
+    el.addEventListener("mouseleave", versteckeCmdHover);
+  });
+}
+
+/* Eine Combo als kompakter Block: Ergebnisse als Liste, die beteiligten Karten
+   als reine Kartenbilder (✓ / „+ Deck" / „+ Wunsch"; volle Karte + Name per
+   Hover), Details aufklappbar mit Ausgangszustand, Voraussetzungen und Ablauf.
    cardByName: Map name→Scryfall-Karte (aus comboKartenLaden). */
 function comboKachel(combo, deckId, cardByName) {
   const fehlt = new Set((combo.missing || []).map(m => (m.name || "").toLowerCase()));
   const karten = (combo.uses || []).map(u => {
     const sc = cardByName && cardByName.get((u.name || "").toLowerCase());
-    if (!sc) return `<div class="syn-card"><div class="syn-name">${esc(u.name)}</div></div>`;
-    // Knopf nur bei im Deck fehlender Karte; synKachel macht daraus je nach
-    // Besitz „+ Deck" (verknüpft die eigene Karte) oder „+ Wunsch".
+    if (!sc) return `<div class="combo-mini"><div class="combo-mini-card"><div class="syn-noimg">&#9670;</div></div><div class="combo-mini-nm">${esc(u.name)}</div></div>`;
     const alsAktion = deckId && fehlt.has((u.name || "").toLowerCase());
-    return synKachel(sc, "", alsAktion ? deckId : null);
+    return comboCardMini(sc, deckId, alsAktion);
   }).join("");
 
   const produces = combo.produces || [];
@@ -2527,21 +2559,26 @@ function comboKachel(combo, deckId, cardByName) {
     ? `<ul class="combo-results">${produces.map(p => `<li>${esc(p)}</li>`).join("")}</ul>`
     : `<div class="combo-results-1">${esc(t("combo.result"))}</div>`;
 
-  const url = `https://commanderspellbook.com/combo/${encodeURIComponent(combo.id)}/`;
+  // Ausgangszustand je Karte: Zone(n) + evtl. Zustandsnotiz (beides von CSB).
+  const zustand = (combo.uses || []).map(u => {
+    const zonen = (u.zones || []).map(z => ZONE_NAMES[z] || z).join(" / ");
+    const st = u.state ? ` (${u.state})` : "";
+    return (zonen || st) ? `<li><b>${esc(u.name)}:</b> ${esc(zonen)}${esc(st)}</li>` : "";
+  }).filter(Boolean).join("");
   const prereq = (combo.prerequisites || "").trim();
   const schritte = (combo.description || "").split("\n").map(s => s.trim()).filter(Boolean);
   const details = [
+    zustand ? `<div><b>${esc(t("combo.cardState"))}:</b><ul class="combo-steps">${zustand}</ul></div>` : "",
     prereq ? `<div><b>${esc(t("combo.prereq"))}:</b> ${mitSymbolen(prereq)}</div>` : "",
     schritte.length ? `<div><b>${esc(t("combo.steps"))}:</b><ol class="combo-steps">${
       schritte.map(s => `<li>${mitSymbolen(s)}</li>`).join("")}</ol></div>` : "",
-    `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(t("combo.onCsb"))} &#8599;</a>`,
   ].filter(Boolean).join("");
 
   return `<div class="combo">
     ${ergebnis}
-    <div class="combo-syn-grid">${karten}</div>
-    <details class="combo-det"><summary>${esc(t("combo.details"))}</summary>
-      <div class="combo-det-body">${details}</div></details>
+    <div class="combo-mini-grid">${karten}</div>
+    ${details ? `<details class="combo-det"><summary>${esc(t("combo.details"))}</summary>
+      <div class="combo-det-body">${details}</div></details>` : ""}
   </div>`;
 }
 
@@ -2569,12 +2606,13 @@ async function deckCombosAnzeigen(box, cards, deckId) {
   const cardByName = await comboKartenLaden([...included, ...almost].flatMap(c => (c.uses || []).map(u => u.name)));
   if (lauf !== combosLauf) return;
 
-  const teile = [`<div class="meta">${esc(t("combo.deckNote"))} <a href="https://commanderspellbook.com/" target="_blank" rel="noopener noreferrer">Commander Spellbook</a></div>`];
+  const teile = [`<div class="meta">${esc(t("combo.deckNote"))}</div>`];
   if (included.length)
     teile.push(`<div class="combo-h">${esc(t("combo.have", { n: included.length }))}</div><div class="combo-grid">${included.map(c => comboKachel(c, deckId, cardByName)).join("")}</div>`);
   if (almost.length)
     teile.push(`<div class="combo-h">${esc(t("combo.almost", { n: almost.length }))}</div><div class="combo-grid">${almost.map(c => comboKachel(c, deckId, cardByName)).join("")}</div>`);
   box.innerHTML = teile.join("");
+  wireComboHover(box);
 }
 
 /* Combos in der GESAMTEN Sammlung: alle besessenen Karten (nach Name
@@ -2597,8 +2635,9 @@ async function sammlungCombosAnzeigen(box, cards) {
   if (!included.length) { box.innerHTML = `<div class="empty">${esc(t("combo.collNone"))}</div>`; return; }
   const cardByName = await comboKartenLaden(included.flatMap(c => (c.uses || []).map(u => u.name)));
   if (lauf !== combosLauf) return;
-  box.innerHTML = `<div class="meta">${esc(t("combo.collHave", { n: included.length }))} <a href="https://commanderspellbook.com/" target="_blank" rel="noopener noreferrer">Commander Spellbook</a></div>
+  box.innerHTML = `<div class="meta">${esc(t("combo.collHave", { n: included.length }))}</div>
     <div class="combo-grid" style="margin-top:6px">${included.map(c => comboKachel(c, null, cardByName)).join("")}</div>`;
+  wireComboHover(box);
 }
 
 /* Combos, in denen eine einzelne Karte vorkommt (Modus variants). Kein
@@ -2622,7 +2661,8 @@ async function karteCombosAnzeigen(box, card) {
   if (!combos.length) { box.innerHTML = `<div class="empty">${esc(t("combo.cardNone"))}</div>`; return; }
   const cardByName = await comboKartenLaden(combos.flatMap(c => (c.uses || []).map(u => u.name)));
   if (lauf !== combosLauf) return;
-  box.innerHTML = `<div class="meta">${esc(t("combo.cardNote", { n: combos.length }))} <a href="https://commanderspellbook.com/" target="_blank" rel="noopener noreferrer">Commander Spellbook</a></div><div class="combo-grid">${combos.map(c => comboKachel(c, null, cardByName)).join("")}</div>`;
+  box.innerHTML = `<div class="meta">${esc(t("combo.cardNote", { n: combos.length }))}</div><div class="combo-grid">${combos.map(c => comboKachel(c, null, cardByName)).join("")}</div>`;
+  wireComboHover(box);
 }
 
 /* Analyse in einen Container zeichnen: Balken je Kategorie, darunter Vorschläge

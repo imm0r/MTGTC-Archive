@@ -190,24 +190,24 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .syn-add.done{background:var(--ok);color:#08210a}
 /* Besessene Vorschlagskarte: „+ Deck" dezenter (Ghost) als das goldene „+ Wunsch". */
 .syn-add.owned{background:var(--panel);color:var(--txt);border:1px solid var(--line)}
-/* Combos (Commander Spellbook): je Combo ein voller Block im Stil der
-   Synergie-Ansicht — Ergebnisse als Liste, beteiligte Karten als kompakte
-   Synergie-Kacheln (.syn-card, kleiner skaliert), Details aufklappbar. */
+/* Combos (Commander Spellbook): Raster aus kompakten Combo-Blöcken (mehrere
+   nebeneinander). Je Block: Ergebnisse als Liste, beteiligte Karten als reine
+   Kartenbilder (Hover = große Karte), Details aufklappbar. */
 .combo-h{font-size:13px;font-weight:700;color:var(--dim);letter-spacing:.3px;margin:14px 0 6px}
-.combo-grid{display:flex;flex-direction:column;gap:12px;margin-top:4px}
+.combo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:4px;align-items:start}
 .combo{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--line);
   border-radius:10px;background:var(--panel2)}
 .combo-results{margin:0;padding-left:20px;font-size:13px;font-weight:600;color:var(--acc2);line-height:1.4}
 .combo-results li{margin:1px 0}
 .combo-results-1{font-size:13px;font-weight:600;color:var(--acc2)}
-.combo-syn-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
-.combo-syn-grid .syn-card{padding:6px;gap:4px}
-.combo-syn-grid .syn-exp{display:none}
-.combo-syn-grid .syn-name{font-size:12px}
-.combo-syn-grid .syn-type{font-size:10px}
-.combo-syn-grid .syn-price{font-size:11px}
-.combo-syn-grid .syn-add{font-size:10px;padding:2px 8px}
-.combo-syn-grid .syn-owned{font-size:10px;padding:2px 5px;top:4px;right:4px}
+.combo-mini-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:6px}
+.combo-mini{display:flex;flex-direction:column;gap:4px;align-items:center}
+.combo-mini-card{position:relative;width:100%;cursor:zoom-in}
+.combo-mini-card img{width:100%;border-radius:5px;display:block}
+.combo-mini-card .syn-noimg{aspect-ratio:5/7;font-size:18px}
+.combo-mini .syn-owned{top:3px;right:3px;font-size:9px;padding:1px 4px}
+.combo-mini .syn-add{font-size:10px;padding:2px 7px}
+.combo-mini-nm{font-size:10px;color:var(--dim);text-align:center;line-height:1.15}
 .combo-det>summary{cursor:pointer;font-size:12px;color:var(--dim);width:fit-content}
 .combo-det>summary:hover{color:var(--acc)}
 .combo-det[open]>summary{color:var(--txt);margin-bottom:4px}

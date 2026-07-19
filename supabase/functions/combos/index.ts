@@ -47,6 +47,11 @@ function trimCombo(v: Any) {
     uses: (v.uses ?? []).map((u: Any) => ({
       name: u.card?.name ?? "",
       oracleId: u.card?.oracleId ?? null,
+      // Ausgangszustand der Karte in der Combo: Zone(n) + evtl. Zustandsnotiz.
+      zones: u.zoneLocations ?? [],
+      state: [u.battlefieldCardState, u.exileCardState, u.graveyardCardState,
+              u.libraryCardState, u.handCardState, u.commandZoneCardState]
+        .filter(Boolean).join("; "),
     })),
     produces: (v.produces ?? []).map((p: Any) => p.feature?.name).filter(Boolean),
     identity: v.identity ?? "",
