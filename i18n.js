@@ -1833,6 +1833,55 @@ Object.assign(I18N.it, {
   "combo.collNone": "Nessuna combo completa nella tua collezione per ora.",
 });
 
+/* ---- Teil 12: Combo-Karten besessen vs. fehlend ---- */
+Object.assign(I18N.de, {
+  "combo.haveTitle": "In deiner Sammlung — nur noch nicht in diesem Deck",
+  "combo.missTitle": "Nicht in deiner Sammlung",
+});
+Object.assign(I18N.en, {
+  "combo.haveTitle": "In your collection — just not in this deck yet",
+  "combo.missTitle": "Not in your collection",
+});
+Object.assign(I18N.fr, {
+  "combo.haveTitle": "Dans ta collection — juste pas encore dans ce deck",
+  "combo.missTitle": "Pas dans ta collection",
+});
+Object.assign(I18N.es, {
+  "combo.haveTitle": "En tu colección — solo que aún no en este mazo",
+  "combo.missTitle": "No está en tu colección",
+});
+Object.assign(I18N.it, {
+  "combo.haveTitle": "Nella tua collezione — solo non ancora in questo mazzo",
+  "combo.missTitle": "Non è nella tua collezione",
+});
+
+/* ---- Teil 13: Combo-Details (aufklappbar) ---- */
+Object.assign(I18N.de, {
+  "combo.prereq": "Voraussetzungen",
+  "combo.steps": "Ablauf",
+  "combo.onCsb": "Auf Commander Spellbook ansehen",
+});
+Object.assign(I18N.en, {
+  "combo.prereq": "Prerequisites",
+  "combo.steps": "Steps",
+  "combo.onCsb": "View on Commander Spellbook",
+});
+Object.assign(I18N.fr, {
+  "combo.prereq": "Prérequis",
+  "combo.steps": "Étapes",
+  "combo.onCsb": "Voir sur Commander Spellbook",
+});
+Object.assign(I18N.es, {
+  "combo.prereq": "Requisitos",
+  "combo.steps": "Pasos",
+  "combo.onCsb": "Ver en Commander Spellbook",
+});
+Object.assign(I18N.it, {
+  "combo.prereq": "Prerequisiti",
+  "combo.steps": "Passaggi",
+  "combo.onCsb": "Vedi su Commander Spellbook",
+});
+
 /* ---- Teil 7: Spielrunde (live) ---- */
 Object.assign(I18N.de, {
   "nav.session": "Spielrunde",
