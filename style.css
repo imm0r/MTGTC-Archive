@@ -449,6 +449,20 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
 .deck-cat-arrow{display:inline-block;width:12px;color:var(--dim);font-size:10px;margin-right:6px}
 .deck-cat-count{color:var(--dim);font-weight:400;margin-left:8px}
 .deck-cat-body.zu tr:not(.deck-cat-head){display:none}
+/* Aufgeräumter Deck-Kopf: Verwaltung (Bearbeiten/Teilen/Löschen) rechts im Kopf,
+   darunter die gruppierte Werkzeugleiste (Karte hinzufügen / Übersicht /
+   Vorschläge) mit durchgehend beschrifteten Feldern. */
+.deck-manage{display:flex;gap:6px;flex:none;align-items:center;flex-wrap:wrap}
+.deck-tools{margin-top:12px;display:flex;flex-direction:column;gap:14px;
+  border:1px solid var(--line);border-radius:10px;background:var(--panel2);padding:12px 14px}
+.tool-label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:7px}
+.tool-row{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+.tool-cols{display:flex;flex-wrap:wrap;gap:22px}
+.tool-cols>.tool-group{flex:1;min-width:290px}
+.field{display:flex;flex-direction:column;gap:3px}
+.field>label{font-size:11px;color:var(--dim);text-transform:none;letter-spacing:0;margin:0}
+.field>input{margin:0;width:100%}
+.tool-sep{height:1px;background:var(--line)}
 
 /* ------------------------------------------------------------ Sammlung */
 table{width:100%;border-collapse:collapse}

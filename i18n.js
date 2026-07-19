@@ -2139,6 +2139,43 @@ Object.assign(I18N.it, {
   "type.planeswalker": "Planeswalker", "type.battle": "Battaglie", "type.other": "Altro",
 });
 
+/* ---- Teil 20: Aufgeräumter Deck-Kopf (Werkzeug-Gruppen + Hinzufügen-Knopf) ---- */
+Object.assign(I18N.de, {
+  "deck.addCard": "Karte hinzufügen", "deck.addBtn": "Hinzufügen",
+  "deck.addPick": "Bitte zuerst eine Karte aus der Liste wählen.",
+  "deck.groupOverview": "Übersicht & Prüfung", "deck.groupSuggest": "Kartenvorschläge",
+  "deck.maxPerCard": "max €/Karte", "deck.budget": "Budget €", "deck.editBtn": "Bearbeiten",
+  "deck.priceHint": "Preisrahmen für Synergie-/KI-Vorschläge",
+});
+Object.assign(I18N.en, {
+  "deck.addCard": "Add card", "deck.addBtn": "Add",
+  "deck.addPick": "Please pick a card from the list first.",
+  "deck.groupOverview": "Overview & checks", "deck.groupSuggest": "Card suggestions",
+  "deck.maxPerCard": "max €/card", "deck.budget": "Budget €", "deck.editBtn": "Edit",
+  "deck.priceHint": "Price cap for synergy/AI suggestions",
+});
+Object.assign(I18N.fr, {
+  "deck.addCard": "Ajouter une carte", "deck.addBtn": "Ajouter",
+  "deck.addPick": "Choisis d'abord une carte dans la liste.",
+  "deck.groupOverview": "Aperçu & vérifications", "deck.groupSuggest": "Suggestions de cartes",
+  "deck.maxPerCard": "max €/carte", "deck.budget": "Budget €", "deck.editBtn": "Modifier",
+  "deck.priceHint": "Plafond de prix pour les suggestions synergie/IA",
+});
+Object.assign(I18N.es, {
+  "deck.addCard": "Añadir carta", "deck.addBtn": "Añadir",
+  "deck.addPick": "Elige primero una carta de la lista.",
+  "deck.groupOverview": "Resumen y comprobación", "deck.groupSuggest": "Sugerencias de cartas",
+  "deck.maxPerCard": "máx €/carta", "deck.budget": "Presupuesto €", "deck.editBtn": "Editar",
+  "deck.priceHint": "Límite de precio para sugerencias sinergia/IA",
+});
+Object.assign(I18N.it, {
+  "deck.addCard": "Aggiungi carta", "deck.addBtn": "Aggiungi",
+  "deck.addPick": "Scegli prima una carta dall'elenco.",
+  "deck.groupOverview": "Panoramica e verifica", "deck.groupSuggest": "Suggerimenti carte",
+  "deck.maxPerCard": "max €/carta", "deck.budget": "Budget €", "deck.editBtn": "Modifica",
+  "deck.priceHint": "Limite di prezzo per suggerimenti sinergia/IA",
+});
+
 /* ---- Teil 7: Spielrunde (live) ---- */
 Object.assign(I18N.de, {
   "nav.session": "Spielrunde",
