@@ -440,6 +440,15 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
 /* Klassifizierung im Deck-Kopf: Format (hervorgehoben) und Archetyp als
    Pillen unter dem Namen. */
 .deck-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+/* Aufklappbare Typ-Kategorien in der Deck-Tabelle — je Kategorie ein <tbody> mit
+   anklickbarer Kopfzeile; .zu blendet die Kartenzeilen aus. */
+.deck-cat-head{cursor:pointer;user-select:none}
+.deck-cat-head>td{background:var(--panel2);border-top:1px solid var(--line);
+  padding:6px 10px;font-size:12.5px;font-weight:600;color:var(--acc2)}
+.deck-cat-head:hover>td{color:var(--acc)}
+.deck-cat-arrow{display:inline-block;width:12px;color:var(--dim);font-size:10px;margin-right:6px}
+.deck-cat-count{color:var(--dim);font-weight:400;margin-left:8px}
+.deck-cat-body.zu tr:not(.deck-cat-head){display:none}
 
 /* ------------------------------------------------------------ Sammlung */
 table{width:100%;border-collapse:collapse}

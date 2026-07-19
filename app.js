@@ -939,7 +939,7 @@ function sortUm(zustand, key) {
 
 function filtered() {
   const q = $("#q").value.trim().toLowerCase();
-  const fs = $("#f-set").value, ff = $("#f-foil").value;
+  const fs = $("#f-set").value, ff = $("#f-foil").value, ft = $("#f-type").value;
   return CARDS.filter(c =>
     // qty 0 = „im Deck, aber nicht besessen" (aus einem Deck-Import). Gehört
     // NICHT in die Sammlung — nur ins Deck, wo es als „fehlen" erscheint.
@@ -947,7 +947,8 @@ function filtered() {
     (!q || c.name.toLowerCase().includes(q) || c.disp.toLowerCase().includes(q) ||
            (c.set_name || "").toLowerCase().includes(q)) &&
     (!fs || c.set === fs) &&
-    (ff === "" || String(c.foil ? 1 : 0) === ff)
+    (ff === "" || String(c.foil ? 1 : 0) === ff) &&
+    (!ft || typMatch(c.type_line, ft))
   ).sort((a, b) => cmpWert(sortWert(sortKey, a), sortWert(sortKey, b), sortDir));
 }
 
@@ -1151,6 +1152,18 @@ const TYPEN = [
 ];
 
 const istLand = c => /(^|\/\/\s*)[^/]*\bland\b/i.test(c.type_line || "");
+
+/* Sprachunabhängiger Typ-Test (type_line ist englisch): steht der Typ irgendwo in
+   der — evtl. zweiseitigen — Typzeile? Gleiches Muster wie istLand und das Typen-
+   Diagramm. typLabel liefert das lokalisierte Etikett zum englischen Schlüssel. */
+const typMatch = (tl, en) => new RegExp(`(^|//\\s*)[^/]*\\b${en}\\b`, "i").test(tl || "");
+const typLabel = en => t("type." + en.toLowerCase());
+
+/* Reihenfolge der aufklappbaren Deck-Kategorien = zugleich Zuordnungspriorität
+   (erste passende gewinnt → „Artifact Creature" zählt zu den Kreaturen). Ohne
+   Treffer „Sonstige" (deckKatKey liefert dann ""). */
+const DECK_KAT_ORDNUNG = ["Creature", "Planeswalker", "Battle", "Instant", "Sorcery", "Artifact", "Enchantment", "Land"];
+const deckKatKey = c => DECK_KAT_ORDNUNG.find(en => typMatch(c.type_line || "", en)) || "";
 
 function balkenHtml(daten, hinweis) {
   if (!daten.length) return '<div class="empty" style="padding:14px">Nichts auszuwerten.</div>';
@@ -1364,6 +1377,10 @@ function renderCollection() {
   const cur = $("#f-set").value;
   $("#f-set").innerHTML = `<option value="">${esc(t("coll.all"))}</option>` +
     sets.map(s => `<option value="${esc(s)}"${s === cur ? " selected" : ""}>${esc(s)}</option>`).join("");
+  // Typ-Filter: feste Liste mit lokalisierten Etiketten, Auswahl bleibt erhalten.
+  const curTyp = $("#f-type").value;
+  $("#f-type").innerHTML = `<option value="">${esc(t("coll.all"))}</option>` +
+    TYPEN.map(([en]) => `<option value="${esc(en)}"${en === curTyp ? " selected" : ""}>${esc(typLabel(en))}</option>`).join("");
 
   $("#coll-empty").textContent = besessen.length
     ? t("coll.emptyFilter")
@@ -3112,6 +3129,11 @@ const deckOffen = {
    aufgeklappte Deck. Ein neuer Seitenaufruf startet ohne offene Dashboards. */
 const deckDashOffen = new Set();
 
+/* Zugeklappte Deck-Typ-Kategorien (Schlüssel „deckId|Typ"). Nur im Speicher,
+   Standard alles aufgeklappt — wie die Statistik ein kurzer Blick, kein
+   Dauerzustand. Ein neuer Seitenaufruf startet mit allen Kategorien offen. */
+const deckCatZu = new Set();
+
 /* Filter der Deck-Ansicht nach Klassifizierung. Nur im Speicher wie die
    Statistik — ein neuer Seitenaufruf zeigt wieder alle Decks. "" heißt "egal". */
 let deckFilter = { format: "", archetype: "" };
@@ -3282,8 +3304,29 @@ function renderDecks() {
       .filter(x => x.c)
       .sort((a, b) => cmpWert(sortWert(ds.key, a.c, a.e),
                               sortWert(ds.key, b.c, b.e), ds.dir));
-    const rows = eintraege.map(({ e, c }) => cardRow(c, {
-      deckId: d.id, qty: e.qty, istHaupt: d.main_card_id === c.id })).join("");
+    // Deck-Karten in aufklappbare Typ-Kategorien (feste Reihenfolge; die Tabellen-
+    // Sortierung bleibt je Kategorie erhalten). Jede Kategorie ist ein eigener
+    // <tbody> mit anklickbarer Kopfzeile. `rows` = Kartenzahl, steuert nur die
+    // Sichtbarkeit von Knöpfen/Tabelle (0 = leeres Deck).
+    const rows = eintraege.length;
+    const katGruppen = new Map();
+    for (const x of eintraege) {
+      const en = deckKatKey(x.c);
+      if (!katGruppen.has(en)) katGruppen.set(en, []);
+      katGruppen.get(en).push(x);
+    }
+    const deckKoerper = [...DECK_KAT_ORDNUNG, ""].filter(en => katGruppen.has(en)).map(en => {
+      const items = katGruppen.get(en);
+      const anz = items.reduce((s, x) => s + x.e.qty, 0);
+      const zu = deckCatZu.has(`${d.id}|${en}`);
+      const catRows = items.map(({ e, c }) => cardRow(c, {
+        deckId: d.id, qty: e.qty, istHaupt: d.main_card_id === c.id })).join("");
+      return `<tbody class="deck-cat-body${zu ? " zu" : ""}">`
+        + `<tr class="deck-cat-head" data-cattoggle="${d.id}|${en}"><td colspan="99">`
+        + `<span class="deck-cat-arrow">${zu ? "&#9654;" : "&#9660;"}</span>`
+        + `<span class="deck-cat-name">${esc(en ? typLabel(en) : t("type.other"))}</span>`
+        + `<span class="deck-cat-count">${anz}</span></td></tr>${catRows}</tbody>`;
+    }).join("");
 
     const n = eintraege.reduce((s, x) => s + x.e.qty, 0);
     const v = eintraege.reduce((s, x) => s + (x.c.price || 0) * x.e.qty, 0);
@@ -3341,7 +3384,7 @@ function renderDecks() {
         </div>
         <div class="deck-dash" data-dash="${d.id}" style="margin-top:12px"></div>
         ${rows ? `<div class="xscroll" style="overflow-x:auto"><table class="deck-tbl" style="margin-top:10px">
-                    <thead>${cardHead(true)}</thead><tbody>${rows}</tbody></table></div>`
+                    <thead>${cardHead(true)}</thead>${deckKoerper}</table></div>`
                : `<div class="empty">${esc(t("deck.emptyDeck"))}</div>`}
         <div class="deck-syn" data-synbox="${d.id}" style="margin-top:12px"></div>
         <div class="deck-combos" data-combobox="${d.id}" style="margin-top:12px"></div>
@@ -3381,6 +3424,15 @@ function renderDecks() {
   });
 
   $$("#deck-list .deck-tbl").forEach(t => wireCardRows(t));
+
+  // Typ-Kategorien im Deck auf-/zuklappen: nur die Kartenzeilen dieses <tbody>
+  // ausblenden, Zustand in deckCatZu merken (übersteht das nächste renderDecks).
+  $$("#deck-list .deck-cat-head").forEach(h => h.onclick = () => {
+    const tb = h.closest(".deck-cat-body");
+    const zu = tb.classList.toggle("zu");
+    zu ? deckCatZu.add(h.dataset.cattoggle) : deckCatZu.delete(h.dataset.cattoggle);
+    h.querySelector(".deck-cat-arrow").innerHTML = zu ? "&#9654;" : "&#9660;";
+  });
 
   // Offene Deck-Statistiken füllen. Erst jetzt, weil renderDash in ein
   // reales, sichtbares Element schreibt — der data-ans-ende-Trick braucht
@@ -5935,6 +5987,7 @@ function wireApp() {
   $("#q").oninput = () => { collPage = 0; renderCollection(); };
   $("#f-set").onchange = () => { collPage = 0; renderCollection(); };
   $("#f-foil").onchange = () => { collPage = 0; renderCollection(); };
+  $("#f-type").onchange = () => { collPage = 0; renderCollection(); };
   $("#upd").onclick = updatePrices;
 
   // „Deine Combos": komplette Combos quer über den ganzen Bestand. Karten nach
