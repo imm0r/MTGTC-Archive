@@ -559,7 +559,7 @@ dialog{background:var(--panel);color:var(--txt);border:1px solid var(--line);bor
 dialog::backdrop{background:#000a}
 
 /* -------------------------------------------------- Karten-Detailansicht */
-#detail-dlg{max-width:640px;width:94vw}
+#detail-dlg{max-width:920px;width:94vw}
 .detail{display:flex;gap:16px;flex-wrap:wrap}
 .detail-img{width:230px;max-width:100%;border-radius:10px;background:#000;flex:none;align-self:flex-start}
 .detail-info{flex:1;min-width:220px}

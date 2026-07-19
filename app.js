@@ -1961,7 +1961,12 @@ function showHover(id, x, y) {
    nicht #hovercard — das ist 430px breit für die Sammlungs-Detailkarte). */
 let cmdHoverEl = null;
 function zeigeCmdHover(img, name, x, y) {
-  if (!cmdHoverEl) { cmdHoverEl = document.createElement("div"); cmdHoverEl.className = "cmd-hover"; document.body.appendChild(cmdHoverEl); }
+  if (!cmdHoverEl) { cmdHoverEl = document.createElement("div"); cmdHoverEl.className = "cmd-hover"; }
+  // Ist ein modaler Dialog offen (Kartendetail via showModal → Top-Layer), muss
+  // die Vorschau DARIN hängen — sonst rendert sie hinter dem Dialog, den kein
+  // z-index überbietet. Sonst am body (z. B. Combos in der Deck-Ansicht).
+  const ziel = document.querySelector("dialog[open]") || document.body;
+  if (cmdHoverEl.parentElement !== ziel) ziel.appendChild(cmdHoverEl);
   const el = cmdHoverEl;
   el.innerHTML = `<img src="${esc(img)}" alt=""><div class="cmd-hover-nm">${esc(name)}</div>`;
   el.style.left = "0px"; el.style.top = "0px"; el.style.display = "block";
