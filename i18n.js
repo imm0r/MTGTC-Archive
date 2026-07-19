@@ -1677,6 +1677,73 @@ Object.assign(I18N.it, {
   "syn.aiError": "La ricerca IA non è disponibile al momento.",
 });
 
+/* ---- Teil 9: Combos (Commander Spellbook) ---- */
+Object.assign(I18N.de, {
+  "combo.btn": "Combos",
+  "combo.deckTitle": "Combos in diesem Deck finden (Commander Spellbook)",
+  "combo.loading": "Combos werden gesucht…",
+  "combo.error": "Combos konnten gerade nicht geladen werden.",
+  "combo.none": "Keine Combos in diesem Deck gefunden.",
+  "combo.deckNote": "Combos aus deiner Deckliste — Daten von",
+  "combo.have": "Komplett ({n})",
+  "combo.almost": "Fast komplett ({n})",
+  "combo.result": "Combo",
+  "combo.details": "Details",
+  "combo.addWishTitle": "„{name}“ als Wunschkarte ins Deck",
+});
+Object.assign(I18N.en, {
+  "combo.btn": "Combos",
+  "combo.deckTitle": "Find combos in this deck (Commander Spellbook)",
+  "combo.loading": "Searching for combos…",
+  "combo.error": "Couldn’t load combos right now.",
+  "combo.none": "No combos found in this deck.",
+  "combo.deckNote": "Combos from your deck list — data from",
+  "combo.have": "Complete ({n})",
+  "combo.almost": "Almost complete ({n})",
+  "combo.result": "Combo",
+  "combo.details": "Details",
+  "combo.addWishTitle": "Add “{name}” to the deck as a wish card",
+});
+Object.assign(I18N.fr, {
+  "combo.btn": "Combos",
+  "combo.deckTitle": "Trouver les combos de ce deck (Commander Spellbook)",
+  "combo.loading": "Recherche de combos…",
+  "combo.error": "Impossible de charger les combos pour le moment.",
+  "combo.none": "Aucun combo trouvé dans ce deck.",
+  "combo.deckNote": "Combos de ta liste de deck — données de",
+  "combo.have": "Complet ({n})",
+  "combo.almost": "Presque complet ({n})",
+  "combo.result": "Combo",
+  "combo.details": "Détails",
+  "combo.addWishTitle": "Ajouter « {name} » au deck comme carte souhaitée",
+});
+Object.assign(I18N.es, {
+  "combo.btn": "Combos",
+  "combo.deckTitle": "Buscar combos en este mazo (Commander Spellbook)",
+  "combo.loading": "Buscando combos…",
+  "combo.error": "No se pudieron cargar los combos ahora mismo.",
+  "combo.none": "No se encontraron combos en este mazo.",
+  "combo.deckNote": "Combos de tu lista de mazo — datos de",
+  "combo.have": "Completo ({n})",
+  "combo.almost": "Casi completo ({n})",
+  "combo.result": "Combo",
+  "combo.details": "Detalles",
+  "combo.addWishTitle": "Añadir «{name}» al mazo como carta deseada",
+});
+Object.assign(I18N.it, {
+  "combo.btn": "Combo",
+  "combo.deckTitle": "Trova le combo in questo mazzo (Commander Spellbook)",
+  "combo.loading": "Ricerca di combo…",
+  "combo.error": "Impossibile caricare le combo al momento.",
+  "combo.none": "Nessuna combo trovata in questo mazzo.",
+  "combo.deckNote": "Combo dalla tua lista mazzo — dati da",
+  "combo.have": "Completa ({n})",
+  "combo.almost": "Quasi completa ({n})",
+  "combo.result": "Combo",
+  "combo.details": "Dettagli",
+  "combo.addWishTitle": "Aggiungi «{name}» al mazzo come carta desiderata",
+});
+
 /* ---- Teil 7: Spielrunde (live) ---- */
 Object.assign(I18N.de, {
   "nav.session": "Spielrunde",
