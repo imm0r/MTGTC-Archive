@@ -3351,36 +3351,61 @@ function renderDecks() {
             d.shared ? ` &middot; <span style="color:var(--ok)">${esc(t("deck.shared"))}</span>` : ""}${
             fehlt ? ` &middot; <span style="color:var(--err)">${esc(t("deck.incomplete", { n: fehlt }))}</span>` : ""}</div>
         </div>
-        ${rows ? `<button class="btn ghost sm" data-dashtoggle="${d.id}" style="flex:none"
-          title="${esc(dashOffen ? t("deck.statsHide") : t("deck.statsShow"))}">&#128202; ${esc(dashOffen ? t("deck.statsHide") : t("deck.statsShow"))}</button>
-        <button class="btn ghost sm" data-bracketbtn="${d.id}" style="flex:none"
-          title="${esc(t("bracket.title"))}">&#9878; ${esc(t("bracket.btn"))}</button>` : ""}
-        <button class="btn ghost sm" data-share="${d.id}" style="flex:none"
-          title="${d.shared ? esc(t("deck.unshareTitle")) : esc(t("deck.shareTitle"))}">${d.shared ? "&#128101; " + esc(t("deck.sharedBtn")) : esc(t("deck.share"))}</button>
-        <button class="btn ghost sm" data-ded="${d.id}" style="flex:none"
-          title="${esc(t("deck.editTitle"))}">&#9998;</button>
-        <button class="btn danger sm" data-dx="${d.id}" style="flex:none">${esc(t("deck.delete"))}</button>
+        <div class="deck-manage">
+          <button class="btn ghost sm" data-share="${d.id}"
+            title="${d.shared ? esc(t("deck.unshareTitle")) : esc(t("deck.shareTitle"))}">${d.shared ? "&#128101; " + esc(t("deck.sharedBtn")) : esc(t("deck.share"))}</button>
+          <button class="btn ghost sm" data-ded="${d.id}"
+            title="${esc(t("deck.editTitle"))}">&#9998; ${esc(t("deck.editBtn"))}</button>
+          <button class="btn danger sm" data-dx="${d.id}">${esc(t("deck.delete"))}</button>
+        </div>
       </div>
       <div class="deck-inhalt" style="display:${offen ? "block" : "none"}">
-        <div class="row" style="margin-top:10px">
-          <div class="sugg"><input type="text" data-dadd="${d.id}" placeholder="${esc(t("deck.addCardPh"))}"></div>
-          <div style="flex:none;min-width:80px"><input type="number" min="1" value="1" data-dqty="${d.id}"></div>
-          ${rows ? `<div style="flex:none"><input type="number" data-syncap="${d.id}" min="0" step="0.5"
-            value="${prefWert("capDefault") ?? ""}"
-            placeholder="${esc(t("syn.capPh"))}" title="${esc(t("syn.capTitle"))}" style="width:92px"></div>
-          <div class="syn-std-btn" style="flex:none"><input type="number" data-synbudget="${d.id}" min="0" step="1"
-            value="${prefWert("budgetDefault") ?? ""}"
-            placeholder="${esc(t("syn.budgetPh"))}" title="${esc(t("syn.budgetTitle"))}" style="width:104px"></div>
-          <div class="syn-std-btn" style="flex:none"><button class="btn ghost" data-synbtn="${d.id}"
-            title="${esc(t("syn.deckTitle"))}">&#128269; ${esc(t("syn.deckBtn"))}</button></div>
-          <div style="flex:none"><button class="btn ghost" data-analysebtn="${d.id}"
-            title="${esc(t("an.btnTitle"))}">&#128295; ${esc(t("an.btn"))}</button></div>
-          <div class="syn-ai-btn" style="flex:none"><button class="btn ghost" data-synaibtn="${d.id}"
-            title="${esc(t("syn.aiDeckTitle"))}">&#10024; ${esc(t("syn.ai"))}</button></div>
-          <div style="flex:none"><button class="btn ghost" data-combobtn="${d.id}"
-            title="${esc(t("combo.deckTitle"))}">&#128279; ${esc(t("combo.btn"))}</button></div>
-          <div style="flex:none"><button class="btn ghost" data-legalbtn="${d.id}"
-            title="${esc(t("legal.deckTitle"))}">&#9878; ${esc(t("legal.deckBtn"))}</button></div>` : ""}
+        <div class="deck-tools">
+          <div class="tool-group">
+            <span class="tool-label">${esc(t("deck.addCard"))}</span>
+            <div class="tool-row">
+              <div class="sugg" style="flex:1;min-width:220px"><input type="text" data-dadd="${d.id}" placeholder="${esc(t("deck.addCardPh"))}"></div>
+              <div class="field" style="width:96px"><label>${esc(t("common.qtyLabel"))}</label>
+                <input type="number" min="1" value="1" data-dqty="${d.id}"></div>
+              <button class="btn ghost" data-daddbtn="${d.id}">${esc(t("deck.addBtn"))}</button>
+            </div>
+          </div>
+          ${rows ? `<div class="tool-sep"></div>
+          <div class="tool-cols">
+            <div class="tool-group">
+              <span class="tool-label">${esc(t("deck.groupOverview"))}</span>
+              <div class="tool-row">
+                <button class="btn ghost" data-dashtoggle="${d.id}"
+                  title="${esc(dashOffen ? t("deck.statsHide") : t("deck.statsShow"))}">&#128202; ${esc(dashOffen ? t("deck.statsHide") : t("deck.statsShow"))}</button>
+                <button class="btn ghost" data-bracketbtn="${d.id}"
+                  title="${esc(t("bracket.title"))}">&#9878; ${esc(t("bracket.btn"))}</button>
+                <button class="btn ghost" data-legalbtn="${d.id}"
+                  title="${esc(t("legal.deckTitle"))}">&#9878; ${esc(t("legal.deckBtn"))}</button>
+              </div>
+            </div>
+            <div class="tool-group">
+              <span class="tool-label">${esc(t("deck.groupSuggest"))}</span>
+              <div class="tool-row">
+                <button class="btn ghost syn-std-btn" data-synbtn="${d.id}"
+                  title="${esc(t("syn.deckTitle"))}">&#128269; ${esc(t("syn.deckBtn"))}</button>
+                <button class="btn ghost" data-analysebtn="${d.id}"
+                  title="${esc(t("an.btnTitle"))}">&#128295; ${esc(t("an.btn"))}</button>
+                <button class="btn ghost syn-ai-btn" data-synaibtn="${d.id}"
+                  title="${esc(t("syn.aiDeckTitle"))}">&#10024; ${esc(t("syn.ai"))}</button>
+                <button class="btn ghost" data-combobtn="${d.id}"
+                  title="${esc(t("combo.deckTitle"))}">&#128279; ${esc(t("combo.btn"))}</button>
+              </div>
+              <div class="tool-row" style="margin-top:8px">
+                <div class="field" style="width:118px"><label>${esc(t("deck.maxPerCard"))}</label>
+                  <input type="number" data-syncap="${d.id}" min="0" step="0.5" value="${prefWert("capDefault") ?? ""}"
+                    placeholder="${esc(t("syn.capPh"))}" title="${esc(t("syn.capTitle"))}"></div>
+                <div class="field syn-std-btn" style="width:118px"><label>${esc(t("deck.budget"))}</label>
+                  <input type="number" data-synbudget="${d.id}" min="0" step="1" value="${prefWert("budgetDefault") ?? ""}"
+                    placeholder="${esc(t("syn.budgetPh"))}" title="${esc(t("syn.budgetTitle"))}"></div>
+                <span class="hint" style="align-self:center">${esc(t("deck.priceHint"))}</span>
+              </div>
+            </div>
+          </div>` : ""}
         </div>
         <div class="deck-dash" data-dash="${d.id}" style="margin-top:12px"></div>
         ${rows ? `<div class="xscroll" style="overflow-x:auto"><table class="deck-tbl" style="margin-top:10px">
@@ -3601,19 +3626,28 @@ function renderDecks() {
   });
   $$("[data-dadd]").forEach(inp => {
     attachLocalSuggest(inp);
-    inp.addEventListener("deck-pick", async ev => {
-      const deckId = inp.dataset.dadd;
-      const d = DECKS.find(x => x.id === deckId);
-      const add = Math.max(1, parseInt($(`[data-dqty="${deckId}"]`).value) || 1);
-      const ex = d.entries.find(e => e.cardId === ev.detail);
-      try {
-        const { error } = await sb.from("deck_entries")
-          .upsert({ deck_id: deckId, card_id: ev.detail, qty: (ex?.qty || 0) + add },
-                  { onConflict: "deck_id,card_id" });
-        if (error) throw error;
-        await reload(); renderAll();
-      } catch (e) { toast(dbErr(e)); }
-    });
+    // Auswahl nur merken; ins Deck gelegt wird erst per „Hinzufügen"-Knopf.
+    inp.addEventListener("deck-pick", ev => { inp.dataset.picked = ev.detail; });
+    // Tippt man nach der Auswahl weiter, ist die gemerkte Karte hinfällig.
+    inp.addEventListener("input", () => { delete inp.dataset.picked; });
+  });
+  $$("[data-daddbtn]").forEach(btn => btn.onclick = async () => {
+    const deckId = btn.dataset.daddbtn;
+    const inp = $(`[data-dadd="${deckId}"]`);
+    const cardId = inp?.dataset.picked;
+    if (!cardId) { toast(t("deck.addPick")); inp?.focus(); return; }   // nichts gewählt
+    const d = DECKS.find(x => x.id === deckId);
+    if (!d) return;
+    const add = Math.max(1, parseInt($(`[data-dqty="${deckId}"]`).value) || 1);
+    const ex = d.entries.find(e => e.cardId === cardId);
+    btn.disabled = true;
+    try {
+      const { error } = await sb.from("deck_entries")
+        .upsert({ deck_id: deckId, card_id: cardId, qty: (ex?.qty || 0) + add },
+                { onConflict: "deck_id,card_id" });
+      if (error) throw error;
+      await reload(); renderAll();
+    } catch (e) { toast(dbErr(e)); btn.disabled = false; }
   });
 }
 
@@ -3634,7 +3668,10 @@ function attachLocalSuggest(inp) {
       const li = document.createElement("li");
       li.textContent = `${c.disp} · ${c.set}${c.foil ? " · Foil" : ""} (${c.qty}×)`;
       li.onmousedown = e => {
-        e.preventDefault(); inp.value = ""; close();
+        // Auswahl übernehmen (das Feld zeigt die Karte), aber NICHT sofort ins Deck
+        // legen — das macht erst der „Hinzufügen"-Knopf, sodass man die Menge in
+        // Ruhe setzen und einen Fehlgriff noch korrigieren kann.
+        e.preventDefault(); inp.value = c.disp; close();
         inp.dispatchEvent(new CustomEvent("deck-pick", { detail: c.id }));
       };
       list.appendChild(li);
