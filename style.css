@@ -232,6 +232,21 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .legal-row+.legal-row{border-top:1px solid var(--line)}
 .legal-name{color:var(--txt);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .legal-qty{color:var(--dim);font-weight:600}
+/* Legalitäts-Pille im Deck-Kopf: Verdikt + Hover-Tooltip mit den Problemkarten.
+   Kein overflow:hidden auf .card/.deck-kopf, daher darf der Tooltip herausragen. */
+.deck-legal-wrap{position:relative;display:inline-flex}
+.deck-legal-pill{cursor:default;font-weight:600}
+.deck-legal-tip{position:absolute;top:calc(100% + 6px);left:0;z-index:60;display:none;
+  min-width:210px;max-width:340px;max-height:280px;overflow:auto;white-space:normal;
+  background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+  padding:8px 10px;box-shadow:0 12px 30px #000b;cursor:default}
+.deck-legal-wrap:hover .deck-legal-tip,.deck-legal-wrap:focus-within .deck-legal-tip{display:block}
+.deck-legal-tiphd{display:block;color:var(--err);font-size:12px;margin-bottom:6px}
+.deck-legal-tip .legal-row{padding:5px 2px;font-size:12px}
+/* Im Tooltip den vollen Kartennamen zeigen (umbrechen statt kürzen); die Status-
+   Pille bleibt einzeilig und schrumpft nicht — gilt auch fürs Body-Panel. */
+.deck-legal-tip .legal-name{white-space:normal;overflow:visible;text-overflow:clip}
+.legal-row .pill{flex:none;white-space:nowrap}
 .combo-det>summary{cursor:pointer;font-size:12px;color:var(--dim);width:fit-content}
 .combo-det>summary:hover{color:var(--acc)}
 .combo-det[open]>summary{color:var(--txt);margin-bottom:4px}

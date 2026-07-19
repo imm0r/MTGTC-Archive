@@ -2070,6 +2070,43 @@ Object.assign(I18N.it, {
   "legal.tooMany": "più copie",
 });
 
+/* ---- Teil 18: Deck-Legalität automatisch + Header-Pille ---- */
+Object.assign(I18N.de, {
+  "set.autoDeckLegal": "Deck-Legalität beim Öffnen automatisch prüfen",
+  "legal.pillChecking": "Legalität wird geprüft…",
+  "legal.pillLegal": "{fmt} legal",
+  "legal.pillLegalTitle": "Keine gebannten oder nicht legalen Karten in {fmt}.",
+  "legal.pillIllegal": "nicht legal · {n}",
+});
+Object.assign(I18N.en, {
+  "set.autoDeckLegal": "Auto-check deck legality on open",
+  "legal.pillChecking": "Checking legality…",
+  "legal.pillLegal": "{fmt} legal",
+  "legal.pillLegalTitle": "No banned or non-legal cards in {fmt}.",
+  "legal.pillIllegal": "not legal · {n}",
+});
+Object.assign(I18N.fr, {
+  "set.autoDeckLegal": "Vérifier la légalité du deck à l'ouverture",
+  "legal.pillChecking": "Vérification de la légalité…",
+  "legal.pillLegal": "{fmt} légal",
+  "legal.pillLegalTitle": "Aucune carte bannie ou non légale en {fmt}.",
+  "legal.pillIllegal": "non légal · {n}",
+});
+Object.assign(I18N.es, {
+  "set.autoDeckLegal": "Comprobar la legalidad del mazo al abrir",
+  "legal.pillChecking": "Comprobando legalidad…",
+  "legal.pillLegal": "{fmt} legal",
+  "legal.pillLegalTitle": "Sin cartas prohibidas o no legales en {fmt}.",
+  "legal.pillIllegal": "no legal · {n}",
+});
+Object.assign(I18N.it, {
+  "set.autoDeckLegal": "Verifica la legalità del mazzo all'apertura",
+  "legal.pillChecking": "Verifica della legalità…",
+  "legal.pillLegal": "{fmt} legale",
+  "legal.pillLegalTitle": "Nessuna carta bandita o non legale in {fmt}.",
+  "legal.pillIllegal": "non legale · {n}",
+});
+
 /* ---- Teil 7: Spielrunde (live) ---- */
 Object.assign(I18N.de, {
   "nav.session": "Spielrunde",

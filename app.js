@@ -2599,19 +2599,27 @@ async function deckLegalitaeten(sids) {
   return new Map(uniq.map(id => [id, LEGAL_CACHE.get(id) ?? null]));
 }
 
-/* „Deck-Legalität prüfen": jede Deckkarte gegen das Deck-Format (Fallback
-   Commander, wie bei den Combos). Meldet gebannte und nicht-legale Karten sowie
-   restricted-Karten (nur Vintage) mit mehr als einem Exemplar. Bewusst NICHT
-   geprüft: Bau-Regeln wie Singleton, Farbidentität oder Deckgröße — daher spricht
-   der Befund präzise von „gebannt/nicht legal", nicht von „Deck ist legal". */
-async function deckLegalPruefen(box, karten, deck) {
+/* Problemkarten-Zeilen (Name + Menge + Status-Pille) — geteilt vom Body-Panel
+   und vom Header-Pillen-Tooltip. */
+function legalProblemRows(probleme) {
+  return probleme.map(p => {
+    const menge = (p.c.qty || 1) > 1 ? ` <span class="legal-qty">&times;${p.c.qty}</span>` : "";
+    const pill = p.tooMany
+      ? `<span class="pill warn">${esc(t("legal.restricted"))} &middot; ${esc(t("legal.tooMany"))}</span>`
+      : legalPill(p.st);
+    return `<div class="legal-row"><span class="legal-name">${esc(p.c.disp || p.c.name)}${menge}</span>${pill}</div>`;
+  }).join("");
+}
+
+/* Kernbefund: jede Deckkarte gegen das Deck-Format (Fallback Commander, wie bei
+   den Combos). Meldet gebannte und nicht-legale Karten sowie restricted-Karten
+   (nur Vintage) mit mehr als einem Exemplar. Bewusst NICHT geprüft: Bau-Regeln
+   wie Singleton, Farbidentität oder Deckgröße — daher „gebannt/nicht legal", nicht
+   „Deck ist legal". Kann werfen (Netzfehler); Problemkarten nach Schwere sortiert. */
+async function deckLegalBefund(karten, deck) {
   const key = comboLegalKey(deck?.format);
   const fmt = legalFmtName(key);
-  box.innerHTML = `<div class="legal-note">${esc(t("legal.deckChecking", { fmt }))}</div>`;
-  let legMap;
-  try { legMap = await deckLegalitaeten(karten.map(c => c.scryfall_id)); }
-  catch { box.innerHTML = `<div class="legal-note bad">${esc(t("legal.error"))}</div>`; return; }
-
+  const legMap = await deckLegalitaeten(karten.map(c => c.scryfall_id));
   const probleme = [];
   let ungeprueft = 0;
   for (const c of karten) {
@@ -2623,26 +2631,80 @@ async function deckLegalPruefen(box, karten, deck) {
     else if (st === "restricted" && (c.qty || 1) > 1) probleme.push({ c, st, rang: 2, tooMany: true });
   }
   probleme.sort((a, b) => a.rang - b.rang);
-
   const gesamt = karten.length;
-  const geprueft = gesamt - ungeprueft;
-  if (!probleme.length && !geprueft) {   // nichts prüfbar (z. B. Netzfehler)
-    box.innerHTML = `<div class="legal-note bad">${esc(t("legal.error"))}</div>`;
-    return;
-  }
+  return { key, fmt, probleme, gesamt, ungeprueft, geprueft: gesamt - ungeprueft };
+}
+
+/* Befund je Deck im Speicher (deckId → {sig, state, …befund}), damit die Header-
+   Pille ihn zeigt und ein zweiter Blick nicht neu lädt. sig = Kartenliste+Mengen;
+   ändert sich das Deck, stimmt die sig nicht mehr und es wird neu geprüft. */
+const DECK_LEGAL = new Map();
+const deckSig = d => (d.entries || []).map(e => e.cardId + ":" + e.qty).join(",");
+
+/* Header-Pille (+ Hover-Tooltip mit den Problemkarten) aus dem gespeicherten
+   Befund. Leerer String, solange nichts geprüft wurde (Pille bleibt unsichtbar). */
+function deckLegalPillInner(res) {
+  if (!res) return "";
+  if (res.state === "checking")
+    return `<span class="pill deck-legal-pill" title="${esc(t("legal.pillChecking"))}"><span class="syn-spin">&#9878;</span></span>`;
+  if (res.state === "error")
+    return `<span class="pill deck-legal-pill" title="${esc(t("legal.error"))}">&#9878; ?</span>`;
+  if (!res.probleme.length)
+    return `<span class="pill ok deck-legal-pill" title="${esc(t("legal.pillLegalTitle", { fmt: res.fmt }))}">&#10004; ${esc(t("legal.pillLegal", { fmt: res.fmt }))}</span>`;
+  return `<span class="pill err deck-legal-pill" tabindex="0">&#9888; ${esc(t("legal.pillIllegal", { n: res.probleme.length }))}</span>`
+    + `<span class="deck-legal-tip" role="tooltip"><span class="deck-legal-tiphd">${esc(t("legal.deckProblems", { m: res.probleme.length, n: res.gesamt, fmt: res.fmt }))}</span>${legalProblemRows(res.probleme)}</span>`;
+}
+
+/* Nur die eine Pille neu zeichnen (der Rest des Decks bleibt unberührt). */
+function updateDeckLegalPill(id) {
+  const el = $(`[data-legalpill="${id}"]`);
+  if (el) el.innerHTML = deckLegalPillInner(DECK_LEGAL.get(id));
+}
+
+/* Prüfung anstoßen (Auto beim Öffnen ODER Handklick): Zustand „checking" setzen,
+   Befund holen, Ergebnis merken und die Header-Pille aktualisieren. Gibt den
+   gespeicherten Befund zurück (das Body-Panel rendert daraus weiter). */
+async function deckLegalCheck(deck, karten, sig) {
+  DECK_LEGAL.set(deck.id, { sig, state: "checking" });
+  updateDeckLegalPill(deck.id);
+  try {
+    const b = await deckLegalBefund(karten, deck);
+    DECK_LEGAL.set(deck.id, (!b.probleme.length && !b.geprueft)
+      ? { sig, state: "error", fmt: b.fmt }        // nichts prüfbar (Netzfehler)
+      : { sig, state: "done", ...b });
+  } catch { DECK_LEGAL.set(deck.id, { sig, state: "error" }); }
+  updateDeckLegalPill(deck.id);
+  return DECK_LEGAL.get(deck.id);
+}
+
+/* Auto-Prüfung beim Öffnen, wenn die Einstellung an ist und der Befund fehlt oder
+   veraltet ist (Deck geändert → sig stimmt nicht mehr). Läuft leise in die Pille. */
+function deckLegalAutoTrigger(d) {
+  if (!d || !suchPrefs().autoDeckLegal) return;
+  const sig = deckSig(d);
+  const cur = DECK_LEGAL.get(d.id);
+  if (cur && cur.sig === sig) return;   // aktuell oder gerade in Arbeit
+  const karten = (d.entries || []).map(e => {
+    const c = CARDS.find(x => x.id === e.cardId);
+    return c ? { ...c, qty: e.qty } : null;
+  }).filter(Boolean);
+  if (karten.length) deckLegalCheck(d, karten, sig);
+}
+
+/* „Deck-Legalität prüfen" (Handklick): volle Problemliste im Body-Panel — und
+   über deckLegalCheck zugleich die Header-Pille. */
+async function deckLegalPruefen(box, karten, deck) {
+  const fmt0 = legalFmtName(comboLegalKey(deck?.format));
+  box.innerHTML = `<div class="legal-note">${esc(t("legal.deckChecking", { fmt: fmt0 }))}</div>`;
+  const res = await deckLegalCheck(deck, karten, deckSig(deck));
+  if (res.state === "error") { box.innerHTML = `<div class="legal-note bad">${esc(t("legal.error"))}</div>`; return; }
+  const { fmt, probleme, gesamt, ungeprueft, geprueft } = res;
   const kopf = probleme.length
     ? `<div class="legal-note bad">&#9888; ${esc(t("legal.deckProblems", { m: probleme.length, n: gesamt, fmt }))}</div>`
     : `<div class="legal-note good">&#10004; ${esc(t("legal.deckAllLegal", { n: geprueft, fmt }))}</div>`;
-  const liste = probleme.map(p => {
-    const menge = (p.c.qty || 1) > 1 ? ` <span class="legal-qty">&times;${p.c.qty}</span>` : "";
-    const pill = p.tooMany
-      ? `<span class="pill warn">${esc(t("legal.restricted"))} &middot; ${esc(t("legal.tooMany"))}</span>`
-      : legalPill(p.st);
-    return `<div class="legal-row"><span class="legal-name">${esc(p.c.disp || p.c.name)}${menge}</span>${pill}</div>`;
-  }).join("");
   const rest = ungeprueft
     ? `<div class="legal-note">${esc(t("legal.deckUnknown", { u: ungeprueft }))}</div>` : "";
-  box.innerHTML = kopf + (liste ? `<div class="legal-decklist">${liste}</div>` : "") + rest;
+  box.innerHTML = kopf + (probleme.length ? `<div class="legal-decklist">${legalProblemRows(probleme)}</div>` : "") + rest;
 }
 
 /* Eine Combo-Karte als reines Bild — mit ✓-Badge, falls besessen, und (nur bei
@@ -3238,9 +3300,10 @@ function renderDecks() {
              title="${esc(haupt.disp)}">` : ""}
         <div style="flex:1;min-width:0">
           <h3 style="margin:0">${esc(d.name)}</h3>
-          ${d.format || d.archetype ? `<div class="deck-tags">${
+          <div class="deck-tags">${
             d.format ? `<span class="pill fmt">${esc(d.format)}</span>` : ""}${
-            d.archetype ? `<span class="pill">${esc(d.archetype)}</span>` : ""}</div>` : ""}
+            d.archetype ? `<span class="pill">${esc(d.archetype)}</span>` : ""
+          }<span class="deck-legal-wrap" data-legalpill="${d.id}">${deckLegalPillInner(DECK_LEGAL.get(d.id))}</span></div>
           <div class="hint" style="margin:2px 0 0">${n} ${esc(t("common.cards"))} &middot; ${eur(v)}${
             d.shared ? ` &middot; <span style="color:var(--ok)">${esc(t("deck.shared"))}</span>` : ""}${
             fehlt ? ` &middot; <span style="color:var(--err)">${esc(t("deck.incomplete", { n: fehlt }))}</span>` : ""}</div>
@@ -3291,11 +3354,15 @@ function renderDecks() {
   $("#deck-list").innerHTML = html ||
     `<div class="card"><div class="empty">${esc(t("deck.noMatch"))}</div></div>`;
 
+  // Auto-Legalität für bereits offene Decks (Seiten-Neuaufbau, nach Bearbeitung):
+  // die Klick-Handler decken nur frisch aufgeklappte Decks ab (Aufklappen löst
+  // kein renderDecks aus). deckLegalAutoTrigger prüft Einstellung + Aktualität.
+  if (suchPrefs().autoDeckLegal) sichtbar.forEach(d => { if (deckOffen.ist(d.id)) deckLegalAutoTrigger(d); });
+
   $$("#deck-list .deck-kopf").forEach(k => k.onclick = ev => {
-    // Im Kopf sitzen Knöpfe (Umbenennen, Löschen) — ihr Klick darf nicht
-    // zuklappen. Bewusst alle Knöpfe statt einer Liste einzelner Auswahlen:
-    // die wäre beim nächsten Knopf wieder unvollständig.
-    if (ev.target.closest("button")) return;
+    // Im Kopf sitzen Knöpfe (Umbenennen, Löschen) und die Legalitäts-Pille (nur
+    // zum Hovern) — deren Klick darf nicht zuklappen.
+    if (ev.target.closest("button, .deck-legal-wrap")) return;
     const offen = deckOffen.schalte(k.dataset.toggle);
     const karte = k.parentElement;
     karte.querySelector(".deck-inhalt").style.display = offen ? "block" : "none";
@@ -3309,6 +3376,8 @@ function renderDecks() {
       const btnC = karte.querySelector(`[data-combobtn="${k.dataset.toggle}"]`);
       if (boxC && !boxC.childElementCount && btnC && !btnC.disabled) btnC.click();
     }
+    // Einstellung „Deck-Legalität beim Öffnen prüfen": still nur in die Header-Pille.
+    if (offen) deckLegalAutoTrigger(DECKS.find(x => x.id === k.dataset.toggle));
   });
 
   $$("#deck-list .deck-tbl").forEach(t => wireCardRows(t));
@@ -4357,7 +4426,7 @@ function renderSettings() {
     <div class="card">
       <h3 style="margin-top:0">${esc(t("set.searchTitle"))}</h3>
       ${[["onlyOwned", "set.onlyOwned"], ["onlyComplete", "set.onlyComplete"], ["comboAuto", "set.comboAuto"],
-         ["hideBanned", "set.hideBanned"]]
+         ["autoDeckLegal", "set.autoDeckLegal"], ["hideBanned", "set.hideBanned"]]
         .map(([k, key]) => `
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:14px;color:var(--txt);margin-bottom:8px">
         <input type="checkbox" data-pref="${k}"${suchPrefs()[k] ? " checked" : ""} style="width:auto">
