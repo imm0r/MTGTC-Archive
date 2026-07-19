@@ -33,7 +33,7 @@ nav button.on{background:var(--acc);border-color:var(--acc);color:#1a1400;font-w
 main{padding:14px;max-width:1100px;margin:0 auto}
 .view{display:none} .view.on{display:block}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:14px}
-button,select,input{font:inherit}
+button,select,input,textarea{font:inherit}
 .btn{background:var(--acc);color:#1a1400;border:0;padding:10px 16px;border-radius:8px;
      cursor:pointer;font-weight:600}
 .btn:hover{background:var(--acc2)} .btn:disabled{opacity:.45;cursor:not-allowed}
@@ -41,9 +41,22 @@ button,select,input{font:inherit}
 .btn.ghost:hover{border-color:var(--acc)}
 .btn.sm{padding:5px 10px;font-size:13px}
 .btn.danger{background:transparent;border:1px solid var(--err);color:var(--err)}
-input[type=text],input[type=number],input[type=email],input[type=password],select{
+input[type=text],input[type=number],input[type=email],input[type=password],
+input[type=datetime-local],input[type=date],input[type=time],select,textarea{
   background:var(--panel2);border:1px solid var(--line);
   color:var(--txt);padding:9px 10px;border-radius:8px;width:100%}
+textarea{resize:vertical;min-height:56px;line-height:1.4}
+input[type=text]:focus,input[type=number]:focus,input[type=email]:focus,input[type=password]:focus,
+input[type=datetime-local]:focus,input[type=date]:focus,input[type=time]:focus,select:focus,textarea:focus{
+  outline:none;border-color:var(--acc)}
+/* Kalender-Icon des nativen Datumsfelds an das dunkle Design angleichen */
+input[type=datetime-local]::-webkit-calendar-picker-indicator,
+input[type=date]::-webkit-calendar-picker-indicator,
+input[type=time]::-webkit-calendar-picker-indicator{
+  filter:invert(70%) sepia(30%) saturate(600%) hue-rotate(2deg);cursor:pointer;opacity:.85}
+input[type=datetime-local]::-webkit-calendar-picker-indicator:hover,
+input[type=date]::-webkit-calendar-picker-indicator:hover,
+input[type=time]::-webkit-calendar-picker-indicator:hover{opacity:1}
 label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transform:uppercase;letter-spacing:.6px}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
 .row>div{flex:1;min-width:110px}
@@ -214,6 +227,8 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
   font-size:14px;color:var(--txt);text-transform:none;letter-spacing:normal}
 .ev-serie-check input{flex:none;margin:0}
 .ev-serie-opts{margin-top:6px}
+.ev-serie-preview{font-variant-numeric:tabular-nums}
+.ev-serie-preview:empty{display:none}
 /* Mobil (hochkant): Monat und kommende Termine untereinander; Desktop (quer): nebeneinander */
 .termin-cols{display:flex;flex-direction:column}
 @media (orientation:landscape){

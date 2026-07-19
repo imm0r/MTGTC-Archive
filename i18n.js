@@ -1776,7 +1776,10 @@ Object.assign(I18N.de, {
   "cal.sessionStarted": "Spielrunde gestartet — Zusagende sind eingeladen.",
   "cal.needTitle": "Bitte einen Titel eingeben.", "cal.needWhen": "Bitte Datum & Uhrzeit wählen.",
   "cal.recurring": "Als Serientermin anlegen", "cal.recurFreq": "Wiederholung", "cal.recurCount": "Anzahl Termine",
-  "cal.freqWeekly": "Wöchentlich", "cal.freqBiweekly": "Alle 2 Wochen", "cal.freqMonthly": "Monatlich",
+  "cal.freqWeekly": "Wöchentlich", "cal.freqBiweekly": "Alle 2 Wochen",
+  "cal.freqMonthly": "Monatlich · gleicher Tag", "cal.freqMonthlyLast": "Monatlich · letzter Tag",
+  "cal.freqMonthlyWeekday": "Monatlich · gleicher Wochentag", "cal.freqMonthlyLastWeekday": "Monatlich · letzter Wochentag",
+  "cal.seriePreview": "Termine: {list}",
   "cal.serieCreated": "{n} Termine angelegt.",
 });
 Object.assign(I18N.en, {
@@ -1795,7 +1798,10 @@ Object.assign(I18N.en, {
   "cal.sessionStarted": "Session started — attendees are invited.",
   "cal.needTitle": "Please enter a title.", "cal.needWhen": "Please pick a date & time.",
   "cal.recurring": "Create as recurring event", "cal.recurFreq": "Repeat", "cal.recurCount": "Number of events",
-  "cal.freqWeekly": "Weekly", "cal.freqBiweekly": "Every 2 weeks", "cal.freqMonthly": "Monthly",
+  "cal.freqWeekly": "Weekly", "cal.freqBiweekly": "Every 2 weeks",
+  "cal.freqMonthly": "Monthly · same date", "cal.freqMonthlyLast": "Monthly · last day",
+  "cal.freqMonthlyWeekday": "Monthly · same weekday", "cal.freqMonthlyLastWeekday": "Monthly · last weekday",
+  "cal.seriePreview": "Dates: {list}",
   "cal.serieCreated": "{n} events created.",
 });
 Object.assign(I18N.fr, {
@@ -1814,7 +1820,10 @@ Object.assign(I18N.fr, {
   "cal.sessionStarted": "Partie démarrée — les participants sont invités.",
   "cal.needTitle": "Merci d'indiquer un titre.", "cal.needWhen": "Merci de choisir une date et une heure.",
   "cal.recurring": "Créer comme événement récurrent", "cal.recurFreq": "Répétition", "cal.recurCount": "Nombre d'événements",
-  "cal.freqWeekly": "Hebdomadaire", "cal.freqBiweekly": "Toutes les 2 semaines", "cal.freqMonthly": "Mensuel",
+  "cal.freqWeekly": "Hebdomadaire", "cal.freqBiweekly": "Toutes les 2 semaines",
+  "cal.freqMonthly": "Mensuel · même date", "cal.freqMonthlyLast": "Mensuel · dernier jour",
+  "cal.freqMonthlyWeekday": "Mensuel · même jour de semaine", "cal.freqMonthlyLastWeekday": "Mensuel · dernier jour de semaine",
+  "cal.seriePreview": "Dates : {list}",
   "cal.serieCreated": "{n} événements créés.",
 });
 Object.assign(I18N.es, {
@@ -1833,7 +1842,10 @@ Object.assign(I18N.es, {
   "cal.sessionStarted": "Partida iniciada — los asistentes están invitados.",
   "cal.needTitle": "Introduce un título.", "cal.needWhen": "Elige fecha y hora.",
   "cal.recurring": "Crear como evento recurrente", "cal.recurFreq": "Repetición", "cal.recurCount": "Número de eventos",
-  "cal.freqWeekly": "Semanal", "cal.freqBiweekly": "Cada 2 semanas", "cal.freqMonthly": "Mensual",
+  "cal.freqWeekly": "Semanal", "cal.freqBiweekly": "Cada 2 semanas",
+  "cal.freqMonthly": "Mensual · mismo día", "cal.freqMonthlyLast": "Mensual · último día",
+  "cal.freqMonthlyWeekday": "Mensual · mismo día de la semana", "cal.freqMonthlyLastWeekday": "Mensual · último día de la semana",
+  "cal.seriePreview": "Fechas: {list}",
   "cal.serieCreated": "{n} eventos creados.",
 });
 Object.assign(I18N.it, {
@@ -1852,7 +1864,10 @@ Object.assign(I18N.it, {
   "cal.sessionStarted": "Partita avviata — i partecipanti sono invitati.",
   "cal.needTitle": "Inserisci un titolo.", "cal.needWhen": "Scegli data e ora.",
   "cal.recurring": "Crea come evento ricorrente", "cal.recurFreq": "Ripetizione", "cal.recurCount": "Numero di eventi",
-  "cal.freqWeekly": "Settimanale", "cal.freqBiweekly": "Ogni 2 settimane", "cal.freqMonthly": "Mensile",
+  "cal.freqWeekly": "Settimanale", "cal.freqBiweekly": "Ogni 2 settimane",
+  "cal.freqMonthly": "Mensile · stesso giorno", "cal.freqMonthlyLast": "Mensile · ultimo giorno",
+  "cal.freqMonthlyWeekday": "Mensile · stesso giorno della settimana", "cal.freqMonthlyLastWeekday": "Mensile · ultimo giorno della settimana",
+  "cal.seriePreview": "Date: {list}",
   "cal.serieCreated": "{n} eventi creati.",
 });
 
