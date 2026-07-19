@@ -208,6 +208,11 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .combo-mini .syn-owned{top:3px;right:3px;font-size:9px;padding:1px 4px}
 .combo-mini .syn-add{font-size:10px;padding:2px 7px}
 .combo-mini-nm{font-size:10px;color:var(--dim);text-align:center;line-height:1.15}
+/* „Kaufen"-Pille an nicht besessenen Combo-Karten ohne Deck-Kontext
+   (z. B. Kartendetail) — Link zu Cardmarket im Pillen-Look der Add-Knöpfe. */
+.combo-mini .combo-buy{font-size:10px;font-weight:600;padding:2px 7px;border-radius:999px;
+  border:1px solid var(--line);color:var(--txt);text-decoration:none;white-space:nowrap}
+.combo-mini .combo-buy:hover{border-color:var(--acc);color:var(--acc)}
 .combo-det>summary{cursor:pointer;font-size:12px;color:var(--dim);width:fit-content}
 .combo-det>summary:hover{color:var(--acc)}
 .combo-det[open]>summary{color:var(--txt);margin-bottom:4px}

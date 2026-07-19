@@ -329,11 +329,15 @@ create table if not exists public.profiles (
   -- Karten je Sammlungsseite (Profil-Einstellung). NULL = Voreinstellung (50),
   -- 0 = alles auf einer Seite.
   page_size    integer,
+  -- Such- & Vorschlags-Einstellungen (Synergien/Combos) als jsonb-Beutel:
+  -- neue Schalter brauchen so keine Schemaänderung. NULL = alles Voreinstellung.
+  search_prefs jsonb,
   created      timestamptz not null default now()
 );
 
 -- Für Bestände, die vor dieser Spalte angelegt wurden:
 alter table public.profiles add column if not exists page_size integer;
+alter table public.profiles add column if not exists search_prefs jsonb;
 alter table public.profiles drop constraint if exists profiles_page_size_check;
 alter table public.profiles add constraint profiles_page_size_check
   check (page_size is null or (page_size >= 0 and page_size <= 1000));

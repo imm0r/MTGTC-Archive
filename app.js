@@ -1858,6 +1858,7 @@ function detailHtml(c, hover) {
           <div style="flex:none"><button class="btn ghost sm" id="dt-price"
             title="${esc(t("detail.priceBtnTitle"))}">&#8635; ${esc(t("detail.priceBtn"))}</button></div>
           <div style="flex:none"><input type="number" id="syn-cap" min="0" step="0.5"
+            value="${prefWert("capDefault") ?? ""}"
             placeholder="${esc(t("syn.capPh"))}" title="${esc(t("syn.capTitle"))}" style="width:92px"></div>
           <div class="syn-std-btn" style="flex:none"><button class="btn ghost sm" id="dt-syn"
             title="${esc(t("syn.findTitle"))}">&#128269; ${esc(t("syn.find"))}</button></div>
@@ -2105,10 +2106,15 @@ async function synergieSuchen(hooks, opts = {}) {
   // EDHREC-Rang als Feinschliff. So steht eine Karte, die dieselbe Fähigkeit
   // teilt, über einer, die nur denselben Kreaturentyp hat.
   const punkte = e => [...e.hooks.values()].reduce((s, v) => s + hookGewicht(v.kind), 0);
-  let rang = [...treffer.values()]
+  // Einstellung „nur eigene Sammlung": Vorschläge auf besessene Karten begrenzen
+  // (besessenAnzahl gleicht über die oracle_id ab — Sprache/Foil egal).
+  let kandidaten = [...treffer.values()];
+  if (suchPrefs().onlyOwned) kandidaten = kandidaten.filter(e => besessenAnzahl(e.card) > 0);
+  let rang = kandidaten
     .sort((a, b) => (punkte(b) - punkte(a)) ||
                     ((a.card.edhrec_rank ?? 9e9) - (b.card.edhrec_rank ?? 9e9)))
-    .slice(0, opts.limit || 18);
+    // Die eingestellte Höchstzahl (Profil) schlägt die Voreinstellung des Aufrufers.
+    .slice(0, prefWert("synLimit") || opts.limit || 18);
   // Gesamtbudget (Deck): beste Synergien zuerst aufnehmen, bis das Geld reicht.
   // Zu teure werden übersprungen (billigere weiter unten kommen noch rein);
   // Karten ohne Preis lassen sich nicht budgetieren und fallen dabei raus.
@@ -2391,6 +2397,7 @@ async function kiSynergieLauf(box, cfg) {
   const farbSet = cfg.colors ? new Set(cfg.colors.replace(/c/gi, "").toUpperCase().split("").filter(Boolean)) : null;
   const gesehen = new Set();
   const treffer = [];
+  const lim = prefWert("synLimit");   // Profil-Einstellung „max. Vorschläge"
   for (const s of sugg) {                       // Reihenfolge des Modells behalten
     const c = byName.get(s.name.toLowerCase());
     if (!c || !c.oracle_id || gesehen.has(c.oracle_id)) continue;
@@ -2398,8 +2405,10 @@ async function kiSynergieLauf(box, cfg) {
     if (selfLower && (c.name || "").toLowerCase() === selfLower) continue;
     if (farbSet && !farbIdentPasst(c.color_identity, farbSet)) continue;   // außerhalb der Deckfarben
     if (cap && (synPreis(c) ?? 9e9) > cap) continue;
+    if (suchPrefs().onlyOwned && !besessenAnzahl(c)) continue;   // Einstellung „nur eigene Sammlung"
     gesehen.add(c.oracle_id);
     treffer.push(vorschlagCardHtml(c, s.reason, cfg.deckId));
+    if (lim && treffer.length >= lim) break;
   }
   const kosten = kiKostenHtml(data?.usage);   // die Abfrage kostete unabhängig von der Trefferzahl
   box.innerHTML = treffer.length
@@ -2529,10 +2538,19 @@ function comboCardMini(card, deckId, alsAktion) {
     addBtn = `<button class="syn-add${owned ? " owned" : ""}" data-deck="${esc(deckId)}" data-sid="${esc(card.id)}"
       title="${esc(owned ? t("syn.addOwnedTitle") : t("syn.addWishTitle"))}">&#43;&#160;${esc(t(owned ? "syn.addDeck" : "syn.addWish"))}</button>`;
   }
+  // Weder besessen noch (mangels Deck-Kontext) wünschbar — z. B. im
+  // Kartendetail: direkt zum Kauf verlinken (Scryfalls Cardmarket-Link,
+  // Rückfall über die cardmarket_id).
+  let buy = "";
+  if (!besessen && !addBtn) {
+    const url = card.purchase_uris?.cardmarket || (card.cardmarket_id ? cmLink(card.cardmarket_id) : "");
+    if (url) buy = `<a class="combo-buy" href="${esc(url)}" target="_blank" rel="noopener noreferrer"
+      title="${esc(t("combo.buyTitle"))}">&#128722;&#160;${esc(t("combo.buy"))}</a>`;
+  }
   return `<div class="combo-mini">
     <div class="combo-mini-card" data-cmd-img="${esc(gross)}" data-cmd-name="${esc(card.name)}">
       ${klein ? `<img src="${esc(klein)}" alt="${esc(card.name)}" loading="lazy">` : `<div class="syn-noimg">&#9670;</div>`}${badge}
-    </div>${addBtn}
+    </div>${addBtn}${buy}
   </div>`;
 }
 
@@ -2612,7 +2630,9 @@ async function deckCombosAnzeigen(box, cards, deckId) {
   }
   if (lauf !== combosLauf) return;
 
-  const included = data.included || [], almost = data.almostIncluded || [];
+  const included = data.included || [];
+  // Einstellung „nur komplette Combos": die „Fast komplett"-Kategorie weglassen.
+  const almost = suchPrefs().onlyComplete ? [] : (data.almostIncluded || []);
   if (!included.length && !almost.length) { box.innerHTML = `<div class="empty">${esc(t("combo.none"))}</div>`; return; }
 
   // Alle Karten aller Combos (fertig + fast fertig) bei Scryfall auflösen —
@@ -3083,8 +3103,10 @@ function renderDecks() {
           <div class="sugg"><input type="text" data-dadd="${d.id}" placeholder="${esc(t("deck.addCardPh"))}"></div>
           <div style="flex:none;min-width:80px"><input type="number" min="1" value="1" data-dqty="${d.id}"></div>
           ${rows ? `<div style="flex:none"><input type="number" data-syncap="${d.id}" min="0" step="0.5"
+            value="${prefWert("capDefault") ?? ""}"
             placeholder="${esc(t("syn.capPh"))}" title="${esc(t("syn.capTitle"))}" style="width:92px"></div>
           <div class="syn-std-btn" style="flex:none"><input type="number" data-synbudget="${d.id}" min="0" step="1"
+            value="${prefWert("budgetDefault") ?? ""}"
             placeholder="${esc(t("syn.budgetPh"))}" title="${esc(t("syn.budgetTitle"))}" style="width:104px"></div>
           <div class="syn-std-btn" style="flex:none"><button class="btn ghost" data-synbtn="${d.id}"
             title="${esc(t("syn.deckTitle"))}">&#128269; ${esc(t("syn.deckBtn"))}</button></div>
@@ -3119,6 +3141,14 @@ function renderDecks() {
     karte.querySelector(".deck-inhalt").style.display = offen ? "block" : "none";
     k.querySelector(".deck-pfeil").innerHTML = offen ? "&#9660;" : "&#9654;";
     k.title = offen ? t("common.collapse") : t("common.expand");
+    // Einstellung „Combos automatisch laden": beim Aufklappen die Combo-Suche
+    // anstoßen — über den Knopf, damit Busy-Zustand und Anzeige identisch zum
+    // Handklick laufen. Nur wenn der Kasten noch leer ist (kein Doppel-Laden).
+    if (offen && suchPrefs().comboAuto) {
+      const boxC = karte.querySelector(".deck-combos");
+      const btnC = karte.querySelector(`[data-combobtn="${k.dataset.toggle}"]`);
+      if (boxC && !boxC.childElementCount && btnC && !btnC.disabled) btnC.click();
+    }
   });
 
   $$("#deck-list .deck-tbl").forEach(t => wireCardRows(t));
@@ -4143,6 +4173,27 @@ function renderSettings() {
         }</select></div>
       </div>
       <p class="hint">${esc(t("settings.synHint"))}</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">${esc(t("set.searchTitle"))}</h3>
+      ${[["onlyOwned", "set.onlyOwned"], ["onlyComplete", "set.onlyComplete"], ["comboAuto", "set.comboAuto"]]
+        .map(([k, key]) => `
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:14px;color:var(--txt);margin-bottom:8px">
+        <input type="checkbox" data-pref="${k}"${suchPrefs()[k] ? " checked" : ""} style="width:auto">
+        <span>${esc(t(key))}</span>
+      </label>`).join("")}
+      <div class="row" style="margin-top:10px">
+        <div style="flex:none"><label>${esc(t("set.capDefault"))}</label>
+          <input type="number" data-prefnum="capDefault" min="0" step="0.5" style="width:150px"
+            value="${prefWert("capDefault") ?? ""}" placeholder="–"></div>
+        <div style="flex:none"><label>${esc(t("set.budgetDefault"))}</label>
+          <input type="number" data-prefnum="budgetDefault" min="0" step="1" style="width:150px"
+            value="${prefWert("budgetDefault") ?? ""}" placeholder="–"></div>
+        <div style="flex:none"><label>${esc(t("set.synLimit"))}</label>
+          <input type="number" data-prefnum="synLimit" min="1" max="60" step="1" style="width:150px"
+            value="${prefWert("synLimit") ?? ""}" placeholder="18"></div>
+      </div>
+      <p class="hint">${esc(t("set.searchHint"))}</p>
     </div>${IS_ADMIN ? `
     <div class="card">
       <h3 style="margin-top:0">${esc(t("admin.title"))}</h3>
@@ -4164,6 +4215,18 @@ function renderSettings() {
   });
   $("#set-pagesize").onchange = ev => pageSizeSpeichern(parseInt(ev.target.value));
   $("#set-synmode").onchange = ev => synModusSetzen(ev.target.value);
+  // Such- & Vorschlags-Einstellungen: sofort speichern (Profil, alle Geräte).
+  $$("#v-settings [data-pref]").forEach(cb => cb.onchange = async () => {
+    cb.disabled = true;
+    try { await suchPrefSpeichern({ [cb.dataset.pref]: cb.checked || null }); toast(t("set.saved")); }
+    catch (e) { cb.checked = !cb.checked; toast(dbErr(e)); }
+    finally { cb.disabled = false; }
+  });
+  $$("#v-settings [data-prefnum]").forEach(inp => inp.onchange = async () => {
+    const v = inp.value === "" ? null : Math.max(0, parseFloat(inp.value));
+    try { await suchPrefSpeichern({ [inp.dataset.prefnum]: Number.isFinite(v) && v > 0 ? v : null }); toast(t("set.saved")); }
+    catch (e) { toast(dbErr(e)); }
+  });
   const fk = $("#flag-ki");
   if (fk) fk.onchange = async ev => {
     const an = ev.target.checked;
@@ -4172,6 +4235,25 @@ function renderSettings() {
     catch (e) { fk.checked = !an; toast(dbErr(e)); }
     finally { fk.disabled = false; }
   };
+}
+
+/* Such- & Vorschlags-Einstellungen (profiles.search_prefs, jsonb): Schalter und
+   Vorbelegungen für die Synergie- und Combo-Suchen. Ein jsonb-Beutel statt
+   einzelner Spalten — neue Schalter brauchen keine Schemaänderung. Liegt im
+   Profil, gilt also auf allen Geräten (RLS: nur das eigene Profil). */
+function suchPrefs() { return PROFILE?.search_prefs || {}; }
+
+/* Zahl-Einstellung lesen: gesetzt und > 0, sonst null. */
+function prefWert(k) { const v = +suchPrefs()[k]; return Number.isFinite(v) && v > 0 ? v : null; }
+
+async function suchPrefSpeichern(patch) {
+  const neu = { ...suchPrefs(), ...patch };
+  // Nicht gesetzt = Schlüssel weg (false/null/"" speichern wir nicht) — der
+  // Beutel bleibt klein, und „aus" ist eindeutig die Abwesenheit.
+  for (const k of Object.keys(neu)) if (neu[k] == null || neu[k] === false || neu[k] === "") delete neu[k];
+  const { error } = await sb.from("profiles").update({ search_prefs: neu }).eq("id", USER.id);
+  if (error) throw error;
+  PROFILE.search_prefs = neu;
 }
 
 /* Karten je Sammlungsseite speichern (Profil-Einstellung, gilt damit auf allen

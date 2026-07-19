@@ -1889,6 +1889,73 @@ Object.assign(I18N.fr, { "combo.cardState": "État initial des cartes" });
 Object.assign(I18N.es, { "combo.cardState": "Estado inicial de las cartas" });
 Object.assign(I18N.it, { "combo.cardState": "Stato iniziale delle carte" });
 
+/* ---- Teil 15: Such- & Vorschlags-Einstellungen + Kauf-Link ---- */
+Object.assign(I18N.de, {
+  "set.searchTitle": "Suche & Vorschläge",
+  "set.onlyOwned": "Synergie-Vorschläge nur aus der eigenen Sammlung",
+  "set.onlyComplete": "Combos: nur komplette anzeigen",
+  "set.comboAuto": "Combos beim Aufklappen eines Decks automatisch laden",
+  "set.capDefault": "Max. € pro Karte (Vorbelegung)",
+  "set.budgetDefault": "Max. € gesamt (Vorbelegung)",
+  "set.synLimit": "Max. Anzahl Vorschläge",
+  "set.searchHint": "Gilt für Synergie- und Combo-Suchen — auf allen deinen Geräten. Leeres Feld = Voreinstellung.",
+  "set.saved": "Einstellung gespeichert",
+  "combo.buy": "Kaufen",
+  "combo.buyTitle": "Karte auf Cardmarket kaufen",
+});
+Object.assign(I18N.en, {
+  "set.searchTitle": "Search & suggestions",
+  "set.onlyOwned": "Synergy suggestions only from your own collection",
+  "set.onlyComplete": "Combos: show complete only",
+  "set.comboAuto": "Load combos automatically when expanding a deck",
+  "set.capDefault": "Max € per card (prefill)",
+  "set.budgetDefault": "Max € total (prefill)",
+  "set.synLimit": "Max number of suggestions",
+  "set.searchHint": "Applies to synergy and combo searches — on all your devices. Empty field = default.",
+  "set.saved": "Setting saved",
+  "combo.buy": "Buy card",
+  "combo.buyTitle": "Buy this card on Cardmarket",
+});
+Object.assign(I18N.fr, {
+  "set.searchTitle": "Recherche & suggestions",
+  "set.onlyOwned": "Suggestions de synergies uniquement depuis ta collection",
+  "set.onlyComplete": "Combos : n'afficher que les complets",
+  "set.comboAuto": "Charger les combos automatiquement à l'ouverture d'un deck",
+  "set.capDefault": "€ max par carte (prérempli)",
+  "set.budgetDefault": "€ max au total (prérempli)",
+  "set.synLimit": "Nombre max de suggestions",
+  "set.searchHint": "S'applique aux recherches de synergies et de combos — sur tous tes appareils. Champ vide = valeur par défaut.",
+  "set.saved": "Réglage enregistré",
+  "combo.buy": "Acheter",
+  "combo.buyTitle": "Acheter cette carte sur Cardmarket",
+});
+Object.assign(I18N.es, {
+  "set.searchTitle": "Búsqueda y sugerencias",
+  "set.onlyOwned": "Sugerencias de sinergias solo de tu colección",
+  "set.onlyComplete": "Combos: mostrar solo completos",
+  "set.comboAuto": "Cargar combos automáticamente al desplegar un mazo",
+  "set.capDefault": "€ máx. por carta (valor inicial)",
+  "set.budgetDefault": "€ máx. en total (valor inicial)",
+  "set.synLimit": "N.º máx. de sugerencias",
+  "set.searchHint": "Se aplica a las búsquedas de sinergias y combos — en todos tus dispositivos. Campo vacío = valor por defecto.",
+  "set.saved": "Ajuste guardado",
+  "combo.buy": "Comprar",
+  "combo.buyTitle": "Comprar esta carta en Cardmarket",
+});
+Object.assign(I18N.it, {
+  "set.searchTitle": "Ricerca e suggerimenti",
+  "set.onlyOwned": "Suggerimenti di sinergia solo dalla tua collezione",
+  "set.onlyComplete": "Combo: mostra solo complete",
+  "set.comboAuto": "Carica le combo automaticamente all'apertura di un mazzo",
+  "set.capDefault": "€ max per carta (precompilato)",
+  "set.budgetDefault": "€ max totale (precompilato)",
+  "set.synLimit": "Numero max di suggerimenti",
+  "set.searchHint": "Vale per le ricerche di sinergie e combo — su tutti i tuoi dispositivi. Campo vuoto = predefinito.",
+  "set.saved": "Impostazione salvata",
+  "combo.buy": "Acquista",
+  "combo.buyTitle": "Acquista questa carta su Cardmarket",
+});
+
 /* ---- Teil 7: Spielrunde (live) ---- */
 Object.assign(I18N.de, {
   "nav.session": "Spielrunde",
