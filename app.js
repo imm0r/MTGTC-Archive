@@ -952,6 +952,14 @@ function spark(hist) {
           stroke="${vs[vs.length - 1] >= vs[0] ? "#4caf7d" : "#e0605e"}" stroke-width="1.5"/></svg>`;
 }
 
+/* Preis-Zelle der Liste: €-Preis, darunter der Mini-Graph — gestapelt statt
+   nebeneinander. Fehlt die Historie (spark liefert ""), bleibt nur der Preis,
+   ohne Leerzeile darunter. */
+function preisZelle(c) {
+  const graph = spark(c.hist);
+  return graph ? `${eur(c.price)}<br>${graph}` : eur(c.price);
+}
+
 /* --------------------------- Gemeinsame Kartentabelle -----------------
    Sammlung und Decks zeigen dieselben Zeilen. Drei Dinge unterscheiden
    sich im Deck: die Anzahl ist die Deck-Menge (deck_entries.qty, nicht der
@@ -1013,7 +1021,7 @@ function cardRow(c, o = {}) {
       ${imDeck ? `<td class="num">${fehlt
         ? `<span class="pill err">${esc(t("row.missing", { n: fehlt }))}</span>`
         : `<span class="pill ok">${esc(t("row.present"))}</span>`}</td>`
-      : `<td class="num">${eur(c.price)} ${spark(c.hist)}</td>`}
+      : `<td class="num" style="line-height:1.5">${preisZelle(c)}</td>`}
       <td class="num cm-cell" style="white-space:nowrap">${cmLink(c.cm_id)
         ? `<a class="cm" href="${esc(cmLink(c.cm_id))}" target="_blank" rel="noopener noreferrer"
              title="${esc(t("row.cmTitle"))}">CM</a>` : ""}${sfLink(c)
