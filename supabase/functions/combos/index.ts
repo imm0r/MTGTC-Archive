@@ -54,6 +54,8 @@ function trimCombo(v: Any) {
         .filter(Boolean).join("; "),
     })),
     produces: (v.produces ?? []).map((p: Any) => p.feature?.name).filter(Boolean),
+    // Je Format ein Boolean (commander, modern, …) — für Filter und Warnhinweis.
+    legalities: v.legalities ?? null,
     identity: v.identity ?? "",
     popularity: v.popularity ?? null,
     manaNeeded: v.manaNeeded ?? "",

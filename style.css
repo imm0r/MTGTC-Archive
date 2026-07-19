@@ -213,6 +213,15 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .combo-mini .combo-buy{font-size:10px;font-weight:600;padding:2px 7px;border-radius:999px;
   border:1px solid var(--line);color:var(--txt);text-decoration:none;white-space:nowrap}
 .combo-mini .combo-buy:hover{border-color:var(--acc);color:var(--acc)}
+/* Legalität: aufklappbares Panel im Kartendetail (Format → Status-Pille) und
+   die Zusammenfassungs-Zeile über den Combo-Ergebnissen. */
+.legal-det>summary{cursor:pointer;font-size:12px;color:var(--dim);width:fit-content}
+.legal-det>summary:hover{color:var(--acc)}
+.legal-det[open]>summary{color:var(--txt);margin-bottom:6px}
+.legal-grid{display:flex;flex-wrap:wrap;gap:6px}
+.legal-item{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--txt);
+  border:1px solid var(--line);border-radius:8px;padding:4px 8px;background:var(--panel2)}
+.legal-note{color:var(--acc2)}
 .combo-det>summary{cursor:pointer;font-size:12px;color:var(--dim);width:fit-content}
 .combo-det>summary:hover{color:var(--acc)}
 .combo-det[open]>summary{color:var(--txt);margin-bottom:4px}
@@ -402,6 +411,7 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
 .pill.fmt{border-color:var(--acc);color:var(--acc)}
 .pill.ok{border-color:var(--ok);color:var(--ok)}
 .pill.err{border-color:var(--err);color:var(--err)}
+.pill.warn{border-color:var(--acc);color:var(--acc2)}   /* restricted */
 /* Klassifizierung im Deck-Kopf: Format (hervorgehoben) und Archetyp als
    Pillen unter dem Namen. */
 .deck-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
