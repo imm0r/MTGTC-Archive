@@ -1956,6 +1956,73 @@ Object.assign(I18N.it, {
   "combo.buyTitle": "Acquista questa carta su Cardmarket",
 });
 
+/* ---- Teil 16: Legalität (Formate, Bannlisten) ---- */
+Object.assign(I18N.de, {
+  "set.hideBanned": "Combos mit nicht legalen Karten ausblenden",
+  "legal.title": "Legalität",
+  "legal.loading": "Legalität wird geladen…",
+  "legal.error": "Legalität konnte nicht geladen werden.",
+  "legal.legal": "legal",
+  "legal.notLegal": "nicht legal",
+  "legal.banned": "gebannt",
+  "legal.restricted": "restricted",
+  "legal.warnNote": "{n} von {total} gefundenen Combos sind in {fmt} nicht legal.",
+  "legal.hiddenNote": "{n} von {total} gefundenen Combos sind in {fmt} nicht legal — ausgeblendet.",
+  "legal.warnTitle": "Diese Combo ist in {fmt} nicht legal (gebannte oder nicht legale Karte).",
+});
+Object.assign(I18N.en, {
+  "set.hideBanned": "Hide combos with non-legal cards",
+  "legal.title": "Legality",
+  "legal.loading": "Loading legality…",
+  "legal.error": "Couldn’t load legality.",
+  "legal.legal": "legal",
+  "legal.notLegal": "not legal",
+  "legal.banned": "banned",
+  "legal.restricted": "restricted",
+  "legal.warnNote": "{n} of {total} combos found are not legal in {fmt}.",
+  "legal.hiddenNote": "{n} of {total} combos found are not legal in {fmt} — hidden.",
+  "legal.warnTitle": "This combo is not legal in {fmt} (banned or not-legal card).",
+});
+Object.assign(I18N.fr, {
+  "set.hideBanned": "Masquer les combos avec des cartes non légales",
+  "legal.title": "Légalité",
+  "legal.loading": "Chargement de la légalité…",
+  "legal.error": "Impossible de charger la légalité.",
+  "legal.legal": "légale",
+  "legal.notLegal": "non légale",
+  "legal.banned": "bannie",
+  "legal.restricted": "restreinte",
+  "legal.warnNote": "{n} des {total} combos trouvés ne sont pas légaux en {fmt}.",
+  "legal.hiddenNote": "{n} des {total} combos trouvés ne sont pas légaux en {fmt} — masqués.",
+  "legal.warnTitle": "Ce combo n'est pas légal en {fmt} (carte bannie ou non légale).",
+});
+Object.assign(I18N.es, {
+  "set.hideBanned": "Ocultar combos con cartas no legales",
+  "legal.title": "Legalidad",
+  "legal.loading": "Cargando legalidad…",
+  "legal.error": "No se pudo cargar la legalidad.",
+  "legal.legal": "legal",
+  "legal.notLegal": "no legal",
+  "legal.banned": "prohibida",
+  "legal.restricted": "restringida",
+  "legal.warnNote": "{n} de {total} combos encontrados no son legales en {fmt}.",
+  "legal.hiddenNote": "{n} de {total} combos encontrados no son legales en {fmt} — ocultos.",
+  "legal.warnTitle": "Este combo no es legal en {fmt} (carta prohibida o no legal).",
+});
+Object.assign(I18N.it, {
+  "set.hideBanned": "Nascondi le combo con carte non legali",
+  "legal.title": "Legalità",
+  "legal.loading": "Caricamento della legalità…",
+  "legal.error": "Impossibile caricare la legalità.",
+  "legal.legal": "legale",
+  "legal.notLegal": "non legale",
+  "legal.banned": "bandita",
+  "legal.restricted": "limitata",
+  "legal.warnNote": "{n} delle {total} combo trovate non sono legali in {fmt}.",
+  "legal.hiddenNote": "{n} delle {total} combo trovate non sono legali in {fmt} — nascoste.",
+  "legal.warnTitle": "Questa combo non è legale in {fmt} (carta bandita o non legale).",
+});
+
 /* ---- Teil 7: Spielrunde (live) ---- */
 Object.assign(I18N.de, {
   "nav.session": "Spielrunde",

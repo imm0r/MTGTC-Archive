@@ -1852,6 +1852,10 @@ function detailHtml(c, hover) {
           ${sfLink(c) ? `<a class="cm" href="${esc(sfLink(c))}" target="_blank"
             rel="noopener noreferrer" title="${esc(t("row.sfTitle"))}">SF</a>` : ""}
         </div>
+        <details class="legal-det" id="dt-legal" style="margin-top:8px">
+          <summary>&#9878; ${esc(t("legal.title"))}</summary>
+          <div id="dt-legal-body"><div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("legal.loading"))}</div></div>
+        </details>
         <div class="row" style="margin-top:10px">
           <div style="flex:none"><button class="btn ghost sm" id="dt-edit"
             title="${esc(t("row.editTitle"))}">&#9998; ${esc(t("detail.edit"))}</button></div>
@@ -1927,6 +1931,16 @@ function showCardDetail(id) {
     karteCombosAnzeigen($("#card-combo-box"), c)
       .finally(() => synBtnBusy(cb, lbl, false, "&#128279;"));
   };
+  // Legalität: erst beim ersten Aufklappen von Scryfall laden (die Sammlung
+  // speichert keine Legalitäten — sie wandern mit jeder Bannliste).
+  const lg = $("#dt-legal");
+  if (lg) lg.addEventListener("toggle", async () => {
+    if (!lg.open || lg.dataset.geladen) return;
+    lg.dataset.geladen = "1";
+    const body = $("#dt-legal-body");
+    try { body.innerHTML = legalGridHtml(await kartenLegalitaet(c.scryfall_id)); }
+    catch { body.innerHTML = `<div class="empty">${esc(t("legal.error"))}</div>`; }
+  });
 }
 
 /* Hover-Vorschau: dieselben Details schweben neben dem Mauszeiger, ohne
@@ -2521,6 +2535,41 @@ async function comboKartenLaden(namen) {
    Die Zustandsnotizen selbst (u.state) kommen englisch von CSB. */
 const ZONE_NAMES = { B: "Battlefield", H: "Hand", G: "Graveyard", E: "Exile", L: "Library", C: "Command Zone", S: "Stack" };
 
+/* ------------------------- Legalität (Formate) -----------------------
+   Combos: CSB liefert je Combo legalities (Boolean je Format). Karten:
+   Scryfall liefert je Karte legalities (legal/not_legal/banned/restricted).
+   Deck-Format → Schlüssel im legalities-Objekt; Draft/Casual haben keine
+   Bannliste — Rückfall ist Commander (CSB ist eine Commander-Datenbank,
+   auch Sammlungs- und Karten-Combos prüfen dagegen). */
+const FORMAT_LEGAL_KEY = { commander: "commander", standard: "standard", pioneer: "pioneer",
+  modern: "modern", legacy: "legacy", vintage: "vintage", pauper: "pauper", brawl: "brawl" };
+const comboLegalKey = format => FORMAT_LEGAL_KEY[(format || "").toLowerCase()] || "commander";
+const comboIstLegal = (combo, key) => combo.legalities ? combo.legalities[key] !== false : true;
+const legalFmtName = key => key.charAt(0).toUpperCase() + key.slice(1);
+
+/* Kartenlegalität fürs Detail: einmal je Auflage frisch von Scryfall (die
+   Sammlung speichert keine Legalitäten — sie ändern sich mit jeder Bannliste,
+   gespeichert wären sie veraltet). Gecacht je scryfall_id für die Sitzung. */
+const LEGAL_CACHE = new Map();
+async function kartenLegalitaet(sid) {
+  if (LEGAL_CACHE.has(sid)) return LEGAL_CACHE.get(sid);
+  const leg = (await sfById(sid)).legalities || {};
+  LEGAL_CACHE.set(sid, leg);
+  return leg;
+}
+const LEGAL_FORMATE = [["standard", "Standard"], ["pioneer", "Pioneer"], ["modern", "Modern"],
+  ["legacy", "Legacy"], ["vintage", "Vintage"], ["commander", "Commander"], ["brawl", "Brawl"], ["pauper", "Pauper"]];
+function legalPill(status) {
+  const cls = status === "legal" ? " ok" : status === "banned" ? " err" : status === "restricted" ? " warn" : "";
+  const key = status === "legal" ? "legal.legal" : status === "banned" ? "legal.banned"
+    : status === "restricted" ? "legal.restricted" : "legal.notLegal";
+  return `<span class="pill${cls}">${esc(t(key))}</span>`;
+}
+function legalGridHtml(leg) {
+  return `<div class="legal-grid">${LEGAL_FORMATE.map(([k, name]) =>
+    `<span class="legal-item">${esc(name)} ${legalPill(leg[k] || "not_legal")}</span>`).join("")}</div>`;
+}
+
 /* Eine Combo-Karte als reines Bild — mit ✓-Badge, falls besessen, und (nur bei
    im Deck fehlender Karte) dem „+ Deck"/„+ Wunsch"-Knopf. Volle Karte + Name
    erscheinen per Hover-Vorschau (data-cmd-img, siehe wireComboHover). Der
@@ -2577,7 +2626,11 @@ function wireComboKategorien(box) {
    als reine Kartenbilder (✓ / „+ Deck" / „+ Wunsch"; volle Karte + Name per
    Hover), Details aufklappbar mit Ausgangszustand, Voraussetzungen und Ablauf.
    cardByName: Map name→Scryfall-Karte (aus comboKartenLaden). */
-function comboKachel(combo, deckId, cardByName) {
+function comboKachel(combo, deckId, cardByName, legKey) {
+  // Nicht legal im geprüften Format → rote Warn-Pille am Combo-Block (sichtbar
+  // nur, wenn die Einstellung „ausblenden" aus ist — sonst ist sie schon weg).
+  const warn = legKey && !comboIstLegal(combo, legKey)
+    ? `<div><span class="pill err" title="${esc(t("legal.warnTitle", { fmt: legalFmtName(legKey) }))}">&#9888; ${esc(legalFmtName(legKey))}: ${esc(t("legal.notLegal"))}</span></div>` : "";
   const fehlt = new Set((combo.missing || []).map(m => (m.name || "").toLowerCase()));
   const karten = (combo.uses || []).map(u => {
     const sc = cardByName && cardByName.get((u.name || "").toLowerCase());
@@ -2607,7 +2660,7 @@ function comboKachel(combo, deckId, cardByName) {
   ].filter(Boolean).join("");
 
   return `<div class="combo">
-    ${ergebnis}
+    ${warn}${ergebnis}
     <div class="combo-mini-grid">${karten}</div>
     ${details ? `<details class="combo-det"><summary>${esc(t("combo.details"))}</summary>
       <div class="combo-det-body">${details}</div></details>` : ""}
@@ -2630,10 +2683,20 @@ async function deckCombosAnzeigen(box, cards, deckId) {
   }
   if (lauf !== combosLauf) return;
 
-  const included = data.included || [];
+  let included = data.included || [];
   // Einstellung „nur komplette Combos": die „Fast komplett"-Kategorie weglassen.
-  const almost = suchPrefs().onlyComplete ? [] : (data.almostIncluded || []);
+  let almost = suchPrefs().onlyComplete ? [] : (data.almostIncluded || []);
   if (!included.length && !almost.length) { box.innerHTML = `<div class="empty">${esc(t("combo.none"))}</div>`; return; }
+
+  // Legalität im Deck-Format: erst zählen (für die Zusammenfassung), dann —
+  // je nach Einstellung — die nicht legalen Combos ganz ausblenden.
+  const legKey = comboLegalKey(DECKS.find(d => d.id === deckId)?.format);
+  const gesamt = included.length + almost.length;
+  const illegal = [...included, ...almost].filter(c => !comboIstLegal(c, legKey)).length;
+  if (illegal && suchPrefs().hideBanned) {
+    included = included.filter(c => comboIstLegal(c, legKey));
+    almost = almost.filter(c => comboIstLegal(c, legKey));
+  }
 
   // Alle Karten aller Combos (fertig + fast fertig) bei Scryfall auflösen —
   // für die Kacheln und die „+ Deck"/„+ Wunsch"-Knöpfe.
@@ -2641,13 +2704,17 @@ async function deckCombosAnzeigen(box, cards, deckId) {
   if (lauf !== combosLauf) return;
 
   const teile = [`<div class="meta">${esc(t("combo.deckNote"))}</div>`];
+  if (illegal) teile.push(`<div class="meta legal-note">&#9878; ${esc(t(
+    suchPrefs().hideBanned ? "legal.hiddenNote" : "legal.warnNote",
+    { n: illegal, total: gesamt, fmt: legalFmtName(legKey) }))}</div>`);
   const kats = [];
   if (included.length) kats.push([t("combo.have", { n: included.length }), included]);
   if (almost.length) kats.push([t("combo.almost", { n: almost.length }), almost]);
+  if (!kats.length) teile.push(`<div class="empty">${esc(t("combo.none"))}</div>`);
   // Kategorien als aufklappbare Blöcke: die erste (Komplett) offen, die andere zu.
   kats.forEach(([label, combos], i) => teile.push(`<details class="combo-cat"${i === 0 ? " open" : ""}>
     <summary class="combo-h">${esc(label)}</summary>
-    <div class="combo-grid">${combos.map(c => comboKachel(c, deckId, cardByName)).join("")}</div></details>`));
+    <div class="combo-grid">${combos.map(c => comboKachel(c, deckId, cardByName, legKey)).join("")}</div></details>`));
   box.innerHTML = teile.join("");
   wireComboHover(box);
   wireComboKategorien(box);
@@ -2669,12 +2736,19 @@ async function sammlungCombosAnzeigen(box, cards) {
     return;
   }
   if (lauf !== combosLauf) return;
-  const included = data.included || [];
+  let included = data.included || [];
   if (!included.length) { box.innerHTML = `<div class="empty">${esc(t("combo.collNone"))}</div>`; return; }
+  // Legalität: ohne Deck-Kontext gegen Commander (siehe comboLegalKey).
+  const gesamt = included.length;
+  const illegal = included.filter(c => !comboIstLegal(c, "commander")).length;
+  if (illegal && suchPrefs().hideBanned) included = included.filter(c => comboIstLegal(c, "commander"));
   const cardByName = await comboKartenLaden(included.flatMap(c => (c.uses || []).map(u => u.name)));
   if (lauf !== combosLauf) return;
-  box.innerHTML = `<div class="meta">${esc(t("combo.collHave", { n: included.length }))}</div>
-    <div class="combo-grid" style="margin-top:6px">${included.map(c => comboKachel(c, null, cardByName)).join("")}</div>`;
+  const note = illegal ? `<div class="meta legal-note">&#9878; ${esc(t(
+    suchPrefs().hideBanned ? "legal.hiddenNote" : "legal.warnNote",
+    { n: illegal, total: gesamt, fmt: "Commander" }))}</div>` : "";
+  box.innerHTML = `<div class="meta">${esc(t("combo.collHave", { n: gesamt }))}</div>${note}
+    ${included.length ? `<div class="combo-grid" style="margin-top:6px">${included.map(c => comboKachel(c, null, cardByName, "commander")).join("")}</div>` : `<div class="empty">${esc(t("combo.collNone"))}</div>`}`;
   wireComboHover(box);
 }
 
@@ -2695,11 +2769,19 @@ async function karteCombosAnzeigen(box, card) {
     return;
   }
   if (lauf !== combosLauf) return;
-  const combos = data.combos || [];
+  let combos = data.combos || [];
   if (!combos.length) { box.innerHTML = `<div class="empty">${esc(t("combo.cardNone"))}</div>`; return; }
+  // Legalität: ohne Deck-Kontext gegen Commander (siehe comboLegalKey).
+  const gesamt = combos.length;
+  const illegal = combos.filter(c => !comboIstLegal(c, "commander")).length;
+  if (illegal && suchPrefs().hideBanned) combos = combos.filter(c => comboIstLegal(c, "commander"));
   const cardByName = await comboKartenLaden(combos.flatMap(c => (c.uses || []).map(u => u.name)));
   if (lauf !== combosLauf) return;
-  box.innerHTML = `<div class="meta">${esc(t("combo.cardNote", { n: combos.length }))}</div><div class="combo-grid">${combos.map(c => comboKachel(c, null, cardByName)).join("")}</div>`;
+  const note = illegal ? `<div class="meta legal-note">&#9878; ${esc(t(
+    suchPrefs().hideBanned ? "legal.hiddenNote" : "legal.warnNote",
+    { n: illegal, total: gesamt, fmt: "Commander" }))}</div>` : "";
+  box.innerHTML = `<div class="meta">${esc(t("combo.cardNote", { n: gesamt }))}</div>${note}${
+    combos.length ? `<div class="combo-grid">${combos.map(c => comboKachel(c, null, cardByName, "commander")).join("")}</div>` : `<div class="empty">${esc(t("combo.cardNone"))}</div>`}`;
   wireComboHover(box);
 }
 
@@ -4176,7 +4258,8 @@ function renderSettings() {
     </div>
     <div class="card">
       <h3 style="margin-top:0">${esc(t("set.searchTitle"))}</h3>
-      ${[["onlyOwned", "set.onlyOwned"], ["onlyComplete", "set.onlyComplete"], ["comboAuto", "set.comboAuto"]]
+      ${[["onlyOwned", "set.onlyOwned"], ["onlyComplete", "set.onlyComplete"], ["comboAuto", "set.comboAuto"],
+         ["hideBanned", "set.hideBanned"]]
         .map(([k, key]) => `
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:14px;color:var(--txt);margin-bottom:8px">
         <input type="checkbox" data-pref="${k}"${suchPrefs()[k] ? " checked" : ""} style="width:auto">
