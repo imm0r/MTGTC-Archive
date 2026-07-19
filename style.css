@@ -222,6 +222,16 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .legal-item{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--txt);
   border:1px solid var(--line);border-radius:8px;padding:4px 8px;background:var(--panel2)}
 .legal-note{color:var(--acc2)}
+/* Deck-Legalität: Befund (grün = keine Verstöße / rot = Problemkarten) + Liste. */
+.legal-note.good{color:var(--ok)}
+.legal-note.bad{color:var(--err)}
+.legal-decklist{margin-top:8px;border:1px solid var(--line);border-radius:8px;
+  background:var(--panel2);max-height:320px;overflow:auto}
+.legal-row{display:flex;justify-content:space-between;align-items:center;gap:10px;
+  padding:6px 10px;font-size:13px}
+.legal-row+.legal-row{border-top:1px solid var(--line)}
+.legal-name{color:var(--txt);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.legal-qty{color:var(--dim);font-weight:600}
 .combo-det>summary{cursor:pointer;font-size:12px;color:var(--dim);width:fit-content}
 .combo-det>summary:hover{color:var(--acc)}
 .combo-det[open]>summary{color:var(--txt);margin-bottom:4px}
