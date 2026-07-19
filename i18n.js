@@ -1684,7 +1684,7 @@ Object.assign(I18N.de, {
   "combo.loading": "Combos werden gesucht…",
   "combo.error": "Combos konnten gerade nicht geladen werden.",
   "combo.none": "Keine Combos in diesem Deck gefunden.",
-  "combo.deckNote": "Combos aus deiner Deckliste — Daten von",
+  "combo.deckNote": "Combos aus deiner Deckliste",
   "combo.have": "Komplett ({n})",
   "combo.almost": "Fast komplett ({n})",
   "combo.result": "Combo",
@@ -1697,7 +1697,7 @@ Object.assign(I18N.en, {
   "combo.loading": "Searching for combos…",
   "combo.error": "Couldn’t load combos right now.",
   "combo.none": "No combos found in this deck.",
-  "combo.deckNote": "Combos from your deck list — data from",
+  "combo.deckNote": "Combos from your deck list",
   "combo.have": "Complete ({n})",
   "combo.almost": "Almost complete ({n})",
   "combo.result": "Combo",
@@ -1710,7 +1710,7 @@ Object.assign(I18N.fr, {
   "combo.loading": "Recherche de combos…",
   "combo.error": "Impossible de charger les combos pour le moment.",
   "combo.none": "Aucun combo trouvé dans ce deck.",
-  "combo.deckNote": "Combos de ta liste de deck — données de",
+  "combo.deckNote": "Combos de ta liste de deck",
   "combo.have": "Complet ({n})",
   "combo.almost": "Presque complet ({n})",
   "combo.result": "Combo",
@@ -1723,7 +1723,7 @@ Object.assign(I18N.es, {
   "combo.loading": "Buscando combos…",
   "combo.error": "No se pudieron cargar los combos ahora mismo.",
   "combo.none": "No se encontraron combos en este mazo.",
-  "combo.deckNote": "Combos de tu lista de mazo — datos de",
+  "combo.deckNote": "Combos de tu lista de mazo",
   "combo.have": "Completo ({n})",
   "combo.almost": "Casi completo ({n})",
   "combo.result": "Combo",
@@ -1736,7 +1736,7 @@ Object.assign(I18N.it, {
   "combo.loading": "Ricerca di combo…",
   "combo.error": "Impossibile caricare le combo al momento.",
   "combo.none": "Nessuna combo trovata in questo mazzo.",
-  "combo.deckNote": "Combo dalla tua lista mazzo — dati da",
+  "combo.deckNote": "Combo dalla tua lista mazzo",
   "combo.have": "Completa ({n})",
   "combo.almost": "Quasi completa ({n})",
   "combo.result": "Combo",
@@ -1746,27 +1746,27 @@ Object.assign(I18N.it, {
 Object.assign(I18N.de, {
   "combo.cardTitle": "Combos mit dieser Karte (Commander Spellbook)",
   "combo.cardNone": "Diese Karte ist in keiner bekannten Combo.",
-  "combo.cardNote": "Combos mit dieser Karte ({n}) — Daten von",
+  "combo.cardNote": "Combos mit dieser Karte ({n})",
 });
 Object.assign(I18N.en, {
   "combo.cardTitle": "Combos with this card (Commander Spellbook)",
   "combo.cardNone": "This card isn’t in any known combo.",
-  "combo.cardNote": "Combos with this card ({n}) — data from",
+  "combo.cardNote": "Combos with this card ({n})",
 });
 Object.assign(I18N.fr, {
   "combo.cardTitle": "Combos avec cette carte (Commander Spellbook)",
   "combo.cardNone": "Cette carte n’apparaît dans aucun combo connu.",
-  "combo.cardNote": "Combos avec cette carte ({n}) — données de",
+  "combo.cardNote": "Combos avec cette carte ({n})",
 });
 Object.assign(I18N.es, {
   "combo.cardTitle": "Combos con esta carta (Commander Spellbook)",
   "combo.cardNone": "Esta carta no está en ningún combo conocido.",
-  "combo.cardNote": "Combos con esta carta ({n}) — datos de",
+  "combo.cardNote": "Combos con esta carta ({n})",
 });
 Object.assign(I18N.it, {
   "combo.cardTitle": "Combo con questa carta (Commander Spellbook)",
   "combo.cardNone": "Questa carta non è in nessuna combo nota.",
-  "combo.cardNote": "Combo con questa carta ({n}) — dati da",
+  "combo.cardNote": "Combo con questa carta ({n})",
 });
 
 /* ---- Teil 10: Deck-Bracket (Commander Spellbook) ---- */
@@ -1805,31 +1805,31 @@ Object.assign(I18N.it, {
 Object.assign(I18N.de, {
   "combo.collBtn": "🔗 Deine Combos",
   "combo.collTitle": "Combos in deiner gesamten Sammlung finden (Commander Spellbook)",
-  "combo.collHave": "Combos in deiner Sammlung ({n}) — Daten von",
+  "combo.collHave": "Combos in deiner Sammlung ({n})",
   "combo.collNone": "In deiner Sammlung steckt noch keine komplette Combo.",
 });
 Object.assign(I18N.en, {
   "combo.collBtn": "🔗 Your combos",
   "combo.collTitle": "Find combos across your whole collection (Commander Spellbook)",
-  "combo.collHave": "Combos in your collection ({n}) — data from",
+  "combo.collHave": "Combos in your collection ({n})",
   "combo.collNone": "No complete combo in your collection yet.",
 });
 Object.assign(I18N.fr, {
   "combo.collBtn": "🔗 Tes combos",
   "combo.collTitle": "Trouver les combos dans toute ta collection (Commander Spellbook)",
-  "combo.collHave": "Combos dans ta collection ({n}) — données de",
+  "combo.collHave": "Combos dans ta collection ({n})",
   "combo.collNone": "Aucun combo complet dans ta collection pour l’instant.",
 });
 Object.assign(I18N.es, {
   "combo.collBtn": "🔗 Tus combos",
   "combo.collTitle": "Buscar combos en toda tu colección (Commander Spellbook)",
-  "combo.collHave": "Combos en tu colección ({n}) — datos de",
+  "combo.collHave": "Combos en tu colección ({n})",
   "combo.collNone": "Aún no hay ningún combo completo en tu colección.",
 });
 Object.assign(I18N.it, {
   "combo.collBtn": "🔗 Le tue combo",
   "combo.collTitle": "Trova le combo in tutta la tua collezione (Commander Spellbook)",
-  "combo.collHave": "Combo nella tua collezione ({n}) — dati da",
+  "combo.collHave": "Combo nella tua collezione ({n})",
   "combo.collNone": "Nessuna combo completa nella tua collezione per ora.",
 });
 
@@ -1881,6 +1881,13 @@ Object.assign(I18N.it, {
   "combo.steps": "Passaggi",
   "combo.onCsb": "Vedi su Commander Spellbook",
 });
+
+/* ---- Teil 14: Combo — Ausgangszustand der Karten ---- */
+Object.assign(I18N.de, { "combo.cardState": "Ausgangszustand" });
+Object.assign(I18N.en, { "combo.cardState": "Initial card state" });
+Object.assign(I18N.fr, { "combo.cardState": "État initial des cartes" });
+Object.assign(I18N.es, { "combo.cardState": "Estado inicial de las cartas" });
+Object.assign(I18N.it, { "combo.cardState": "Stato iniziale delle carte" });
 
 /* ---- Teil 7: Spielrunde (live) ---- */
 Object.assign(I18N.de, {
