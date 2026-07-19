@@ -143,9 +143,20 @@ Deno.serve(async (req) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ main: cards }),
       });
+      const list = Array.isArray(data.cards) ? data.cards : [];
+      const combos = Array.isArray(data.combos) ? data.combos : [];
+      // Karten mit einer Bracket-relevanten Eigenschaft -> Namensliste (die
+      // „Begründung": Game Changer, gebannt, Mass Land Denial, Extra-Turn).
+      const namen = (flag: string) =>
+        list.filter((c: Any) => c[flag]).map((c: Any) => c.card?.name).filter(Boolean);
       return json({
         bracketTag: data.bracketTag ?? null,
-        comboCount: Array.isArray(data.combos) ? data.combos.length : 0,
+        comboCount: combos.length,
+        twoCardCombos: combos.filter((c: Any) => c.definitelyTwoCard).length,
+        gameChangers: namen("gameChanger"),
+        banned: namen("banned"),
+        massLandDenial: namen("massLandDenial"),
+        extraTurn: namen("extraTurn"),
       });
     }
 

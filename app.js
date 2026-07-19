@@ -2522,6 +2522,40 @@ function vorschlagCardHtml(card, etikett, deckId) { return synKachel(card, etike
    das sind die etablierten Begriffe der Commander-Szene. */
 const BRACKET_NAMES = { R: "Ruthless", S: "Spicy", P: "Powerful", O: "Oddball", C: "Core", E: "Exhibition", B: "Banned" };
 
+/* CSB-Tag → offizielle Commander-Bracket-Stufe (1–5). CSBs Schätzung reicht bis
+   Ruthless ≈ Stufe 4 (Optimized/cEDH); „B" = enthält eine gebannte Karte, also
+   keine Stufe. Grundlage: WotCs Bracket-System + CSBs estimate-bracket. */
+const BRACKET_STUFE = { E: 1, C: 2, O: 2, P: 3, S: 3, R: 4 };
+
+/* Aufklappbare Bracket-Begründung: Stufe + Name, die auslösenden Signale (Combos,
+   Game Changer, gebannte Karten, Mass Land Denial, Extra-Turns) und eine Legende
+   der fünf offiziellen Stufen. Fehlende Felder (ältere Edge Function) werden
+   einfach weggelassen — der Client bleibt tolerant. */
+function deckBracketAnzeigen(box, data) {
+  const tag = data.bracketTag;
+  const name = BRACKET_NAMES[tag] || tag || "?";
+  const stufe = BRACKET_STUFE[tag];
+  const two = data.twoCardCombos;
+  const zeile = (cls, label, namen) => (namen && namen.length)
+    ? `<div class="bracket-line"><span class="pill ${cls}">${namen.length}</span> <b>${esc(label)}:</b> ${esc(namen.join(", "))}</div>` : "";
+  const kopf = tag === "B"
+    ? `<div class="legal-note bad">&#9878; ${esc(t("bracket.badgeBanned"))}</div>`
+    : `<div class="legal-note good">&#9878; ${esc(t("bracket.badge", { stufe: stufe ?? "?", name }))}</div>`;
+  const combos = `<div class="bracket-line"><span class="pill">${data.comboCount ?? 0}</span> <b>${esc(t("bracket.rowCombos"))}</b>${
+    two != null ? ` &middot; ${esc(t("bracket.rowTwoCard", { n: two }))}` : ""}</div>`;
+  const grund = `<div class="bracket-reason">${combos}`
+    + zeile("warn", t("bracket.rowGC"), data.gameChangers)
+    + zeile("err", t("bracket.rowBanned"), data.banned)
+    + zeile("warn", t("bracket.rowMLD"), data.massLandDenial)
+    + zeile("warn", t("bracket.rowExtra"), data.extraTurn)
+    + `</div>`;
+  const legende = `<details class="legal-det" style="margin-top:8px"><summary>${esc(t("bracket.legendTitle"))}</summary>`
+    + `<div class="bracket-legend">${[1, 2, 3, 4, 5].map(n =>
+        `<div><b>${n}</b> ${esc(t("bracket.legend" + n))}</div>`).join("")}</div></details>`;
+  box.innerHTML = kopf + grund + legende
+    + `<div class="hint" style="margin-top:6px">${esc(t("bracket.footer"))}</div>`;
+}
+
 /* Ruft die Edge Function „combos" und wirft bei Fehlern mit der Klartext-
    Meldung der Function (wie kiSynergieLauf die Non-2xx-Antwort auspackt). */
 async function combosApi(body) {
@@ -3414,6 +3448,7 @@ function renderDecks() {
         <div class="deck-syn" data-synbox="${d.id}" style="margin-top:12px"></div>
         <div class="deck-combos" data-combobox="${d.id}" style="margin-top:12px"></div>
         <div class="deck-legal" data-legalbox="${d.id}" style="margin-top:12px"></div>
+        <div class="deck-bracket" data-bracketbox="${d.id}" style="margin-top:12px"></div>
       </div>
     </div>`;
   }).join("");
@@ -3588,14 +3623,22 @@ function renderDecks() {
     if (!d) return;
     const cards = (d.entries || []).map(e => CARDS.find(x => x.id === e.cardId)).filter(Boolean);
     if (!cards.length) return;
+    const box = $(`.deck-bracket[data-bracketbox="${id}"]`);
     const orig = b.innerHTML;
     b.disabled = true;
     b.innerHTML = `<span class="syn-spin">&#9881;</span> ${esc(t("bracket.btn"))}`;
     try {
       const data = await combosApi({ mode: "bracket", cards: cards.map(c => ({ card: c.name, quantity: 1 })) });
-      const nm = BRACKET_NAMES[data.bracketTag] || data.bracketTag || "?";
-      b.innerHTML = `&#9878; ${esc(t("bracket.result", { name: nm }))}`;
+      const tag = data.bracketTag;
+      const nm = BRACKET_NAMES[tag] || tag || "?";
+      const stufe = BRACKET_STUFE[tag];
+      // Knopf-Beschriftung: „Bracket 3 · Spicy" (bzw. „Banned"); der aufklappbare
+      // Grund + die Legende landen im eigenen Kasten darunter.
+      b.innerHTML = tag === "B"
+        ? `&#9878; ${esc(t("bracket.badgeBanned"))}`
+        : `&#9878; ${esc(t("bracket.badge", { stufe: stufe ?? "?", name: nm }))}`;
       b.title = t("bracket.resTitle", { n: data.comboCount });
+      if (box) { deckBracketAnzeigen(box, data); box.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
     } catch (e) {
       b.innerHTML = orig; toast(e.message);
     } finally { b.disabled = false; }

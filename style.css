@@ -225,6 +225,13 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 /* Deck-Legalität: Befund (grün = keine Verstöße / rot = Problemkarten) + Liste. */
 .legal-note.good{color:var(--ok)}
 .legal-note.bad{color:var(--err)}
+/* Bracket-Begründung: Signal-Zeilen (Combos, Game Changer …) + Stufen-Legende. */
+.bracket-reason{margin-top:8px;display:flex;flex-direction:column;gap:5px}
+.bracket-line{font-size:13px;color:var(--txt);line-height:1.5}
+.bracket-line b{color:var(--dim);font-weight:600}
+.bracket-line .pill{margin-right:4px}
+.bracket-legend{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--dim);margin-top:4px}
+.bracket-legend b{display:inline-block;width:16px;color:var(--acc2)}
 .legal-decklist{margin-top:8px;border:1px solid var(--line);border-radius:8px;
   background:var(--panel2);max-height:320px;overflow:auto}
 .legal-row{display:flex;justify-content:space-between;align-items:center;gap:10px;
