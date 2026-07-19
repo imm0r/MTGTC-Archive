@@ -1769,6 +1769,38 @@ Object.assign(I18N.it, {
   "combo.cardNote": "Combo con questa carta ({n}) — dati da",
 });
 
+/* ---- Teil 10: Deck-Bracket (Commander Spellbook) ---- */
+Object.assign(I18N.de, {
+  "bracket.btn": "Bracket",
+  "bracket.title": "Power-Level dieses Decks schätzen (Commander Spellbook)",
+  "bracket.result": "Bracket: {name}",
+  "bracket.resTitle": "{n} Combos gefunden · Schätzung von Commander Spellbook",
+});
+Object.assign(I18N.en, {
+  "bracket.btn": "Bracket",
+  "bracket.title": "Estimate this deck’s power level (Commander Spellbook)",
+  "bracket.result": "Bracket: {name}",
+  "bracket.resTitle": "{n} combos found · estimate by Commander Spellbook",
+});
+Object.assign(I18N.fr, {
+  "bracket.btn": "Bracket",
+  "bracket.title": "Estimer le niveau de puissance de ce deck (Commander Spellbook)",
+  "bracket.result": "Bracket : {name}",
+  "bracket.resTitle": "{n} combos trouvés · estimation de Commander Spellbook",
+});
+Object.assign(I18N.es, {
+  "bracket.btn": "Bracket",
+  "bracket.title": "Estimar el nivel de poder de este mazo (Commander Spellbook)",
+  "bracket.result": "Bracket: {name}",
+  "bracket.resTitle": "{n} combos encontrados · estimación de Commander Spellbook",
+});
+Object.assign(I18N.it, {
+  "bracket.btn": "Bracket",
+  "bracket.title": "Stima il livello di potenza di questo mazzo (Commander Spellbook)",
+  "bracket.result": "Bracket: {name}",
+  "bracket.resTitle": "{n} combo trovate · stima di Commander Spellbook",
+});
+
 /* ---- Teil 7: Spielrunde (live) ---- */
 Object.assign(I18N.de, {
   "nav.session": "Spielrunde",

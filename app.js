@@ -2463,6 +2463,11 @@ function vorschlagCardHtml(card, etikett, deckId) { return synKachel(card, etike
    sendet für uns kein CORS). Zurück kommen fertige (included) und fast
    fertige (almostIncluded) Combos, exakt über die Karten der Deckliste. */
 
+/* Commander-Spellbook-Bracket-Kürzel (BracketTagEnum) → CSBs feste Klartext-
+   Namen. Nur das Drumherum ist übersetzt, die Bracket-Namen selbst nicht —
+   das sind die etablierten Begriffe der Commander-Szene. */
+const BRACKET_NAMES = { R: "Ruthless", S: "Spicy", P: "Powerful", O: "Oddball", C: "Core", E: "Exhibition", B: "Banned" };
+
 /* Ruft die Edge Function „combos" und wirft bei Fehlern mit der Klartext-
    Meldung der Function (wie kiSynergieLauf die Non-2xx-Antwort auspackt). */
 async function combosApi(body) {
@@ -2992,7 +2997,9 @@ function renderDecks() {
           <div class="syn-ai-btn" style="flex:none"><button class="btn ghost" data-synaibtn="${d.id}"
             title="${esc(t("syn.aiDeckTitle"))}">&#10024; ${esc(t("syn.ai"))}</button></div>
           <div style="flex:none"><button class="btn ghost" data-combobtn="${d.id}"
-            title="${esc(t("combo.deckTitle"))}">&#128279; ${esc(t("combo.btn"))}</button></div>` : ""}
+            title="${esc(t("combo.deckTitle"))}">&#128279; ${esc(t("combo.btn"))}</button></div>
+          <div style="flex:none"><button class="btn ghost" data-bracketbtn="${d.id}"
+            title="${esc(t("bracket.title"))}">&#9878; ${esc(t("bracket.btn"))}</button></div>` : ""}
         </div>
         <div class="deck-dash" data-dash="${d.id}" style="margin-top:12px"></div>
         ${rows ? `<div class="xscroll" style="overflow-x:auto"><table class="deck-tbl" style="margin-top:10px">
@@ -3116,6 +3123,28 @@ function renderDecks() {
     deckCombosAnzeigen(box, cards, id)
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
       .finally(() => synBtnBusy(b, lbl, false, "&#128279;"));
+  });
+
+  // Deck-Bracket (Power-Level) über Commander Spellbook (estimate-bracket mit
+  // der Deckliste). Das Ergebnis ersetzt die Knopf-Beschriftung („Bracket:
+  // Spicy"); der Knopf bleibt anklickbar zum Neuberechnen.
+  $$("[data-bracketbtn]").forEach(b => b.onclick = async () => {
+    const id = b.dataset.bracketbtn;
+    const d = DECKS.find(x => x.id === id);
+    if (!d) return;
+    const cards = (d.entries || []).map(e => CARDS.find(x => x.id === e.cardId)).filter(Boolean);
+    if (!cards.length) return;
+    const orig = b.innerHTML;
+    b.disabled = true;
+    b.innerHTML = `<span class="syn-spin">&#9881;</span> ${esc(t("bracket.btn"))}`;
+    try {
+      const data = await combosApi({ mode: "bracket", cards: cards.map(c => ({ card: c.name, quantity: 1 })) });
+      const nm = BRACKET_NAMES[data.bracketTag] || data.bracketTag || "?";
+      b.innerHTML = `&#9878; ${esc(t("bracket.result", { name: nm }))}`;
+      b.title = t("bracket.resTitle", { n: data.comboCount });
+    } catch (e) {
+      b.innerHTML = orig; toast(e.message);
+    } finally { b.disabled = false; }
   });
 
   // Sortier-Handler je Deck. renderDecks() baut alles neu, aber der
