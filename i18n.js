@@ -1801,6 +1801,38 @@ Object.assign(I18N.it, {
   "bracket.resTitle": "{n} combo trovate · stima di Commander Spellbook",
 });
 
+/* ---- Teil 11: Sammlungs-Combos (Commander Spellbook) ---- */
+Object.assign(I18N.de, {
+  "combo.collBtn": "🔗 Deine Combos",
+  "combo.collTitle": "Combos in deiner gesamten Sammlung finden (Commander Spellbook)",
+  "combo.collHave": "Combos in deiner Sammlung ({n}) — Daten von",
+  "combo.collNone": "In deiner Sammlung steckt noch keine komplette Combo.",
+});
+Object.assign(I18N.en, {
+  "combo.collBtn": "🔗 Your combos",
+  "combo.collTitle": "Find combos across your whole collection (Commander Spellbook)",
+  "combo.collHave": "Combos in your collection ({n}) — data from",
+  "combo.collNone": "No complete combo in your collection yet.",
+});
+Object.assign(I18N.fr, {
+  "combo.collBtn": "🔗 Tes combos",
+  "combo.collTitle": "Trouver les combos dans toute ta collection (Commander Spellbook)",
+  "combo.collHave": "Combos dans ta collection ({n}) — données de",
+  "combo.collNone": "Aucun combo complet dans ta collection pour l’instant.",
+});
+Object.assign(I18N.es, {
+  "combo.collBtn": "🔗 Tus combos",
+  "combo.collTitle": "Buscar combos en toda tu colección (Commander Spellbook)",
+  "combo.collHave": "Combos en tu colección ({n}) — datos de",
+  "combo.collNone": "Aún no hay ningún combo completo en tu colección.",
+});
+Object.assign(I18N.it, {
+  "combo.collBtn": "🔗 Le tue combo",
+  "combo.collTitle": "Trova le combo in tutta la tua collezione (Commander Spellbook)",
+  "combo.collHave": "Combo nella tua collezione ({n}) — dati da",
+  "combo.collNone": "Nessuna combo completa nella tua collezione per ora.",
+});
+
 /* ---- Teil 7: Spielrunde (live) ---- */
 Object.assign(I18N.de, {
   "nav.session": "Spielrunde",

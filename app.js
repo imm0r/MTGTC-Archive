@@ -2567,6 +2567,28 @@ async function deckCombosAnzeigen(box, cards, deckId) {
   box.innerHTML = teile.join("");
 }
 
+/* Combos in der GESAMTEN Sammlung: alle besessenen Karten (nach Name
+   dedupliziert — dieselbe Karte in mehreren Auflagen zählt einmal) an
+   „find-my-combos". Gezeigt werden die KOMPLETTEN Combos, die der Bestand
+   hergibt. Ohne Deck-Kontext (deckId null), also ohne „+ Wunsch". */
+async function sammlungCombosAnzeigen(box, cards) {
+  if (!box) return;
+  const lauf = ++combosLauf;
+  box.innerHTML = `<div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("combo.loading"))}</div>`;
+  let data;
+  try {
+    data = await combosApi({ mode: "find-my-combos", cards: cards.map(c => ({ card: c.name, quantity: 1 })) });
+  } catch (e) {
+    if (lauf === combosLauf) box.innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+    return;
+  }
+  if (lauf !== combosLauf) return;
+  const included = data.included || [];
+  if (!included.length) { box.innerHTML = `<div class="empty">${esc(t("combo.collNone"))}</div>`; return; }
+  box.innerHTML = `<div class="meta">${esc(t("combo.collHave", { n: included.length }))} <a href="https://commanderspellbook.com/" target="_blank" rel="noopener noreferrer">Commander Spellbook</a></div>
+    <div class="combo-grid" style="margin-top:6px">${included.map(c => comboKachel(c, null, null)).join("")}</div>`;
+}
+
 /* Combos, in denen eine einzelne Karte vorkommt (Modus variants). Kein
    Deck-Kontext → ohne „+ Wunsch". Teilt sich den Lauf-Zähler mit den
    Deck-Combos; parallel läuft ohnehin höchstens eine Combo-Suche. */
@@ -5506,6 +5528,25 @@ function wireApp() {
   $("#f-set").onchange = () => { collPage = 0; renderCollection(); };
   $("#f-foil").onchange = () => { collPage = 0; renderCollection(); };
   $("#upd").onclick = updatePrices;
+
+  // „Deine Combos": komplette Combos quer über den ganzen Bestand. Karten nach
+  // Namen dedupliziert (dieselbe Karte in mehreren Auflagen zählt einmal).
+  $("#coll-combos").onclick = () => {
+    const box = $("#coll-combo-box");
+    const b = $("#coll-combos");
+    if (!box) return;
+    const seen = new Set(), cards = [];
+    for (const c of CARDS) {
+      if (c.qty <= 0) continue;
+      const k = (c.name || "").toLowerCase();
+      if (k && !seen.has(k)) { seen.add(k); cards.push(c); }
+    }
+    if (!cards.length) { box.innerHTML = `<div class="empty">${esc(t("combo.collNone"))}</div>`; return; }
+    b.disabled = true;
+    sammlungCombosAnzeigen(box, cards)
+      .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
+      .finally(() => { b.disabled = false; });
+  };
 
   // Anlege-Dropdowns aus demselben Vokabular wie Bearbeiten und Filter.
   $("#deck-format").innerHTML = deckOptions(DECK_FORMATE, "", "—");
