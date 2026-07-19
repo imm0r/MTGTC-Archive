@@ -190,6 +190,19 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .syn-add.done{background:var(--ok);color:#08210a}
 /* Besessene Vorschlagskarte: „+ Deck" dezenter (Ghost) als das goldene „+ Wunsch". */
 .syn-add.owned{background:var(--panel);color:var(--txt);border:1px solid var(--line)}
+/* Combos (Commander Spellbook): Payoff oben, beteiligte Karten als Chips
+   (fehlende rot); „+ Wunsch" nutzt den bestehenden .syn-add-Knopf. */
+.combo-h{font-size:13px;font-weight:700;color:var(--dim);letter-spacing:.3px;margin:14px 0 6px}
+.combo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-top:4px}
+.combo{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border:1px solid var(--line);
+  border-radius:10px;background:var(--panel2)}
+.combo-produces{font-size:13px;font-weight:600;color:var(--acc2)}
+.combo-cards{display:flex;flex-wrap:wrap;gap:4px}
+.combo-card{font-size:12px;padding:2px 8px;border-radius:6px;border:1px solid var(--line);color:var(--txt)}
+.combo-card.missing{border-color:var(--err);color:var(--err)}
+.combo-missing{display:flex;flex-wrap:wrap;gap:6px}
+.combo-link{font-size:12px;color:var(--dim);text-decoration:none;align-self:flex-start}
+.combo-link:hover{color:var(--acc)}
 .syn-add.owned:hover{border-color:var(--acc);filter:none}
 
 /* Spielrunde (live) */

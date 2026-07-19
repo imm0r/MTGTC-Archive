@@ -2446,6 +2446,110 @@ function deckAnalyse(cards) {
    KI-Begründung statt Synergie-Erklärung. */
 function vorschlagCardHtml(card, etikett, deckId) { return synKachel(card, etikett, deckId); }
 
+/* ====================== Combos (Commander Spellbook) ==================
+   Über die Edge Function „combos" (Proxy zu commanderspellbook.com — CSB
+   sendet für uns kein CORS). Zurück kommen fertige (included) und fast
+   fertige (almostIncluded) Combos, exakt über die Karten der Deckliste. */
+
+/* Ruft die Edge Function „combos" und wirft bei Fehlern mit der Klartext-
+   Meldung der Function (wie kiSynergieLauf die Non-2xx-Antwort auspackt). */
+async function combosApi(body) {
+  let data, error;
+  try {
+    ({ data, error } = await sb.functions.invoke("combos", { body }));
+  } catch (e) { error = e; }
+  if (error) {
+    let msg = t("combo.error");
+    try { const ctx = await error.context?.json?.(); if (ctx?.error) msg = ctx.error; } catch { /* generisch */ }
+    throw new Error(msg);
+  }
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
+/* Fehlende Combo-Karten (nur Namen) bei Scryfall zu vollen Objekten auflösen
+   (ein Sammel-Request bis 75) und in SYN_CACHE legen — dann übernimmt sie der
+   bestehende „+ Wunsch"-Knopf (.syn-add) ins Deck. Gibt Map name→scryfall-id. */
+async function comboFehlkartenLaden(namen) {
+  const byLower = new Map();
+  const uniq = [...new Set(namen.filter(Boolean))].slice(0, 75);
+  if (!uniq.length) return byLower;
+  try {
+    const r = await fetch("https://api.scryfall.com/cards/collection", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ identifiers: uniq.map(name => ({ name })) }),
+    });
+    if (r.ok) for (const c of (await r.json()).data || []) {
+      SYN_CACHE.set(c.id, c);
+      byLower.set((c.name || "").toLowerCase(), c.id);
+    }
+  } catch { /* ohne Auflösung eben kein +Wunsch */ }
+  return byLower;
+}
+
+/* Eine Combo als Kachel: Payoff (was sie bewirkt), die beteiligten Karten
+   (fehlende rot), bei „fast fertig" je Fehlkarte ein „+ Wunsch" (sofern
+   Scryfall die Karte kennt), und ein Link auf die Combo-Seite von CSB. */
+function comboKachel(combo, deckId, sidByName) {
+  const fehlt = new Set((combo.missing || []).map(m => (m.name || "").toLowerCase()));
+  const karten = (combo.uses || []).map(u =>
+    `<span class="combo-card${fehlt.has((u.name || "").toLowerCase()) ? " missing" : ""}">${esc(u.name)}</span>`).join("");
+  const payoff = (combo.produces || []).slice(0, 4).map(esc).join(" &middot; ") || esc(t("combo.result"));
+  // Nur AKTIONierbare Fehlkarten (von Scryfall aufgelöst) bekommen einen
+  // „+ Wunsch"-Knopf; nicht auflösbare stehen ohnehin schon rot oben in den
+  // Karten — kein zweites Mal darunter wiederholen.
+  let wunsch = "";
+  if (deckId && combo.missing?.length) {
+    const btns = combo.missing.map(m => {
+      const sid = sidByName && sidByName.get((m.name || "").toLowerCase());
+      return sid
+        ? `<button class="syn-add" data-deck="${esc(deckId)}" data-sid="${esc(sid)}"
+             title="${esc(t("combo.addWishTitle", { name: m.name }))}">&#43;&#160;${esc(m.name)}</button>`
+        : "";
+    }).filter(Boolean).join("");
+    if (btns) wunsch = `<div class="combo-missing">${btns}</div>`;
+  }
+  const url = `https://commanderspellbook.com/combo/${encodeURIComponent(combo.id)}/`;
+  return `<div class="combo">
+    <div class="combo-produces">&#10148; ${payoff}</div>
+    <div class="combo-cards">${karten}</div>
+    ${wunsch}
+    <a class="combo-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(t("combo.details"))} &#8599;</a>
+  </div>`;
+}
+
+/* Combos in einem Deck: Deckliste an „find-my-combos", fertige und fast fertige
+   Combos zeigen. Eigener Lauf-Zähler gegen veraltete Antworten bei Doppelklick. */
+let combosLauf = 0;
+async function deckCombosAnzeigen(box, cards, deckId) {
+  if (!box) return;
+  const lauf = ++combosLauf;
+  box.innerHTML = `<div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("combo.loading"))}</div>`;
+  let data;
+  try {
+    data = await combosApi({ mode: "find-my-combos", cards: cards.map(c => ({ card: c.name, quantity: 1 })) });
+  } catch (e) {
+    if (lauf === combosLauf) box.innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+    return;
+  }
+  if (lauf !== combosLauf) return;
+
+  const included = data.included || [], almost = data.almostIncluded || [];
+  if (!included.length && !almost.length) { box.innerHTML = `<div class="empty">${esc(t("combo.none"))}</div>`; return; }
+
+  // Fehlkarten aller „fast fertigen" Combos einmal bei Scryfall auflösen (+Wunsch).
+  const sidByName = await comboFehlkartenLaden(almost.flatMap(c => (c.missing || []).map(m => m.name)));
+  if (lauf !== combosLauf) return;
+
+  const teile = [`<div class="meta">${esc(t("combo.deckNote"))} <a href="https://commanderspellbook.com/" target="_blank" rel="noopener noreferrer">Commander Spellbook</a></div>`];
+  if (included.length)
+    teile.push(`<div class="combo-h">${esc(t("combo.have", { n: included.length }))}</div><div class="combo-grid">${included.map(c => comboKachel(c, deckId, sidByName)).join("")}</div>`);
+  if (almost.length)
+    teile.push(`<div class="combo-h">${esc(t("combo.almost", { n: almost.length }))}</div><div class="combo-grid">${almost.map(c => comboKachel(c, deckId, sidByName)).join("")}</div>`);
+  box.innerHTML = teile.join("");
+}
+
 /* Analyse in einen Container zeichnen: Balken je Kategorie, darunter Vorschläge
    für die zu dünnen Kategorien (in Deckfarben, nicht besessen). */
 async function deckAnalyseAnzeigen(box, cards, colors, deckId) {
@@ -2852,13 +2956,16 @@ function renderDecks() {
           <div style="flex:none"><button class="btn ghost" data-analysebtn="${d.id}"
             title="${esc(t("an.btnTitle"))}">&#128295; ${esc(t("an.btn"))}</button></div>
           <div class="syn-ai-btn" style="flex:none"><button class="btn ghost" data-synaibtn="${d.id}"
-            title="${esc(t("syn.aiDeckTitle"))}">&#10024; ${esc(t("syn.ai"))}</button></div>` : ""}
+            title="${esc(t("syn.aiDeckTitle"))}">&#10024; ${esc(t("syn.ai"))}</button></div>
+          <div style="flex:none"><button class="btn ghost" data-combobtn="${d.id}"
+            title="${esc(t("combo.deckTitle"))}">&#128279; ${esc(t("combo.btn"))}</button></div>` : ""}
         </div>
         <div class="deck-dash" data-dash="${d.id}" style="margin-top:12px"></div>
         ${rows ? `<div class="xscroll" style="overflow-x:auto"><table class="deck-tbl" style="margin-top:10px">
                     <thead>${cardHead(true)}</thead><tbody>${rows}</tbody></table></div>`
                : `<div class="empty">${esc(t("deck.emptyDeck"))}</div>`}
         <div class="deck-syn" data-synbox="${d.id}" style="margin-top:12px"></div>
+        <div class="deck-combos" data-combobox="${d.id}" style="margin-top:12px"></div>
       </div>
     </div>`;
   }).join("");
@@ -2958,6 +3065,23 @@ function renderDecks() {
     kiSynergienDeck(d, cards, box, { maxPrice: numVal($(`[data-syncap="${id}"]`)) })
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
       .finally(() => { synBtnBusy(b, lbl, false, "&#10024;"); synGeschwister(gsw, false); });
+  });
+
+  // Combos im Deck über Commander Spellbook: fertige + „fast fertige" Combos in
+  // einen EIGENEN Kasten (nicht den Synergie-Kasten), daher keine Geschwister-
+  // Sperre nötig — die Synergie-Knöpfe schreiben woanders hin.
+  $$("[data-combobtn]").forEach(b => b.onclick = () => {
+    const id = b.dataset.combobtn;
+    const d = DECKS.find(x => x.id === id);
+    if (!d) return;
+    const cards = (d.entries || []).map(e => CARDS.find(x => x.id === e.cardId)).filter(Boolean);
+    const box = $(`.deck-combos[data-combobox="${id}"]`);
+    if (!cards.length || !box) return;
+    const lbl = t("combo.btn");
+    synBtnBusy(b, lbl, true, "&#128279;");
+    deckCombosAnzeigen(box, cards, id)
+      .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
+      .finally(() => synBtnBusy(b, lbl, false, "&#128279;"));
   });
 
   // Sortier-Handler je Deck. renderDecks() baut alles neu, aber der
