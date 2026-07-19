@@ -1014,10 +1014,10 @@ function cardRow(c, o = {}) {
         ? `<span class="pill err">${esc(t("row.missing", { n: fehlt }))}</span>`
         : `<span class="pill ok">${esc(t("row.present"))}</span>`}</td>`
       : `<td class="num">${eur(c.price)} ${spark(c.hist)}</td>`}
-      <td class="num" style="white-space:nowrap">${cmLink(c.cm_id)
+      <td class="num cm-cell" style="white-space:nowrap">${cmLink(c.cm_id)
         ? `<a class="cm" href="${esc(cmLink(c.cm_id))}" target="_blank" rel="noopener noreferrer"
              title="${esc(t("row.cmTitle"))}">CM</a>` : ""}${sfLink(c)
-        ? ` <a class="cm" href="${esc(sfLink(c))}" target="_blank" rel="noopener noreferrer"
+        ? `<a class="cm" href="${esc(sfLink(c))}" target="_blank" rel="noopener noreferrer"
              title="${esc(t("row.sfTitle"))}">SF</a>` : ""}</td>
       <td class="num" style="white-space:nowrap">
         ${imDeck
