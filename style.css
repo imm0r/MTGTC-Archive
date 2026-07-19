@@ -372,6 +372,11 @@ td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000
     padding:3px 7px;border-radius:5px;text-decoration:none;
     border:1px solid var(--line);color:var(--dim)}
 .cm:hover{border-color:var(--acc);color:var(--acc)}
+/* In den Listen (Sammlung und Decks) stehen CM und SF untereinander statt
+   nebeneinander — je ein Badge auf eigener Zeile, rechtsbündig wie die Spalte.
+   Nur hier, nicht in der Detailansicht (dort bleiben sie in einer Reihe). */
+.cm-cell .cm{display:block;width:fit-content;margin-left:auto}
+.cm-cell .cm + .cm{margin-top:4px}
 /* Manakosten: die Symbole kommen als SVG von Scryfall. Feste Größe in em,
    damit sie mit der Schrift der Zeile mitwachsen — in der Tabelle stehen sie
    neben dem Namen, in der Detailansicht neben der größeren Überschrift.

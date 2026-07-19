@@ -1003,7 +1003,7 @@ function cardRow(c, o = {}) {
       <td class="hide-s">${langHtml(c.lang)}</td>
       ${imDeck ? "" : `<td class="hide-s">${condBadge(c.condition)}</td>
       <td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap">${esc(datShort(c.released))}</td>
-      <td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap">${dtShort(c.added)}</td>`}
+      <td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap;line-height:1.35">${dtStacked(c.added)}</td>`}
       <!-- 54 px ist die schmalste Breite, bei der drei Stellen noch ganz
            hineinpassen (gemessen, inklusive Spinner-Pfeilen; ab 50 px wird
            abgeschnitten). Zwei Stellen sind der Regelfall, aber 100 Wälder
@@ -1014,10 +1014,10 @@ function cardRow(c, o = {}) {
         ? `<span class="pill err">${esc(t("row.missing", { n: fehlt }))}</span>`
         : `<span class="pill ok">${esc(t("row.present"))}</span>`}</td>`
       : `<td class="num">${eur(c.price)} ${spark(c.hist)}</td>`}
-      <td class="num" style="white-space:nowrap">${cmLink(c.cm_id)
+      <td class="num cm-cell" style="white-space:nowrap">${cmLink(c.cm_id)
         ? `<a class="cm" href="${esc(cmLink(c.cm_id))}" target="_blank" rel="noopener noreferrer"
              title="${esc(t("row.cmTitle"))}">CM</a>` : ""}${sfLink(c)
-        ? ` <a class="cm" href="${esc(sfLink(c))}" target="_blank" rel="noopener noreferrer"
+        ? `<a class="cm" href="${esc(sfLink(c))}" target="_blank" rel="noopener noreferrer"
              title="${esc(t("row.sfTitle"))}">SF</a>` : ""}</td>
       <td class="num" style="white-space:nowrap">
         ${imDeck
@@ -1694,6 +1694,18 @@ const dtShort = iso => {
   const d = new Date(iso);
   return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" })
     + " " + d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+};
+
+/* Wie dtShort, aber Datum und Uhrzeit gestapelt (Datum oben, Uhrzeit darunter)
+   — nur für die Tabellenspalte „Hinzugefügt". Die Detailansicht nutzt weiter
+   dtShort in einer Zeile. Datum/Uhrzeit stammen aus dem ISO-Zeitstempel und
+   sind reine Ziffern/Trenner, das <br> ist gewolltes Markup. */
+const dtStacked = iso => {
+  if (!iso) return "–";
+  const d = new Date(iso);
+  const tag = d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  const uhr = d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  return `${tag}<br>${uhr}`;
 };
 
 /* Preisverlauf als richtiger Graph: Gitterlinien mit Eurowerten, Datum an
