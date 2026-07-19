@@ -4324,13 +4324,13 @@ function wannText(iso) {
 
 function renderTermine() {
   const el = $("#v-events"); if (!el) return;
-  el.innerHTML = terminFormHtml() + kalenderHtml() + terminListeHtml();
+  el.innerHTML = terminFormHtml() + `<div class="termin-cols">${kalenderHtml()}${terminListeHtml()}</div>`;
   wireTermine();
 }
 
 /* -------- Anlege-/Bearbeiten-Formular -------- */
 function terminFormHtml() {
-  if (!eventForm.offen) return `<div class="card"><button class="btn" id="ev-neu">+ ${esc(t("cal.newEvent"))}</button></div>`;
+  if (!eventForm.offen) return "";
   const ed = eventForm.editId ? EVENTS.find(e => e.id === eventForm.editId) : null;
   let defDt;
   if (ed) defDt = isoToLocalInput(ed.starts_at);
@@ -4347,7 +4347,16 @@ function terminFormHtml() {
     ${!ed ? `<label style="margin-top:8px">${esc(t("cal.fInvite"))}</label>
       <div class="ev-invite-list">${freunde.length
         ? freunde.map(f => `<label class="ev-inv"><input type="checkbox" value="${esc(f.id)}">${avatarHtml(22, f)}<span>${esc(f.display_name || t("friends.unknown"))}</span></label>`).join("")
-        : `<div class="hint">${esc(t("cal.noFriends"))}</div>`}</div>` : ""}
+        : `<div class="hint">${esc(t("cal.noFriends"))}</div>`}</div>
+      <label class="ev-serie-check"><input type="checkbox" id="ev-serie">${esc(t("cal.recurring"))}</label>
+      <div id="ev-serie-opts" class="ev-serie-opts" hidden>
+        <div class="row" style="gap:8px">
+          <div><label>${esc(t("cal.recurFreq"))}</label>
+            <select id="ev-serie-freq"><option value="weekly">${esc(t("cal.freqWeekly"))}</option><option value="biweekly">${esc(t("cal.freqBiweekly"))}</option><option value="monthly">${esc(t("cal.freqMonthly"))}</option></select></div>
+          <div><label>${esc(t("cal.recurCount"))}</label>
+            <input type="number" id="ev-serie-count" min="2" max="52" value="4"></div>
+        </div>
+      </div>` : ""}
     <div class="row" style="margin-top:12px;gap:8px">
       <div style="flex:none"><button class="btn" id="ev-save">${esc(ed ? t("common.save") : t("cal.create"))}</button></div>
       <div style="flex:none"><button class="btn ghost" id="ev-cancel">${esc(t("dlg.cancel"))}</button></div>
@@ -4377,11 +4386,12 @@ function kalenderHtml() {
     zellen += `<div class="kal-tag${istHeute(d) ? " heute" : ""}"><span class="kal-nr">${d}</span>${pills}${mehr}</div>`;
   }
   const wt = t("cal.weekdays").split(",");
-  return `<div class="card">
-    <div class="row" style="align-items:center;justify-content:space-between">
-      <div style="flex:none"><button class="btn ghost sm" id="kal-prev" title="${esc(t("cal.prevMonth"))}">&#8249;</button></div>
-      <h3 style="margin:0;text-transform:capitalize">${esc(m.toLocaleDateString(LANG, { month: "long", year: "numeric" }))}</h3>
-      <div style="flex:none"><button class="btn ghost sm" id="kal-next" title="${esc(t("cal.nextMonth"))}">&#8250;</button></div>
+  return `<div class="card kal-card">
+    <div class="kal-kopf">
+      <button class="btn ghost sm" id="kal-prev" title="${esc(t("cal.prevMonth"))}">&#8249;</button>
+      <h3 class="kal-titel">${esc(m.toLocaleDateString(LANG, { month: "long", year: "numeric" }))}</h3>
+      <button class="btn ghost sm" id="kal-next" title="${esc(t("cal.nextMonth"))}">&#8250;</button>
+      <button class="btn sm kal-neu" id="ev-neu">+ ${esc(t("cal.newEvent"))}</button>
     </div>
     <div class="kal-grid kal-head">${wt.map(w => `<div class="kal-wt">${esc(w)}</div>`).join("")}</div>
     <div class="kal-grid">${zellen}</div>
@@ -4393,7 +4403,7 @@ function terminListeHtml() {
   const grenze = Date.now() - 3 * 3600 * 1000;   // 3h Kulanz für laufende Runden
   const kommend = EVENTS.filter(e => new Date(e.starts_at).getTime() >= grenze)
     .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
-  return `<div class="card"><h3 style="margin-top:0">${esc(t("cal.upcoming"))}</h3>
+  return `<div class="card termin-upcoming"><h3 style="margin-top:0">${esc(t("cal.upcoming"))}</h3>
     ${kommend.length ? kommend.map(terminRowHtml).join("") : `<div class="empty">${esc(t("cal.noneUpcoming"))}</div>`}</div>`;
 }
 function terminRowHtml(e) {
@@ -4442,6 +4452,7 @@ function wireTermine() {
   const neu = $("#ev-neu"); if (neu) neu.onclick = () => { eventForm.offen = true; eventForm.editId = null; renderTermine(); };
   const cancel = $("#ev-cancel"); if (cancel) cancel.onclick = () => { eventForm.offen = false; eventForm.editId = null; renderTermine(); };
   const save = $("#ev-save"); if (save) save.onclick = terminSpeichern;
+  const serie = $("#ev-serie"); if (serie) serie.onchange = () => { const o = $("#ev-serie-opts"); if (o) o.hidden = !serie.checked; };
   const prev = $("#kal-prev"); if (prev) prev.onclick = () => { const m = kalAktuell(); kalMonat = new Date(m.getFullYear(), m.getMonth() - 1, 1); renderTermine(); };
   const next = $("#kal-next"); if (next) next.onclick = () => { const m = kalAktuell(); kalMonat = new Date(m.getFullYear(), m.getMonth() + 1, 1); renderTermine(); };
 
@@ -4460,6 +4471,19 @@ function wireTermine() {
   $$("#v-events [data-ev-invsave]").forEach(b => b.onclick = () => terminEinladen(b.dataset.evInvsave));
 }
 
+/* Serientermin: erzeugt die Startzeitpunkte ausgehend vom ersten Termin. */
+function serienDaten(baseIso, freq, countRaw) {
+  const count = Math.max(2, Math.min(52, parseInt(countRaw, 10) || 2));
+  const base = new Date(baseIso), out = [];
+  for (let i = 0; i < count; i++) {
+    const d = new Date(base);
+    if (freq === "monthly") d.setMonth(base.getMonth() + i);
+    else d.setDate(base.getDate() + (freq === "biweekly" ? 14 : 7) * i);
+    out.push(d.toISOString());
+  }
+  return out;
+}
+
 async function terminSpeichern() {
   const title = $("#ev-title")?.value.trim();
   const whenVal = $("#ev-when")?.value;
@@ -4473,8 +4497,14 @@ async function terminSpeichern() {
       if (error) throw error;
     } else {
       const invitees = $$("#v-events .ev-invite-list input:checked").map(c => c.value);
-      const { error } = await sb.rpc("create_event", { p_title: title, p_desc: desc, p_starts_at: iso, p_invitees: invitees });
-      if (error) throw error;
+      const daten = $("#ev-serie")?.checked
+        ? serienDaten(iso, $("#ev-serie-freq")?.value, $("#ev-serie-count")?.value)
+        : [iso];
+      for (const startIso of daten) {
+        const { error } = await sb.rpc("create_event", { p_title: title, p_desc: desc, p_starts_at: startIso, p_invitees: invitees });
+        if (error) throw error;
+      }
+      if (daten.length > 1) toast(t("cal.serieCreated", { n: daten.length }));
     }
     eventForm.offen = false; eventForm.editId = null;
     await ladeTermine(); renderTermine();

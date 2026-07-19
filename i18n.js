@@ -1775,6 +1775,9 @@ Object.assign(I18N.de, {
   "cal.delete": "Löschen", "cal.delConfirm": "Termin »{title}« wirklich löschen?",
   "cal.sessionStarted": "Spielrunde gestartet — Zusagende sind eingeladen.",
   "cal.needTitle": "Bitte einen Titel eingeben.", "cal.needWhen": "Bitte Datum & Uhrzeit wählen.",
+  "cal.recurring": "Als Serientermin anlegen", "cal.recurFreq": "Wiederholung", "cal.recurCount": "Anzahl Termine",
+  "cal.freqWeekly": "Wöchentlich", "cal.freqBiweekly": "Alle 2 Wochen", "cal.freqMonthly": "Monatlich",
+  "cal.serieCreated": "{n} Termine angelegt.",
 });
 Object.assign(I18N.en, {
   "nav.events": "Events",
@@ -1791,6 +1794,9 @@ Object.assign(I18N.en, {
   "cal.delete": "Delete", "cal.delConfirm": "Really delete event “{title}”?",
   "cal.sessionStarted": "Session started — attendees are invited.",
   "cal.needTitle": "Please enter a title.", "cal.needWhen": "Please pick a date & time.",
+  "cal.recurring": "Create as recurring event", "cal.recurFreq": "Repeat", "cal.recurCount": "Number of events",
+  "cal.freqWeekly": "Weekly", "cal.freqBiweekly": "Every 2 weeks", "cal.freqMonthly": "Monthly",
+  "cal.serieCreated": "{n} events created.",
 });
 Object.assign(I18N.fr, {
   "nav.events": "Événements",
@@ -1807,6 +1813,9 @@ Object.assign(I18N.fr, {
   "cal.delete": "Supprimer", "cal.delConfirm": "Vraiment supprimer l'événement « {title} » ?",
   "cal.sessionStarted": "Partie démarrée — les participants sont invités.",
   "cal.needTitle": "Merci d'indiquer un titre.", "cal.needWhen": "Merci de choisir une date et une heure.",
+  "cal.recurring": "Créer comme événement récurrent", "cal.recurFreq": "Répétition", "cal.recurCount": "Nombre d'événements",
+  "cal.freqWeekly": "Hebdomadaire", "cal.freqBiweekly": "Toutes les 2 semaines", "cal.freqMonthly": "Mensuel",
+  "cal.serieCreated": "{n} événements créés.",
 });
 Object.assign(I18N.es, {
   "nav.events": "Eventos",
@@ -1823,6 +1832,9 @@ Object.assign(I18N.es, {
   "cal.delete": "Eliminar", "cal.delConfirm": "¿Eliminar el evento «{title}»?",
   "cal.sessionStarted": "Partida iniciada — los asistentes están invitados.",
   "cal.needTitle": "Introduce un título.", "cal.needWhen": "Elige fecha y hora.",
+  "cal.recurring": "Crear como evento recurrente", "cal.recurFreq": "Repetición", "cal.recurCount": "Número de eventos",
+  "cal.freqWeekly": "Semanal", "cal.freqBiweekly": "Cada 2 semanas", "cal.freqMonthly": "Mensual",
+  "cal.serieCreated": "{n} eventos creados.",
 });
 Object.assign(I18N.it, {
   "nav.events": "Eventi",
@@ -1839,6 +1851,9 @@ Object.assign(I18N.it, {
   "cal.delete": "Elimina", "cal.delConfirm": "Eliminare davvero l'evento «{title}»?",
   "cal.sessionStarted": "Partita avviata — i partecipanti sono invitati.",
   "cal.needTitle": "Inserisci un titolo.", "cal.needWhen": "Scegli data e ora.",
+  "cal.recurring": "Crea come evento ricorrente", "cal.recurFreq": "Ripetizione", "cal.recurCount": "Numero di eventi",
+  "cal.freqWeekly": "Settimanale", "cal.freqBiweekly": "Ogni 2 settimane", "cal.freqMonthly": "Mensile",
+  "cal.serieCreated": "{n} eventi creati.",
 });
 
 /* Cardmarket-Verkaufsexport */
