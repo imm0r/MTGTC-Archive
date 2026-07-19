@@ -3574,11 +3574,13 @@ function showGate(mode) {
   $("#gate").style.display = "block";
   $("#app").style.display = "none";
   $$("#gate .pane").forEach(p => p.style.display = p.dataset.pane === mode ? "block" : "none");
+  if (mode === "auth") ladeBenutzerzahl();   // Nutzerzahl auf dem Login-Screen (anon)
 }
 function showApp() {
   $("#gate").style.display = "none";
   $("#app").style.display = "block";
   renderWho();
+  ladeBenutzerzahl();                         // Nutzerzahl dauerhaft im Header
 }
 
 async function afterLogin(user) {
@@ -3959,6 +3961,7 @@ async function passwortAendern() {
    Zustimmung). Freunde sehen GETEILTE Decks nur lesend; die RLS erlaubt das,
    geladen wird fremdes Material aber ausschließlich hier gezielt. */
 let FRIENDS = { accepted: [], incoming: [], outgoing: [] };
+let USER_COUNT = null;   // Gesamtzahl registrierter Nutzer (Anzeige unter „Freunde")
 
 async function ladeFreunde() {
   const { data: fr, error } = await sb.from("friendships").select("*");
@@ -3977,6 +3980,23 @@ async function ladeFreunde() {
     incoming: (fr || []).filter(f => f.status === "pending" && f.addressee === USER.id).map(mit),
     outgoing: (fr || []).filter(f => f.status === "pending" && f.requester === USER.id).map(mit),
   };
+}
+
+/* Gesamtzahl registrierter Nutzer laden (SECURITY-DEFINER-RPC, da RLS nur
+   eigene + befreundete Profile sichtbar macht) und anschließend im Header
+   und auf dem Login-Screen anzeigen. Anzeige ist optional — schlägt der
+   Aufruf fehl, bleibt sie einfach leer. */
+async function ladeBenutzerzahl() {
+  try { const { data, error } = await sb.rpc("registered_user_count"); if (!error && data != null) USER_COUNT = Number(data); }
+  catch { /* still ignorieren — Zahl ist nur informativ */ }
+  zeigeBenutzerzahl();
+}
+function zeigeBenutzerzahl() {
+  const n = USER_COUNT != null ? String(USER_COUNT) : null, lbl = t("stats.registeredUsers");
+  const h = $("#user-count");
+  if (h) { h.hidden = n == null; if (n != null) { h.innerHTML = `&#128101;&nbsp;<b>${esc(n)}</b>`; h.title = lbl; } }
+  const g = $("#gate-user-count");
+  if (g) { g.hidden = n == null; if (n != null) g.innerHTML = `&#128101; <b>${esc(n)}</b> ${esc(lbl)}`; }
 }
 
 async function oeffneFreunde() { await ladeFreunde(); renderFriends(); }
