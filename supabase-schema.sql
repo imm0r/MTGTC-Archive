@@ -348,16 +348,17 @@ create policy profiles_select_own on public.profiles for select using (id = auth
 create policy profiles_insert_own on public.profiles for insert with check (id = auth.uid());
 create policy profiles_update_own on public.profiles for update using (id = auth.uid()) with check (id = auth.uid());
 
--- Gesamtzahl registrierter Nutzer (für die Anzeige in der App). SECURITY
--- DEFINER, weil die RLS oben nur eigene + befreundete Profile sichtbar macht;
--- zurückgegeben wird ausschließlich die aggregierte Gesamtzahl (keine
--- personenbezogenen Daten). Nur für angemeldete Nutzer.
+-- Gesamtzahl registrierter Nutzer (Anzeige im Header und auf dem Login-Screen).
+-- SECURITY DEFINER, weil die RLS oben nur eigene + befreundete Profile sichtbar
+-- macht; zurückgegeben wird ausschließlich die aggregierte Gesamtzahl (keine
+-- personenbezogenen Daten). Auch für anon, da sie schon vor der Anmeldung
+-- angezeigt wird.
 create or replace function public.registered_user_count()
 returns bigint language sql stable security definer set search_path=public as $$
   select count(*) from public.profiles
 $$;
 revoke execute on function public.registered_user_count() from public;
-grant execute on function public.registered_user_count() to authenticated;
+grant execute on function public.registered_user_count() to anon, authenticated;
 
 -- =====================================================================
 --  Freunde und Deck-Teilen

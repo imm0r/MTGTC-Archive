@@ -3574,11 +3574,13 @@ function showGate(mode) {
   $("#gate").style.display = "block";
   $("#app").style.display = "none";
   $$("#gate .pane").forEach(p => p.style.display = p.dataset.pane === mode ? "block" : "none");
+  if (mode === "auth") ladeBenutzerzahl();   // Nutzerzahl auf dem Login-Screen (anon)
 }
 function showApp() {
   $("#gate").style.display = "none";
   $("#app").style.display = "block";
   renderWho();
+  ladeBenutzerzahl();                         // Nutzerzahl dauerhaft im Header
 }
 
 async function afterLogin(user) {
@@ -3981,13 +3983,23 @@ async function ladeFreunde() {
 }
 
 /* Gesamtzahl registrierter Nutzer laden (SECURITY-DEFINER-RPC, da RLS nur
-   eigene + befreundete Profile sichtbar macht). Anzeige ist optional. */
+   eigene + befreundete Profile sichtbar macht) und anschließend im Header
+   und auf dem Login-Screen anzeigen. Anzeige ist optional — schlägt der
+   Aufruf fehl, bleibt sie einfach leer. */
 async function ladeBenutzerzahl() {
   try { const { data, error } = await sb.rpc("registered_user_count"); if (!error && data != null) USER_COUNT = Number(data); }
   catch { /* still ignorieren — Zahl ist nur informativ */ }
+  zeigeBenutzerzahl();
+}
+function zeigeBenutzerzahl() {
+  const n = USER_COUNT != null ? String(USER_COUNT) : null, lbl = t("stats.registeredUsers");
+  const h = $("#user-count");
+  if (h) { h.hidden = n == null; if (n != null) { h.innerHTML = `&#128101;&nbsp;<b>${esc(n)}</b>`; h.title = lbl; } }
+  const g = $("#gate-user-count");
+  if (g) { g.hidden = n == null; if (n != null) g.innerHTML = `&#128101; <b>${esc(n)}</b> ${esc(lbl)}`; }
 }
 
-async function oeffneFreunde() { await Promise.all([ladeFreunde(), ladeBenutzerzahl()]); renderFriends(); }
+async function oeffneFreunde() { await ladeFreunde(); renderFriends(); }
 
 function renderFriends() {
   const el = $("#v-friends");
@@ -4000,10 +4012,6 @@ function renderFriends() {
       ${actions}
     </div>`;
   el.innerHTML = `
-    ${USER_COUNT != null ? `<div class="card usercount-card">
-      <span class="usercount-num">${esc(String(USER_COUNT))}</span>
-      <span class="usercount-lbl">${esc(t("friends.registeredUsers"))}</span>
-    </div>` : ""}
     <div class="card">
       <h3 style="margin-top:0">${esc(t("friends.yourCode"))}</h3>
       <div class="row" style="align-items:center">
