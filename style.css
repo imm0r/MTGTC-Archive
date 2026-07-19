@@ -190,20 +190,34 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .syn-add.done{background:var(--ok);color:#08210a}
 /* Besessene Vorschlagskarte: „+ Deck" dezenter (Ghost) als das goldene „+ Wunsch". */
 .syn-add.owned{background:var(--panel);color:var(--txt);border:1px solid var(--line)}
-/* Combos (Commander Spellbook): Payoff oben, beteiligte Karten als Chips
-   (fehlende rot); „+ Wunsch" nutzt den bestehenden .syn-add-Knopf. */
+/* Combos (Commander Spellbook): je Combo ein voller Block im Stil der
+   Synergie-Ansicht — Ergebnisse als Liste, beteiligte Karten als kompakte
+   Synergie-Kacheln (.syn-card, kleiner skaliert), Details aufklappbar. */
 .combo-h{font-size:13px;font-weight:700;color:var(--dim);letter-spacing:.3px;margin:14px 0 6px}
-.combo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-top:4px}
-.combo{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border:1px solid var(--line);
+.combo-grid{display:flex;flex-direction:column;gap:12px;margin-top:4px}
+.combo{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--line);
   border-radius:10px;background:var(--panel2)}
-.combo-produces{font-size:13px;font-weight:600;color:var(--acc2)}
-.combo-cards{display:flex;flex-wrap:wrap;gap:4px}
-.combo-card{font-size:12px;padding:2px 8px;border-radius:6px;border:1px solid var(--line);color:var(--txt)}
-.combo-card.missing{border-color:var(--err);color:var(--err)}
-.combo-card.have{border-color:var(--acc);color:var(--acc2)}
-.combo-missing{display:flex;flex-wrap:wrap;gap:6px}
-.combo-link{font-size:12px;color:var(--dim);text-decoration:none;align-self:flex-start}
-.combo-link:hover{color:var(--acc)}
+.combo-results{margin:0;padding-left:20px;font-size:13px;font-weight:600;color:var(--acc2);line-height:1.4}
+.combo-results li{margin:1px 0}
+.combo-results-1{font-size:13px;font-weight:600;color:var(--acc2)}
+.combo-syn-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.combo-syn-grid .syn-card{padding:6px;gap:4px}
+.combo-syn-grid .syn-exp{display:none}
+.combo-syn-grid .syn-name{font-size:12px}
+.combo-syn-grid .syn-type{font-size:10px}
+.combo-syn-grid .syn-price{font-size:11px}
+.combo-syn-grid .syn-add{font-size:10px;padding:2px 8px}
+.combo-syn-grid .syn-owned{font-size:10px;padding:2px 5px;top:4px;right:4px}
+.combo-det>summary{cursor:pointer;font-size:12px;color:var(--dim);width:fit-content}
+.combo-det>summary:hover{color:var(--acc)}
+.combo-det[open]>summary{color:var(--txt);margin-bottom:4px}
+.combo-det-body{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--dim);line-height:1.45}
+.combo-det-body b{color:var(--txt)}
+.combo-det-body a{color:var(--dim)}
+.combo-det-body a:hover{color:var(--acc)}
+.combo-steps{margin:4px 0 0;padding-left:18px}
+.combo-steps li{margin:2px 0}
+.combo-det-body .mana{width:.95em;height:.95em}
 .syn-add.owned:hover{border-color:var(--acc);filter:none}
 
 /* Spielrunde (live) */

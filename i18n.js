@@ -1855,6 +1855,33 @@ Object.assign(I18N.it, {
   "combo.missTitle": "Non è nella tua collezione",
 });
 
+/* ---- Teil 13: Combo-Details (aufklappbar) ---- */
+Object.assign(I18N.de, {
+  "combo.prereq": "Voraussetzungen",
+  "combo.steps": "Ablauf",
+  "combo.onCsb": "Auf Commander Spellbook ansehen",
+});
+Object.assign(I18N.en, {
+  "combo.prereq": "Prerequisites",
+  "combo.steps": "Steps",
+  "combo.onCsb": "View on Commander Spellbook",
+});
+Object.assign(I18N.fr, {
+  "combo.prereq": "Prérequis",
+  "combo.steps": "Étapes",
+  "combo.onCsb": "Voir sur Commander Spellbook",
+});
+Object.assign(I18N.es, {
+  "combo.prereq": "Requisitos",
+  "combo.steps": "Pasos",
+  "combo.onCsb": "Ver en Commander Spellbook",
+});
+Object.assign(I18N.it, {
+  "combo.prereq": "Prerequisiti",
+  "combo.steps": "Passaggi",
+  "combo.onCsb": "Vedi su Commander Spellbook",
+});
+
 /* ---- Teil 7: Spielrunde (live) ---- */
 Object.assign(I18N.de, {
   "nav.session": "Spielrunde",

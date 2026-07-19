@@ -2484,64 +2484,64 @@ async function combosApi(body) {
   return data;
 }
 
-/* Fehlende Combo-Karten (nur Namen) bei Scryfall zu vollen Objekten auflösen
-   (ein Sammel-Request bis 75) und in SYN_CACHE legen — dann übernimmt sie der
-   bestehende „+ Wunsch"-Knopf (.syn-add) ins Deck. Gibt Map name→scryfall-id. */
-async function comboFehlkartenLaden(namen) {
+/* Alle in Combos vorkommenden Karten (nach Name) bei Scryfall zu vollen
+   Objekten auflösen — für die Kachel-Darstellung (Bild/Typ/Preis) und den
+   „+ Deck"/„+ Wunsch"-Knopf. Sammel-Requests in Blöcken zu 75. Map name→Karte. */
+async function comboKartenLaden(namen) {
   const byLower = new Map();
-  const uniq = [...new Set(namen.filter(Boolean))].slice(0, 75);
-  if (!uniq.length) return byLower;
-  try {
-    const r = await fetch("https://api.scryfall.com/cards/collection", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ identifiers: uniq.map(name => ({ name })) }),
-    });
-    if (r.ok) for (const c of (await r.json()).data || []) {
-      SYN_CACHE.set(c.id, c);
-      byLower.set((c.name || "").toLowerCase(), c.id);
-    }
-  } catch { /* ohne Auflösung eben kein +Wunsch */ }
+  const uniq = [...new Set(namen.map(n => (n || "").trim()).filter(Boolean))];
+  for (let i = 0; i < uniq.length; i += 75) {
+    try {
+      const r = await fetch("https://api.scryfall.com/cards/collection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ identifiers: uniq.slice(i, i + 75).map(name => ({ name })) }),
+      });
+      if (r.ok) for (const c of (await r.json()).data || []) byLower.set((c.name || "").toLowerCase(), c);
+    } catch { /* ohne Auflösung Fallback-Text */ }
+  }
   return byLower;
 }
 
-/* Eine Combo als Kachel: Payoff (was sie bewirkt), die beteiligten Karten
-   (fehlende rot), bei „fast fertig" je Fehlkarte ein „+ Wunsch" (sofern
-   Scryfall die Karte kennt), und ein Link auf die Combo-Seite von CSB. */
-function comboKachel(combo, deckId, sidByName) {
+/* Eine Combo als voller Block — im Stil der Synergie-Ansicht:
+   - die Ergebnisse (was die Combo bewirkt) als Liste, Punkt für Punkt,
+   - die beteiligten Karten als kompakte Synergie-Kacheln (Bild/Name/Typ/Preis);
+     fehlt eine im Deck, trägt sie den „+ Deck"/„+ Wunsch"-Knopf (synKachel
+     entscheidet über den Besitz — Abgleich per oracle_id, also Sprache/Foil egal),
+   - die Details (Voraussetzungen + Ablauf mit Mana-Symbolen + CSB-Link)
+     aufklappbar statt als bloßer Link.
+   cardByName: Map name→Scryfall-Karte (aus comboKartenLaden). */
+function comboKachel(combo, deckId, cardByName) {
   const fehlt = new Set((combo.missing || []).map(m => (m.name || "").toLowerCase()));
-  // Fehlt eine Karte IM DECK, heißt das nicht, dass man sie nicht BESITZT: hat
-  // man sie (irgendeine Auflage — Abgleich über oracle_id, also Sprache/Foil
-  // egal), ist sie nur „nicht in diesem Deck" (gold), sonst wirklich fehlt (rot).
-  const besitzt = (name, oracleId) => besessenAnzahl({ oracle_id: oracleId, name }) > 0;
   const karten = (combo.uses || []).map(u => {
-    if (!fehlt.has((u.name || "").toLowerCase())) return `<span class="combo-card">${esc(u.name)}</span>`;
-    const have = besitzt(u.name, u.oracleId);
-    return `<span class="combo-card ${have ? "have" : "missing"}" title="${
-      esc(t(have ? "combo.haveTitle" : "combo.missTitle"))}">${esc(u.name)}</span>`;
+    const sc = cardByName && cardByName.get((u.name || "").toLowerCase());
+    if (!sc) return `<div class="syn-card"><div class="syn-name">${esc(u.name)}</div></div>`;
+    // Knopf nur bei im Deck fehlender Karte; synKachel macht daraus je nach
+    // Besitz „+ Deck" (verknüpft die eigene Karte) oder „+ Wunsch".
+    const alsAktion = deckId && fehlt.has((u.name || "").toLowerCase());
+    return synKachel(sc, "", alsAktion ? deckId : null);
   }).join("");
-  const payoff = (combo.produces || []).slice(0, 4).map(esc).join(" &middot; ") || esc(t("combo.result"));
-  // Nur AKTIONierbare Fehlkarten (von Scryfall aufgelöst) bekommen einen Knopf;
-  // nicht auflösbare stehen ohnehin schon oben in den Karten. Besitzt man die
-  // Karte, heißt der Knopf „ins Deck" (verknüpft die eigene Karte, gedämpfter
-  // Stil), sonst „als Wunsch" (Bestand 0, Goldakzent) — wie bei den Synergien.
-  let wunsch = "";
-  if (deckId && combo.missing?.length) {
-    const btns = combo.missing.map(m => {
-      const sid = sidByName && sidByName.get((m.name || "").toLowerCase());
-      if (!sid) return "";
-      const owned = besitzt(m.name, m.oracleId);
-      return `<button class="syn-add${owned ? " owned" : ""}" data-deck="${esc(deckId)}" data-sid="${esc(sid)}"
-        title="${esc(owned ? t("syn.addOwnedTitle") : t("combo.addWishTitle", { name: m.name }))}">&#43;&#160;${esc(m.name)}</button>`;
-    }).filter(Boolean).join("");
-    if (btns) wunsch = `<div class="combo-missing">${btns}</div>`;
-  }
+
+  const produces = combo.produces || [];
+  const ergebnis = produces.length
+    ? `<ul class="combo-results">${produces.map(p => `<li>${esc(p)}</li>`).join("")}</ul>`
+    : `<div class="combo-results-1">${esc(t("combo.result"))}</div>`;
+
   const url = `https://commanderspellbook.com/combo/${encodeURIComponent(combo.id)}/`;
+  const prereq = (combo.prerequisites || "").trim();
+  const schritte = (combo.description || "").split("\n").map(s => s.trim()).filter(Boolean);
+  const details = [
+    prereq ? `<div><b>${esc(t("combo.prereq"))}:</b> ${mitSymbolen(prereq)}</div>` : "",
+    schritte.length ? `<div><b>${esc(t("combo.steps"))}:</b><ol class="combo-steps">${
+      schritte.map(s => `<li>${mitSymbolen(s)}</li>`).join("")}</ol></div>` : "",
+    `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(t("combo.onCsb"))} &#8599;</a>`,
+  ].filter(Boolean).join("");
+
   return `<div class="combo">
-    <div class="combo-produces">&#10148; ${payoff}</div>
-    <div class="combo-cards">${karten}</div>
-    ${wunsch}
-    <a class="combo-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(t("combo.details"))} &#8599;</a>
+    ${ergebnis}
+    <div class="combo-syn-grid">${karten}</div>
+    <details class="combo-det"><summary>${esc(t("combo.details"))}</summary>
+      <div class="combo-det-body">${details}</div></details>
   </div>`;
 }
 
@@ -2564,15 +2564,16 @@ async function deckCombosAnzeigen(box, cards, deckId) {
   const included = data.included || [], almost = data.almostIncluded || [];
   if (!included.length && !almost.length) { box.innerHTML = `<div class="empty">${esc(t("combo.none"))}</div>`; return; }
 
-  // Fehlkarten aller „fast fertigen" Combos einmal bei Scryfall auflösen (+Wunsch).
-  const sidByName = await comboFehlkartenLaden(almost.flatMap(c => (c.missing || []).map(m => m.name)));
+  // Alle Karten aller Combos (fertig + fast fertig) bei Scryfall auflösen —
+  // für die Kacheln und die „+ Deck"/„+ Wunsch"-Knöpfe.
+  const cardByName = await comboKartenLaden([...included, ...almost].flatMap(c => (c.uses || []).map(u => u.name)));
   if (lauf !== combosLauf) return;
 
   const teile = [`<div class="meta">${esc(t("combo.deckNote"))} <a href="https://commanderspellbook.com/" target="_blank" rel="noopener noreferrer">Commander Spellbook</a></div>`];
   if (included.length)
-    teile.push(`<div class="combo-h">${esc(t("combo.have", { n: included.length }))}</div><div class="combo-grid">${included.map(c => comboKachel(c, deckId, sidByName)).join("")}</div>`);
+    teile.push(`<div class="combo-h">${esc(t("combo.have", { n: included.length }))}</div><div class="combo-grid">${included.map(c => comboKachel(c, deckId, cardByName)).join("")}</div>`);
   if (almost.length)
-    teile.push(`<div class="combo-h">${esc(t("combo.almost", { n: almost.length }))}</div><div class="combo-grid">${almost.map(c => comboKachel(c, deckId, sidByName)).join("")}</div>`);
+    teile.push(`<div class="combo-h">${esc(t("combo.almost", { n: almost.length }))}</div><div class="combo-grid">${almost.map(c => comboKachel(c, deckId, cardByName)).join("")}</div>`);
   box.innerHTML = teile.join("");
 }
 
@@ -2594,8 +2595,10 @@ async function sammlungCombosAnzeigen(box, cards) {
   if (lauf !== combosLauf) return;
   const included = data.included || [];
   if (!included.length) { box.innerHTML = `<div class="empty">${esc(t("combo.collNone"))}</div>`; return; }
+  const cardByName = await comboKartenLaden(included.flatMap(c => (c.uses || []).map(u => u.name)));
+  if (lauf !== combosLauf) return;
   box.innerHTML = `<div class="meta">${esc(t("combo.collHave", { n: included.length }))} <a href="https://commanderspellbook.com/" target="_blank" rel="noopener noreferrer">Commander Spellbook</a></div>
-    <div class="combo-grid" style="margin-top:6px">${included.map(c => comboKachel(c, null, null)).join("")}</div>`;
+    <div class="combo-grid" style="margin-top:6px">${included.map(c => comboKachel(c, null, cardByName)).join("")}</div>`;
 }
 
 /* Combos, in denen eine einzelne Karte vorkommt (Modus variants). Kein
@@ -2617,7 +2620,9 @@ async function karteCombosAnzeigen(box, card) {
   if (lauf !== combosLauf) return;
   const combos = data.combos || [];
   if (!combos.length) { box.innerHTML = `<div class="empty">${esc(t("combo.cardNone"))}</div>`; return; }
-  box.innerHTML = `<div class="meta">${esc(t("combo.cardNote", { n: combos.length }))} <a href="https://commanderspellbook.com/" target="_blank" rel="noopener noreferrer">Commander Spellbook</a></div><div class="combo-grid">${combos.map(c => comboKachel(c, null, null)).join("")}</div>`;
+  const cardByName = await comboKartenLaden(combos.flatMap(c => (c.uses || []).map(u => u.name)));
+  if (lauf !== combosLauf) return;
+  box.innerHTML = `<div class="meta">${esc(t("combo.cardNote", { n: combos.length }))} <a href="https://commanderspellbook.com/" target="_blank" rel="noopener noreferrer">Commander Spellbook</a></div><div class="combo-grid">${combos.map(c => comboKachel(c, null, cardByName)).join("")}</div>`;
 }
 
 /* Analyse in einen Container zeichnen: Balken je Kategorie, darunter Vorschläge
