@@ -1909,17 +1909,14 @@ function detailHtml(c, hover) {
             <button class="btn ghost sm syn-ai-btn" id="dt-syn-ai" title="${esc(t("syn.aiTitle"))}">&#10024; ${esc(t("syn.ai"))}</button>
             <button class="btn ghost sm" id="dt-combos" title="${esc(t("combo.cardTitle"))}">&#128279; ${esc(t("combo.btn"))}</button>
           </div>
-        </div>
-        <div class="sec-sep"></div>
-        <details class="legal-det"><summary>&#128200; ${esc(t("detail.priceHistory"))}</summary>
-          <div style="margin-top:8px">${priceChart(c.hist, 320, 150)}</div>
-        </details>`
+        </div>`
     : `<div style="margin-top:10px">
           <label style="margin-bottom:2px">${esc(t("detail.priceHistory"))}</label>
           ${priceChart(c.hist, 320, 150)}
         </div>`;
   return `
     <div class="detail">
+      ${!hover ? `<div class="detail-added">${esc(t("detail.added"))}: ${esc(dtShort(c.added))} ${esc(t("detail.addedSuffix"))}</div>` : ""}
       ${gross ? `<img class="detail-img" src="${esc(gross)}" alt="">` : ""}
       <div class="detail-info">
         <div class="name-zeile"><b style="font-size:17px">${esc(c.disp)}</b>${c.mana_cost
@@ -1939,10 +1936,13 @@ function detailHtml(c, hover) {
           ${links}
         </div>
         ${block}
-        <div class="hint" style="margin-top:10px">${esc(t("detail.added"))}: ${dtShort(c.added)} ${esc(t("detail.addedSuffix"))}</div>
+        ${hover ? `<div class="hint" style="margin-top:10px">${esc(t("detail.added"))}: ${esc(dtShort(c.added))} ${esc(t("detail.addedSuffix"))}</div>` : ""}
       </div>
     </div>
-    ${!hover ? `<div id="syn-box" class="dt-results-full"></div>
+    ${!hover ? `<details class="legal-det dt-price-full"><summary>&#128200; ${esc(t("detail.priceHistory"))}</summary>
+      <div style="margin-top:8px">${priceChart(c.hist, 900, 200)}</div>
+    </details>
+    <div id="syn-box" class="dt-results-full"></div>
     <div id="card-combo-box" class="dt-results-full"></div>` : ""}`;
 }
 

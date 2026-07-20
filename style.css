@@ -469,6 +469,9 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
 .field{display:flex;flex-direction:column;gap:3px}
 .field>label{font-size:11px;color:var(--dim);text-transform:none;letter-spacing:0;margin:0}
 .field>input{margin:0;width:100%}
+/* In einer Werkzeugzeile steht das Eingabefeld neben Knöpfen (.btn.sm) — gleiche
+   Maße (Polster + Schriftgröße), damit es genau so hoch ist wie die Knöpfe. */
+.tool-row .field>input{padding:5px 10px;font-size:13px}
 .tool-sep{height:1px;background:var(--line)}
 
 /* ------------------------------------------------------------ Sammlung */
@@ -647,7 +650,9 @@ dialog::backdrop{background:#000a}
 
 /* -------------------------------------------------- Karten-Detailansicht */
 #detail-dlg{max-width:920px;width:94vw}
-.detail{display:flex;gap:16px;flex-wrap:wrap}
+.detail{display:flex;gap:16px;flex-wrap:wrap;position:relative}
+/* „Hinzugefügt am" oben rechts in der Ecke des Fensters statt unten. */
+.detail-added{position:absolute;top:0;right:0;font-size:12px;color:var(--dim);white-space:nowrap}
 .detail-img{width:230px;max-width:100%;border-radius:10px;background:#000;flex:none;align-self:flex-start}
 .detail-info{flex:1;min-width:220px}
 /* Kartendetail aufgeräumt: Kopie-Zeile (Pillen + Preis + Kauf-Logos), dünne
@@ -658,6 +663,10 @@ dialog::backdrop{background:#000a}
 .sec-sep{height:1px;background:var(--line);margin:14px 0}
 .dt-results-full{margin-top:14px}
 .dt-results-full:empty{display:none}
+/* Preisverlauf über die volle Fensterbreite (mit den Dialog-Einzügen); der
+   Graph füllt die Breite, statt auf 360px begrenzt zu sein. */
+.dt-price-full{margin-top:14px}
+.dt-price-full .chart-svg{max-width:none}
 .chart-svg{width:100%;max-width:360px;height:auto;display:block;margin-top:4px}
 
 /* Fähigkeiten. Schlüsselwörter als Tags, darunter der Regeltext in einem
