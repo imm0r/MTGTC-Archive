@@ -1590,7 +1590,10 @@ async function updatePrices() {
   for (const sid of uniq) {
     btn.textContent = t("coll.updatingProgress", { done: ++done, total: uniq.length });
     let fresh = null;
-    try { fresh = await sfById(sid); } catch { failed++; continue; }
+    // withPrice zieht bei fremdsprachigen Auflagen den Preis der englischen
+    // Auflage nach — genau wie der Einzel-Weg (preisNeuZiehen). Ohne das blieben
+    // deutsche Karten hier ohne eur-Preis und set_price schriebe price = null.
+    try { fresh = await withPrice(await sfById(sid)); } catch { failed++; continue; }
     if (!fresh) { failed++; continue; }
     for (const c of CARDS.filter(x => x.scryfall_id === sid)) {
       const { error } = await sb.rpc("set_price", { p_card_id: c.id, p_price: priceOf(fresh, c.foil) });
