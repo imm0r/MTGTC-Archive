@@ -644,6 +644,14 @@ dialog::backdrop{background:#000a}
 .detail{display:flex;gap:16px;flex-wrap:wrap}
 .detail-img{width:230px;max-width:100%;border-radius:10px;background:#000;flex:none;align-self:flex-start}
 .detail-info{flex:1;min-width:220px}
+/* Kartendetail aufgeräumt: Kopie-Zeile (Pillen + Preis + Kauf-Logos), dünne
+   Abschnitts-Trenner und die Vorschlags-/Combo-Ergebnisse über die VOLLE Breite
+   (außerhalb der rechten Spalte — beginnen linksbündig unter dem Kartenbild). */
+.detail-copy{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:12px 0}
+.detail-preis{margin-left:auto}
+.sec-sep{height:1px;background:var(--line);margin:14px 0}
+.dt-results-full{margin-top:14px}
+.dt-results-full:empty{display:none}
 .chart-svg{width:100%;max-width:360px;height:auto;display:block;margin-top:4px}
 
 /* Fähigkeiten. Schlüsselwörter als Tags, darunter der Regeltext in einem

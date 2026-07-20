@@ -2243,6 +2243,13 @@ Object.assign(I18N.it, {
   "bracket.footer": "Stima di Commander Spellbook secondo il sistema ufficiale dei bracket (1–5).",
 });
 
+/* ---- Teil 22: Kartendetail aufgeräumt (Werkzeug-Gruppen) ---- */
+Object.assign(I18N.de, { "detail.groupManage": "Verwaltung", "detail.groupTools": "Vorschläge & Combos" });
+Object.assign(I18N.en, { "detail.groupManage": "Manage", "detail.groupTools": "Suggestions & combos" });
+Object.assign(I18N.fr, { "detail.groupManage": "Gestion", "detail.groupTools": "Suggestions & combos" });
+Object.assign(I18N.es, { "detail.groupManage": "Gestión", "detail.groupTools": "Sugerencias y combos" });
+Object.assign(I18N.it, { "detail.groupManage": "Gestione", "detail.groupTools": "Suggerimenti e combo" });
+
 /* ---- Teil 7: Spielrunde (live) ---- */
 Object.assign(I18N.de, {
   "nav.session": "Spielrunde",
