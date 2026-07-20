@@ -22,6 +22,17 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const today = () => { const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 
+/* App-Version = der Cache-Buster ?v= des eigenen <script>-Tags. Eine einzige
+   Quelle der Wahrheit: der Betreiber zählt sie ohnehin bei jeder Änderung in
+   index.html hoch (siehe README), hier wird sie nur angezeigt. */
+const APP_VERSION = (() => {
+  try {
+    const s = document.currentScript || document.querySelector('script[src*="app.js"]');
+    const m = s && String(s.src).match(/[?&]v=([0-9]+)/);
+    return m ? m[1] : "";
+  } catch { return ""; }
+})();
+
 let toastTimer;
 function toast(msg) {
   const t = $("#toast");
@@ -4688,7 +4699,8 @@ function renderSettings() {
         <span>${esc(t("admin.kiFlag"))}</span>
       </label>
       <p class="hint">${esc(t("admin.hint"))}</p>
-    </div>` : ""}`;
+    </div>` : ""}
+    <p class="hint app-version">${esc(t("settings.version", { v: APP_VERSION || "—" }))}</p>`;
   // Eigenes Sprach-Dropdown mit Flaggen (ein natives <option> kann kein SVG
   // tragen, und Windows zeigt Flaggen-Emoji nur als Buchstaben). Öffnen/Schließen
   // wie das Benutzermenü über die Klasse „open"; Außenklick schließt (wireApp).
