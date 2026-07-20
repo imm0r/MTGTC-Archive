@@ -119,8 +119,10 @@ Deno.serve(async (req) => {
   const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
   const admin = createClient(URL, SERVICE, { auth: { persistSession: false } });
 
-  const cronSecret = req.headers.get("x-cron-secret");
-  const CRON = Deno.env.get("CRON_SECRET");
+  // trim(): häufige Copy-&-Paste-Falle sind unsichtbare Leerzeichen/Zeilenumbrüche
+  // am Ende des Secrets — die sollen den Abgleich nicht scheitern lassen.
+  const cronSecret = (req.headers.get("x-cron-secret") || "").trim();
+  const CRON = (Deno.env.get("CRON_SECRET") || "").trim();
   const istCron = !!cronSecret && !!CRON && cronSecret === CRON;
 
   // ---------------- Nutzer-Modus: Einladung ----------------
