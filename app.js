@@ -4765,12 +4765,19 @@ function renderRules() {
   ta.onkeydown = e => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); regelFrageStellen(); } };
 }
 
-async function regelFrageStellen() {
+function regelFrageStellen() {
   const ta = $("#rules-q"); if (!ta) return;
   const situation = ta.value.trim();
-  const out = $("#rules-out");
   if (situation.length < 5) { toast(t("rules.tooShort")); ta.focus(); return; }
+  regelAbfragen(situation);
+}
 
+/* Kernabfrage: schickt die Schilderung an die Function und zeigt ENTWEDER eine
+   Rückfrage (wenn das Modell die Situation noch nicht eindeutig versteht) ODER
+   das fertige Urteil. `situation` ist der aktuell gesendete Text inkl. bisheriger
+   Ergänzungen — eine weitere Rückfrage baut darauf auf. */
+async function regelAbfragen(situation) {
+  const out = $("#rules-out");
   const lauf = ++rulesLauf;
   const btn = $("#rules-ask"); if (btn) btn.disabled = true;
   if (out) out.innerHTML = `<div class="card"><div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("rules.loading"))}</div></div>`;
@@ -4790,6 +4797,15 @@ async function regelFrageStellen() {
     return;
   }
   if (data?.error) { if (out) out.innerHTML = `<div class="card"><div class="empty">${esc(data.error)}</div></div>`; return; }
+
+  // Rückfrage: das Modell braucht erst noch Angaben. Fragen anzeigen, Antwortfeld
+  // öffnen — nichts kommt in den Verlauf, das passiert erst mit dem Urteil.
+  if (data?.clarify && Array.isArray(data.questions) && data.questions.length) {
+    if (out) out.innerHTML = regelClarifyHtml(data.questions);
+    wireClarify(situation, data.questions);
+    return;
+  }
+
   if (!data?.ruling) { if (out) out.innerHTML = `<div class="card"><div class="empty">${esc(t("rules.error"))}</div></div>`; return; }
 
   const eintrag = { q: situation, ...data };
@@ -4799,7 +4815,38 @@ async function regelFrageStellen() {
   const log = $("#rules-log");
   if (log) log.innerHTML = RULES_LOG.map(regelAntwortHtml).join("");
   // Eingabe geleert: die Frage steht jetzt oben im Verlauf.
-  ta.value = ""; RULES_DRAFT = "";
+  const ta = $("#rules-q"); if (ta) ta.value = ""; RULES_DRAFT = "";
+}
+
+/* Rückfrage-Karte: die Fragen des Modells + ein Feld für die Antwort. */
+function regelClarifyHtml(questions) {
+  return `
+    <div class="card regel-clarify">
+      <div class="regel-clarify-head">&#128172; ${esc(t("rules.clarifyTitle"))}</div>
+      <p class="hint" style="margin-top:2px">${esc(t("rules.clarifyIntro"))}</p>
+      <ul class="regel-clarify-qs">${questions.map(q => `<li>${esc(q)}</li>`).join("")}</ul>
+      <textarea id="rules-answer" class="rules-input" rows="3" placeholder="${esc(t("rules.answersPh"))}"></textarea>
+      <div class="row" style="margin-top:10px">
+        <div style="flex:none"><button class="btn" id="rules-answer-go">${esc(t("rules.answerBtn"))}</button></div>
+      </div>
+    </div>`;
+}
+
+/* Antwort auf die Rückfragen: an die ursprüngliche Schilderung anhängen (samt der
+   gestellten Fragen, damit das Modell den Bezug hat) und erneut abfragen. Reicht
+   die Ergänzung noch nicht, darf das Modell noch einmal nachfragen. */
+function wireClarify(baseSituation, questions) {
+  const ans = $("#rules-answer"), go = $("#rules-answer-go");
+  if (!ans || !go) return;
+  ans.focus();
+  const submit = () => {
+    const a = ans.value.trim();
+    if (a.length < 2) { toast(t("rules.tooShort")); ans.focus(); return; }
+    const combined = `${baseSituation}\n\n${t("rules.clarifyLabel")}\n${questions.map(q => "- " + q).join("\n")}\n\n${t("rules.answersLabel")}\n${a}`;
+    regelAbfragen(combined);
+  };
+  go.onclick = submit;
+  ans.onkeydown = e => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); submit(); } };
 }
 
 /* Eine beantwortete Regelfrage als Karte. Zitate kommen WÖRTLICH aus dem
