@@ -639,6 +639,11 @@ dialog{background:var(--panel);color:var(--txt);border:1px solid var(--line);bor
        padding:16px;max-width:440px;width:92vw}
 dialog::backdrop{background:#000a}
 
+/* Deck-Import: das Textfeld für die eingefügte Deckliste (Monospace, damit die
+   „N Kartenname"-Zeilen sauber untereinander stehen). */
+.imp-text{width:100%;min-height:230px;resize:vertical;font-family:ui-monospace,
+  SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;line-height:1.5}
+
 /* -------------------------------------------------- Karten-Detailansicht */
 #detail-dlg{max-width:920px;width:94vw}
 .detail{display:flex;gap:16px;flex-wrap:wrap}

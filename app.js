@@ -4980,6 +4980,123 @@ async function importFriendDeck(deckId) {
   } catch (e) { toast(dbErr(e)); }
 }
 
+/* ============ Import einer Text-Deckliste (mtgsalvation & Co.) ==========
+   mtgsalvation.com (und die meisten Deckbau-Seiten) exportieren Decks als Text:
+   Deckname bzw. [deck=…]-BBCode oben, Abschnittsüberschriften (Commander,
+   Creature, Land …) und Zeilen „N Kartenname". Wir parsen das, lösen die Namen
+   bei Scryfall auf und legen ein neues Deck an; nicht besessene Karten entstehen
+   wie beim „+ Deck"-Weg (add_wish_to_deck) als Bestand-0-Platzhalter. */
+const IMP_SEKTIONEN = new Set(["commander", "commanders", "creature", "creatures", "land", "lands",
+  "artifact", "artifacts", "enchantment", "enchantments", "instant", "instants", "sorcery", "sorceries",
+  "planeswalker", "planeswalkers", "battle", "battles", "sideboard", "maybeboard", "companion",
+  "token", "tokens", "spell", "spells", "other", "unsorted", "deck", "mainboard"]);
+
+function parseDeckliste(text) {
+  let deckName = "", sektion = "";
+  const commanders = [], eintraege = new Map();
+  const add = (name, qty) => {
+    // Set-/Nummer-Suffixe abschneiden: „Sol Ring [C21]", „Sol Ring (C21) 263".
+    name = name.replace(/\s*[[(]\s*[a-z0-9]{2,6}\s*[\])]\s*\d*\s*$/i, "").trim();
+    if (!name) return;
+    // Kommandeur = Zeile im Commander-Abschnitt (mtgsalvation schreibt ihn dort
+    // OHNE Menge). Deckel gegen einen Export ohne weitere Abschnittsköpfe.
+    if ((sektion === "commander" || sektion === "commanders") && commanders.length < 4) commanders.push(name);
+    eintraege.set(name, (eintraege.get(name) || 0) + qty);
+  };
+  for (const roh of String(text || "").split(/\r?\n/)) {
+    let z = roh.trim();
+    if (!z) continue;
+    const bb = z.match(/^\[deck=(.+?)\]$/i);
+    if (bb) { if (!deckName) deckName = bb[1].trim(); continue; }
+    if (/^\[/.test(z)) { z = z.replace(/\[[^\]]*\]/g, "").trim(); if (!z) continue; }   // sonstiges BBCode
+    if (/^(\/\/|#)/.test(z)) continue;                                                  // Kommentar
+    const m = z.match(/^(\d+)\s*[xX]?\s+(.+)$/);
+    if (m) { add(m[2], Math.max(1, Math.min(99, parseInt(m[1], 10)))); continue; }
+    if (IMP_SEKTIONEN.has(z.toLowerCase())) { sektion = z.toLowerCase(); continue; }
+    // Erste blanke Zeile VOR jedem Abschnitt = Deckname. Steht sie schon in einem
+    // Abschnitt (z. B. der Kommandeur unter „Commander"), ist sie eine Karte.
+    if (!deckName && !sektion) { deckName = z; continue; }
+    add(z, 1);                                    // blanke Kartenzeile (z. B. Commander ohne Menge)
+  }
+  return { deckName, commanders, eintraege: [...eintraege].map(([name, qty]) => ({ name, qty })) };
+}
+
+/* Namen bei Scryfall auflösen: erst Sammel-Request (POST /cards/collection,
+   75/Anfrage, EXAKTER Name), dann für nicht exakt Getroffene ein Fuzzy-Einzel-
+   abruf. Map: angefragter Name (kleingeschrieben) → Scryfall-Karte. */
+async function deckNamenAufloesen(namen) {
+  const uniq = [...new Set(namen.map(n => n.trim()).filter(Boolean))];
+  const out = new Map();
+  for (let i = 0; i < uniq.length; i += 75) {
+    try {
+      const r = await fetch("https://api.scryfall.com/cards/collection", {
+        method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ identifiers: uniq.slice(i, i + 75).map(name => ({ name })) }),
+      });
+      if (r.ok) for (const c of (await r.json()).data || [])
+        for (const nm of [c.name, c.card_faces?.[0]?.name].filter(Boolean)) out.set(nm.toLowerCase(), c);
+    } catch { /* Block scheitert → der Fuzzy-Fallback fängt diese Namen */ }
+  }
+  for (const n of uniq) {
+    if (out.has(n.toLowerCase())) continue;
+    try { const c = await sfNamed(n); if (c?.id) out.set(n.toLowerCase(), c); } catch { /* bleibt fehlend */ }
+  }
+  return out;
+}
+
+async function deckImportieren(text, btn) {
+  const { deckName, commanders, eintraege } = parseDeckliste(text);
+  if (!eintraege.length) return toast(t("imp.empty"));
+  const busy = (an, txt) => { if (btn) { btn.disabled = an;
+    btn.innerHTML = an ? `<span class="syn-spin">&#9881;</span> ${esc(txt || t("imp.busy"))}` : esc(t("imp.btn")); } };
+  busy(true);
+  try {
+    const karten = await deckNamenAufloesen(eintraege.map(e => e.name));
+    const { data: deck, error } = await sb.from("decks")
+      .insert({ name: (deckName || t("imp.defaultName")).slice(0, 100), format: commanders.length ? "Commander" : null })
+      .select("id").single();
+    if (error) throw error;
+    const istCmd = new Set(commanders.map(n => n.toLowerCase()));
+    const fehlend = [], rows = [];
+    let kommandeurId = null, fertig = 0;
+    // In kleinen Blöcken parallel — 100 RPCs sequenziell wären zäh.
+    for (let p = 0; p < eintraege.length; p += 8) {
+      const res = await Promise.all(eintraege.slice(p, p + 8).map(async e => {
+        const c = karten.get(e.name.toLowerCase());
+        if (!c) { fehlend.push(e.name); return null; }
+        try { return { e, cid: await wunschkarteZumDeck(deck.id, c) }; }
+        catch { fehlend.push(e.name); return null; }
+      }));
+      for (const r of res) if (r) {
+        rows.push({ deck_id: deck.id, card_id: r.cid, qty: r.e.qty });
+        if (!kommandeurId && istCmd.has(r.e.name.toLowerCase())) kommandeurId = r.cid;
+      }
+      fertig = Math.min(fertig + 8, eintraege.length);
+      busy(true, t("imp.progress", { i: fertig, n: eintraege.length }));
+    }
+    // Mengen in EINEM Rutsch setzen (add_wish_to_deck legt je 1 an).
+    if (rows.length) { const { error: e2 } = await sb.from("deck_entries").upsert(rows, { onConflict: "deck_id,card_id" }); if (e2) throw e2; }
+    if (kommandeurId) await sb.from("decks").update({ main_card_id: kommandeurId }).eq("id", deck.id);
+    await reload(); renderAll();
+    const b = $('nav button[data-v="decks"]'); if (b) b.click();
+    toast(fehlend.length ? t("imp.doneSome", { n: rows.length, f: fehlend.length }) : t("imp.done", { n: rows.length }));
+    if (fehlend.length) console.warn("Deck-Import — nicht gefunden:", fehlend);
+  } catch (e) { toast(dbErr(e)); }
+  finally { busy(false); }
+}
+
+/* Einfüge-Dialog: Deckliste reinkopieren, dann importieren. confirmDlg gibt nur
+   ok/abbrechen zurück — den Text lesen wir danach aus dem (noch stehenden) Body. */
+async function openDeckImport() {
+  const ok = await confirmDlg(`
+    <h3 style="margin:0 0 6px">${esc(t("imp.title"))}</h3>
+    <p class="hint" style="margin:0 0 8px">${esc(t("imp.hint"))}</p>
+    <textarea id="imp-text" class="imp-text" rows="12" placeholder="${esc(t("imp.ph"))}"></textarea>`);
+  if (!ok) return;
+  const text = $("#imp-text")?.value || "";
+  if (text.trim()) deckImportieren(text, $("#deck-import"));
+}
+
 /* ======================= Spielrunde (live) ==========================
    Synchrone Session über Supabase Realtime: befreundete Nutzer einladen, jeder
    tritt auf seinem Gerät bei, Lebenspunkte + Würfelwürfe aktualisieren sich bei
@@ -6117,6 +6234,7 @@ function wireApp() {
       await reload(); renderAll();
     } catch (e) { toast(dbErr(e)); }
   };
+  $("#deck-import").onclick = openDeckImport;
 
   $("#ex-json").onclick = () => download(`arcanum-archive-sicherung-${today()}.json`,
     JSON.stringify({ v: 2, exported: new Date().toISOString(), cards: CARDS, decks: DECKS }, null, 1),
