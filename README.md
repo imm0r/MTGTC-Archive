@@ -210,6 +210,64 @@ Tokens; die Kostenzeile im Ergebnis rechnet sie vor.
 Das Ergebnis ist KI-gestützt und ohne Gewähr: auf Turnieren entscheidet der
 Schiedsrichter, nicht die App.
 
+## Terminplaner: Einladungen & Erinnerungen per Mail
+
+Der Terminplaner kann zwei Arten von Mails verschicken:
+
+1. **Einladung** — sobald ein Termin mit eingeladenen Freunden angelegt wird
+   (oder später weitere eingeladen werden), bekommen diese eine Einladungs-Mail.
+2. **Erinnerung** — rund **3 Stunden vor Beginn** an alle auf der Gästeliste
+   außer Absagen. Das ist **pro Termin optional** (Häkchen „3 Stunden vorher per
+   Mail erinnern"), standardmäßig aus.
+
+Beides läuft über die Edge Function `event-mail`, die per **SMTP** über ein
+normales Postfach verschickt (die Adressen der Eingeladenen liegen in
+`auth.users` und sind nur serverseitig lesbar). Ohne die folgende Einrichtung
+bleibt der Terminplaner voll nutzbar — es werden nur keine Mails versendet
+(die App meldet das einmal als Hinweis).
+
+### Einrichten
+
+1. **Schema aktualisieren:** `supabase-schema.sql` erneut komplett ausführen
+   (ergänzt die Spalten `remind`/`reminded_at` und erweitert `create_event`).
+2. **Function deployen:** Supabase → **Edge Functions → Deploy a new function**,
+   Name `event-mail`, Inhalt von `supabase/functions/event-mail/index.ts`.
+   Diese Funktion prüft die Anmeldung selbst — daher **„Verify JWT" ausschalten**
+   (der Cron ruft sie mit einem eigenen Geheimnis auf).
+3. **Secrets setzen** (Edge Functions → Secrets):
+   - `SMTP_HOST`, `SMTP_PORT` (z. B. `465`), `SMTP_USER`, `SMTP_PASS` — Zugang
+     deines Postfachs. Für Gmail: ein **App-Passwort** erzeugen (nicht das
+     normale Passwort), Host `smtp.gmail.com`, Port `465`.
+   - `SMTP_FROM` — Absenderadresse (meist gleich `SMTP_USER`), optional
+     `SMTP_FROM_NAME` (Vorgabe „Arcanum Archive").
+   - `CRON_SECRET` — ein selbst gewähltes Geheimnis für den Erinnerungs-Cron.
+   - optional `APP_URL` (Link zur App in der Mail), `EVENT_TZ` (Vorgabe
+     `Europe/Berlin`). `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`/
+     `SUPABASE_ANON_KEY` stellt Supabase automatisch bereit.
+4. **Erinnerungs-Cron einrichten** (Supabase → **SQL Editor**, einmalig). Setze
+   `<CRON_SECRET>` auf denselben Wert wie oben:
+
+   ```sql
+   create extension if not exists pg_cron;
+   create extension if not exists pg_net;
+   select cron.schedule('event-reminders', '*/15 * * * *', $$
+     select net.http_post(
+       url     := 'https://<PROJEKT-REF>.supabase.co/functions/v1/event-mail',
+       headers := jsonb_build_object('Content-Type','application/json','x-cron-secret','<CRON_SECRET>'),
+       body    := '{}'::jsonb
+     );
+   $$);
+   ```
+
+   Alle 15 Minuten prüft der Sweep, welche Termine mit gesetzter Erinnerung in
+   den nächsten 3 Stunden starten und noch nicht erinnert wurden, verschickt die
+   Mails und merkt sich das (`reminded_at`), damit nichts doppelt kommt.
+
+**SMTP statt Mail-API bewusst gewählt:** keine Domain-Verifizierung nötig, der
+Absender ist das eigene Postfach — dafür gelten dessen Tageslimits (Gmail
+~500 Mails/Tag), was für eine Spielgruppe reichlich ist. Der `CRON_SECRET`
+gehört wie alle Secrets **nicht** ins Repository.
+
 ## Hinweise
 
 * Die App braucht Internet — für Scryfall, die Sprachdaten der Texterkennung

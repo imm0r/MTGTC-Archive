@@ -862,7 +862,14 @@ create table if not exists public.game_events (
   id uuid primary key default gen_random_uuid(),
   host uuid not null references auth.users(id) on delete cascade,
   title text not null, description text, starts_at timestamptz not null,
+  -- remind: der Gastgeber möchte alle ~3 h vorher per Mail erinnern lassen
+  -- (Opt-in). reminded_at hält fest, dass die Erinnerung raus ist, damit der
+  -- Sweep (Edge Function event-mail, Cron-Modus) nicht doppelt mailt.
+  remind boolean not null default false, reminded_at timestamptz,
   created timestamptz not null default now());
+-- Für bestehende Datenbanken nachrüsten (create table if not exists ergänzt keine Spalten):
+alter table public.game_events add column if not exists remind boolean not null default false;
+alter table public.game_events add column if not exists reminded_at timestamptz;
 create table if not exists public.event_rsvp (
   event_id uuid not null references public.game_events(id) on delete cascade,
   user_id  uuid not null references auth.users(id) on delete cascade,
@@ -898,15 +905,18 @@ create policy rsvp_update on public.event_rsvp for update to authenticated using
 create policy rsvp_delete on public.event_rsvp for delete to authenticated
   using (user_id = auth.uid() or public.event_host(event_id) = auth.uid());
 
--- Termin anlegen (Host-Zusage + Freunde einladen)
-create or replace function public.create_event(p_title text, p_desc text, p_starts_at timestamptz, p_invitees uuid[])
+-- Termin anlegen (Host-Zusage + Freunde einladen). p_remind: Erinnerung ~3 h
+-- vorher (Opt-in). Die alte 4-Argument-Fassung wird entfernt, damit der Aufruf
+-- mit vier Argumenten nicht mehrdeutig wird.
+drop function if exists public.create_event(text,text,timestamptz,uuid[]);
+create or replace function public.create_event(p_title text, p_desc text, p_starts_at timestamptz, p_invitees uuid[], p_remind boolean default false)
 returns uuid language plpgsql security definer set search_path=public as $$
 declare eid uuid; me uuid := auth.uid(); f uuid;
 begin
   if me is null then raise exception 'Nicht angemeldet'; end if;
   if coalesce(trim(p_title),'') = '' then raise exception 'Titel fehlt'; end if;
-  insert into public.game_events (host, title, description, starts_at)
-    values (me, left(p_title,120), nullif(trim(left(coalesce(p_desc,''),1000)),''), p_starts_at) returning id into eid;
+  insert into public.game_events (host, title, description, starts_at, remind)
+    values (me, left(p_title,120), nullif(trim(left(coalesce(p_desc,''),1000)),''), p_starts_at, coalesce(p_remind,false)) returning id into eid;
   insert into public.event_rsvp (event_id, user_id, status) values (eid, me, 'yes');
   if p_invitees is not null then foreach f in array p_invitees loop
     if f <> me and public.are_friends(me, f) then
@@ -914,7 +924,7 @@ begin
     end if; end loop; end if;
   return eid;
 end $$;
-revoke execute on function public.create_event(text,text,timestamptz,uuid[]) from anon;
+revoke execute on function public.create_event(text,text,timestamptz,uuid[],boolean) from anon;
 
 -- Live-Spielrunde aus Termin: Session + Zusagende ('yes'/'maybe') als eingeladen
 create or replace function public.start_session_from_event(p_event uuid, p_start_life integer default 40)
