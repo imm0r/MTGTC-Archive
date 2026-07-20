@@ -52,6 +52,22 @@ function confirmDlg(html) {
   });
 }
 
+/* Klick außerhalb des Dialog-Fensters (auf den dunklen Backdrop) schließt es —
+   zusätzlich zum Schließen-Knopf. Wir prüfen die Trefferfläche über die
+   Dialog-Maße statt bloß e.target: so schließt weder ein Klick auf das Polster
+   des Fensters noch ein im Inhalt begonnener Zug (z. B. Text markieren, dann
+   außerhalb loslassen) versehentlich. pointerdown reagiert nur, wenn der Druck
+   WIRKLICH auf dem Backdrop beginnt. Einmal je Dialog verdrahten. */
+function dialogBackdropSchliesst(dlg) {
+  if (!dlg) return;
+  dlg.addEventListener("pointerdown", e => {
+    if (e.target !== dlg) return;   // ein Kind (der Inhalt) wurde getroffen, nicht der Backdrop
+    const r = dlg.getBoundingClientRect();
+    const drin = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    if (!drin) dlg.close();         // außerhalb der Fensterfläche = Backdrop
+  });
+}
+
 /* ============================== Supabase ============================== */
 let sb = null, USER = null, PROFILE = null;
 let FLAGS = {}, IS_ADMIN = false;   // globale Feature-Schalter + ob der Nutzer Admin ist
@@ -6604,6 +6620,8 @@ function wireApp() {
   $("#sell-open").onclick = oeffneVerkauf;
   $("#sell-close").onclick = () => $("#sell-dlg").close();
   $("#buy-close").onclick = () => $("#buy-dlg").close();
+  // Klick außerhalb schließt diese „Fenster" (zusätzlich zum Schließen-Knopf).
+  ["#detail-dlg", "#sell-dlg", "#buy-dlg"].forEach(id => dialogBackdropSchliesst($(id)));
   $("#im-json").onclick = () => $("#im-file").click();
   $("#im-file").onchange = async e => {
     const f = e.target.files[0]; e.target.value = "";
