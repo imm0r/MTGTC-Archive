@@ -747,3 +747,4 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px}
 .regel-clarify-head{font-weight:600;color:var(--acc2);margin-bottom:2px}
 .regel-clarify-qs{margin:8px 0 12px;padding-left:20px;line-height:1.6}
 .regel-clarify-qs li{color:var(--txt);margin-bottom:3px}
+.app-version{text-align:center;margin-top:4px;opacity:.65;font-size:12px}
