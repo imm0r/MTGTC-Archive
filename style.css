@@ -697,7 +697,7 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px}
 /* --------- Cardmarket-Verkaufsliste --------- */
 .sell-toggle.on{border-color:var(--acc);color:var(--acc);background:rgba(201,162,39,.14);font-weight:700}
 #sell-open.has{border-color:var(--acc);color:var(--acc2)}
-#sell-dlg{max-width:560px;width:calc(100% - 32px)}
+#sell-dlg,#buy-dlg{max-width:560px;width:calc(100% - 32px)}
 .sell-liste{display:flex;flex-direction:column;max-height:46vh;overflow:auto;
   border:1px solid var(--line);border-radius:10px}
 .sell-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-top:1px solid var(--line)}

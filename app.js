@@ -3426,6 +3426,8 @@ function renderDecks() {
                   title="${esc(t("bracket.title"))}">&#9878; ${esc(t("bracket.btn"))}</button>
                 <button class="btn ghost" data-legalbtn="${d.id}"
                   title="${esc(t("legal.deckTitle"))}">&#9878; ${esc(t("legal.deckBtn"))}</button>
+                ${fehlt ? `<button class="btn ghost" data-buybtn="${d.id}"
+                  title="${esc(t("buy.deckTitle"))}">&#128722; ${esc(t("buy.deckBtn", { n: fehlt }))}</button>` : ""}
               </div>
             </div>
             <div class="tool-group">
@@ -3624,6 +3626,10 @@ function renderDecks() {
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
       .finally(() => synBtnBusy(b, lbl, false, "&#9878;"));
   });
+
+  // Fehlende Karten kaufen: die (Deckmenge > Bestand) fehlenden Karten in einen
+  // Dialog, dort als Cardmarket-Wants-Liste kopieren + Wants-Seite öffnen.
+  $$("[data-buybtn]").forEach(b => b.onclick = () => oeffneKauf(b.dataset.buybtn));
 
   // Deck-Bracket (Power-Level) über Commander Spellbook (estimate-bracket mit
   // der Deckliste). Das Ergebnis ersetzt die Knopf-Beschriftung („Bracket:
@@ -3982,6 +3988,93 @@ function bookmarkletSource() {
   }, function () { alert("Zwischenablage nicht lesbar – bitte die Leseberechtigung erlauben und erneut klicken."); });
 }
 const BOOKMARKLET = "javascript:(" + bookmarkletSource.toString().replace(/\s+/g, " ") + ")()";
+
+/* ---- „Fehlende Karten kaufen" -------------------------------------------
+   Aus einem (oft frisch importierten) Deck die Karten, die man NICHT genug
+   besitzt: fehlt = Deckmenge − Bestand. Cardmarket hat keine offene API und
+   keinen Warenkorb-Deeplink; am schnellsten kauft man dort über die „Wants"
+   per Decklisten-Einfügung. Wir liefern die fehlenden Karten als Decklisten-
+   Text (N Kartenname) zum Kopieren und öffnen die Wants-Seite; je Karte dazu
+   ein Cardmarket-Link (frisch importierte Karten haben keine cm_id → Suche
+   statt Produktseite). */
+function fehlendeKarten(d) {
+  return (d.entries || [])
+    .map(e => { const c = CARDS.find(x => x.id === e.cardId);
+                return c ? { c, fehlt: Math.max(0, e.qty - bestandVon(c)) } : null; })
+    .filter(x => x && x.fehlt > 0);
+}
+
+/* Cardmarket-Kartenname: nur die Vorderseite (Cardmarkets Produktname), ohne
+   „ // Rückseite" — sonst greift der Wants-/Such-Import bei Doppelkarten nicht. */
+function cmName(c) { return (c.name || c.disp || "").split(" // ")[0].trim(); }
+
+/* Wants-Import-Text: „N Kartenname" je Zeile — das Format, das Cardmarket unter
+   Wants → „Decklist zu Wants hinzufügen" erwartet. */
+function kaufWantlist(items) {
+  return items.map(({ c, fehlt }) => `${fehlt} ${cmName(c)}`).join("\n");
+}
+function cmSprache() { return ["de", "en", "fr", "es", "it"].includes(LANG) ? LANG : "en"; }
+function cmWantsUrl() { return `https://www.cardmarket.com/${cmSprache()}/Magic/Wants`; }
+function cmKaufLink(c) {
+  return c.cm_id ? cmLink(c.cm_id)
+    : `https://www.cardmarket.com/${cmSprache()}/Magic/Products/Search?searchString=${encodeURIComponent(cmName(c))}`;
+}
+
+let KAUF_DECK_ID = null;   // Deck, dessen Fehlliste der Kauf-Dialog gerade zeigt
+
+function oeffneKauf(deckId) {
+  KAUF_DECK_ID = deckId;
+  renderKauf();
+  $("#buy-dlg").showModal();
+}
+function kaufDeck() { return DECKS.find(d => d.id === KAUF_DECK_ID) || null; }
+
+function renderKauf() {
+  const body = $("#buy-body");
+  if (!body) return;
+  const d = kaufDeck();
+  const items = d ? fehlendeKarten(d) : [];
+  const head = `<h3 style="margin:0 0 6px">${esc(t("buy.title"))}${d ? " – " + esc(d.name) : ""}</h3>`;
+  if (!items.length) { body.innerHTML = head + `<p class="hint">${esc(t("buy.complete"))}</p>`; return; }
+  const stueck = items.reduce((s, x) => s + x.fehlt, 0);
+  const summe  = items.reduce((s, x) => s + (x.c.price || 0) * x.fehlt, 0);
+  const sub = `<p class="hint" style="margin:0 0 10px">${esc(t("buy.summary", { n: items.length, s: stueck }))} · ~${eur(summe)}</p>`;
+  const liste = items.map(({ c, fehlt }) => `
+    <div class="sell-item">
+      ${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy">` : `<div class="sell-noimg"></div>`}
+      <div class="sell-meta">
+        <div class="sell-nm">${esc(c.disp || c.name)}</div>
+        <div class="hint">${esc([c.set_name, cmName(c)].filter(Boolean).join(" · "))}</div>
+      </div>
+      <div class="sell-pq">${fehlt}&times; ${c.price == null ? "&mdash;" : eur(c.price)}</div>
+      <a class="cm cm-logo" href="${esc(cmKaufLink(c))}" target="_blank" rel="noopener noreferrer"
+         title="${esc(t("buy.cmSearch"))}">${CM_LOGO}</a>
+    </div>`).join("");
+  const actions = `
+    <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap">
+      <div style="flex:none"><button class="btn" id="buy-go">${esc(t("buy.copyOpen"))}</button></div>
+      <div style="flex:none"><button class="btn ghost" id="buy-txt">${esc(t("buy.txt"))}</button></div>
+    </div>
+    <p class="hint" style="margin-top:8px">${esc(t("buy.hint"))}</p>`;
+  body.innerHTML = head + sub + `<div class="sell-liste">${liste}</div>` + actions;
+  const go = $("#buy-go"); if (go) go.onclick = kaufKopierenUndOeffnen;
+  const tx = $("#buy-txt"); if (tx) tx.onclick = kaufTxt;
+}
+
+async function kaufKopierenUndOeffnen() {
+  const d = kaufDeck(); const items = d ? fehlendeKarten(d) : [];
+  if (!items.length) return;
+  try { await navigator.clipboard.writeText(kaufWantlist(items)); toast(t("buy.copied")); }
+  catch { toast(t("buy.copyFail")); }
+  // Auch bei Clipboard-Fehler öffnen — die Liste steht ja im Dialog.
+  window.open(cmWantsUrl(), "_blank", "noopener");
+}
+function kaufTxt() {
+  const d = kaufDeck(); const items = d ? fehlendeKarten(d) : [];
+  if (!items.length) return;
+  const nm = (d?.name || "deck").replace(/[^\w-]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase() || "deck";
+  download(`wants-${nm}-${today()}.txt`, kaufWantlist(items), "text/plain");
+}
 
 /* Einspielen einer alten lokalen Sicherung (aus der IndexedDB-Fassung). */
 async function importJson(file) {
@@ -6243,6 +6336,7 @@ function wireApp() {
   $("#ex-cardmarket").onclick = oeffneVerkauf;
   $("#sell-open").onclick = oeffneVerkauf;
   $("#sell-close").onclick = () => $("#sell-dlg").close();
+  $("#buy-close").onclick = () => $("#buy-dlg").close();
   $("#im-json").onclick = () => $("#im-file").click();
   $("#im-file").onchange = async e => {
     const f = e.target.files[0]; e.target.value = "";

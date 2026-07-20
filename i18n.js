@@ -2312,6 +2312,73 @@ Object.assign(I18N.it, {
   "imp.doneSome": "{n} carte importate, {f} non trovate (vedi console).",
 });
 
+/* ---- Teil 24: Fehlende Karten kaufen (Cardmarket-Wants) ---- */
+Object.assign(I18N.de, {
+  "buy.deckBtn": "Fehlende kaufen ({n})",
+  "buy.deckTitle": "Fehlende Karten dieses Decks über Cardmarket kaufen",
+  "buy.title": "Fehlende Karten kaufen",
+  "buy.complete": "Dieses Deck ist komplett – dir fehlt keine Karte. 🎉",
+  "buy.summary": "{n} Karten fehlen ({s} Exemplare)",
+  "buy.copyOpen": "Wunschliste kopieren + Cardmarket öffnen",
+  "buy.txt": "Als .txt speichern",
+  "buy.hint": "Die Liste ist im Cardmarket-Decklisten-Format. Auf Cardmarket unter Wants → „Decklist zu Wants hinzufügen“ einfügen. Frisch importierte Karten haben keinen direkten Produktlink – dann führt das Cardmarket-Symbol zur Suche.",
+  "buy.copied": "Wunschliste kopiert – auf Cardmarket unter Wants → „Decklist zu Wants hinzufügen“ einfügen.",
+  "buy.copyFail": "Zwischenablage nicht verfügbar – Cardmarket öffnet trotzdem.",
+  "buy.cmSearch": "Auf Cardmarket suchen / öffnen",
+});
+Object.assign(I18N.en, {
+  "buy.deckBtn": "Buy missing ({n})",
+  "buy.deckTitle": "Buy this deck's missing cards via Cardmarket",
+  "buy.title": "Buy missing cards",
+  "buy.complete": "This deck is complete – you're not missing any card. 🎉",
+  "buy.summary": "{n} cards missing ({s} copies)",
+  "buy.copyOpen": "Copy wants list + open Cardmarket",
+  "buy.txt": "Save as .txt",
+  "buy.hint": "The list is in Cardmarket decklist format. On Cardmarket go to Wants → “Add Decklist to Wants” and paste it. Freshly imported cards have no direct product link – the Cardmarket icon then leads to a search.",
+  "buy.copied": "Wants list copied – on Cardmarket go to Wants → “Add Decklist to Wants” and paste it.",
+  "buy.copyFail": "Clipboard unavailable – Cardmarket opens anyway.",
+  "buy.cmSearch": "Search / open on Cardmarket",
+});
+Object.assign(I18N.fr, {
+  "buy.deckBtn": "Acheter manquantes ({n})",
+  "buy.deckTitle": "Acheter les cartes manquantes de ce deck via Cardmarket",
+  "buy.title": "Acheter les cartes manquantes",
+  "buy.complete": "Ce deck est complet – il ne te manque aucune carte. 🎉",
+  "buy.summary": "{n} cartes manquantes ({s} exemplaires)",
+  "buy.copyOpen": "Copier la liste + ouvrir Cardmarket",
+  "buy.txt": "Enregistrer en .txt",
+  "buy.hint": "La liste est au format decklist de Cardmarket. Sur Cardmarket, va dans Wants → « Add Decklist to Wants » et colle-la. Les cartes fraîchement importées n'ont pas de lien produit direct – l'icône Cardmarket mène alors à une recherche.",
+  "buy.copied": "Liste copiée – sur Cardmarket, va dans Wants → « Add Decklist to Wants » et colle-la.",
+  "buy.copyFail": "Presse-papiers indisponible – Cardmarket s'ouvre quand même.",
+  "buy.cmSearch": "Rechercher / ouvrir sur Cardmarket",
+});
+Object.assign(I18N.es, {
+  "buy.deckBtn": "Comprar faltantes ({n})",
+  "buy.deckTitle": "Comprar las cartas que faltan de este mazo vía Cardmarket",
+  "buy.title": "Comprar cartas que faltan",
+  "buy.complete": "Este mazo está completo – no te falta ninguna carta. 🎉",
+  "buy.summary": "Faltan {n} cartas ({s} ejemplares)",
+  "buy.copyOpen": "Copiar lista + abrir Cardmarket",
+  "buy.txt": "Guardar como .txt",
+  "buy.hint": "La lista está en formato de mazo de Cardmarket. En Cardmarket ve a Wants → «Add Decklist to Wants» y pégala. Las cartas recién importadas no tienen enlace de producto directo – el icono de Cardmarket lleva entonces a una búsqueda.",
+  "buy.copied": "Lista copiada – en Cardmarket ve a Wants → «Add Decklist to Wants» y pégala.",
+  "buy.copyFail": "Portapapeles no disponible – Cardmarket se abre igualmente.",
+  "buy.cmSearch": "Buscar / abrir en Cardmarket",
+});
+Object.assign(I18N.it, {
+  "buy.deckBtn": "Compra mancanti ({n})",
+  "buy.deckTitle": "Compra le carte mancanti di questo mazzo tramite Cardmarket",
+  "buy.title": "Compra carte mancanti",
+  "buy.complete": "Questo mazzo è completo – non ti manca nessuna carta. 🎉",
+  "buy.summary": "Mancano {n} carte ({s} copie)",
+  "buy.copyOpen": "Copia lista + apri Cardmarket",
+  "buy.txt": "Salva come .txt",
+  "buy.hint": "La lista è nel formato mazzo di Cardmarket. Su Cardmarket vai su Wants → «Add Decklist to Wants» e incollala. Le carte appena importate non hanno un link prodotto diretto – l'icona Cardmarket porta allora a una ricerca.",
+  "buy.copied": "Lista copiata – su Cardmarket vai su Wants → «Add Decklist to Wants» e incollala.",
+  "buy.copyFail": "Appunti non disponibili – Cardmarket si apre comunque.",
+  "buy.cmSearch": "Cerca / apri su Cardmarket",
+});
+
 /* ---- Teil 7: Spielrunde (live) ---- */
 Object.assign(I18N.de, {
   "nav.session": "Spielrunde",
