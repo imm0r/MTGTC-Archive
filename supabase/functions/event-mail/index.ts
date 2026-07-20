@@ -21,6 +21,12 @@
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+// SMTP-Fehler (z. B. abgelehnte Zugangsdaten) lösen in denomailer eine
+// unbehandelte Rejection im Hintergrund-Leseloop aus, die die Function sonst
+// abstürzen lässt (503 statt sauberer Meldung). Abfangen, damit unser
+// try/catch greift und Fehlversuche als „failed" gezählt werden.
+self.addEventListener("unhandledrejection", (e) => { try { e.preventDefault(); } catch { /* egal */ } });
+
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -91,6 +97,19 @@ function smtpClient(): SMTPClient {
 }
 const fromAddr = () => `${FROM_NAME} <${Deno.env.get("SMTP_FROM")}>`;
 
+// Eine Mail robust verschicken: eigene Verbindung je Mail, Fehler werden
+// abgefangen (nie ein Absturz), Verbindung wird immer geschlossen. Gibt true
+// bei Erfolg, false bei Fehlschlag zurück.
+async function sendMail(to: string, mail: { subject: string; text: string; html: string }): Promise<boolean> {
+  let client: SMTPClient | null = null;
+  try {
+    client = smtpClient();
+    await client.send({ from: fromAddr(), to, subject: mail.subject, content: mail.text, html: mail.html });
+    return true;
+  } catch { return false; }
+  finally { try { await client?.close(); } catch { /* egal */ } }
+}
+
 // E-Mail-Adressen zu Nutzer-IDs (aus auth.users, nur mit Service-Role).
 async function emailsOf(admin: ReturnType<typeof createClient>, ids: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
@@ -153,19 +172,13 @@ Deno.serve(async (req) => {
     if (!ids.length) return json({ sent: 0, failed: 0 });
 
     try {
-      const emails = await emailsOf(admin, ids);
-      const mail = buildMail("invite", ev as EventRow, await hostName(admin, ev.host));
-      const client = smtpClient();
-      let sent = 0, failed = 0;
-      for (const [, addr] of emails) {
-        try { await client.send({ from: fromAddr(), to: addr, subject: mail.subject, content: mail.text, html: mail.html }); sent++; }
-        catch { failed++; }
-      }
-      await client.close();
-      return json({ sent, failed });
-    } catch (e) {
-      return json({ error: (e as Error).message.slice(0, 300) }, 500);
-    }
+      smtpClient();   // frühe, klare Meldung, falls SMTP gar nicht konfiguriert ist
+    } catch (e) { return json({ error: (e as Error).message.slice(0, 300) }, 500); }
+    const emails = await emailsOf(admin, ids);
+    const mail = buildMail("invite", ev as EventRow, await hostName(admin, ev.host));
+    let sent = 0, failed = 0;
+    for (const [, addr] of emails) { if (await sendMail(addr, mail)) sent++; else failed++; }
+    return json({ sent, failed });
   }
 
   // ---------------- Cron-Modus: Erinnerungen ----------------
@@ -180,7 +193,6 @@ Deno.serve(async (req) => {
     const faellig = evs || [];
     if (!faellig.length) return json({ events: 0, sent: 0 });
 
-    const client = smtpClient();
     let sent = 0, failed = 0, done = 0;
     for (const ev of faellig) {
       const { data: rs } = await admin.from("event_rsvp")
@@ -188,15 +200,14 @@ Deno.serve(async (req) => {
       const ids = (rs || []).map((r) => r.user_id as string);
       const emails = await emailsOf(admin, ids);
       const mail = buildMail("reminder", ev as EventRow, await hostName(admin, ev.host));
-      for (const [, addr] of emails) {
-        try { await client.send({ from: fromAddr(), to: addr, subject: mail.subject, content: mail.text, html: mail.html }); sent++; }
-        catch { failed++; }
-      }
-      // Als erinnert markieren, damit der nächste Sweep nicht erneut mailt.
-      await admin.from("game_events").update({ reminded_at: new Date().toISOString() }).eq("id", ev.id);
+      let evSent = 0;
+      for (const [, addr] of emails) { if (await sendMail(addr, mail)) { sent++; evSent++; } else failed++; }
+      // Nur als erinnert markieren, wenn mindestens eine Mail rausging — sonst
+      // (z. B. SMTP vorübergehend kaputt) beim nächsten Sweep erneut versuchen.
+      // Nach dem Start fällt der Termin ohnehin aus dem Zeitfenster.
+      if (evSent > 0) await admin.from("game_events").update({ reminded_at: new Date().toISOString() }).eq("id", ev.id);
       done++;
     }
-    await client.close();
     return json({ events: done, sent, failed });
   } catch (e) {
     return json({ error: (e as Error).message.slice(0, 300) }, 500);
