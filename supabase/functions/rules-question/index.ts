@@ -190,7 +190,13 @@ function expandRule(CR: Corpus, key: string, maxSub = 50): string[] {
   return [...new Set(out.concat(sub.slice(0, maxSub)))];
 }
 
-interface Triage { keywords: string[]; glossaryTerms: string[]; candidateRules: string[]; }
+interface Triage {
+  needsClarification?: boolean;
+  clarifyingQuestions?: string[];
+  keywords: string[];
+  glossaryTerms: string[];
+  candidateRules: string[];
+}
 
 function retrieve(CR: Corpus, tr: Triage, maxChars = 90000) {
   const picked = new Set<string>();
@@ -248,9 +254,17 @@ function retrieve(CR: Corpus, tr: Triage, maxChars = 90000) {
 const TRIAGE_SCHEMA = {
   type: "object",
   properties: {
+    needsClarification: {
+      type: "boolean",
+      description: "true, wenn WESENTLICHE Angaben fehlen oder die Schilderung so mehrdeutig ist, dass sich die Situation nicht eindeutig klären lässt. false, wenn der Kern klar genug ist.",
+    },
+    clarifyingQuestions: {
+      type: "array", items: { type: "string" },
+      description: "Bei needsClarification=true: 1-3 kurze, gezielte Rückfragen in der Zielsprache, deren Beantwortung zur eindeutigen Klärung nötig ist. Sonst leer.",
+    },
     keywords: {
       type: "array", items: { type: "string" },
-      description: "5-12 englische Stichwörter aus der Regelsprache (z. B. 'deathtouch', 'combat damage', 'state-based action'), die zur Situation passen.",
+      description: "5-12 englische Stichwörter aus der Regelsprache (z. B. 'deathtouch', 'combat damage', 'state-based action'), die zur Situation passen. Bei Rückfragen darf die Liste leer bleiben.",
     },
     glossaryTerms: {
       type: "array", items: { type: "string" },
@@ -261,7 +275,7 @@ const TRIAGE_SCHEMA = {
       description: "Vermutete Regelnummern der Comprehensive Rules als Zeichenketten (z. B. '509.1', '702.19', '704.5'). Grob raten ist erwünscht — der echte Text wird danach geladen, nicht deine Erinnerung.",
     },
   },
-  required: ["keywords", "glossaryTerms", "candidateRules"],
+  required: ["needsClarification", "clarifyingQuestions", "keywords", "glossaryTerms", "candidateRules"],
   additionalProperties: false,
 } as const;
 
@@ -342,21 +356,41 @@ Deno.serve(async (req) => {
   try {
     let ctxText = "", usedRules: string[] = [], usedGloss: Gloss[] = [];
 
-    if (CR) {
-      // --- 1. Triage: relevante Regeln vorschlagen ---
-      const tri = await anthropic.messages.create({
-        model: MODEL_TRIAGE,
-        max_tokens: 600,
-        system:
-          `Du hilfst, in den Magic: The Gathering Comprehensive Rules die zu einer Spielsituation passenden Stellen zu finden. Du beantwortest die Frage NICHT — du nennst nur Suchbegriffe, Glossarbegriffe und vermutete Regelnummern (englisch), damit der echte Regeltext geladen werden kann. Sei großzügig: lieber ein paar Kandidaten zu viel.`,
-        output_config: { format: { type: "json_schema", schema: TRIAGE_SCHEMA } },
-        messages: [{ role: "user", content: [{ type: "text", text: SITU }] }],
-      });
-      track(tri.usage);
-      let tr: Triage = { keywords: [], glossaryTerms: [], candidateRules: [] };
-      const tt = tri.content.find((b) => b.type === "text");
-      if (tt && tt.type === "text") { try { tr = JSON.parse(tt.text); } catch { /* leer lassen */ } }
+    // --- 1. Triage: verstehen, ob die Situation klar genug ist, und (wenn ja)
+    //     die passenden Regeln vorschlagen. Läuft immer (auch im abgesicherten
+    //     Modus ohne Regeltext), denn die Rückfrage-Entscheidung braucht nur die
+    //     Schilderung, keinen Regeltext.
+    const tri = await anthropic.messages.create({
+      model: MODEL_TRIAGE,
+      max_tokens: 700,
+      system:
+        `Du hilfst bei Magic: The Gathering-Regelfragen und hast ZWEI Aufgaben:
 
+1) ENTSCHEIDEN, ob die geschilderte Situation klar genug ist, um sie eindeutig zu klären. Setze needsClarification=true und stelle 1-3 kurze, gezielte Rückfragen (Feld clarifyingQuestions, formuliert auf ${langName}), wenn WESENTLICHE Angaben fehlen oder die Schilderung mehrdeutig ist — etwa wenn unklar bleibt, welche Karten oder Fähigkeiten beteiligt sind, wer am Zug ist, in welcher Phase oder Zone es passiert, oder wenn die Frage zu allgemein gestellt ist, um sie konkret zu beantworten. Frage NUR nach, wenn die Antwort ohne diese Angabe wirklich anders ausfiele; ist der Kern klar, setze needsClarification=false und benenne offene Randannahmen lieber später im Urteil, statt unnötig nachzufragen.
+
+2) Wenn klar genug (needsClarification=false): nenne Suchbegriffe, Glossarbegriffe und vermutete Regelnummern (englisch), damit der echte Regeltext geladen werden kann. Sei großzügig: lieber ein paar Kandidaten zu viel. Bei Rückfragen dürfen diese Felder leer bleiben.`,
+      output_config: { format: { type: "json_schema", schema: TRIAGE_SCHEMA } },
+      messages: [{ role: "user", content: [{ type: "text", text: SITU }] }],
+    });
+    track(tri.usage);
+    let tr: Triage = { needsClarification: false, clarifyingQuestions: [], keywords: [], glossaryTerms: [], candidateRules: [] };
+    const tt = tri.content.find((b) => b.type === "text");
+    if (tt && tt.type === "text") { try { tr = JSON.parse(tt.text); } catch { /* leer lassen */ } }
+
+    // Braucht das Modell erst eine Rückfrage, hört es HIER auf: keine
+    // Regelsuche, kein (teures) Urteil, nur die Fragen zurück. Der Nutzer
+    // ergänzt und fragt erneut.
+    const fragen = (tr.clarifyingQuestions || []).map((q) => String(q).trim()).filter(Boolean).slice(0, 3);
+    if (tr.needsClarification && fragen.length) {
+      return json({
+        clarify: true,
+        questions: fragen,
+        rulesDate: CR?.effectiveDate || "",
+        usage: { input: usedIn, output: usedOut, model: tri.model },
+      });
+    }
+
+    if (CR) {
       const r = retrieve(CR, tr);
       usedRules = r.rules;
       usedGloss = r.glossary;

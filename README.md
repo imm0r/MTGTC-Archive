@@ -157,12 +157,19 @@ immer die tatsächliche Formulierung.
 
 Ablauf in der Edge Function `rules-question` (*propose-then-ground*):
 
-1. **Triage** (kleines Modell): liest die Schilderung in beliebiger Sprache und
-   nennt englische Such- und Glossarbegriffe sowie Kandidaten-Regelnummern.
+1. **Triage** (kleines Modell): liest die Schilderung in beliebiger Sprache.
+   Versteht es die Situation noch nicht eindeutig — fehlen wesentliche Angaben
+   oder ist die Schilderung mehrdeutig —, **stellt es zuerst gezielte Rückfragen**
+   und bricht hier ab (keine Regelsuche, kein teures Urteil), bis der Nutzer
+   ergänzt. Ist die Situation klar, nennt es englische Such- und Glossarbegriffe
+   sowie Kandidaten-Regelnummern.
 2. **Retrieval**: holt genau diese Regeln und Glossareinträge wörtlich aus der
    geladenen Textfassung, dazu per Stichwort gefundene weitere Regeln.
 3. **Urteil** (stärkeres Modell): antwortet nur auf Basis dieser Auszüge, in der
    Sprache der Oberfläche, mit klarem Ergebnis, Begründung und Regelnummern.
+
+Die Rückfrage-Schleife darf sich wiederholen: reicht die Ergänzung noch nicht,
+fragt das Modell erneut nach, bevor es urteilt.
 
 Lädt das Regelwerk einmal nicht (Netz, veraltete URL), antwortet die Funktion im
 abgesicherten Modus aus dem Modellwissen — mit deutlichem Hinweis, statt hart zu
