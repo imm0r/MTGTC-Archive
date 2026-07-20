@@ -4741,10 +4741,12 @@ function renderSettings() {
    Regeln vor, lädt deren Text WÖRTLICH aus der offiziellen Fassung und urteilt
    nur auf dieser Grundlage — die gezeigten Zitate stammen 1:1 aus dem Regelwerk,
    nicht aus dem Gedächtnis des Modells. Kein Datenbankbedarf, nur die Function. */
-let RULES_LOG = [];          // geklärte Fragen, neueste zuerst (aus der DB geladen)
+let RULES_LOG = [];          // geklärte Fragen (aus der DB geladen)
 let rulesLauf = 0;           // wie synergyLauf: alte, überholte Läufe verwerfen
 let RULES_DRAFT = "";        // Eingabe über einen Tab-Wechsel hinweg bewahren
 let rulesGeladen = false;    // Verlauf aus der DB schon einmal geholt?
+let rulesOpenKey = "";       // welcher Listeneintrag zuletzt aufgeklappt sein soll
+let rulesTmp = 0;            // laufende Nummer für Einträge ohne DB-id (Speichern schlug fehl)
 
 function renderRules() {
   const el = $("#v-rules");
@@ -4790,7 +4792,7 @@ async function ladeRegelVerlauf() {
       .select("id,question,lang,payload,created_at")
       .order("created_at", { ascending: false }).limit(100);
     if (error) throw error;
-    const geladen = (data || []).map(r => ({ id: r.id, q: r.question, ...(r.payload || {}) }));
+    const geladen = (data || []).map(r => ({ id: r.id, q: r.question, created_at: r.created_at, ...(r.payload || {}) }));
     // Falls währenddessen schon eine Frage gestellt wurde (und noch nicht in der
     // Abfrage steckte), diese oben behalten statt zu verlieren — dedupliziert per id.
     const bekannt = new Set(geladen.map(e => e.id));
@@ -4801,12 +4803,78 @@ async function ladeRegelVerlauf() {
   if ($(".view.on")?.id === "v-rules") zeichneRegelVerlauf();
 }
 
-/* Den Verlauf in #rules-log zeichnen (bis 100) und die Löschknöpfe verdrahten. */
+/* Den Verlauf als kompakte, scrollbare Liste zeichnen: je Eintrag Datum/Uhrzeit
+   + Schlagwort, chronologisch (älteste zuerst). Ein Klick klappt den vollen
+   Eintrag auf (<details>). Der zuletzt geklärte Eintrag wird aufgeklappt und in
+   den Blick gescrollt. */
 function zeichneRegelVerlauf() {
   const log = $("#rules-log");
   if (!log) return;
-  log.innerHTML = RULES_LOG.slice(0, 100).map(regelAntwortHtml).join("");
-  log.querySelectorAll("[data-del-ruling]").forEach(b => b.onclick = () => regelVerlaufLoeschen(b.dataset.delRuling));
+  if (!RULES_LOG.length) { log.innerHTML = `<div class="card"><div class="empty">${esc(t("rules.histEmpty"))}</div></div>`; return; }
+  const sortiert = RULES_LOG.slice()
+    .sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || "")));
+  log.innerHTML = `<div class="regel-liste">${sortiert.map(regelItemHtml).join("")}</div>`;
+  log.querySelectorAll("[data-del-ruling]").forEach(b => b.onclick = ev => {
+    ev.preventDefault(); ev.stopPropagation(); regelVerlaufLoeschen(b.dataset.delRuling);
+  });
+  // Frisch geklärten Eintrag sichtbar machen.
+  const offen = log.querySelector(".regel-item[open]");
+  if (offen) offen.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+/* Schlagwort für die Listenzeile: erste Zeile der Frage, auf ~72 Zeichen gekürzt. */
+function regelSchlagwort(e) {
+  const s = String(e.q || "").replace(/\s+/g, " ").trim();
+  return s.length > 72 ? s.slice(0, 71).trimEnd() + "…" : (s || t("rules.title"));
+}
+
+/* Datum + Uhrzeit eines Eintrags in der Oberflächensprache. */
+function regelZeit(e) {
+  if (!e.created_at) return "";
+  const d = new Date(e.created_at);
+  if (isNaN(d)) return "";
+  return d.toLocaleString(LANG, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+/* Eine Listenzeile: zugeklappt nur Zeit + Schlagwort + Konfidenz; aufgeklappt
+   der volle Eintrag. rulesOpenKey markiert den zuletzt geklärten. */
+function regelItemHtml(e) {
+  const key = e.id || e.tmpKey || "";
+  const confClass = { high: "conf-high", medium: "conf-medium", low: "conf-low" }[e.confidence] || "conf-medium";
+  const conf = { high: "rules.confHigh", medium: "rules.confMedium", low: "rules.confLow" }[e.confidence] || "rules.confMedium";
+  return `
+    <details class="regel-item"${key && key === rulesOpenKey ? " open" : ""}>
+      <summary class="regel-item-head">
+        <span class="regel-item-time">${esc(regelZeit(e))}</span>
+        <span class="regel-item-label">${esc(regelSchlagwort(e))}</span>
+        <span class="regel-conf mini ${confClass}">${esc(t(conf))}</span>
+      </summary>
+      <div class="regel-item-body">${regelAntwortInner(e)}</div>
+    </details>`;
+}
+
+/* Voller Inhalt eines Eintrags (ohne die Listen-Kopfzeile). Zitate kommen
+   WÖRTLICH aus dem Regelwerk (die Function schlägt sie in ihrer geparsten
+   Fassung nach), deshalb dürfen sie unverändert stehen — nur maskiert. */
+function regelAntwortInner(e) {
+  const cites = (e.citations || []).filter(c => c && c.text);
+  const citeHtml = cites.length ? `
+    <details class="regel-cites">
+      <summary>${esc(t("rules.rulesN", { n: cites.length }))}</summary>
+      <div class="regel-cite-list">${cites.map(c =>
+        `<div class="regel-cite"><span class="regel-cite-num">${esc(c.rule)}</span><span class="regel-cite-txt">${esc(c.text.replace(/^\s*\S+\s/, ""))}</span></div>`).join("")}</div>
+    </details>` : "";
+  const dateLine = e.rulesDate ? `<div class="regel-date">${esc(t("rules.basis", { date: e.rulesDate }))}</div>` : "";
+  return `
+      <div class="regel-frage">&bdquo;${esc(e.q)}&ldquo;</div>
+      ${e.degraded ? `<div class="regel-warn">${esc(t("rules.degraded"))}</div>` : ""}
+      <div class="regel-ruling">${esc(e.ruling)}</div>
+      ${e.reasoning ? `<div class="regel-reason">${esc(e.reasoning)}</div>` : ""}
+      ${e.caveat ? `<div class="regel-caveat">&#9888; ${esc(e.caveat)}</div>` : ""}
+      ${citeHtml}
+      ${dateLine}
+      ${kiKostenHtml(e.usage)}
+      ${e.id ? `<div class="regel-actions"><button class="btn ghost sm" data-del-ruling="${esc(e.id)}">&#128465; ${esc(t("rules.delTitle"))}</button></div>` : ""}`;
 }
 
 /* Eine gespeicherte Regelfrage löschen (DB + Verlauf). */
@@ -4869,18 +4937,21 @@ async function regelAbfragen(situation) {
   // bleibt (RLS: nur die eigene Zeile). Scheitert das Speichern, bleibt die
   // Antwort wenigstens in dieser Sitzung sichtbar — dann ohne Löschknopf, weil
   // keine id vorliegt.
-  const eintrag = { q: situation, ...data };
+  const eintrag = { q: situation, ...data, tmpKey: "tmp-" + (++rulesTmp) };
   try {
     const { data: row, error: sErr } = await sb.from("rules_rulings")
       .insert({ question: situation, lang: LANG, payload: data })
-      .select("id").single();
+      .select("id,created_at").single();
     if (sErr) throw sErr;
     eintrag.id = row.id;
+    eintrag.created_at = row.created_at;
   } catch { toast(t("rules.saveError")); }
+  if (!eintrag.created_at) eintrag.created_at = new Date().toISOString();  // Fallback, falls Speichern scheiterte
   RULES_LOG.unshift(eintrag);
+  rulesOpenKey = eintrag.id || eintrag.tmpKey;   // den frisch geklärten Eintrag aufgeklappt zeigen
   if (out) out.innerHTML = "";
   zeichneRegelVerlauf();
-  // Eingabe geleert: die Frage steht jetzt oben im Verlauf.
+  // Eingabe geleert: die geklärte Frage steht jetzt im Verlauf.
   const ta = $("#rules-q"); if (ta) ta.value = ""; RULES_DRAFT = "";
 }
 
@@ -4913,39 +4984,6 @@ function wireClarify(baseSituation, questions) {
   };
   go.onclick = submit;
   ans.onkeydown = e => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); submit(); } };
-}
-
-/* Eine beantwortete Regelfrage als Karte. Zitate kommen WÖRTLICH aus dem
-   Regelwerk (die Function schlägt sie in ihrer geparsten Fassung nach), deshalb
-   dürfen sie unverändert stehen — nur maskiert, nie paraphrasiert. */
-function regelAntwortHtml(e) {
-  const conf = { high: "rules.confHigh", medium: "rules.confMedium", low: "rules.confLow" }[e.confidence] || "rules.confMedium";
-  const confClass = { high: "conf-high", medium: "conf-medium", low: "conf-low" }[e.confidence] || "conf-medium";
-  const cites = (e.citations || []).filter(c => c && c.text);
-  const citeHtml = cites.length ? `
-    <details class="regel-cites">
-      <summary>${esc(t("rules.rulesN", { n: cites.length }))}</summary>
-      <div class="regel-cite-list">${cites.map(c =>
-        `<div class="regel-cite"><span class="regel-cite-num">${esc(c.rule)}</span><span class="regel-cite-txt">${esc(c.text.replace(/^\s*\S+\s/, ""))}</span></div>`).join("")}</div>
-    </details>` : "";
-  const dateLine = e.rulesDate ? `<span class="regel-date">${esc(t("rules.basis", { date: e.rulesDate }))}</span>` : "";
-  return `
-    <div class="card regel-antwort">
-      <div class="regel-top">
-        <div class="regel-frage">&bdquo;${esc(e.q)}&ldquo;</div>
-        ${e.id ? `<button class="regel-del" data-del-ruling="${esc(e.id)}" title="${esc(t("rules.delTitle"))}" aria-label="${esc(t("rules.delTitle"))}">&times;</button>` : ""}
-      </div>
-      ${e.degraded ? `<div class="regel-warn">${esc(t("rules.degraded"))}</div>` : ""}
-      <div class="regel-head">
-        <span class="regel-conf ${confClass}">${esc(t(conf))}</span>
-        ${dateLine}
-      </div>
-      <div class="regel-ruling">${esc(e.ruling)}</div>
-      ${e.reasoning ? `<div class="regel-reason">${esc(e.reasoning)}</div>` : ""}
-      ${e.caveat ? `<div class="regel-caveat">&#9888; ${esc(e.caveat)}</div>` : ""}
-      ${citeHtml}
-      ${kiKostenHtml(e.usage)}
-    </div>`;
 }
 
 /* Such- & Vorschlags-Einstellungen (profiles.search_prefs, jsonb): Schalter und
