@@ -175,11 +175,19 @@ Lädt das Regelwerk einmal nicht (Netz, veraltete URL), antwortet die Funktion i
 abgesicherten Modus aus dem Modellwissen — mit deutlichem Hinweis, statt hart zu
 brechen (wie die Bilderkennung auf Tesseract zurückfällt).
 
+**Verlauf.** Jedes fertige Urteil wird in der Tabelle `rules_rulings` gespeichert
+(jsonb-`payload`, damit neue Felder ohne Schemaänderung mitkommen) und beim
+Öffnen der Ansicht wieder geladen — so bleiben geklärte Fragen nach einem
+Neuladen abrufbar. RLS zeigt jedem nur die eigenen; über das ×-Zeichen an einer
+Antwort lässt sich ein Eintrag wieder löschen. Rückfragen (ohne Urteil) werden
+nicht gespeichert.
+
 ### Einrichten
 
-Wie `scan-card` braucht die Funktion nur den Anthropic-Schlüssel; eine
-Schemaänderung ist **nicht** nötig, der Zugriff ist allein durch die Anmeldung
-geschützt.
+Die Funktion selbst braucht wie `scan-card` nur den Anthropic-Schlüssel und ist
+allein durch die Anmeldung geschützt. Für den **Verlauf** kommt die Tabelle
+`rules_rulings` hinzu — dafür `supabase-schema.sql` erneut komplett ausführen
+(das Skript ist wiederholbar, vorhandene Daten bleiben erhalten).
 
 1. Supabase → **Edge Functions → Deploy a new function**, Name `rules-question`,
    Inhalt von `supabase/functions/rules-question/index.ts` einfügen.

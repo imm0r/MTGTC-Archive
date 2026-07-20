@@ -4741,9 +4741,10 @@ function renderSettings() {
    Regeln vor, lädt deren Text WÖRTLICH aus der offiziellen Fassung und urteilt
    nur auf dieser Grundlage — die gezeigten Zitate stammen 1:1 aus dem Regelwerk,
    nicht aus dem Gedächtnis des Modells. Kein Datenbankbedarf, nur die Function. */
-let RULES_LOG = [];          // beantwortete Fragen dieser Sitzung, neueste zuerst
+let RULES_LOG = [];          // geklärte Fragen, neueste zuerst (aus der DB geladen)
 let rulesLauf = 0;           // wie synergyLauf: alte, überholte Läufe verwerfen
 let RULES_DRAFT = "";        // Eingabe über einen Tab-Wechsel hinweg bewahren
+let rulesGeladen = false;    // Verlauf aus der DB schon einmal geholt?
 
 function renderRules() {
   const el = $("#v-rules");
@@ -4765,7 +4766,7 @@ function renderRules() {
       </div>
     </div>
     <div id="rules-out"></div>
-    <div id="rules-log">${RULES_LOG.map(regelAntwortHtml).join("")}</div>`;
+    <div id="rules-log"></div>`;
 
   const ta = $("#rules-q");
   ta.oninput = () => { RULES_DRAFT = ta.value; };
@@ -4775,6 +4776,50 @@ function renderRules() {
   $("#rules-ask").onclick = () => regelFrageStellen();
   // Strg/Cmd+Enter im Feld schickt ab — bequem am Spieltisch.
   ta.onkeydown = e => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); regelFrageStellen(); } };
+
+  // Verlauf: beim ersten Öffnen einmal aus der DB holen, danach aus RULES_LOG
+  // zeichnen (ein Sprachwechsel baut die Ansicht neu, soll aber nicht neu laden).
+  if (rulesGeladen) zeichneRegelVerlauf();
+  else { $("#rules-log").innerHTML = `<div class="card"><div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("rules.histLoading"))}</div></div>`; ladeRegelVerlauf(); }
+}
+
+/* Verlauf aus der DB laden (nur die eigenen Zeilen dank RLS), neueste zuerst. */
+async function ladeRegelVerlauf() {
+  try {
+    const { data, error } = await sb.from("rules_rulings")
+      .select("id,question,lang,payload,created_at")
+      .order("created_at", { ascending: false }).limit(100);
+    if (error) throw error;
+    const geladen = (data || []).map(r => ({ id: r.id, q: r.question, ...(r.payload || {}) }));
+    // Falls währenddessen schon eine Frage gestellt wurde (und noch nicht in der
+    // Abfrage steckte), diese oben behalten statt zu verlieren — dedupliziert per id.
+    const bekannt = new Set(geladen.map(e => e.id));
+    const zusatz = RULES_LOG.filter(e => !e.id || !bekannt.has(e.id));
+    RULES_LOG = [...zusatz, ...geladen];
+    rulesGeladen = true;
+  } catch { /* bei Fehler bleibt der bisherige (evtl. leere) Verlauf stehen */ }
+  if ($(".view.on")?.id === "v-rules") zeichneRegelVerlauf();
+}
+
+/* Den Verlauf in #rules-log zeichnen (bis 100) und die Löschknöpfe verdrahten. */
+function zeichneRegelVerlauf() {
+  const log = $("#rules-log");
+  if (!log) return;
+  log.innerHTML = RULES_LOG.slice(0, 100).map(regelAntwortHtml).join("");
+  log.querySelectorAll("[data-del-ruling]").forEach(b => b.onclick = () => regelVerlaufLoeschen(b.dataset.delRuling));
+}
+
+/* Eine gespeicherte Regelfrage löschen (DB + Verlauf). */
+async function regelVerlaufLoeschen(id) {
+  if (!id) return;
+  if (!await confirmDlg(esc(t("rules.delConfirm")))) return;
+  try {
+    const { error } = await sb.from("rules_rulings").delete().eq("id", id);
+    if (error) throw error;
+    RULES_LOG = RULES_LOG.filter(e => e.id !== id);
+    zeichneRegelVerlauf();
+    toast(t("rules.deleted"));
+  } catch (e) { toast(dbErr(e)); }
 }
 
 function regelFrageStellen() {
@@ -4820,12 +4865,21 @@ async function regelAbfragen(situation) {
 
   if (!data?.ruling) { if (out) out.innerHTML = `<div class="card"><div class="empty">${esc(t("rules.error"))}</div></div>`; return; }
 
+  // Fertiges Urteil in der DB speichern, damit es nach dem Neuladen abrufbar
+  // bleibt (RLS: nur die eigene Zeile). Scheitert das Speichern, bleibt die
+  // Antwort wenigstens in dieser Sitzung sichtbar — dann ohne Löschknopf, weil
+  // keine id vorliegt.
   const eintrag = { q: situation, ...data };
+  try {
+    const { data: row, error: sErr } = await sb.from("rules_rulings")
+      .insert({ question: situation, lang: LANG, payload: data })
+      .select("id").single();
+    if (sErr) throw sErr;
+    eintrag.id = row.id;
+  } catch { toast(t("rules.saveError")); }
   RULES_LOG.unshift(eintrag);
-  if (RULES_LOG.length > 20) RULES_LOG.pop();
   if (out) out.innerHTML = "";
-  const log = $("#rules-log");
-  if (log) log.innerHTML = RULES_LOG.map(regelAntwortHtml).join("");
+  zeichneRegelVerlauf();
   // Eingabe geleert: die Frage steht jetzt oben im Verlauf.
   const ta = $("#rules-q"); if (ta) ta.value = ""; RULES_DRAFT = "";
 }
@@ -4877,7 +4931,10 @@ function regelAntwortHtml(e) {
   const dateLine = e.rulesDate ? `<span class="regel-date">${esc(t("rules.basis", { date: e.rulesDate }))}</span>` : "";
   return `
     <div class="card regel-antwort">
-      <div class="regel-frage">&bdquo;${esc(e.q)}&ldquo;</div>
+      <div class="regel-top">
+        <div class="regel-frage">&bdquo;${esc(e.q)}&ldquo;</div>
+        ${e.id ? `<button class="regel-del" data-del-ruling="${esc(e.id)}" title="${esc(t("rules.delTitle"))}" aria-label="${esc(t("rules.delTitle"))}">&times;</button>` : ""}
+      </div>
       ${e.degraded ? `<div class="regel-warn">${esc(t("rules.degraded"))}</div>` : ""}
       <div class="regel-head">
         <span class="regel-conf ${confClass}">${esc(t(conf))}</span>
