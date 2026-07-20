@@ -1853,6 +1853,44 @@ function detailHtml(c, hover) {
   // Scryfall-Bild-URLs tragen die Größe im Pfad — aus small wird normal
   // (488×680), ohne einen weiteren API-Aufruf.
   const gross = (c.img || "").replace("/small/", "/normal/");
+  // Kauf-/Scryfall-Logos: nur im Dialog, nicht in der Hover-Vorschau.
+  const links = !hover
+    ? `${cmLink(c.cm_id) ? `<a class="cm cm-logo" href="${esc(cmLink(c.cm_id))}" target="_blank" rel="noopener noreferrer" title="${esc(t("row.cmTitle"))}">${CM_LOGO}</a>` : ""}${sfLink(c) ? `<a class="cm sf-logo" href="${esc(sfLink(c))}" target="_blank" rel="noopener noreferrer" title="${esc(t("row.sfTitle"))}">${SF_LOGO}</a>` : ""}`
+    : "";
+  // Werkzeuge nur im Dialog: gruppiert und beschriftet (Verwaltung / Vorschläge
+  // & Combos), Legalität und Preisverlauf aufklappbar. In der Hover-Vorschau
+  // bleibt nur der schlichte Preisgraph.
+  const block = !hover ? `
+        <div class="sec-sep"></div>
+        <div class="tool-group"><span class="tool-label">${esc(t("detail.groupManage"))}</span>
+          <div class="tool-row">
+            <button class="btn ghost sm" id="dt-edit" title="${esc(t("row.editTitle"))}">&#9998; ${esc(t("detail.edit"))}</button>
+            <button class="btn ghost sm" id="dt-price" title="${esc(t("detail.priceBtnTitle"))}">&#8635; ${esc(t("detail.priceBtn"))}</button>
+          </div>
+        </div>
+        <div class="sec-sep"></div>
+        <details class="legal-det" id="dt-legal"><summary>&#9878; ${esc(t("legal.title"))}</summary>
+          <div id="dt-legal-body"><div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("legal.loading"))}</div></div>
+        </details>
+        <div class="sec-sep"></div>
+        <div class="tool-group"><span class="tool-label">${esc(t("detail.groupTools"))}</span>
+          <div class="tool-row">
+            <div class="field" style="width:118px"><label>${esc(t("deck.maxPerCard"))}</label>
+              <input type="number" id="syn-cap" min="0" step="0.5" value="${prefWert("capDefault") ?? ""}"
+                placeholder="${esc(t("syn.capPh"))}" title="${esc(t("syn.capTitle"))}"></div>
+            <button class="btn ghost sm syn-std-btn" id="dt-syn" title="${esc(t("syn.findTitle"))}">&#128269; ${esc(t("syn.find"))}</button>
+            <button class="btn ghost sm syn-ai-btn" id="dt-syn-ai" title="${esc(t("syn.aiTitle"))}">&#10024; ${esc(t("syn.ai"))}</button>
+            <button class="btn ghost sm" id="dt-combos" title="${esc(t("combo.cardTitle"))}">&#128279; ${esc(t("combo.btn"))}</button>
+          </div>
+        </div>
+        <div class="sec-sep"></div>
+        <details class="legal-det"><summary>&#128200; ${esc(t("detail.priceHistory"))}</summary>
+          <div style="margin-top:8px">${priceChart(c.hist, 320, 150)}</div>
+        </details>`
+    : `<div style="margin-top:10px">
+          <label style="margin-bottom:2px">${esc(t("detail.priceHistory"))}</label>
+          ${priceChart(c.hist, 320, 150)}
+        </div>`;
   return `
     <div class="detail">
       ${gross ? `<img class="detail-img" src="${esc(gross)}" alt="">` : ""}
@@ -1864,48 +1902,21 @@ function detailHtml(c, hover) {
           c.released ? ` · erschienen ${esc(datShort(c.released))}` : ""}</div>
         ${c.type_line ? `<div class="hint" style="margin-top:2px">${esc(c.type_line)}</div>` : ""}
         ${faehigkeitenHtml(c, hover)}
-        <div style="margin:10px 0">
+        <div class="detail-copy">
           ${rarityPill(c.rarity)}
-          ${c.foil ? '<span class="pill foil">Foil</span> ' : ""}
+          ${c.foil ? '<span class="pill foil">Foil</span>' : ""}
           <span class="pill">${flaggeHtml(c.lang, true)} ${esc(langName(c.lang))}</span>
           ${condBadge(c.condition)}
           <span class="pill">${esc(t("common.qtyLabel"))} ${c.qty}</span>
+          <span class="detail-preis">${esc(t("detail.price"))}: <b>${eur(c.price)}</b></span>
+          ${links}
         </div>
-        <div>${esc(t("detail.price"))}: <b>${eur(c.price)}</b></div>
-        ${!hover ? `<div style="margin-top:8px">
-          ${cmLink(c.cm_id) ? `<a class="cm cm-logo" href="${esc(cmLink(c.cm_id))}" target="_blank"
-            rel="noopener noreferrer" title="${esc(t("row.cmTitle"))}">${CM_LOGO}</a> ` : ""}
-          ${sfLink(c) ? `<a class="cm sf-logo" href="${esc(sfLink(c))}" target="_blank"
-            rel="noopener noreferrer" title="${esc(t("row.sfTitle"))}">${SF_LOGO}</a>` : ""}
-        </div>
-        <details class="legal-det" id="dt-legal" style="margin-top:8px">
-          <summary>&#9878; ${esc(t("legal.title"))}</summary>
-          <div id="dt-legal-body"><div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("legal.loading"))}</div></div>
-        </details>
-        <div class="row" style="margin-top:10px">
-          <div style="flex:none"><button class="btn ghost sm" id="dt-edit"
-            title="${esc(t("row.editTitle"))}">&#9998; ${esc(t("detail.edit"))}</button></div>
-          <div style="flex:none"><button class="btn ghost sm" id="dt-price"
-            title="${esc(t("detail.priceBtnTitle"))}">&#8635; ${esc(t("detail.priceBtn"))}</button></div>
-          <div style="flex:none"><input type="number" id="syn-cap" min="0" step="0.5"
-            value="${prefWert("capDefault") ?? ""}"
-            placeholder="${esc(t("syn.capPh"))}" title="${esc(t("syn.capTitle"))}" style="width:92px"></div>
-          <div class="syn-std-btn" style="flex:none"><button class="btn ghost sm" id="dt-syn"
-            title="${esc(t("syn.findTitle"))}">&#128269; ${esc(t("syn.find"))}</button></div>
-          <div class="syn-ai-btn" style="flex:none"><button class="btn ghost sm" id="dt-syn-ai"
-            title="${esc(t("syn.aiTitle"))}">&#10024; ${esc(t("syn.ai"))}</button></div>
-          <div style="flex:none"><button class="btn ghost sm" id="dt-combos"
-            title="${esc(t("combo.cardTitle"))}">&#128279; ${esc(t("combo.btn"))}</button></div>
-        </div>` : ""}
+        ${block}
         <div class="hint" style="margin-top:10px">${esc(t("detail.added"))}: ${dtShort(c.added)} ${esc(t("detail.addedSuffix"))}</div>
-        ${!hover ? `<div id="syn-box" style="margin-top:12px"></div>` : ""}
-        ${!hover ? `<div id="card-combo-box" style="margin-top:12px"></div>` : ""}
-        <div style="margin-top:10px">
-          <label style="margin-bottom:2px">${esc(t("detail.priceHistory"))}</label>
-          ${priceChart(c.hist, 320, 150)}
-        </div>
       </div>
-    </div>`;
+    </div>
+    ${!hover ? `<div id="syn-box" class="dt-results-full"></div>
+    <div id="card-combo-box" class="dt-results-full"></div>` : ""}`;
 }
 
 function showCardDetail(id) {
