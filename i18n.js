@@ -2877,4 +2877,11 @@ Object.assign(I18N.it, {
   "cm.cardmarketHint": "«Lista di vendita Cardmarket» apre la tua lista di vendita. Segna singole carte nella collezione con il pulsante € (es. doppioni). Dalla lista puoi aprire la vendita multipla di Cardmarket, copiare la lista negli appunti (il nostro bookmarklet la sovrappone alla pagina) o scaricare un CSV solo di quelle carte. L’API di Cardmarket è chiusa ai nuovi accessi — da qui la via appunti/bookmarklet invece di un’estensione di terze parti.",
 });
 
+/* ---- Teil 24: Zweiseitige Karten (Vorder-/Rückseite umdrehen) ---- */
+Object.assign(I18N.de, { "detail.flipHint": "Zum Umdrehen klicken" });
+Object.assign(I18N.en, { "detail.flipHint": "Click to flip" });
+Object.assign(I18N.fr, { "detail.flipHint": "Cliquer pour retourner" });
+Object.assign(I18N.es, { "detail.flipHint": "Haz clic para girar" });
+Object.assign(I18N.it, { "detail.flipHint": "Clicca per girare" });
+
 initLang();

@@ -292,6 +292,49 @@ const priceOf = (c, foil) => {
 };
 const imgOf = c => c.image_uris?.small || c.card_faces?.[0]?.image_uris?.small || "";
 
+/* Regex-Sonderzeichen entschärfen — genutzt, um einen Schlüsselwort-Namen im
+   Regeltext einer Kartenseite zu suchen. */
+const escRx = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/* Zweiseitige Karten (Vorder-/Rückseite zum Umdrehen). Scryfall führt sie als
+   card_faces, bei denen JEDE Seite ein eigenes Bild trägt — das unterscheidet
+   sie von geteilten und Abenteuer-Karten, die zwar zwei Seiten, aber nur EIN
+   Bild haben und sich nicht umdrehen lassen. Betroffene Layouts: transform,
+   modal_dfc, double_faced_token, reversible_card. Rückgabe: ein Eintrag je
+   Seite mit allem, was die Detailansicht je Seite zeigt (Name, Typ, Regeltext,
+   Kosten, Stärke/Widerstand, Bild). Die Schlüsselwörter führt Scryfall nur
+   gesammelt über beide Seiten — sie werden hier je Seite aus deren Regeltext
+   herausgefiltert. null, wenn die Karte nicht umdrehbar ist. */
+const facesOf = card => {
+  const f = card?.card_faces;
+  if (!Array.isArray(f) || f.length < 2) return null;
+  if (!f[0]?.image_uris?.small || !f[1]?.image_uris?.small) return null;
+  const kw = Array.isArray(card.keywords) ? card.keywords : [];
+  return f.map(x => {
+    const oracle = typeof x.oracle_text === "string" ? x.oracle_text : null;
+    return {
+      name: x.name ?? null,
+      printed: x.printed_name ?? null,
+      type_line: x.type_line ?? null,
+      mana_cost: typeof x.mana_cost === "string" ? x.mana_cost : null,
+      oracle_text: oracle,
+      power: x.power ?? null,
+      toughness: x.toughness ?? null,
+      keywords: oracle
+        ? kw.filter(k => new RegExp(`(^|[^A-Za-zÀ-ÿ])${escRx(k)}([^A-Za-zÀ-ÿ]|$)`, "i").test(oracle))
+        : [],
+      img: x.image_uris.small,
+    };
+  });
+};
+
+/* Erkennt an den GESPEICHERTEN Feldern, dass eine Karte mehrseitig sein könnte
+   (Typzeile oder Regeltext mit „//"). Nur ein günstiger Vorfilter: OB sie
+   wirklich umdrehbar ist (eigene Bilder je Seite), sagt erst facesOf nach einem
+   Scryfall-Abruf. Für einseitige Karten immer falsch — sie lösen kein Nachladen
+   aus. */
+const looksMultiface = c => / \/\/ /.test(c?.type_line || "") || /\n\/\/\n/.test(c?.oracle_text || "");
+
 /* ============================ Bildmodell ==============================
    Die Edge Function hält den Anthropic-Schlüssel. Sie liest die Karte nur
    ab; der Abgleich gegen Scryfall bleibt hier in der App. Fällt sie aus,
@@ -788,8 +831,17 @@ async function addToCollection(card, el, detected) {
   });
   if (error) throw new Error(dbErr(error));
 
-  await reload(); renderAll();
+  // Zweiseitige Karten: die Seiten dieser Auflage festhalten, damit die
+  // Detailansicht sie später ohne erneuten Scryfall-Abruf umdrehen kann.
+  // Getrennt vom add_card-Aufruf, um dessen Signatur nicht zu erweitern.
   const row = Array.isArray(data) ? data[0] : data;
+  const fc = facesOf(card);
+  if (fc && row?.id) {
+    try { await sb.from("cards").update({ faces: fc }).eq("id", row.id); }
+    catch { /* Anzeige klappt auch ohne gespeicherte Seiten */ }
+  }
+
+  await reload(); renderAll();
   el.querySelector(".thumb").src = imgOf(card) || el.querySelector(".thumb").src;
   el.querySelector(".body").innerHTML = `
     <div class="title">${esc(card.printed_name || card.name)}</div>
@@ -1564,6 +1616,13 @@ async function nachtragen(c, fresh) {
     const o = oracleOf(fresh);
     if (o != null) patch.oracle_text = o;
   }
+  // Seiten einer zweiseitigen Karte nachtragen (fürs Umdrehen in der
+  // Detailansicht). facesOf liefert nur bei echten Vorder-/Rückseiten-Karten
+  // etwas — einseitige bleiben null und werden nicht angefasst.
+  if (c.faces == null) {
+    const fc = facesOf(fresh);
+    if (fc != null) patch.faces = fc;
+  }
   if (!Object.keys(patch).length) return;
   const { error } = await sb.from("cards").update(patch).eq("id", c.id);
   if (error) throw new Error(dbErr(error));
@@ -1876,10 +1935,62 @@ function faehigkeitenHtml(c, kompakt) {
   return `<div style="margin-top:10px"><label style="margin-bottom:4px">${esc(t("detail.abilities"))}</label>${teile.join("")}</div>`;
 }
 
+/* ------------------------------------------ Zweiseitige Karten ------ */
+/* Sicht auf EINE Seite einer zweiseitigen Karte: dieselbe Form wie eine ganze
+   Karte, aber Name/Typ/Kosten/Regeltext/Schlüsselwörter/Bild der gewählten
+   Seite. So rendern die seitenabhängigen Teile der Detailansicht mit demselben
+   Code wie bei einseitigen Karten. */
+function faceView(c, i) {
+  const f = (c.faces && c.faces[i]) || {};
+  return { ...c,
+    disp: f.printed || f.name || c.disp,
+    name: f.name ?? c.name,
+    printed_name: f.printed ?? null,
+    mana_cost: f.mana_cost,
+    type_line: f.type_line,
+    oracle_text: f.oracle_text,
+    keywords: f.keywords,
+    img: f.img || c.img };
+}
+
+/* Seitenabhängiger Kopf (Name + Manakosten, darunter der englische Name bei
+   fremdsprachigem Druck) und Rumpf (Typzeile + Fähigkeiten). Beim Umdrehen
+   werden nur diese beiden Teile ersetzt — Auflagenzeile, Pillen und Werkzeuge
+   bleiben stehen. */
+function faceTopHtml(v) {
+  return `<div class="name-zeile"><b style="font-size:17px">${esc(v.disp)}</b>${v.mana_cost
+      ? `<span class="mana-kosten">${manaHtml(v.mana_cost)}</span>` : ""}</div>
+    ${v.printed_name && v.printed_name !== v.name ? `<div class="hint" style="margin:0">${esc(v.name)}</div>` : ""}`;
+}
+function faceBottomHtml(v, hover) {
+  return `${v.type_line ? `<div class="hint" style="margin-top:2px">${esc(v.type_line)}</div>` : ""}
+    ${faehigkeitenHtml(v, hover)}`;
+}
+
+/* Umdrehbares Kartenbild: Vorder- und Rückseite im selben Rahmen, per 3D-Dreh
+   umgeschlagen. Klick (oder Enter/Leertaste) auf das Bild dreht — verdrahtet in
+   wireFlip. Die Bild-URLs tragen die Größe im Pfad, aus small wird normal. */
+function flipHtml(c) {
+  const norm = u => (u || "").replace("/small/", "/normal/");
+  const front = norm(c.faces[0].img || c.img), back = norm(c.faces[1].img);
+  return `<div class="detail-flip" id="dt-flip" role="button" tabindex="0"
+      title="${esc(t("detail.flipHint"))}" aria-label="${esc(t("detail.flipHint"))}">
+      <div class="detail-flip-inner">
+        <img class="flip-face flip-front" src="${esc(front)}" alt="">
+        <img class="flip-face flip-back" src="${esc(back)}" alt="">
+      </div>
+      <span class="flip-badge" aria-hidden="true">&#8635;</span>
+    </div>`;
+}
+
 /* Gemeinsame Vorlage für Dialog und Hover-Vorschau. Der Preisgraph sitzt in
    der rechten Spalte unter dem Hinzugefügt-Datum — kompakt (320er-viewBox),
    damit die Beschriftung beim Skalieren lesbar bleibt. */
 function detailHtml(c, hover) {
+  // Zweiseitige Karte im Dialog: mit Seite 0 (Vorderseite) starten und das
+  // Umdrehen ermöglichen. Die Hover-Vorschau bleibt schlicht bei der Vorderseite.
+  const faced = !hover && Array.isArray(c.faces) && c.faces.length >= 2;
+  const v = faced ? faceView(c, 0) : c;
   // Scryfall-Bild-URLs tragen die Größe im Pfad — aus small wird normal
   // (488×680), ohne einen weiteren API-Aufruf.
   const gross = (c.img || "").replace("/small/", "/normal/");
@@ -1920,15 +2031,12 @@ function detailHtml(c, hover) {
   return `
     <div class="detail">
       ${!hover ? `<div class="detail-added">${esc(t("detail.added"))}: ${esc(dtShort(c.added))} ${esc(t("detail.addedSuffix"))}</div>` : ""}
-      ${gross ? `<img class="detail-img" src="${esc(gross)}" alt="">` : ""}
+      ${faced ? flipHtml(c) : (gross ? `<img class="detail-img" src="${esc(gross)}" alt="">` : "")}
       <div class="detail-info">
-        <div class="name-zeile"><b style="font-size:17px">${esc(c.disp)}</b>${c.mana_cost
-          ? `<span class="mana-kosten">${manaHtml(c.mana_cost)}</span>` : ""}</div>
-        ${c.printed_name && c.printed_name !== c.name ? `<div class="hint" style="margin:0">${esc(c.name)}</div>` : ""}
+        ${!hover ? `<div class="detail-face-top" id="dt-face-top">${faceTopHtml(v)}</div>` : faceTopHtml(v)}
         <div class="hint" style="margin-top:2px">${esc(c.set_name || c.set)} · #${esc(c.cn)}${
           c.released ? ` · erschienen ${esc(datShort(c.released))}` : ""}</div>
-        ${c.type_line ? `<div class="hint" style="margin-top:2px">${esc(c.type_line)}</div>` : ""}
-        ${faehigkeitenHtml(c, hover)}
+        ${!hover ? `<div class="detail-face-bottom" id="dt-face-bottom">${faceBottomHtml(v, hover)}</div>` : faceBottomHtml(v, hover)}
         <div class="detail-copy">
           ${rarityPill(c.rarity)}
           ${c.foil ? '<span class="pill foil">Foil</span>' : ""}
@@ -1952,8 +2060,17 @@ function detailHtml(c, hover) {
 function showCardDetail(id) {
   const c = CARDS.find(x => x.id === id);
   if (!c) return;
+  renderDetail(c, id);
+  // showModal wirft, wenn der Dialog schon offen ist — beim Neuzeichnen (nach
+  // Preis-Update oder nachgeladenen Seiten) also nur den Inhalt ersetzen.
+  if (!$("#detail-dlg").open) $("#detail-dlg").showModal();
+}
+
+/* Inhalt der Detailansicht zeichnen und verdrahten — getrennt vom Öffnen,
+   damit dieselbe Ansicht bei offenem Dialog neu gezeichnet werden kann. */
+function renderDetail(c, id) {
   $("#detail-body").innerHTML = detailHtml(c, false);
-  $("#detail-dlg").showModal();
+  wireFlip(c, id);
 
   // Erst schließen, dann bearbeiten: zwei gestapelte Dialoge wären fragil.
   $("#dt-edit").onclick = () => { $("#detail-dlg").close(); editCard(id); };
@@ -2008,6 +2125,43 @@ function showCardDetail(id) {
     try { body.innerHTML = legalGridHtml(await kartenLegalitaet(c.scryfall_id)); }
     catch { body.innerHTML = `<div class="empty">${esc(t("legal.error"))}</div>`; }
   });
+}
+
+/* Umdrehen verdrahten. Sind die Seiten bekannt, schaltet ein Klick (oder
+   Enter/Leertaste) Bild und seitenabhängige Texte um. Fehlen die Seiten noch
+   (Bestand von vor dieser Funktion), die Karte SIEHT aber zweiseitig aus, wird
+   sie einmal von Scryfall nachgeladen, gespeichert und die Ansicht neu
+   gezeichnet — danach ist das Umdrehen sofort verfügbar. */
+function wireFlip(c, id) {
+  const flip = $("#dt-flip");
+  if (flip) {
+    let hinten = false;
+    const dreh = () => {
+      hinten = !hinten;
+      flip.classList.toggle("flipped", hinten);
+      const v = faceView(c, hinten ? 1 : 0);
+      $("#dt-face-top").innerHTML = faceTopHtml(v);
+      $("#dt-face-bottom").innerHTML = faceBottomHtml(v, false);
+    };
+    flip.onclick = dreh;
+    flip.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); dreh(); } };
+    return;
+  }
+  // Noch keine Seiten gespeichert: nur nachladen, wenn die Karte überhaupt
+  // mehrseitig aussieht (einseitige lösen nie einen Abruf aus). Je Sitzung
+  // höchstens ein Versuch.
+  if (!looksMultiface(c) || c._facesTried) return;
+  c._facesTried = true;
+  (async () => {
+    let fresh;
+    try { fresh = await sfById(c.scryfall_id); } catch { return; }
+    const fc = facesOf(fresh);
+    if (!fc) return;                 // doch nur geteilt/Abenteuer — nicht umdrehbar
+    c.faces = fc;
+    try { await sb.from("cards").update({ faces: fc }).eq("id", c.id); }
+    catch { /* Anzeige klappt auch ohne Speichern */ }
+    if ($("#detail-dlg").open) renderDetail(c, id);
+  })();
 }
 
 /* Hover-Vorschau: dieselben Details schweben neben dem Mauszeiger, ohne
