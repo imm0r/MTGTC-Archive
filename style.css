@@ -679,6 +679,14 @@ dialog::backdrop{background:#000a}
    (außerhalb der rechten Spalte — beginnen linksbündig unter dem Kartenbild). */
 .detail-copy{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:12px 0}
 .detail-preis{margin-left:auto}
+/* Deck-Zugehörigkeit der Karte: Label + anklickbare Deck-„Chips", die zum Deck
+   springen. */
+.detail-decks{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:2px 0 4px}
+.detail-decks-lbl{font-size:13px;color:var(--dim);margin-right:2px}
+.deck-chip{background:var(--panel2);border:1px solid var(--line);color:var(--txt);
+  border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer;
+  transition:border-color .15s,color .15s}
+.deck-chip:hover,.deck-chip:focus-visible{border-color:var(--acc);color:var(--acc);outline:none}
 .sec-sep{height:1px;background:var(--line);margin:14px 0}
 .dt-results-full{margin-top:14px}
 .dt-results-full:empty{display:none}

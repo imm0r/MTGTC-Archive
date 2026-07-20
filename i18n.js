@@ -2884,4 +2884,31 @@ Object.assign(I18N.fr, { "detail.flipHint": "Cliquer pour retourner" });
 Object.assign(I18N.es, { "detail.flipHint": "Haz clic para girar" });
 Object.assign(I18N.it, { "detail.flipHint": "Clicca per girare" });
 
+/* ---- Teil 25: Deck-Zugehörigkeit + Kontingent (Karte eineindeutig) ---- */
+Object.assign(I18N.de, {
+  "detail.inDecks": "In Deck(s):",
+  "detail.inDeckGo": "Zum Deck springen",
+  "deck.allocFull": "Alle {n} Exemplar(e) dieser Karte stecken bereits in anderen Decks ({decks}). Erhöhe erst deinen Bestand.",
+});
+Object.assign(I18N.en, {
+  "detail.inDecks": "In deck(s):",
+  "detail.inDeckGo": "Go to deck",
+  "deck.allocFull": "All {n} copy/copies of this card are already used in other decks ({decks}). Increase your collection count first.",
+});
+Object.assign(I18N.fr, {
+  "detail.inDecks": "Dans le(s) deck(s) :",
+  "detail.inDeckGo": "Aller au deck",
+  "deck.allocFull": "Les {n} exemplaire(s) de cette carte sont déjà utilisés dans d'autres decks ({decks}). Augmente d'abord ta collection.",
+});
+Object.assign(I18N.es, {
+  "detail.inDecks": "En mazo(s):",
+  "detail.inDeckGo": "Ir al mazo",
+  "deck.allocFull": "Los {n} ejemplar(es) de esta carta ya están en otros mazos ({decks}). Aumenta primero tu colección.",
+});
+Object.assign(I18N.it, {
+  "detail.inDecks": "Nel/i mazzo/i:",
+  "detail.inDeckGo": "Vai al mazzo",
+  "deck.allocFull": "Tutte le {n} copia/e di questa carta sono già in altri mazzi ({decks}). Aumenta prima la tua collezione.",
+});
+
 initLang();
