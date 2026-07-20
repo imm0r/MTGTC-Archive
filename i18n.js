@@ -2250,6 +2250,68 @@ Object.assign(I18N.fr, { "detail.groupManage": "Gestion", "detail.groupTools": "
 Object.assign(I18N.es, { "detail.groupManage": "Gestión", "detail.groupTools": "Sugerencias y combos" });
 Object.assign(I18N.it, { "detail.groupManage": "Gestione", "detail.groupTools": "Suggerimenti e combo" });
 
+/* ---- Teil 23: Deck-Import (Text-Deckliste, z. B. mtgsalvation.com) ---- */
+Object.assign(I18N.de, {
+  "imp.btn": "Deck importieren",
+  "imp.title": "Deck aus Deckliste importieren",
+  "imp.hint": "Füge eine als Text exportierte Deckliste ein (z. B. von mtgsalvation.com/decks). Abschnitte wie Commander/Creature/Land werden erkannt, Kartennamen über Scryfall aufgelöst. Nicht besessene Karten kommen als Platzhalter (Bestand 0) ins Deck.",
+  "imp.ph": "Commander\n1 Edgar Markov\n\nCreature\n1 Bloodline Keeper\n1 Captivating Vampire\n\nLand\n1 Command Tower\n…",
+  "imp.empty": "Keine Karten in der Deckliste erkannt.",
+  "imp.defaultName": "Importiertes Deck",
+  "imp.busy": "Importiere …",
+  "imp.progress": "Importiere … {i}/{n}",
+  "imp.done": "{n} Karten importiert.",
+  "imp.doneSome": "{n} Karten importiert, {f} nicht gefunden (siehe Konsole).",
+});
+Object.assign(I18N.en, {
+  "imp.btn": "Import deck",
+  "imp.title": "Import deck from a decklist",
+  "imp.hint": "Paste a decklist exported as text (e.g. from mtgsalvation.com/decks). Sections like Commander/Creature/Land are recognised and card names resolved via Scryfall. Cards you don't own are added as placeholders (quantity 0).",
+  "imp.ph": "Commander\n1 Edgar Markov\n\nCreature\n1 Bloodline Keeper\n1 Captivating Vampire\n\nLand\n1 Command Tower\n…",
+  "imp.empty": "No cards found in the decklist.",
+  "imp.defaultName": "Imported deck",
+  "imp.busy": "Importing …",
+  "imp.progress": "Importing … {i}/{n}",
+  "imp.done": "Imported {n} cards.",
+  "imp.doneSome": "Imported {n} cards, {f} not found (see console).",
+});
+Object.assign(I18N.fr, {
+  "imp.btn": "Importer un deck",
+  "imp.title": "Importer un deck depuis une liste",
+  "imp.hint": "Colle une liste de deck exportée en texte (p. ex. depuis mtgsalvation.com/decks). Les sections comme Commander/Creature/Land sont reconnues et les noms de cartes résolus via Scryfall. Les cartes que tu ne possèdes pas sont ajoutées comme espaces réservés (quantité 0).",
+  "imp.ph": "Commander\n1 Edgar Markov\n\nCreature\n1 Bloodline Keeper\n1 Captivating Vampire\n\nLand\n1 Command Tower\n…",
+  "imp.empty": "Aucune carte trouvée dans la liste.",
+  "imp.defaultName": "Deck importé",
+  "imp.busy": "Importation …",
+  "imp.progress": "Importation … {i}/{n}",
+  "imp.done": "{n} cartes importées.",
+  "imp.doneSome": "{n} cartes importées, {f} introuvables (voir la console).",
+});
+Object.assign(I18N.es, {
+  "imp.btn": "Importar mazo",
+  "imp.title": "Importar mazo desde una lista",
+  "imp.hint": "Pega una lista de mazo exportada como texto (p. ej. de mtgsalvation.com/decks). Se reconocen secciones como Commander/Creature/Land y los nombres de cartas se resuelven con Scryfall. Las cartas que no tienes se añaden como marcadores (cantidad 0).",
+  "imp.ph": "Commander\n1 Edgar Markov\n\nCreature\n1 Bloodline Keeper\n1 Captivating Vampire\n\nLand\n1 Command Tower\n…",
+  "imp.empty": "No se encontraron cartas en la lista.",
+  "imp.defaultName": "Mazo importado",
+  "imp.busy": "Importando …",
+  "imp.progress": "Importando … {i}/{n}",
+  "imp.done": "{n} cartas importadas.",
+  "imp.doneSome": "{n} cartas importadas, {f} no encontradas (ver consola).",
+});
+Object.assign(I18N.it, {
+  "imp.btn": "Importa mazzo",
+  "imp.title": "Importa mazzo da una lista",
+  "imp.hint": "Incolla una lista di mazzo esportata come testo (es. da mtgsalvation.com/decks). Le sezioni come Commander/Creature/Land vengono riconosciute e i nomi delle carte risolti tramite Scryfall. Le carte che non possiedi vengono aggiunte come segnaposto (quantità 0).",
+  "imp.ph": "Commander\n1 Edgar Markov\n\nCreature\n1 Bloodline Keeper\n1 Captivating Vampire\n\nLand\n1 Command Tower\n…",
+  "imp.empty": "Nessuna carta trovata nella lista.",
+  "imp.defaultName": "Mazzo importato",
+  "imp.busy": "Importazione …",
+  "imp.progress": "Importazione … {i}/{n}",
+  "imp.done": "{n} carte importate.",
+  "imp.doneSome": "{n} carte importate, {f} non trovate (vedi console).",
+});
+
 /* ---- Teil 7: Spielrunde (live) ---- */
 Object.assign(I18N.de, {
   "nav.session": "Spielrunde",
