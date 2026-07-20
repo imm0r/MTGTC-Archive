@@ -4723,6 +4723,115 @@ function renderSettings() {
   };
 }
 
+/* ===================== Regel-Assistent =====================
+   Klärt eine strittige Spielsituation gegen das OFFIZIELLE erweiterte Regelwerk.
+   Die Edge Function „rules-question" schlägt zunächst per Modell die passenden
+   Regeln vor, lädt deren Text WÖRTLICH aus der offiziellen Fassung und urteilt
+   nur auf dieser Grundlage — die gezeigten Zitate stammen 1:1 aus dem Regelwerk,
+   nicht aus dem Gedächtnis des Modells. Kein Datenbankbedarf, nur die Function. */
+let RULES_LOG = [];          // beantwortete Fragen dieser Sitzung, neueste zuerst
+let rulesLauf = 0;           // wie synergyLauf: alte, überholte Läufe verwerfen
+let RULES_DRAFT = "";        // Eingabe über einen Tab-Wechsel hinweg bewahren
+
+function renderRules() {
+  const el = $("#v-rules");
+  if (!el) return;
+  const beispiele = [
+    t("rules.ex1"), t("rules.ex2"), t("rules.ex3"), t("rules.ex4"),
+  ].filter(Boolean);
+  el.innerHTML = `
+    <div class="card">
+      <h3 style="margin-top:0">${esc(t("rules.title"))}</h3>
+      <p class="hint" style="margin-top:-4px">${esc(t("rules.intro"))}</p>
+      <textarea id="rules-q" class="rules-input" rows="4"
+        placeholder="${esc(t("rules.ph"))}">${esc(RULES_DRAFT)}</textarea>
+      <div class="rules-ex">${beispiele.map(b =>
+        `<button type="button" class="chip" data-ex="${esc(b)}">${esc(b)}</button>`).join("")}</div>
+      <div class="row" style="margin-top:10px;align-items:center">
+        <div style="flex:none"><button class="btn" id="rules-ask">${esc(t("rules.ask"))}</button></div>
+        <div class="hint" style="flex:1">${esc(t("rules.disclaimer"))}</div>
+      </div>
+    </div>
+    <div id="rules-out"></div>
+    <div id="rules-log">${RULES_LOG.map(regelAntwortHtml).join("")}</div>`;
+
+  const ta = $("#rules-q");
+  ta.oninput = () => { RULES_DRAFT = ta.value; };
+  el.querySelectorAll("[data-ex]").forEach(b => b.onclick = () => {
+    ta.value = b.dataset.ex; RULES_DRAFT = ta.value; ta.focus();
+  });
+  $("#rules-ask").onclick = () => regelFrageStellen();
+  // Strg/Cmd+Enter im Feld schickt ab — bequem am Spieltisch.
+  ta.onkeydown = e => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); regelFrageStellen(); } };
+}
+
+async function regelFrageStellen() {
+  const ta = $("#rules-q"); if (!ta) return;
+  const situation = ta.value.trim();
+  const out = $("#rules-out");
+  if (situation.length < 5) { toast(t("rules.tooShort")); ta.focus(); return; }
+
+  const lauf = ++rulesLauf;
+  const btn = $("#rules-ask"); if (btn) btn.disabled = true;
+  if (out) out.innerHTML = `<div class="card"><div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("rules.loading"))}</div></div>`;
+
+  let data, error;
+  try {
+    ({ data, error } = await sb.functions.invoke("rules-question", { body: { situation, lang: LANG } }));
+  } catch (e) { error = e; }
+  if (lauf !== rulesLauf) return;                 // ein neuerer Lauf hat übernommen
+  if (btn) btn.disabled = false;
+
+  if (error) {
+    // Wie bei den Synergien steckt die Klartext-Meldung der Function in error.context.
+    let msg = t("rules.error");
+    try { const ctx = await error.context?.json?.(); if (ctx?.error) msg = ctx.error; } catch { /* generisch */ }
+    if (out) out.innerHTML = `<div class="card"><div class="empty">${esc(msg)}</div></div>`;
+    return;
+  }
+  if (data?.error) { if (out) out.innerHTML = `<div class="card"><div class="empty">${esc(data.error)}</div></div>`; return; }
+  if (!data?.ruling) { if (out) out.innerHTML = `<div class="card"><div class="empty">${esc(t("rules.error"))}</div></div>`; return; }
+
+  const eintrag = { q: situation, ...data };
+  RULES_LOG.unshift(eintrag);
+  if (RULES_LOG.length > 20) RULES_LOG.pop();
+  if (out) out.innerHTML = "";
+  const log = $("#rules-log");
+  if (log) log.innerHTML = RULES_LOG.map(regelAntwortHtml).join("");
+  // Eingabe geleert: die Frage steht jetzt oben im Verlauf.
+  ta.value = ""; RULES_DRAFT = "";
+}
+
+/* Eine beantwortete Regelfrage als Karte. Zitate kommen WÖRTLICH aus dem
+   Regelwerk (die Function schlägt sie in ihrer geparsten Fassung nach), deshalb
+   dürfen sie unverändert stehen — nur maskiert, nie paraphrasiert. */
+function regelAntwortHtml(e) {
+  const conf = { high: "rules.confHigh", medium: "rules.confMedium", low: "rules.confLow" }[e.confidence] || "rules.confMedium";
+  const confClass = { high: "conf-high", medium: "conf-medium", low: "conf-low" }[e.confidence] || "conf-medium";
+  const cites = (e.citations || []).filter(c => c && c.text);
+  const citeHtml = cites.length ? `
+    <details class="regel-cites">
+      <summary>${esc(t("rules.rulesN", { n: cites.length }))}</summary>
+      <div class="regel-cite-list">${cites.map(c =>
+        `<div class="regel-cite"><span class="regel-cite-num">${esc(c.rule)}</span><span class="regel-cite-txt">${esc(c.text.replace(/^\s*\S+\s/, ""))}</span></div>`).join("")}</div>
+    </details>` : "";
+  const dateLine = e.rulesDate ? `<span class="regel-date">${esc(t("rules.basis", { date: e.rulesDate }))}</span>` : "";
+  return `
+    <div class="card regel-antwort">
+      <div class="regel-frage">&bdquo;${esc(e.q)}&ldquo;</div>
+      ${e.degraded ? `<div class="regel-warn">${esc(t("rules.degraded"))}</div>` : ""}
+      <div class="regel-head">
+        <span class="regel-conf ${confClass}">${esc(t(conf))}</span>
+        ${dateLine}
+      </div>
+      <div class="regel-ruling">${esc(e.ruling)}</div>
+      ${e.reasoning ? `<div class="regel-reason">${esc(e.reasoning)}</div>` : ""}
+      ${e.caveat ? `<div class="regel-caveat">&#9888; ${esc(e.caveat)}</div>` : ""}
+      ${citeHtml}
+      ${kiKostenHtml(e.usage)}
+    </div>`;
+}
+
 /* Such- & Vorschlags-Einstellungen (profiles.search_prefs, jsonb): Schalter und
    Vorbelegungen für die Synergie- und Combo-Suchen. Ein jsonb-Beutel statt
    einzelner Spalten — neue Schalter brauchen keine Schemaänderung. Liegt im
@@ -6238,6 +6347,7 @@ function wireApp() {
     if (b.dataset.v === "friends") oeffneFreunde();
     if (b.dataset.v === "session") oeffneSession();
     if (b.dataset.v === "events") oeffneTermine();
+    if (b.dataset.v === "rules") renderRules();
     if (b.dataset.v === "settings") renderSettings();
   });
   // Klick irgendwo anders schließt das per Klick geöffnete Benutzermenü (Touch)
@@ -6383,6 +6493,7 @@ function onLangChange() {
   else if (aktiv === "v-friends") renderFriends();
   else if (aktiv === "v-session") renderSession();
   else if (aktiv === "v-events") renderTermine();
+  else if (aktiv === "v-rules") renderRules();
   else if (aktiv === "v-settings") renderSettings();
   aktualisiereVerkaufZaehler();
   if ($("#sell-dlg")?.open) renderVerkauf();
