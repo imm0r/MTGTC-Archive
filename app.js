@@ -4822,10 +4822,13 @@ function zeichneRegelVerlauf() {
   if (offen) offen.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
-/* Schlagwort für die Listenzeile: erste Zeile der Frage, auf ~72 Zeichen gekürzt. */
+/* Schlagwort für die Listenzeile: die Frage in einer Zeile. Voll durchreichen
+   (bis zu einer Sicherheitsgrenze fürs DOM) — die SICHTBARE Kürzung macht CSS
+   per text-overflow, damit das Feld genau die verfügbare Breite bis zur
+   Konfidenz-Pille füllt, statt schon früh mit „…" abzubrechen. */
 function regelSchlagwort(e) {
   const s = String(e.q || "").replace(/\s+/g, " ").trim();
-  return s.length > 72 ? s.slice(0, 71).trimEnd() + "…" : (s || t("rules.title"));
+  return s.slice(0, 200) || t("rules.title");
 }
 
 /* Datum + Uhrzeit eines Eintrags in der Oberflächensprache. */
