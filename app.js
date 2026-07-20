@@ -989,6 +989,33 @@ function bestandVon(c) {
   return CARDS.reduce((s, x) => s + (x.set === c.set && x.cn === c.cn ? x.qty : 0), 0);
 }
 
+/* Zwei Sammlungszeilen sind „dieselbe Karte" — fürs Deck-Kontingent und die
+   Deck-Zugehörigkeit — über Set + Sammlernummer, genau wie bestandVon (sprach-,
+   foil- und zustandsunabhängig). Ohne Set/Nummer (Uralt-Zeilen) zählt die ID. */
+function gleicheKarte(a, b) {
+  if (a.set && a.cn && b.set && b.cn) return a.set === b.set && a.cn === b.cn;
+  return a.id === b.id;
+}
+
+/* In welchen Decks steckt diese Karte (nach Set+Nummer) — je Deck mit Deckmenge.
+   Grundlage für „in welchem Deck" (Kartendetails) und das Kontingent (eine
+   besessene Karte darf nicht in mehr Decks als vorhanden). exceptId nimmt ein
+   Deck aus (fürs „in ANDEREN Decks"). */
+function deckVorkommen(c, exceptId) {
+  const byId = new Map(CARDS.map(x => [x.id, x]));
+  const out = [];
+  for (const d of DECKS) {
+    if (exceptId && d.id === exceptId) continue;
+    let q = 0;
+    for (const e of d.entries) {
+      const card = byId.get(e.cardId);
+      if (card && gleicheKarte(card, c)) q += e.qty;
+    }
+    if (q > 0) out.push({ id: d.id, name: d.name, qty: q });
+  }
+  return out;
+}
+
 function sortWert(key, c, e) {
   const qty = e ? e.qty : c.qty;
   if (key === "name")  return c.disp;
@@ -1983,6 +2010,30 @@ function flipHtml(c) {
     </div>`;
 }
 
+/* Deck-Zugehörigkeit für die Kartendetails: in welchen Decks steckt diese Karte
+   (nach Set+Nummer) und mit welcher Deckmenge. Jede Nennung ist ein Knopf, der
+   zum Deck springt. Leer, wenn die Karte in keinem Deck liegt. */
+function deckMembershipHtml(c) {
+  const vork = deckVorkommen(c);
+  if (!vork.length) return "";
+  const chips = vork.map(v =>
+    `<button class="deck-chip" data-godeck="${esc(v.id)}" title="${esc(t("detail.inDeckGo"))}">${esc(v.name)} &middot; ${v.qty}&times;</button>`).join("");
+  return `<div class="detail-decks"><span class="detail-decks-lbl">${esc(t("detail.inDecks"))}</span>${chips}</div>`;
+}
+
+/* Von den Kartendetails zum Deck springen: Dialog schließen, Deck-Ansicht öffnen,
+   das Deck aufklappen und hinscrollen. */
+function zeigeDeck(deckId) {
+  $("#detail-dlg")?.close();
+  const nav = $('nav button[data-v="decks"]'); if (nav) nav.click();
+  if (!deckOffen.ist(deckId)) deckOffen.schalte(deckId);
+  renderDecks();
+  requestAnimationFrame(() => {
+    const el = $(`.deck-kopf[data-toggle="${deckId}"]`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
 /* Gemeinsame Vorlage für Dialog und Hover-Vorschau. Der Preisgraph sitzt in
    der rechten Spalte unter dem Hinzugefügt-Datum — kompakt (320er-viewBox),
    damit die Beschriftung beim Skalieren lesbar bleibt. */
@@ -2046,6 +2097,7 @@ function detailHtml(c, hover) {
           <span class="detail-preis">${esc(t("detail.price"))}: <b>${eur(c.price)}</b></span>
           ${links}
         </div>
+        ${!hover ? deckMembershipHtml(c) : ""}
         ${block}
         ${hover ? `<div class="hint" style="margin-top:10px">${esc(t("detail.added"))}: ${esc(dtShort(c.added))} ${esc(t("detail.addedSuffix"))}</div>` : ""}
       </div>
@@ -2125,6 +2177,10 @@ function renderDetail(c, id) {
     try { body.innerHTML = legalGridHtml(await kartenLegalitaet(c.scryfall_id)); }
     catch { body.innerHTML = `<div class="empty">${esc(t("legal.error"))}</div>`; }
   });
+
+  // Deck-Zugehörigkeit: Klick auf eine Deck-Nennung springt zum Deck.
+  $$("#detail-body .deck-chip[data-godeck]").forEach(ch =>
+    ch.onclick = () => zeigeDeck(ch.dataset.godeck));
 }
 
 /* Umdrehen verdrahten. Sind die Seiten bekannt, schaltet ein Klick (oder
@@ -3900,6 +3956,25 @@ function renderDecks() {
     if (!d) return;
     const add = Math.max(1, parseInt($(`[data-dqty="${deckId}"]`).value) || 1);
     const ex = d.entries.find(e => e.cardId === cardId);
+
+    // Kontingent: eine besessene Karte, deren Exemplare bereits alle in ANDEREN
+    // Decks stecken, lässt sich nicht zusätzlich hier einbauen — außer sie ist in
+    // diesem Deck schon drin (dann ist es ein Erhöhen, das als Wunsch/„fehlt"
+    // gilt und erlaubt bleibt). Nur besessene Karten (Bestand ≥ 1) sind betroffen;
+    // reine Wunschkarten (Bestand 0) dürfen in beliebig viele Decks.
+    const c = CARDS.find(x => x.id === cardId);
+    if (c) {
+      const owned = bestandVon(c);
+      const vork = deckVorkommen(c);
+      const inDiesem = vork.filter(x => x.id === deckId).reduce((s, x) => s + x.qty, 0);
+      const andere = vork.filter(x => x.id !== deckId);
+      const belegtAnderswo = andere.reduce((s, x) => s + x.qty, 0);
+      if (owned >= 1 && inDiesem === 0 && belegtAnderswo >= owned) {
+        toast(t("deck.allocFull", { n: owned, decks: andere.map(x => x.name).join(", ") }));
+        return;
+      }
+    }
+
     btn.disabled = true;
     try {
       const { error } = await sb.from("deck_entries")
