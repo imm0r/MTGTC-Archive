@@ -5636,6 +5636,8 @@ function terminFormHtml() {
     <input type="datetime-local" id="ev-when" value="${esc(defDt)}">
     <label style="margin-top:8px">${esc(t("cal.fDesc"))}</label>
     <textarea id="ev-desc" rows="2" maxlength="1000" placeholder="${esc(t("cal.fDescPh"))}">${esc(ed?.description || "")}</textarea>
+    <label class="ev-serie-check" style="margin-top:10px"><input type="checkbox" id="ev-remind"${ed?.remind ? " checked" : ""}>${esc(t("cal.remind"))}</label>
+    <div class="hint" style="margin:-2px 0 0">${esc(t("cal.remindHint"))}</div>
     ${!ed ? `<label style="margin-top:8px">${esc(t("cal.fInvite"))}</label>
       <div class="ev-invite-list">${freunde.length
         ? freunde.map(f => `<label class="ev-inv"><input type="checkbox" value="${esc(f.id)}">${avatarHtml(22, f)}<span>${esc(f.display_name || t("friends.unknown"))}</span></label>`).join("")
@@ -5836,24 +5838,45 @@ async function terminSpeichern() {
   if (!title) { toast(t("cal.needTitle")); return; }
   if (!whenVal) { toast(t("cal.needWhen")); return; }
   const iso = new Date(whenVal).toISOString();
+  const remind = $("#ev-remind")?.checked || false;
   try {
     if (eventForm.editId) {
-      const { error } = await sb.from("game_events").update({ title, description: desc.trim() || null, starts_at: iso }).eq("id", eventForm.editId);
+      // reminded_at zurücksetzen: bei geändertem Zeitpunkt / neu gesetzter Option
+      // soll die Erinnerung erneut greifen.
+      const { error } = await sb.from("game_events")
+        .update({ title, description: desc.trim() || null, starts_at: iso, remind, reminded_at: null })
+        .eq("id", eventForm.editId);
       if (error) throw error;
     } else {
       const invitees = $$("#v-events .ev-invite-list input:checked").map(c => c.value);
       const daten = $("#ev-serie")?.checked
         ? serienDaten(iso, $("#ev-serie-freq")?.value, $("#ev-serie-count")?.value)
         : [iso];
+      let ersteId = null;
       for (const startIso of daten) {
-        const { error } = await sb.rpc("create_event", { p_title: title, p_desc: desc, p_starts_at: startIso, p_invitees: invitees });
+        const { data: eid, error } = await sb.rpc("create_event", { p_title: title, p_desc: desc, p_starts_at: startIso, p_invitees: invitees, p_remind: remind });
         if (error) throw error;
+        if (!ersteId) ersteId = eid;
       }
       if (daten.length > 1) toast(t("cal.serieCreated", { n: daten.length }));
+      // Einladungs-Mails verschicken (bei einer Serie einmal für den ersten Termin).
+      if (invitees.length && ersteId) await mailEinladung(ersteId, invitees);
     }
     eventForm.offen = false; eventForm.editId = null;
     await ladeTermine(); renderTermine();
   } catch (e) { toast(dbErr(e)); }
+}
+
+/* Einladungs-Mails über die Edge Function „event-mail" verschicken. Schlägt der
+   Versand fehl (z. B. SMTP noch nicht eingerichtet), bleibt der Termin trotzdem
+   angelegt — nur ein Hinweis, kein harter Fehler. */
+async function mailEinladung(eventId, ids) {
+  if (!eventId || !ids?.length) return;
+  try {
+    const { data, error } = await sb.functions.invoke("event-mail", { body: { event: eventId, invitees: ids } });
+    if (error) { let msg = ""; try { const c = await error.context?.json?.(); msg = c?.error; } catch { /* egal */ } throw new Error(msg || "mail"); }
+    if (data?.error) throw new Error(data.error);
+  } catch { toast(t("cal.mailFailed")); }
 }
 async function terminRsvp(eventId, status) {
   try {
@@ -5869,6 +5892,7 @@ async function terminEinladen(eventId) {
     const { error } = await sb.from("event_rsvp").insert(ids.map(id => ({ event_id: eventId, user_id: id, status: "invited" })));
     if (error) throw error;
     terminInviteOffen = null;
+    await mailEinladung(eventId, ids);   // die neu Eingeladenen per Mail informieren
     await ladeTermine(); renderTermine();
   } catch (e) { toast(dbErr(e)); }
 }
