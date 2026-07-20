@@ -113,6 +113,11 @@ alter table public.cards add column if not exists released date;
 alter table public.cards add column if not exists colors text[];
 alter table public.cards add column if not exists keywords text[];
 alter table public.cards add column if not exists oracle_text text;
+-- Seiten zweiseitiger Karten (Vorder-/Rückseite zum Umdrehen), als JSON je
+-- Seite: Name, Typzeile, Regeltext, Manakosten, Stärke/Widerstand, Bild. NULL
+-- bei einseitigen Karten. Nur für die Detailansicht — Suche/Sortierung laufen
+-- weiter über die flachen Spalten (name, type_line …).
+alter table public.cards add column if not exists faces jsonb;
 -- Kuratierte Verkaufsliste: Karte für den Cardmarket-Verkauf markiert.
 alter table public.cards add column if not exists for_sale boolean not null default false;
 create index if not exists cards_for_sale_idx on public.cards(user_id) where for_sale;

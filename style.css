@@ -654,6 +654,25 @@ dialog::backdrop{background:#000a}
 /* „Hinzugefügt am" oben rechts in der Ecke des Fensters statt unten. */
 .detail-added{position:absolute;top:0;right:0;font-size:12px;color:var(--dim);white-space:nowrap}
 .detail-img{width:230px;max-width:100%;border-radius:10px;background:#000;flex:none;align-self:flex-start}
+/* Zweiseitige Karten (Vorder-/Rückseite): beide Seiten im selben Rahmen, per
+   Klick mit 3D-Dreh umgeschlagen — wie auf Scryfall. Der Rahmen hält das
+   Kartenmaß (488×680), damit die absolut gesetzten Seiten sich genau decken. */
+.detail-flip{width:230px;max-width:100%;flex:none;align-self:flex-start;position:relative;
+  perspective:1400px;cursor:pointer;outline:none}
+.detail-flip-inner{position:relative;width:100%;aspect-ratio:488/680;transform-style:preserve-3d;
+  transition:transform .6s cubic-bezier(.2,.8,.25,1)}
+.detail-flip.flipped .detail-flip-inner{transform:rotateY(180deg)}
+.flip-face{position:absolute;inset:0;width:100%;height:100%;border-radius:10px;background:#000;
+  object-fit:cover;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.flip-back{transform:rotateY(180deg)}
+/* Kleines Umdreh-Zeichen in der Ecke als Hinweis; dreht nicht mit (außerhalb
+   des drehenden Rahmens). */
+.flip-badge{position:absolute;top:8px;right:8px;width:30px;height:30px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:16px;line-height:1;
+  background:#000a;color:#fff;border:1px solid #ffffff40;pointer-events:none;transition:background .2s,color .2s}
+.detail-flip:hover .flip-badge,.detail-flip:focus-visible .flip-badge{background:var(--acc);color:#12131a}
+.detail-flip:focus-visible{box-shadow:0 0 0 2px var(--acc);border-radius:12px}
+@media(prefers-reduced-motion:reduce){.detail-flip-inner{transition:none}}
 .detail-info{flex:1;min-width:220px}
 /* Kartendetail aufgeräumt: Kopie-Zeile (Pillen + Preis + Kauf-Logos), dünne
    Abschnitts-Trenner und die Vorschlags-/Combo-Ergebnisse über die VOLLE Breite
