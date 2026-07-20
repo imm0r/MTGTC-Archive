@@ -3548,7 +3548,13 @@ function renderDecks() {
       const items = katGruppen.get(en);
       const anz = items.reduce((s, x) => s + x.e.qty, 0);
       const zu = deckCatZu.has(`${d.id}|${en}`);
-      const catRows = items.map(({ e, c }) => cardRow(c, {
+      // Die Commanderkarte steht immer ganz oben in ihrer Kategorie (Kreaturen),
+      // unabhängig von der gewählten Sortierung. Stabiler Sort: nur der Commander
+      // wandert nach vorn, alle anderen behalten ihre Reihenfolge.
+      const geordnet = d.main_card_id
+        ? [...items].sort((a, b) => (b.c.id === d.main_card_id) - (a.c.id === d.main_card_id))
+        : items;
+      const catRows = geordnet.map(({ e, c }) => cardRow(c, {
         deckId: d.id, qty: e.qty, istHaupt: d.main_card_id === c.id })).join("");
       return `<tbody class="deck-cat-body${zu ? " zu" : ""}">`
         + `<tr class="deck-cat-head" data-cattoggle="${d.id}|${en}"><td colspan="99">`
@@ -3569,7 +3575,9 @@ function renderDecks() {
       <div class="deck-kopf" data-toggle="${d.id}" title="${offen ? t("common.collapse") : t("common.expand")}">
         <span class="deck-pfeil">${offen ? "&#9660;" : "&#9654;"}</span>
         ${haupt?.img ? `<img class="deck-haupt" src="${esc(haupt.img)}" alt=""
-             title="${esc(haupt.disp)}">` : ""}
+             title="${esc(haupt.disp)}"
+             data-cmd-img="${esc((haupt.img || "").replace("/small/", "/normal/"))}"
+             data-cmd-name="${esc(haupt.disp)}">` : ""}
         <div style="flex:1;min-width:0">
           <h3 style="margin:0">${esc(d.name)}</h3>
           <div class="deck-tags">${
@@ -3678,6 +3686,14 @@ function renderDecks() {
     }
     // Einstellung „Deck-Legalität beim Öffnen prüfen": still nur in die Header-Pille.
     if (offen) deckLegalAutoTrigger(DECKS.find(x => x.id === k.dataset.toggle));
+  });
+
+  // Commanderkarte im Deck-Kopf: beim Hover die große Vorschau + Name schweben
+  // lassen — dieselbe Vorschau wie bei den Commander-Karten in der Spielrunde.
+  // Nur auf Hover-fähigen Geräten.
+  if (HOVER_OK) $$("#deck-list .deck-haupt[data-cmd-img]").forEach(el => {
+    el.addEventListener("mousemove", e => zeigeCmdHover(el.dataset.cmdImg, el.dataset.cmdName, e.clientX, e.clientY));
+    el.addEventListener("mouseleave", versteckeCmdHover);
   });
 
   $$("#deck-list .deck-tbl").forEach(t => wireCardRows(t));
