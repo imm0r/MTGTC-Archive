@@ -934,3 +934,33 @@ end $$;
 revoke execute on function public.start_session_from_event(uuid,integer) from anon;
 alter publication supabase_realtime add table public.game_events;
 alter publication supabase_realtime add table public.event_rsvp;
+
+-- =====================================================================
+--  Regelfrage-Verlauf: erfolgreich geklärte Regelfragen je Nutzer
+--
+--  Jede beantwortete Regelfrage (siehe Edge Function rules-question)
+--  wird hier gespeichert, damit sie nach einem Neuladen wieder abrufbar
+--  ist. payload trägt die Antwort der Function (ruling, reasoning,
+--  confidence, caveat, citations, degraded, rulesDate, usage …) als jsonb
+--  — so kommen neue Felder ohne Schemaänderung mit. Rückfragen (clarify)
+--  werden NICHT gespeichert, nur fertige Urteile.
+-- =====================================================================
+create table if not exists public.rules_rulings (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  question   text not null,
+  lang       text,
+  payload    jsonb not null default '{}'::jsonb
+);
+create index if not exists rules_rulings_user_created
+  on public.rules_rulings (user_id, created_at desc);
+
+alter table public.rules_rulings enable row level security;
+alter table public.rules_rulings force row level security;
+revoke all on public.rules_rulings from anon;
+
+drop policy if exists "eigene regelfragen" on public.rules_rulings;
+create policy "eigene regelfragen" on public.rules_rulings
+  for all to authenticated
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
