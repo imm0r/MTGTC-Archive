@@ -33,6 +33,13 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const MODEL_TRIAGE = "claude-haiku-4-5";
 const MODEL_JUDGE = "claude-sonnet-4-6";
 
+// Nach so vielen bereits beantworteten Rückfrage-Runden gibt es KEINE weiteren
+// Fragen mehr — dann urteilt die Funktion mit ausdrücklichen Annahmen statt
+// weiter nachzufragen. round=0 ist die erste Schilderung, round=1 nach der
+// ersten Antwort usw. Deckelt die von Testern gemeldeten langen Frage-Ketten
+// (bis zu zehn Runden), ohne die Genauigkeit des Urteils anzutasten.
+const MAX_CLARIFY_ROUNDS = 2;
+
 // Die offizielle Textfassung. Wizards datiert den Dateinamen bei jeder
 // Aktualisierung — die alte URL bleibt eine Weile erreichbar. Bricht sie doch,
 // setzt der Betreiber das Secret RULES_TXT_URL auf die aktuelle .txt von
@@ -327,12 +334,15 @@ Deno.serve(async (req) => {
   const key = Deno.env.get("ANTHROPIC_API_KEY");
   if (!key) return json({ error: "ANTHROPIC_API_KEY ist nicht gesetzt" }, 500);
 
-  let situation = "", lang = "de", context = "";
+  let situation = "", lang = "de", context = "", round = 0;
   try {
     const body = await req.json();
     lang = SPRACHE[body.lang] ? String(body.lang) : "de";
     situation = String(body.situation ?? "").trim().slice(0, 4000);
     context = String(body.context ?? "").trim().slice(0, 1000);
+    // Wie viele Rückfrage-Runden der Nutzer schon beantwortet hat (der Client
+    // zählt hoch). Begrenzt, damit ein manipulierter Wert nichts anrichtet.
+    round = Math.max(0, Math.min(10, Math.floor(Number(body.round) || 0)));
     if (situation.length < 5) throw new Error("Bitte die Situation kurz schildern.");
   } catch (e) {
     return json({ error: (e as Error).message }, 400);
@@ -360,15 +370,25 @@ Deno.serve(async (req) => {
     //     die passenden Regeln vorschlagen. Läuft immer (auch im abgesicherten
     //     Modus ohne Regeltext), denn die Rückfrage-Entscheidung braucht nur die
     //     Schilderung, keinen Regeltext.
+    // Rückfrage-Verhalten je nach Runde: immer „nicht wiederholen, nur
+    // Entscheidungsrelevantes"; ab der ersten beantworteten Runde klar Richtung
+    // Urteil; ab der Obergrenze gar keine Fragen mehr (hart erzwungen, s. u.).
+    const mayClarify = round < MAX_CLARIFY_ROUNDS;
+    const triageSystem =
+`Du hilfst bei Magic: The Gathering-Regelfragen und hast ZWEI Aufgaben:
+
+1) ENTSCHEIDEN, ob die geschilderte Situation klar genug ist, um sie eindeutig zu klären. Setze needsClarification=true und stelle 1-3 kurze, gezielte Rückfragen (Feld clarifyingQuestions, auf ${langName}), wenn WESENTLICHE Angaben fehlen oder die Schilderung mehrdeutig ist — etwa welche Karten oder Fähigkeiten beteiligt sind, wer am Zug ist, in welcher Phase oder Zone es passiert.
+
+Regeln fürs Nachfragen — strikt beachten:
+- Der Situationstext kann BEREITS frühere Rückfragen und die Antworten des Nutzers enthalten (entsprechend beschriftet). Stelle NIEMALS eine Frage erneut, die dort schon beantwortet wurde, und frage nicht nach etwas, das aus den Antworten bereits hervorgeht. Vorhandene Antworten gelten als ausreichend.
+- Frage NUR nach, wenn eine noch offene, WIRKLICH entscheidungsrelevante Angabe fehlt — eine, ohne die das Urteil anders ausfiele. Im Zweifel lieber urteilen und die Annahme später im Urteil benennen, statt nachzufragen.
+${round >= 1 ? `- Der Nutzer hat bereits ${round === 1 ? "eine" : "mehrere"} Rückfrage-Runde(n) beantwortet. Bevorzuge jetzt DEUTLICH ein Urteil mit ausdrücklich benannten Annahmen; frage nur dann noch einmal, wenn ohne die fehlende Angabe gar kein sinnvolles Urteil möglich ist.\n` : ""}${!mayClarify ? `- Es sind KEINE weiteren Rückfragen mehr erlaubt. Setze needsClarification=false und triff die beste Einschätzung unter ausdrücklichen Annahmen.\n` : ""}
+2) Wenn klar genug (needsClarification=false): nenne Suchbegriffe, Glossarbegriffe und vermutete Regelnummern (englisch), damit der echte Regeltext geladen werden kann. Sei großzügig: lieber ein paar Kandidaten zu viel. Bei Rückfragen dürfen diese Felder leer bleiben.`;
+
     const tri = await anthropic.messages.create({
       model: MODEL_TRIAGE,
       max_tokens: 700,
-      system:
-        `Du hilfst bei Magic: The Gathering-Regelfragen und hast ZWEI Aufgaben:
-
-1) ENTSCHEIDEN, ob die geschilderte Situation klar genug ist, um sie eindeutig zu klären. Setze needsClarification=true und stelle 1-3 kurze, gezielte Rückfragen (Feld clarifyingQuestions, formuliert auf ${langName}), wenn WESENTLICHE Angaben fehlen oder die Schilderung mehrdeutig ist — etwa wenn unklar bleibt, welche Karten oder Fähigkeiten beteiligt sind, wer am Zug ist, in welcher Phase oder Zone es passiert, oder wenn die Frage zu allgemein gestellt ist, um sie konkret zu beantworten. Frage NUR nach, wenn die Antwort ohne diese Angabe wirklich anders ausfiele; ist der Kern klar, setze needsClarification=false und benenne offene Randannahmen lieber später im Urteil, statt unnötig nachzufragen.
-
-2) Wenn klar genug (needsClarification=false): nenne Suchbegriffe, Glossarbegriffe und vermutete Regelnummern (englisch), damit der echte Regeltext geladen werden kann. Sei großzügig: lieber ein paar Kandidaten zu viel. Bei Rückfragen dürfen diese Felder leer bleiben.`,
+      system: triageSystem,
       output_config: { format: { type: "json_schema", schema: TRIAGE_SCHEMA } },
       messages: [{ role: "user", content: [{ type: "text", text: SITU }] }],
     });
@@ -376,6 +396,10 @@ Deno.serve(async (req) => {
     let tr: Triage = { needsClarification: false, clarifyingQuestions: [], keywords: [], glossaryTerms: [], candidateRules: [] };
     const tt = tri.content.find((b) => b.type === "text");
     if (tt && tt.type === "text") { try { tr = JSON.parse(tt.text); } catch { /* leer lassen */ } }
+
+    // Rückfrage-Obergrenze durchsetzen — unabhängig davon, was das Modell will:
+    // ab MAX_CLARIFY_ROUNDS wird geurteilt statt weiter gefragt.
+    if (!mayClarify) { tr.needsClarification = false; tr.clarifyingQuestions = []; }
 
     // Braucht das Modell erst eine Rückfrage, hört es HIER auf: keine
     // Regelsuche, kein (teures) Urteil, nur die Fragen zurück. Der Nutzer

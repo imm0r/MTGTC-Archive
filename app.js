@@ -5086,14 +5086,16 @@ function regelFrageStellen() {
   const ta = $("#rules-q"); if (!ta) return;
   const situation = ta.value.trim();
   if (situation.length < 5) { toast(t("rules.tooShort")); ta.focus(); return; }
-  regelAbfragen(situation);
+  regelAbfragen(situation, 0);
 }
 
 /* Kernabfrage: schickt die Schilderung an die Function und zeigt ENTWEDER eine
    Rückfrage (wenn das Modell die Situation noch nicht eindeutig versteht) ODER
    das fertige Urteil. `situation` ist der aktuell gesendete Text inkl. bisheriger
-   Ergänzungen — eine weitere Rückfrage baut darauf auf. */
-async function regelAbfragen(situation) {
+   Ergänzungen — eine weitere Rückfrage baut darauf auf. `round` zählt die schon
+   beantworteten Rückfrage-Runden mit; die Function deckelt daran die Anzahl der
+   Rückfragen, damit keine langen Frage-Ketten entstehen. */
+async function regelAbfragen(situation, round = 0) {
   const out = $("#rules-out");
   const lauf = ++rulesLauf;
   const btn = $("#rules-ask"); if (btn) btn.disabled = true;
@@ -5101,7 +5103,7 @@ async function regelAbfragen(situation) {
 
   let data, error;
   try {
-    ({ data, error } = await sb.functions.invoke("rules-question", { body: { situation, lang: LANG } }));
+    ({ data, error } = await sb.functions.invoke("rules-question", { body: { situation, lang: LANG, round } }));
   } catch (e) { error = e; }
   if (lauf !== rulesLauf) return;                 // ein neuerer Lauf hat übernommen
   if (btn) btn.disabled = false;
@@ -5119,7 +5121,7 @@ async function regelAbfragen(situation) {
   // öffnen — nichts kommt in den Verlauf, das passiert erst mit dem Urteil.
   if (data?.clarify && Array.isArray(data.questions) && data.questions.length) {
     if (out) out.innerHTML = regelClarifyHtml(data.questions);
-    wireClarify(situation, data.questions);
+    wireClarify(situation, data.questions, round);
     return;
   }
 
@@ -5162,9 +5164,11 @@ function regelClarifyHtml(questions) {
 }
 
 /* Antwort auf die Rückfragen: an die ursprüngliche Schilderung anhängen (samt der
-   gestellten Fragen, damit das Modell den Bezug hat) und erneut abfragen. Reicht
-   die Ergänzung noch nicht, darf das Modell noch einmal nachfragen. */
-function wireClarify(baseSituation, questions) {
+   gestellten Fragen, damit das Modell den Bezug hat) und erneut abfragen — mit
+   erhöhtem Rundenzähler, damit die Function die Rückfragen deckeln kann. Reicht
+   die Ergänzung noch nicht, darf das Modell (bis zur Obergrenze) noch einmal
+   nachfragen. */
+function wireClarify(baseSituation, questions, round = 0) {
   const ans = $("#rules-answer"), go = $("#rules-answer-go");
   if (!ans || !go) return;
   ans.focus();
@@ -5172,7 +5176,7 @@ function wireClarify(baseSituation, questions) {
     const a = ans.value.trim();
     if (a.length < 2) { toast(t("rules.tooShort")); ans.focus(); return; }
     const combined = `${baseSituation}\n\n${t("rules.clarifyLabel")}\n${questions.map(q => "- " + q).join("\n")}\n\n${t("rules.answersLabel")}\n${a}`;
-    regelAbfragen(combined);
+    regelAbfragen(combined, round + 1);
   };
   go.onclick = submit;
   ans.onkeydown = e => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); submit(); } };
