@@ -2933,4 +2933,46 @@ Object.assign(I18N.it, {
   "color.W": "Bianco", "color.U": "Blu", "color.B": "Nero", "color.R": "Rosso", "color.G": "Verde", "color.C": "Incolore",
 });
 
+/* ---- Teil 27: Zweiter Commander (Partner-Mechanik) ---- */
+Object.assign(I18N.de, {
+  "row.second2SetTitle": "Als zweiten Commander (Partner) festlegen",
+  "row.second2IsTitle": "Zweiter Commander (Partner) — zum Entfernen klicken",
+  "toast.secondSet": "Zweiter Commander festgelegt.",
+  "toast.secondUnset": "Zweiter Commander entfernt.",
+  "toast.needMainFirst": "Lege zuerst den ersten Commander fest.",
+  "toast.notPartner": "Diese Karte passt nicht als Partner-Commander zum ersten Commander.",
+});
+Object.assign(I18N.en, {
+  "row.second2SetTitle": "Set as second commander (partner)",
+  "row.second2IsTitle": "Second commander (partner) — click to remove",
+  "toast.secondSet": "Second commander set.",
+  "toast.secondUnset": "Second commander removed.",
+  "toast.needMainFirst": "Set the first commander first.",
+  "toast.notPartner": "This card isn't a compatible partner for the first commander.",
+});
+Object.assign(I18N.fr, {
+  "row.second2SetTitle": "Définir comme second commandant (partenaire)",
+  "row.second2IsTitle": "Second commandant (partenaire) — cliquer pour retirer",
+  "toast.secondSet": "Second commandant défini.",
+  "toast.secondUnset": "Second commandant retiré.",
+  "toast.needMainFirst": "Définis d'abord le premier commandant.",
+  "toast.notPartner": "Cette carte n'est pas un partenaire compatible du premier commandant.",
+});
+Object.assign(I18N.es, {
+  "row.second2SetTitle": "Definir como segundo comandante (compañero)",
+  "row.second2IsTitle": "Segundo comandante (compañero) — clic para quitar",
+  "toast.secondSet": "Segundo comandante definido.",
+  "toast.secondUnset": "Segundo comandante quitado.",
+  "toast.needMainFirst": "Primero define el comandante principal.",
+  "toast.notPartner": "Esta carta no es un compañero compatible del comandante principal.",
+});
+Object.assign(I18N.it, {
+  "row.second2SetTitle": "Imposta come secondo comandante (compagno)",
+  "row.second2IsTitle": "Secondo comandante (compagno) — clicca per rimuovere",
+  "toast.secondSet": "Secondo comandante impostato.",
+  "toast.secondUnset": "Secondo comandante rimosso.",
+  "toast.needMainFirst": "Imposta prima il comandante principale.",
+  "toast.notPartner": "Questa carta non è un compagno compatibile del comandante principale.",
+});
+
 initLang();

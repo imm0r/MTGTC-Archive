@@ -81,6 +81,11 @@ create table if not exists public.decks (
   -- verschwindet die Karte aus der Sammlung, verliert das Deck nur sein
   -- Bild — es darf auf keinen Fall mitgelöscht werden.
   main_card_id uuid references public.cards(id) on delete set null,
+  -- Zweiter Commander (Partner-Mechanik): bei erfüllten Voraussetzungen darf ein
+  -- Commander-Deck zwei Commander haben. NULL = keiner. Wie main_card_id "set
+  -- null" beim Löschen der Karte. Die Kompatibilität der Partner-Fähigkeiten
+  -- prüft der Client; der Trigger unten sichert nur die Grundregeln ab.
+  second_card_id uuid references public.cards(id) on delete set null,
   -- Klassifizierung aus festem Vokabular (die Listen stehen in app.js): format
   -- etwa Commander/Modern, archetype etwa Aggro/Control. Beides darf leer sein
   -- (NULL = nicht eingeordnet). Bewusst text und kein enum — das Vokabular
@@ -102,6 +107,8 @@ create table if not exists public.deck_entries (
 alter table public.cards add column if not exists printed_name text;
 alter table public.cards add column if not exists cm_id integer;
 alter table public.decks add column if not exists main_card_id uuid
+  references public.cards(id) on delete set null;
+alter table public.decks add column if not exists second_card_id uuid
   references public.cards(id) on delete set null;
 alter table public.decks add column if not exists format text;
 alter table public.decks add column if not exists archetype text;
@@ -286,6 +293,60 @@ drop trigger if exists decks_main_card_legendary on public.decks;
 create trigger decks_main_card_legendary
   before insert or update of main_card_id on public.decks
   for each row execute function public.check_main_card_legendary();
+
+-- ------------- Zweiter Commander: Grundregeln in der Datenbank absichern
+-- Die genaue Partner-Kompatibilität (welche Partner-Fähigkeiten zusammenpassen)
+-- prüft der Client anhand von Regeltext/Schlüsselwörtern — das ist in SQL zu
+-- brüchig. Der Trigger sichert nur das Unumstößliche: ein zweiter Commander
+-- braucht einen ersten, muss eine ANDERE Karte sein und ein legendärer
+-- Commander-Typ (Kreatur, Planeswalker ODER Background — nur so kommt die
+-- Partner-Mechanik über "Choose a Background" auf zwei Commander).
+create or replace function public.check_second_card()
+returns trigger
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  tl text;
+  vorderseite text;
+begin
+  if new.second_card_id is null then return new; end if;
+
+  if new.main_card_id is null then
+    raise exception 'Ein zweiter Commander braucht zuerst einen ersten Commander'
+      using errcode = 'check_violation';
+  end if;
+  if new.second_card_id = new.main_card_id then
+    raise exception 'Die beiden Commander müssen verschiedene Karten sein'
+      using errcode = 'check_violation';
+  end if;
+
+  select type_line into tl from public.cards where id = new.second_card_id;
+  if tl is null then
+    raise exception 'Typzeile dieser Karte ist unbekannt — Preis neu ziehen, dann erneut versuchen'
+      using errcode = 'check_violation';
+  end if;
+
+  vorderseite := split_part(tl, '//', 1);
+  if vorderseite not ilike '%legendary%' then
+    raise exception 'Nur legendäre Karten können Commander sein (diese ist: %)', tl
+      using errcode = 'check_violation';
+  end if;
+  if vorderseite not ilike '%creature%'
+     and vorderseite not ilike '%planeswalker%'
+     and vorderseite not ilike '%background%' then
+    raise exception 'Ein zweiter Commander muss eine legendäre Kreatur, ein Planeswalker oder ein Background sein (diese ist: %)', tl
+      using errcode = 'check_violation';
+  end if;
+
+  return new;
+end $$;
+
+drop trigger if exists decks_second_card on public.decks;
+create trigger decks_second_card
+  before insert or update of second_card_id, main_card_id on public.decks
+  for each row execute function public.check_second_card();
 
 -- ------------------------------------------------- Preis fortschreiben
 -- Schreibt den Tagespreis in die Historie: ein Eintrag pro Tag, die
