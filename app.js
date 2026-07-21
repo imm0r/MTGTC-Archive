@@ -727,6 +727,14 @@ const loadImg = file => new Promise((res, rej) => {
   im.src = URL.createObjectURL(file);
 });
 
+/* Erkannten Treffer sofort in die Sammlung schreiben — oder erst bestätigen
+   lassen? Gerätelokal (localStorage). Vorgabe: bestätigen. Die Bilderkennung
+   liest sehr gut, trifft aber nicht jede Karte; eine falsch erkannte gehört
+   nicht ungefragt in die Sammlung, sondern vor dem Schreiben korrigiert. Wer
+   der Erkennung vertraut, schaltet das direkte Übernehmen im Scan-Bereich ein. */
+function autoUebernehmen() { return localStorage.getItem("mtg-scan-auto") === "1"; }
+function autoUebernehmenSetzen(an) { localStorage.setItem("mtg-scan-auto", an ? "1" : "0"); }
+
 /* Ein Job in der Warteschlange: identifizieren und Ergebnis anzeigen. img ist
    ein <img> ODER ein <canvas> — beide lassen sich gleich zeichnen und messen.
    Genutzt vom Einzelscan (ein Foto = eine Karte) UND vom Mehrfach-Scan (ein
@@ -744,10 +752,16 @@ async function scanBild(img, thumbSrc, lang) {
   try {
     const r = await identify(img, lang, s => { step(s); prog(70); });
     prog(100);
-    // Nur die Sprache übernehmen — sie steht auf der Karte. Foil und Zustand
-    // bleiben beim Nutzer.
-    if (r.card) await addToCollection(r.card, el, r.vision ? { lang: r.lang } : null);
-    else renderManual(el, r.guess, r.candidates);
+    // Nur die Sprache stammt von der Karte — Foil und Zustand bleiben beim
+    // Nutzer. Standardmäßig wird der Treffer erst gezeigt und muss bestätigt
+    // werden: So landet eine falsch erkannte Karte gar nicht erst in der
+    // Sammlung, sondern lässt sich vorher korrigieren. Nur wer das direkte
+    // Übernehmen eingeschaltet hat, schreibt sofort (der alte Weg).
+    if (r.card) {
+      const detected = r.vision ? { lang: r.lang } : null;
+      if (autoUebernehmen()) await addToCollection(r.card, el, detected);
+      else renderConfirm(r.card, el, detected);
+    } else renderManual(el, r.guess, r.candidates);
   } catch (e) {
     el.querySelector(".body").innerHTML =
       `<div class="title">${esc(t("scan.failed"))}</div>
@@ -866,6 +880,7 @@ async function addToCollection(card, el, detected) {
   }
 
   await reload(); renderAll();
+  el.classList.remove("pending");   // war es ein bestätigter Treffer, ist er nun geschrieben
   el.querySelector(".thumb").src = imgOf(card) || el.querySelector(".thumb").src;
   el.querySelector(".body").innerHTML = `
     <div class="title">${esc(card.printed_name || card.name)}</div>
@@ -878,6 +893,44 @@ async function addToCollection(card, el, detected) {
       <button class="btn ghost sm" data-fix style="margin-left:6px">${esc(t("scan.wrongCard"))}</button>
     </div>`;
   el.querySelector("[data-fix]").onclick = () => renderManual(el, card.name);
+}
+
+/* Erkannt, aber noch NICHT gespeichert. Erst zeigen, was gelesen wurde —
+   mit Bild, damit es sich mit der Karte in der Hand vergleichen lässt —, dann
+   erst per „Übernehmen" schreiben. „Falsche Karte?" führt vor dem Schreiben in
+   die Handkorrektur, „Verwerfen" wirft den Treffer weg. So kommt eine falsch
+   erkannte Karte gar nicht erst in die Sammlung. Sprache/Foil/Zustand gelten
+   wie beim direkten Übernehmen aus den Dropdowns (detected.lang schlägt das
+   Sprach-Dropdown); dieselben Werte reicht „Übernehmen" an addToCollection
+   weiter. */
+function renderConfirm(card, el, detected) {
+  const lang = detected?.lang || $("#d-lang").value;
+  const cond = $("#d-cond").value;
+  const foil = $("#d-foil").value === "1";
+  const price = priceOf(card, foil);
+
+  el.classList.add("pending");
+  el.querySelector(".thumb").src = imgOf(card) || el.querySelector(".thumb").src;
+  el.querySelector(".body").innerHTML = `
+    <div class="title">${esc(card.printed_name || card.name)}</div>
+    ${card.printed_name ? `<div class="meta">${esc(card.name)}</div>` : ""}
+    <div class="meta">${esc(card.set_name)} &middot; #${esc(card.collector_number)} &middot; ${eur(price)}</div>
+    <div class="meta" style="margin-top:6px">
+      <span class="pill warn">${esc(t("scan.pendingBadge"))}</span>
+      <span class="pill">${esc(lang.toUpperCase())}</span>${condBadge(cond)}
+      ${foil ? '<span class="pill foil">Foil</span>' : ""}
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div style="flex:none"><button class="btn sm" data-take>${esc(t("scan.confirmAdd"))}</button></div>
+      <div style="flex:none"><button class="btn ghost sm" data-fix>${esc(t("scan.wrongCard"))}</button></div>
+      <div style="flex:none"><button class="btn ghost sm" data-drop>${esc(t("scan.discard"))}</button></div>
+    </div>`;
+  el.querySelector("[data-take]").onclick = async () => {
+    try { await addToCollection(card, el, detected); }
+    catch (e) { toast(e.message); }
+  };
+  el.querySelector("[data-fix]").onclick = () => renderManual(el, card.name);
+  el.querySelector("[data-drop]").onclick = () => el.remove();
 }
 
 function renderManual(el, guess, candidates) {
@@ -7031,6 +7084,13 @@ function wireApp() {
       toast(t("syn.addedWish", { name: card.name, deck: d?.name || "" }));
     } catch (err) { btn.disabled = false; toast(dbErr(err)); }
   });
+
+  // Treffer direkt übernehmen oder erst bestätigen (gerätelokal gemerkt).
+  const auto = $("#d-auto");
+  if (auto) {
+    auto.checked = autoUebernehmen();
+    auto.onchange = () => autoUebernehmenSetzen(auto.checked);
+  }
 
   $("#drop").onclick = () => $("#file").click();
   $("#file").onchange = e => { [...e.target.files].forEach(scanFile); e.target.value = ""; };
