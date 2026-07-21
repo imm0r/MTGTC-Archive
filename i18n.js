@@ -2911,4 +2911,26 @@ Object.assign(I18N.it, {
   "deck.allocFull": "Tutte le {n} copia/e di questa carta sono già in altri mazzi ({decks}). Aumenta prima la tua collezione.",
 });
 
+/* ---- Teil 26: Farbidentitäts-Filter in der Sammlung ---- */
+Object.assign(I18N.de, {
+  "coll.colorId": "Farbidentität",
+  "color.W": "Weiß", "color.U": "Blau", "color.B": "Schwarz", "color.R": "Rot", "color.G": "Grün", "color.C": "Farblos",
+});
+Object.assign(I18N.en, {
+  "coll.colorId": "Color identity",
+  "color.W": "White", "color.U": "Blue", "color.B": "Black", "color.R": "Red", "color.G": "Green", "color.C": "Colorless",
+});
+Object.assign(I18N.fr, {
+  "coll.colorId": "Identité de couleur",
+  "color.W": "Blanc", "color.U": "Bleu", "color.B": "Noir", "color.R": "Rouge", "color.G": "Vert", "color.C": "Incolore",
+});
+Object.assign(I18N.es, {
+  "coll.colorId": "Identidad de color",
+  "color.W": "Blanco", "color.U": "Azul", "color.B": "Negro", "color.R": "Rojo", "color.G": "Verde", "color.C": "Incoloro",
+});
+Object.assign(I18N.it, {
+  "coll.colorId": "Identità di colore",
+  "color.W": "Bianco", "color.U": "Blu", "color.B": "Nero", "color.R": "Rosso", "color.G": "Verde", "color.C": "Incolore",
+});
+
 initLang();
