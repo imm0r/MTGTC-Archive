@@ -834,17 +834,18 @@ function cropCanvas(img, box, padFrac) {
   return cv;
 }
 
-/* detected.lang schlägt das Dropdown: Die Sprache ist auf die Karte gedruckt,
-   eindeutig und ablesbar.
-   Foil und Zustand kommen dagegen IMMER aus den Dropdowns. Beides sind
-   physische Eigenschaften, die man einem Foto nicht ansieht: Glanz erzeugt
-   auch jede Lampe über einer normalen Karte, und ein Fehlurteil legt eine
-   eigene Zeile mit falschem Preis an. Wer scannt, weiß, was er in der Hand
-   hält — eine ausdrückliche Auswahl überstimmt man nicht. */
-async function addToCollection(card, el, detected) {
-  const lang = detected?.lang || $("#d-lang").value;
-  const cond = $("#d-cond").value;
-  const foil = $("#d-foil").value === "1";
+/* Die pro Karte gewählten Werte (opts) schlagen die globalen Scan-Dropdowns.
+   Die Sprache steht auf der Karte; Foil und Zustand wählt man im Bestätigungs-
+   schritt bewusst je Karte. Fehlt ein Wert — beim direkten Übernehmen oder aus
+   der Handkorrektur wird nichts mitgegeben —, gilt die globale Voreinstellung
+   aus den Dropdowns. Foil bleibt eine physische Eigenschaft, die kein Foto
+   verrät (Glanz erzeugt auch jede Lampe über einer normalen Karte, und ein
+   Fehlurteil legt eine eigene Zeile mit falschem Preis an): Vorgabe „Normal",
+   bis der Nutzer im Dropdown etwas anderes wählt. */
+async function addToCollection(card, el, opts) {
+  const lang = opts?.lang || $("#d-lang").value;
+  const cond = opts?.cond || $("#d-cond").value;
+  const foil = opts?.foil != null ? opts.foil : $("#d-foil").value === "1";
   const price = priceOf(card, foil);
   const before = CARDS.find(c => c.scryfall_id === card.id && c.foil === foil &&
                                  c.lang === lang && c.condition === cond);
@@ -897,37 +898,60 @@ async function addToCollection(card, el, detected) {
 
 /* Erkannt, aber noch NICHT gespeichert. Erst zeigen, was gelesen wurde —
    mit Bild, damit es sich mit der Karte in der Hand vergleichen lässt —, dann
-   erst per „Übernehmen" schreiben. „Falsche Karte?" führt vor dem Schreiben in
-   die Handkorrektur, „Verwerfen" wirft den Treffer weg. So kommt eine falsch
-   erkannte Karte gar nicht erst in die Sammlung. Sprache/Foil/Zustand gelten
-   wie beim direkten Übernehmen aus den Dropdowns (detected.lang schlägt das
-   Sprach-Dropdown); dieselben Werte reicht „Übernehmen" an addToCollection
-   weiter. */
+   erst per „Übernehmen" schreiben. Sprache, Ausführung und Zustand lassen sich
+   hier je Karte anpassen (Vorauswahl: die erkannte Sprache bzw. die globalen
+   Scan-Dropdowns); „Übernehmen" reicht genau diese Werte an addToCollection.
+   „Falsche Karte?" führt vor dem Schreiben in die Handkorrektur, „Verwerfen"
+   wirft den Treffer weg. So kommt eine falsch erkannte Karte gar nicht erst in
+   die Sammlung. */
 function renderConfirm(card, el, detected) {
-  const lang = detected?.lang || $("#d-lang").value;
-  const cond = $("#d-cond").value;
-  const foil = $("#d-foil").value === "1";
-  const price = priceOf(card, foil);
+  const lang0 = detected?.lang || $("#d-lang").value;
+  const cond0 = $("#d-cond").value;
+  const foil0 = $("#d-foil").value === "1";
+  // Sprachliste wie im Bearbeiten-Dialog: alle geführten Sprachen, eine
+  // unbekannte Vorauswahl vorneweg, damit sie nicht verlorengeht.
+  const langs = LANG_NAMES[lang0] ? Object.keys(LANG_NAMES) : [lang0, ...Object.keys(LANG_NAMES)];
 
   el.classList.add("pending");
   el.querySelector(".thumb").src = imgOf(card) || el.querySelector(".thumb").src;
   el.querySelector(".body").innerHTML = `
-    <div class="title">${esc(card.printed_name || card.name)}</div>
-    ${card.printed_name ? `<div class="meta">${esc(card.name)}</div>` : ""}
-    <div class="meta">${esc(card.set_name)} &middot; #${esc(card.collector_number)} &middot; ${eur(price)}</div>
-    <div class="meta" style="margin-top:6px">
-      <span class="pill warn">${esc(t("scan.pendingBadge"))}</span>
-      <span class="pill">${esc(lang.toUpperCase())}</span>${condBadge(cond)}
-      ${foil ? '<span class="pill foil">Foil</span>' : ""}
-    </div>
-    <div class="row" style="margin-top:8px">
-      <div style="flex:none"><button class="btn sm" data-take>${esc(t("scan.confirmAdd"))}</button></div>
-      <div style="flex:none"><button class="btn ghost sm" data-fix>${esc(t("scan.wrongCard"))}</button></div>
-      <div style="flex:none"><button class="btn ghost sm" data-drop>${esc(t("scan.discard"))}</button></div>
+    <div class="confirm">
+      <div class="c-info">
+        <div class="title">${esc(card.printed_name || card.name)}</div>
+        ${card.printed_name ? `<div class="meta">${esc(card.name)}</div>` : ""}
+        <div class="meta">${esc(card.set_name)} &middot; #${esc(card.collector_number)} &middot; <span data-price>${eur(priceOf(card, foil0))}</span></div>
+        <div class="meta" style="margin-top:6px"><span class="pill warn">${esc(t("scan.pendingBadge"))}</span></div>
+      </div>
+      <div class="c-opts">
+        <div><label>${esc(t("cm.language"))}</label><select data-lang>${langs.map(l =>
+          `<option value="${esc(l)}"${l === lang0 ? " selected" : ""}>${esc(langName(l))}</option>`).join("")}</select></div>
+        <div><label>${esc(t("cm.finish"))}</label><select data-foil>
+          <option value="0"${!foil0 ? " selected" : ""}>${esc(t("cm.normal"))}</option>
+          <option value="1"${foil0 ? " selected" : ""}>Foil</option></select></div>
+        <div><label>${esc(t("cm.condition"))}</label><select data-cond>${CONDITION_CODES.map(x =>
+          `<option value="${x}"${x === cond0 ? " selected" : ""}>${x} · ${esc(CONDITION_BY[x].name)}</option>`).join("")}</select></div>
+      </div>
+      <div class="c-actions">
+        <button class="btn sm" data-take>${esc(t("scan.confirmAdd"))}</button>
+        <button class="btn ghost sm" data-fix>${esc(t("scan.wrongCard"))}</button>
+        <button class="btn ghost sm" data-drop>${esc(t("scan.discard"))}</button>
+      </div>
     </div>`;
+
+  const selLang = el.querySelector("[data-lang]");
+  const selFoil = el.querySelector("[data-foil]");
+  const selCond = el.querySelector("[data-cond]");
+  // Der Preis hängt an der Ausführung — Foil kostet anders. Anzeige mitführen.
+  selFoil.onchange = () => {
+    const p = el.querySelector("[data-price]");
+    if (p) p.textContent = eur(priceOf(card, selFoil.value === "1"));
+  };
   el.querySelector("[data-take]").onclick = async () => {
-    try { await addToCollection(card, el, detected); }
-    catch (e) { toast(e.message); }
+    try {
+      await addToCollection(card, el, {
+        lang: selLang.value, cond: selCond.value, foil: selFoil.value === "1",
+      });
+    } catch (e) { toast(e.message); }
   };
   el.querySelector("[data-fix]").onclick = () => renderManual(el, card.name);
   el.querySelector("[data-drop]").onclick = () => el.remove();
