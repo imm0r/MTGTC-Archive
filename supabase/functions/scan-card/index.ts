@@ -20,6 +20,14 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 // Handeingabe es ab. Wechsel ist diese eine Zeile.
 const MODEL = "claude-haiku-4-5";
 
+// Das Ablesen je Karte (zwei kleine Zeilen) bleibt bei Haiku. Die
+// Lokalisierung mehrerer Karten auf einem Foto ist perceptuell deutlich
+// schwerer — Haiku fasste dieselbe Karte doppelt, übersprang Nachbarn und
+// erfand leere Flächen als Karte. Dafür ein stärkeres Sehmodell. Läuft nur
+// EINMAL je Foto, die Mehrkosten (~1 ct statt ~0,3 ct) fallen also je Import
+// an, nicht je Karte. Wechsel ist diese eine Zeile.
+const DETECT_MODEL = "claude-sonnet-5";
+
 // x-client-info schickt supabase-js bei JEDEM invoke mit. Fehlt er hier,
 // scheitert schon der Preflight und die Anfrage erreicht die Funktion nie —
 // der Browser meldet dann nur einen Netzwerkfehler ohne Status. Von file://
@@ -194,14 +202,14 @@ Deno.serve(async (req) => {
     // Ablesen je Karte macht danach der Einzelscan im Client.
     if (mode === "detect") {
       const det = await anthropic.messages.create({
-        model: MODEL,
+        model: DETECT_MODEL,
         max_tokens: 1024,
-        // temperature 0: ohne Angabe würfelt die API mit 1,0, und dann liefert
-        // dasselbe Foto bei jedem Durchlauf andere Rechtecke — mal eine Karte
-        // doppelt gefasst, mal eine übersprungen. Beim Lokalisieren wollen wir
-        // die eine wahrscheinlichste Antwort, nicht Vielfalt. Haiku 4.5 nimmt
-        // den Parameter noch an (bei Opus/Sonnet 5 wäre er entfernt).
-        temperature: 0,
+        // temperature entfällt: Sonnet 5 lehnt den Parameter ab (400). Statt-
+        // dessen die Denkschritte aus — fürs bloße Verorten reicht ein schneller,
+        // stabiler Durchlauf, das hält Latenz (liegt vor jedem Einzelscan) und
+        // Kosten niedrig. Die Genauigkeit kommt hier vom stärkeren Sehmodell,
+        // nicht vom Nachdenken.
+        thinking: { type: "disabled" },
         system: DETECT_SYSTEM,
         output_config: { format: { type: "json_schema", schema: DETECT_SCHEMA } },
         messages: [{
