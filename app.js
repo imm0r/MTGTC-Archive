@@ -1218,6 +1218,66 @@ async function backfillFarbident() {
   } finally { backfillFarbident._laeuft = false; }
 }
 
+/* ------------------------------------------- Geteilte Preishistorie (MTGJSON)
+   Scryfall kennt nur den Tagespreis — einen Verlauf gibt es dort nicht.
+   MTGJSON liefert ~90 Tage, die ein Backfill-Job (GitHub Action, siehe
+   scripts/price-backfill) in die geteilte Tabelle price_history legt: dieselben
+   Werte für alle Nutzer, deshalb je scryfall_id nur einmal. Hier laden wir die
+   EUR-Reihen für den eigenen Bestand nach und legen sie beim Anzeigen UNTER die
+   persönliche Vorwärts-Historie (cards.hist).
+
+   Fehlt die Tabelle (Schema noch nicht nachgezogen) oder lief der Job nie,
+   bleibt alles beim Alten — die App zeigt dann nur die eigenen Punkte. */
+let HISTMKT = new Map();   // scryfall_id → { normal:[{d,v}], foil:[{d,v}] } (EUR)
+
+async function ladePreisHistorie() {
+  if (ladePreisHistorie._laeuft) return;
+  const sids = [...new Set(CARDS.map(c => c.scryfall_id).filter(Boolean))]
+    .filter(s => !HISTMKT.has(s));
+  if (!sids.length) return;
+  ladePreisHistorie._laeuft = true;
+  try {
+    for (let i = 0; i < sids.length; i += 200) {   // .in()-Liste kurz halten (URL-Länge)
+      const chunk = sids.slice(i, i + 200);
+      const { data, error } = await sb.from("price_history")
+        .select("scryfall_id, prices").in("scryfall_id", chunk);
+      if (error) return;   // Tabelle fehlt o. Ä.: still bleiben, nicht den Start stören
+      for (const row of data || []) {
+        const eur = row.prices && row.prices.eur;
+        HISTMKT.set(row.scryfall_id, {
+          normal: Array.isArray(eur?.normal) ? eur.normal : [],
+          foil:   Array.isArray(eur?.foil) ? eur.foil : [],
+        });
+      }
+      // Karten ohne Treffer als „nachgeschaut, nichts da" vermerken, damit ein
+      // zweiter Lauf sie nicht erneut abfragt.
+      for (const s of chunk) if (!HISTMKT.has(s)) HISTMKT.set(s, { normal: [], foil: [] });
+    }
+    if ($(".view.on")?.id === "v-coll") renderCollection();
+  } finally { ladePreisHistorie._laeuft = false; }
+}
+
+/* Die persönliche Historie (cards.hist) über das MTGJSON-Fundament legen:
+   MTGJSON deckt die ~90 Tage bis gestern ab, die eigenen Punkte den aktuellen
+   Rand — und gewinnen bei gleichem Datum, denn sie sind der Preis, den die
+   Liste zeigt. Ergebnis nach Datum sortiert, ohne Dubletten. Ohne MTGJSON-Daten
+   (oder bei leerer Foil-/Normal-Reihe) kommt unverändert cards.hist zurück, das
+   bisherige Verhalten. Foil und Normal sind getrennte Reihen — passend zu
+   priceOf(c, foil), aus dem die eigenen Punkte stammen. */
+function mergedHist(c) {
+  const mkt  = HISTMKT.get(c.scryfall_id);
+  const base = mkt ? (c.foil ? mkt.foil : mkt.normal) : null;
+  const pers = Array.isArray(c.hist) ? c.hist : [];
+  if (!base || !base.length) return pers;
+  const byDate = new Map();
+  for (const p of base) if (p && p.d != null) byDate.set(p.d, Number(p.v));
+  for (const p of pers) if (p && p.d != null) byDate.set(p.d, Number(p.v));
+  return [...byDate.entries()]
+    .filter(([, v]) => Number.isFinite(v))
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    .map(([d, v]) => ({ d, v }));
+}
+
 function spark(hist) {
   if (!hist || hist.length < 2) return "";
   const vs = hist.slice(-12).map(h => Number(h.v)), mn = Math.min(...vs), mx = Math.max(...vs);
@@ -1232,7 +1292,7 @@ function spark(hist) {
    nebeneinander. Fehlt die Historie (spark liefert ""), bleibt nur der Preis,
    ohne Leerzeile darunter. */
 function preisZelle(c) {
-  const graph = spark(c.hist);
+  const graph = spark(mergedHist(c));
   return graph ? `${eur(c.price)}<br>${graph}` : eur(c.price);
 }
 
@@ -2037,7 +2097,8 @@ const dtStacked = iso => {
 };
 
 /* Preisverlauf als richtiger Graph: Gitterlinien mit Eurowerten, Datum an
-   den Enden, ein Punkt pro Tag (bis 60, so weit reicht die Historie).
+   den Enden, ein Punkt pro Tag (bis ~90 mit MTGJSON-Fundament, sonst so weit
+   die eigene Historie reicht — siehe mergedHist).
    Grün bei gestiegenem, rot bei gefallenem Kurs — wie die Mini-Kurve. */
 function priceChart(hist, w = 560, h = 200) {
   const H = (hist || []).map(p => ({ d: p.d, v: Number(p.v) })).filter(p => !isNaN(p.v));
@@ -2255,7 +2316,7 @@ function detailHtml(c, hover) {
         </div>`
     : `<div style="margin-top:10px">
           <label style="margin-bottom:2px">${esc(t("detail.priceHistory"))}</label>
-          ${priceChart(c.hist, 320, 150)}
+          ${priceChart(mergedHist(c), 320, 150)}
         </div>`;
   return `
     <div class="detail">
@@ -2281,7 +2342,7 @@ function detailHtml(c, hover) {
       </div>
     </div>
     ${!hover ? `<details class="legal-det dt-price-full"><summary>&#128200; ${esc(t("detail.priceHistory"))}</summary>
-      <div style="margin-top:8px">${priceChart(c.hist, 900, 200)}</div>
+      <div style="margin-top:8px">${priceChart(mergedHist(c), 900, 200)}</div>
     </details>
     <div id="syn-box" class="dt-results-full"></div>
     <div id="card-combo-box" class="dt-results-full"></div>` : ""}`;
@@ -4966,6 +5027,10 @@ async function afterLogin(user) {
   // des Farbidentitäts-Filters). Nicht kritisch, blockiert den Start nicht; ist
   // alles erfasst, kehrt es sofort zurück.
   backfillFarbident().catch(() => {});
+  // Geteilte MTGJSON-Preishistorie im Hintergrund nachladen, damit die
+  // Preisgraphen rückwirkend ~90 Tage zeigen statt erst ab dem Erfassen. Nicht
+  // kritisch; fehlt die Tabelle, bleibt es bei der eigenen Vorwärts-Historie.
+  ladePreisHistorie().catch(() => {});
   // Spielrunde: Einladungs-Badge + laufende Session live, auch ohne die Ansicht
   // zu öffnen. Nicht kritisch — schlägt es fehl, läuft der Rest weiter.
   try { await ladeSession(); subscribeInvites(); if (SESSION) subscribeSession(); }

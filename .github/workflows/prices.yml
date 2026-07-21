@@ -1,0 +1,44 @@
+# Füllt die geteilte Tabelle public.price_history täglich aus MTGJSON
+# (~90 Tage Cardmarket-EUR + TCGplayer-USD). Läuft serverseitig; der
+# service_role-Key liegt als Repository-Secret, nie im Browser.
+#
+# Nötige Secrets (Repo → Settings → Secrets and variables → Actions):
+#   SUPABASE_URL                 z. B. https://abcd.supabase.co
+#   SUPABASE_SERVICE_ROLE_KEY    service_role-Key aus Project Settings → API
+name: Preishistorie (MTGJSON)
+
+on:
+  schedule:
+    # 15:00 UTC — nach MTGJSONs Tages-Build (live ~09:00 EST). Cron ist immer UTC.
+    - cron: "0 15 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: price-backfill
+  cancel-in-progress: true
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: scripts/price-backfill/package-lock.json
+
+      - name: Abhängigkeiten installieren
+        working-directory: scripts/price-backfill
+        run: npm ci --no-audit --no-fund
+
+      - name: Backfill ausführen
+        working-directory: scripts/price-backfill
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # AllPrices ist entpackt ~1 GB; großzügiger Heap für den Stream-Parser.
+          NODE_OPTIONS: "--max-old-space-size=4096"
+        run: node backfill.mjs

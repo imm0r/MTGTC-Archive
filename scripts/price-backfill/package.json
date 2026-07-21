@@ -1,0 +1,14 @@
+{
+  "name": "arcanum-price-backfill",
+  "private": true,
+  "type": "module",
+  "description": "Fuellt die geteilte price_history-Tabelle aus MTGJSON (Cardmarket-EUR + TCGplayer-USD, ~90 Tage). Laeuft serverseitig als GitHub Action, nie im Browser.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node backfill.mjs",
+    "self-test": "node backfill.mjs --self-test"
+  },
+  "dependencies": {
+    "stream-json": "^1.8.0"
+  }
+}

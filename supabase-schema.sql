@@ -384,6 +384,43 @@ begin
 end $$;
 
 -- =====================================================================
+--  Geteilte Preishistorie (MTGJSON)
+--
+--  Scryfall liefert nur den TAGESpreis — einen Verlauf gibt es dort nicht.
+--  MTGJSON bündelt ~90 Tage Preishistorie (Cardmarket-EUR, TCGplayer-USD),
+--  und diese Werte sind für alle Nutzer dieselben; sie hängen NICHT am
+--  Konto. Deshalb eine einzige geteilte Tabelle je scryfall_id statt einer
+--  Kopie in jeder cards-Zeile. Die persönliche cards.hist (Vorwärtspunkte
+--  aus set_price) bleibt unberührt — die App legt beim Anzeigen beides
+--  übereinander: MTGJSON als 90-Tage-Fundament, die eigenen Punkte oben drauf.
+--
+--  Gefüllt wird ausschließlich serverseitig vom Backfill-Job (GitHub Action
+--  mit service_role-Key, siehe scripts/price-backfill/) — nie aus dem
+--  Browser. Angemeldete dürfen nur lesen: Preise sind kein Geheimnis, aber
+--  auch nichts, das ein Client schreiben können soll.
+-- =====================================================================
+create table if not exists public.price_history (
+  scryfall_id text primary key,
+  -- { "eur": { "normal": [{ "d","v" }, …], "foil": [ … ] },
+  --   "usd": { "normal": [ … ],            "foil": [ … ] } }
+  -- Punktform { d:"YYYY-MM-DD", v:Zahl } — identisch zu cards.hist, damit die
+  -- App die Reihen ohne Umformung mischen kann. usd liegt für später bereit;
+  -- die App zeigt vorerst nur eur.
+  prices     jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.price_history enable  row level security;
+alter table public.price_history force  row level security;
+revoke all on public.price_history from anon;
+
+-- Lesen für alle Angemeldeten (using true). BEWUSST keine Schreib-Policy:
+-- allein der service_role-Key des Backfill-Jobs umgeht RLS und darf füllen.
+drop policy if exists "preishistorie lesbar" on public.price_history;
+create policy "preishistorie lesbar" on public.price_history
+  for select to authenticated using (true);
+
+-- =====================================================================
 --  Profil je Konto: Anzeigename und Avatar. Ein Datensatz pro Nutzer
 --  (id = auth.uid), angelegt beim ersten Anmelden aus der App heraus.
 --
