@@ -811,10 +811,34 @@ async function detectCards(img) {
     throw new Error(msg || t("scan.detectUnreach"));
   }
   const cards = Array.isArray(data?.detect?.cards) ? data.detect.cards : [];
-  return cards
+  const gefiltert = cards
     .map(b => ({ x: +b.x, y: +b.y, w: +b.w, h: +b.h }))
     .filter(b => [b.x, b.y, b.w, b.h].every(Number.isFinite) &&
                  b.w > 0.03 && b.h > 0.03 && b.x >= 0 && b.y >= 0 && b.x < 1 && b.y < 1);
+  return dedupeBoxes(gefiltert);
+}
+
+/* Karten liegen auf dem Foto getrennt nebeneinander. Überlappen sich zwei
+   Rechtecke stark, ist es zweimal DIESELBE Karte — das Modell hat sie doppelt
+   gefasst. Ohne diesen Schritt landet sie zweimal in der Warteschlange (genau
+   das Doppel-Ergebnis „Wegefinder"/„Mind's Desire" aus dem Nutzer-Feedback).
+   Verfahren: das größere Rechteck behalten, ein kleineres mit Überlappung
+   (IoU) über 0,5 verwerfen. Getrennt liegende Karten überschneiden sich kaum
+   und bleiben beide erhalten; die ursprüngliche Reihenfolge bleibt gewahrt. */
+function dedupeBoxes(boxes) {
+  const flaeche = b => b.w * b.h;
+  const iou = (a, b) => {
+    const x1 = Math.max(a.x, b.x), y1 = Math.max(a.y, b.y);
+    const x2 = Math.min(a.x + a.w, b.x + b.w), y2 = Math.min(a.y + a.h, b.y + b.h);
+    const schnitt = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
+    const verein = flaeche(a) + flaeche(b) - schnitt;
+    return verein > 0 ? schnitt / verein : 0;
+  };
+  // Greedy: nach Fläche absteigend prüfen, damit das größere Rechteck gewinnt.
+  const behalten = new Set();
+  for (const b of [...boxes].sort((a, c) => flaeche(c) - flaeche(a)))
+    if (![...behalten].some(k => iou(k, b) > 0.5)) behalten.add(b);
+  return boxes.filter(b => behalten.has(b));
 }
 
 /* Schneidet ein Kartenrechteck mit etwas Rand aus dem Foto in ein eigenes
