@@ -196,6 +196,12 @@ Deno.serve(async (req) => {
       const det = await anthropic.messages.create({
         model: MODEL,
         max_tokens: 1024,
+        // temperature 0: ohne Angabe würfelt die API mit 1,0, und dann liefert
+        // dasselbe Foto bei jedem Durchlauf andere Rechtecke — mal eine Karte
+        // doppelt gefasst, mal eine übersprungen. Beim Lokalisieren wollen wir
+        // die eine wahrscheinlichste Antwort, nicht Vielfalt. Haiku 4.5 nimmt
+        // den Parameter noch an (bei Opus/Sonnet 5 wäre er entfernt).
+        temperature: 0,
         system: DETECT_SYSTEM,
         output_config: { format: { type: "json_schema", schema: DETECT_SCHEMA } },
         messages: [{
@@ -218,6 +224,11 @@ Deno.serve(async (req) => {
     const res = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 1024,          // die Antwort ist ein kleines JSON-Objekt
+      // temperature 0: eine treue Abschrift ist keine kreative Aufgabe. Ohne
+      // Angabe (Default 1,0) las dieselbe Karte von Lauf zu Lauf verschieden —
+      // mal die richtige Ecke, mal ein geratener Nachbar-Setcode. Fixiert man
+      // das Sampling, bleibt die Ablesung über Durchläufe hinweg stabil.
+      temperature: 0,
       system: SYSTEM,
       output_config: { format: { type: "json_schema", schema: SCHEMA } },
       messages: [{
