@@ -17,6 +17,12 @@ concurrency:
   group: price-backfill
   cancel-in-progress: true
 
+# Least Privilege: Der Job liest nur den Code aus (Checkout) und spricht sonst
+# ausschließlich mit Supabase und MTGJSON — die GitHub-API braucht er nie.
+# Ohne diesen Block erbt GITHUB_TOKEN die (evtl. zu weiten) Repo-Standardrechte.
+permissions:
+  contents: read
+
 jobs:
   backfill:
     runs-on: ubuntu-latest
