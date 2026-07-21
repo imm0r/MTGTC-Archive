@@ -14,6 +14,9 @@ geräteübergreifend.
 | `app.js`              | Logik: OCR, Scryfall, Supabase, Ansichten           |
 | `style.css`           | Gestaltung                                          |
 | `supabase-schema.sql` | Tabellen, Row Level Security, Funktionen            |
+| `supabase/functions/` | Edge Functions (Scan, Regelfrage, Terminmail …)     |
+| `scripts/price-backfill/` | Node-Job: MTGJSON-Preisverlauf → Supabase       |
+| `.github/workflows/`  | GitHub Action, die den Preis-Job täglich fährt      |
 | `start.cmd`           | Nur für lokales Testen (braucht Python)             |
 
 Kein Build-Schritt: Die Seite lädt Supabase und Tesseract per CDN.
@@ -268,6 +271,59 @@ Absender ist das eigene Postfach — dafür gelten dessen Tageslimits (Gmail
 ~500 Mails/Tag), was für eine Spielgruppe reichlich ist. Der `CRON_SECRET`
 gehört wie alle Secrets **nicht** ins Repository.
 
+## Preisverlauf: ~90 Tage aus MTGJSON
+
+Scryfall liefert nur den **Tagespreis** — einen Verlauf gibt es dort nicht. Die
+App führt deshalb selbst eine Historie: „Preise aktualisieren" schreibt je Karte
+einen Punkt pro Tag. Das beginnt aber erst mit dem Erfassen und wächst nur
+langsam.
+
+[MTGJSON](https://mtgjson.com/) bündelt ~90 Tage Preisverlauf (Cardmarket-EUR,
+TCGplayer-USD) als Bulk-Daten. Ein **optionaler** Hintergrund-Job lädt daraus
+die passenden Reihen in eine geteilte Tabelle; die App legt sie beim Anzeigen
+**unter** die eigene Historie — der Graph zeigt dann sofort ~90 Tage, statt bei
+null anzufangen. Ohne diese Einrichtung bleibt alles beim Alten: nur die eigenen
+Vorwärts-Punkte.
+
+Warum ein GitHub Action und keine Edge Function: MTGJSONs Preisdatei ist entpackt
+~1 GB — zu groß für den Speicher einer Edge Function. Der Runner hat den Platz,
+**streamt** die Datei und zieht nur die Karten heraus, die im Bestand stehen. Der
+`service_role`-Key liegt dabei als Actions-Secret, **nie** im Browser.
+
+### So funktioniert es
+
+* **Tabelle `price_history`** — je `scryfall_id`, nicht je Nutzer (die Preise
+  sind für alle gleich, das spart Dubletten). Angemeldete dürfen nur lesen;
+  schreiben darf allein der Job über den `service_role`-Key, der RLS umgeht. Die
+  Tabelle kommt mit `supabase-schema.sql`. Die persönliche Historie (`cards.hist`)
+  bleibt davon unberührt.
+* **`scripts/price-backfill/`** — Node-Skript: liest die vorhandenen
+  `scryfall_id` aus der Datenbank, streamt MTGJSONs `AllIdentifiers` (Zuordnung
+  `scryfallId → uuid`) und `AllPrices`, schreibt die EUR/USD-Reihen gebündelt in
+  `price_history`.
+* **`.github/workflows/prices.yml`** — führt das Skript täglich (15:00 UTC, nach
+  MTGJSONs Tages-Build) und auf Knopfdruck aus.
+
+Vorerst zeigt die App nur den **EUR**-Verlauf; die USD-Reihe wird schon
+mitgespeichert und lässt sich später ohne erneuten Import sichtbar machen.
+
+### Einrichten (optional)
+
+1. **Schema aktualisieren:** `supabase-schema.sql` erneut komplett ausführen
+   (legt `price_history` samt RLS an; wiederholbar, Daten bleiben erhalten).
+2. **Secrets im GitHub-Repo** (Settings → Secrets and variables → Actions):
+   * `SUPABASE_URL` — z. B. `https://<projekt>.supabase.co`.
+   * `SUPABASE_SERVICE_ROLE_KEY` — aus **Project Settings → API**. Er umgeht RLS
+     und gehört ausschließlich hierher, nie in die App.
+3. **Auslösen:** im Repo unter **Actions → „Preishistorie (MTGJSON)" → Run
+   workflow** einmal von Hand starten; danach läuft er täglich. Beim nächsten
+   Öffnen der Sammlung sind die Graphen gefüllt.
+
+Lokal prüfen: in `scripts/price-backfill/` einmal `npm ci`, dann
+`node backfill.mjs --self-test` (nur die Umform-Logik, ohne Netz) oder — mit
+gesetzten `SUPABASE_*`-Variablen — `node backfill.mjs --dry-run` (lädt und
+rechnet, schreibt aber nichts).
+
 ## Hinweise
 
 * Die App braucht Internet — für Scryfall, die Sprachdaten der Texterkennung
@@ -305,4 +361,6 @@ Die Cardmarket-API selbst kommt nicht in Frage:
 Was Cardmarket besser kann, sind die konkreten Angebote. Dorthin führt der
 `CM`-Link je Kartenzeile.
 * „Preise aktualisieren“ ruft jede Karte einzeln ab und schreibt einen
-  Historienpunkt pro Tag (die letzten 60 bleiben erhalten).
+  Historienpunkt pro Tag (die letzten 60 bleiben erhalten). Rückwirkend füllt
+  der optionale MTGJSON-Job den Verlauf auf ~90 Tage — siehe „Preisverlauf:
+  ~90 Tage aus MTGJSON“.

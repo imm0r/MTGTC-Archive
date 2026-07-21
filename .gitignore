@@ -5,6 +5,11 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Node-Abhängigkeiten des Backfill-Jobs (scripts/price-backfill). Nur
+# package.json + package-lock.json gehören ins Repo; der Rest kommt per
+# "npm ci" im GitHub Action.
+node_modules/
+
 # Roh-Logovorlagen (Quelle). Deployt werden nur die verarbeiteten logo-*.png;
 # die eigentliche Grafik stammt aus Logo2.png (Emblem + Schriftzug), per
 # Hintergrund-Matte auf die App-Flächen umgefärbt.
