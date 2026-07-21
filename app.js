@@ -1232,11 +1232,13 @@ function cardRow(c, o = {}) {
           // nur, was das Deck betrifft: Hauptkarte und Zuordnung lösen.
           // Der Stern erscheint nur bei möglichen Commandern; die Regel selbst
           // erzwingt ein Trigger in der Datenbank.
-          ? (istCommanderFaehig(c)
-            ? `<button class="btn ghost sm${o.istHaupt ? " star-on" : ""}" data-main
-              title="${o.istHaupt ? esc(t("row.mainIsTitle"))
-                                  : esc(t("row.mainSetTitle"))}">${o.istHaupt ? "&#9733;" : "&#9734;"}</button>`
-            : "")
+          ? `${istCommanderFaehig(c)
+              ? `<button class="btn ghost sm${o.istHaupt ? " star-on" : ""}" data-main
+                title="${o.istHaupt ? esc(t("row.mainIsTitle")) : esc(t("row.mainSetTitle"))}">${o.istHaupt ? "&#9733;" : "&#9734;"}</button>`
+              : ""}${(o.istZweit || o.partnerOk)
+              ? `<button class="btn ghost sm${o.istZweit ? " star2-on" : ""}" data-second
+                title="${o.istZweit ? esc(t("row.second2IsTitle")) : esc(t("row.second2SetTitle"))}">${o.istZweit ? "&#10022;" : "&#10023;"}</button>`
+              : ""}`
           : `<button class="btn ghost sm" data-edit title="${esc(t("row.editTitle"))}">&#9998;</button>
         <button class="btn ghost sm" data-price title="${esc(t("row.priceTitle"))}">&#8635;</button>
         <button class="btn ghost sm sell-toggle${c.for_sale ? " on" : ""}" data-sell title="${esc(t("row.sellTitle"))}">&#8364;</button>`}
@@ -1299,6 +1301,9 @@ function wireCardRows(root) {
 
     const mb = tr.querySelector("[data-main]");
     if (mb) mb.onclick = () => setMainCard(deck, id);
+
+    const s2 = tr.querySelector("[data-second]");
+    if (s2) s2.onclick = () => setSecondCard(deck, id);
 
     const db = tr.querySelector("[data-del]");
     if (db) db.onclick = async () => {
@@ -3555,11 +3560,65 @@ const istCommanderFaehig = c => {
          /creature|planeswalker/i.test(vorderseite);
 };
 
+/* Kann diese Karte ZWEITER Commander sein? Wie istCommanderFaehig, aber
+   zusätzlich legendäre Backgrounds (Verzauberungen) — nur so bringt die
+   „Choose a Background"-Variante zwei Commander zusammen. */
+const istZweitCommanderFaehig = c => {
+  const vorderseite = (c?.type_line || "").split("//")[0];
+  if (!/legendary/i.test(vorderseite)) return false;
+  return /creature|planeswalker/i.test(vorderseite) || /\bbackground\b/i.test(vorderseite);
+};
+
+/* ------------------------------------------------ Partner-Mechanik ----
+   Zwei Karten dürfen nur dann gemeinsam Commander sein, wenn ihre Partner-
+   Fähigkeiten zusammenpassen. Die fünf Varianten (Partner, Partner mit [Name],
+   Friends forever, Choose a Background, Doctor's companion) liest partnerInfo
+   aus Schlüsselwörtern (Scryfalls keywords, verbürgt) mit Rückfall auf den
+   Regeltext bzw. die Typzeile. WICHTIG (regeltreu): „Partner with [Name]" trägt
+   AUCH das schlichte „Partner", darf also mit jeder Partner-Karte kombiniert
+   werden — der genannte Name gibt nur einen Bonus. Scryfall führt „Partner with"-
+   Karten deshalb auch unter dem Schlüsselwort „Partner". */
+function partnerInfo(c) {
+  const kw = Array.isArray(c?.keywords) ? c.keywords.map(k => k.toLowerCase()) : [];
+  const ot = c?.oracle_text || "";
+  const front = (c?.type_line || "").split("//")[0];
+  const has = k => kw.includes(k);
+  return {
+    partner:      has("partner") || has("partner with") || /(^|\n)partner\b/i.test(ot),
+    friends:      has("friends forever") || /friends forever/i.test(ot),
+    chooseBg:     has("choose a background") || /choose a background/i.test(ot),
+    isBackground: /\bbackground\b/i.test(front),
+    docCompanion: has("doctor's companion") || /doctor.?s companion/i.test(ot),
+    isDoctor:     /creature/i.test(front) && /\bdoctor\b/i.test(front),
+  };
+}
+
+/* Passen die Partner-Fähigkeiten zweier Karten zusammen? Verschiedene Varianten
+   lassen sich NICHT mischen. Kein Zusammenspiel erlaubt je mehr als zwei
+   Commander — hier geht es nur um EIN Paar. */
+function sindPartner(a, b) {
+  const A = partnerInfo(a), B = partnerInfo(b);
+  if (A.partner && B.partner) return true;                                  // Partner (inkl. „Partner with")
+  if (A.friends && B.friends) return true;                                  // Friends forever
+  if ((A.chooseBg && B.isBackground) || (B.chooseBg && A.isBackground)) return true;   // Choose a Background
+  if ((A.docCompanion && B.isDoctor) || (B.docCompanion && A.isDoctor)) return true;   // Doctor's companion
+  return false;
+}
+
 async function setMainCard(deckId, cardId) {
   const d = DECKS.find(x => x.id === deckId);
-  // Nochmal auf dieselbe Karte: Hauptkarte wieder abwählen.
-  const neu = d?.main_card_id === cardId ? null : cardId;
-  const { error } = await sb.from("decks").update({ main_card_id: neu }).eq("id", deckId);
+  // Nochmal auf dieselbe Karte: Hauptkarte (ersten Commander) wieder abwählen —
+  // dann fällt auch der zweite weg (ohne ersten ergibt er keinen Sinn).
+  const abwaehlen = d?.main_card_id === cardId;
+  const patch = abwaehlen ? { main_card_id: null, second_card_id: null } : { main_card_id: cardId };
+  // Beim WECHSEL des ersten Commanders einen nun unpassenden zweiten lösen.
+  if (!abwaehlen && d?.second_card_id) {
+    const neuHaupt = CARDS.find(x => x.id === cardId);
+    const zweit = CARDS.find(x => x.id === d.second_card_id);
+    if (!zweit || zweit.id === cardId || !neuHaupt || !sindPartner(neuHaupt, zweit))
+      patch.second_card_id = null;
+  }
+  const { error } = await sb.from("decks").update(patch).eq("id", deckId);
   if (error) {
     // Fehlt die Spalte, ist das Schema älter als die App.
     if (error.code === "42703" || /main_card_id/.test(error.message || ""))
@@ -3567,12 +3626,37 @@ async function setMainCard(deckId, cardId) {
     // Der Trigger lehnt ungeeignete Karten ab; seine Meldung ist bereits
     // für Menschen geschrieben, also unverändert durchreichen. (Sie enthält
     // selbst einen Doppelpunkt — ein Präfix-Abschneider fräße den halben Satz.)
-    if (error.code === "23514" || /legendär|Typzeile|Hauptkarte/i.test(error.message || ""))
+    if (error.code === "23514" || /legendär|Typzeile|Hauptkarte|Commander/i.test(error.message || ""))
       return toast(error.message);
     return toast(dbErr(error));
   }
   await reload(); renderDecks();
-  toast(neu ? t("toast.mainSet") : t("toast.mainUnset"));
+  toast(abwaehlen ? t("toast.mainUnset") : t("toast.mainSet"));
+}
+
+/* Zweiten Commander (Partner) setzen/lösen. Voraussetzungen: erster Commander
+   gesetzt, andere Karte, geeigneter Typ UND passende Partner-Fähigkeit. */
+async function setSecondCard(deckId, cardId) {
+  const d = DECKS.find(x => x.id === deckId);
+  if (!d) return;
+  const abwaehlen = d.second_card_id === cardId;
+  if (!abwaehlen) {
+    if (!d.main_card_id) return toast(t("toast.needMainFirst"));
+    const haupt = CARDS.find(x => x.id === d.main_card_id);
+    const c = CARDS.find(x => x.id === cardId);
+    if (!c || cardId === d.main_card_id || !istZweitCommanderFaehig(c) || !haupt || !sindPartner(haupt, c))
+      return toast(t("toast.notPartner"));
+  }
+  const { error } = await sb.from("decks").update({ second_card_id: abwaehlen ? null : cardId }).eq("id", deckId);
+  if (error) {
+    if (error.code === "42703" || /second_card_id/.test(error.message || ""))
+      return toast(t("toast.columnMissing"));
+    if (error.code === "23514" || /legendär|Typzeile|Commander/i.test(error.message || ""))
+      return toast(error.message);
+    return toast(dbErr(error));
+  }
+  await reload(); renderDecks();
+  toast(abwaehlen ? t("toast.secondUnset") : t("toast.secondSet"));
 }
 
 /* ============================= Decks-Ansicht ========================== */
@@ -3657,6 +3741,14 @@ function deckFilterUi() {
   karte.style.display = "";
 }
 
+/* Commander-Kärtchen im Deck-Kopf: kleines Bild mit Hover-Vorschau (data-cmd-*
+   wie in der Spielrunde). Für ersten und — bei Partnern — zweiten Commander. */
+function deckHauptImg(c) {
+  return `<img class="deck-haupt" src="${esc(c.img)}" alt="" title="${esc(c.disp)}"
+     data-cmd-img="${esc((c.img || "").replace("/small/", "/normal/"))}"
+     data-cmd-name="${esc(c.disp)}">`;
+}
+
 function renderDecks() {
   if (!DECKS.length) {
     $("#deck-list").innerHTML = `<div class="card"><div class="empty">${esc(t("deck.none"))}</div></div>`;
@@ -3696,18 +3788,28 @@ function renderDecks() {
       if (!katGruppen.has(en)) katGruppen.set(en, []);
       katGruppen.get(en).push(x);
     }
+    // Erster Commander als Kartenobjekt: Grundlage der Partner-Prüfung je Zeile.
+    const mainCard = d.main_card_id ? CARDS.find(x => x.id === d.main_card_id) : null;
     const deckKoerper = [...DECK_KAT_ORDNUNG, ""].filter(en => katGruppen.has(en)).map(en => {
       const items = katGruppen.get(en);
       const anz = items.reduce((s, x) => s + x.e.qty, 0);
       const zu = deckCatZu.has(`${d.id}|${en}`);
-      // Die Commanderkarte steht immer ganz oben in ihrer Kategorie (Kreaturen),
-      // unabhängig von der gewählten Sortierung. Stabiler Sort: nur der Commander
-      // wandert nach vorn, alle anderen behalten ihre Reihenfolge.
-      const geordnet = d.main_card_id
-        ? [...items].sort((a, b) => (b.c.id === d.main_card_id) - (a.c.id === d.main_card_id))
+      // Beide Commander (erster + Partner) stehen immer oben in ihrer Kategorie,
+      // unabhängig von der gewählten Sortierung. Stabiler Sort: erst der erste
+      // Commander, dann der zweite, dann der Rest in bisheriger Reihenfolge.
+      const rang = x => x.c.id === d.main_card_id ? 0 : x.c.id === d.second_card_id ? 1 : 2;
+      const geordnet = (d.main_card_id || d.second_card_id)
+        ? [...items].sort((a, b) => rang(a) - rang(b))
         : items;
       const catRows = geordnet.map(({ e, c }) => cardRow(c, {
-        deckId: d.id, qty: e.qty, istHaupt: d.main_card_id === c.id })).join("");
+        deckId: d.id, qty: e.qty,
+        istHaupt: d.main_card_id === c.id,
+        istZweit: d.second_card_id === c.id,
+        // Partner-Stern anbieten, wenn ein erster Commander steht, diese Karte
+        // ein tauglicher zweiter Commander ist und die Partner-Fähigkeiten passen.
+        partnerOk: !!mainCard && c.id !== mainCard.id && d.second_card_id !== c.id &&
+                   istZweitCommanderFaehig(c) && sindPartner(mainCard, c),
+      })).join("");
       return `<tbody class="deck-cat-body${zu ? " zu" : ""}">`
         + `<tr class="deck-cat-head" data-cattoggle="${d.id}|${en}"><td colspan="99">`
         + `<span class="deck-cat-arrow">${zu ? "&#9654;" : "&#9660;"}</span>`
@@ -3721,15 +3823,15 @@ function renderDecks() {
     const offen = deckOffen.ist(d.id);
     const dashOffen = deckDashOffen.has(d.id);
     if (dashOffen) deckDashRows.set(d.id, eintraege.map(({ e, c }) => ({ ...c, qty: e.qty })));
-    const haupt = d.main_card_id ? CARDS.find(c => c.id === d.main_card_id) : null;
+    const haupt = mainCard;
+    const zweit = d.second_card_id ? CARDS.find(c => c.id === d.second_card_id) : null;
 
     return `<div class="card">
       <div class="deck-kopf" data-toggle="${d.id}" title="${offen ? t("common.collapse") : t("common.expand")}">
         <span class="deck-pfeil">${offen ? "&#9660;" : "&#9654;"}</span>
-        ${haupt?.img ? `<img class="deck-haupt" src="${esc(haupt.img)}" alt=""
-             title="${esc(haupt.disp)}"
-             data-cmd-img="${esc((haupt.img || "").replace("/small/", "/normal/"))}"
-             data-cmd-name="${esc(haupt.disp)}">` : ""}
+        ${(haupt?.img || zweit?.img)
+          ? `<span class="deck-cmds">${haupt?.img ? deckHauptImg(haupt) : ""}${zweit?.img ? deckHauptImg(zweit) : ""}</span>`
+          : ""}
         <div style="flex:1;min-width:0">
           <h3 style="margin:0">${esc(d.name)}</h3>
           <div class="deck-tags">${
