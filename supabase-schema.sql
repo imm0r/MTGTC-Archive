@@ -821,32 +821,52 @@ alter table public.session_players enable row level security;
 alter table public.session_events  enable row level security;
 revoke all on public.game_sessions, public.session_players, public.session_events from anon;
 
+drop policy if exists gs_select on public.game_sessions;
 create policy gs_select on public.game_sessions for select to authenticated
   using (host = auth.uid() or public.in_session(id));
+drop policy if exists gs_insert on public.game_sessions;
 create policy gs_insert on public.game_sessions for insert to authenticated
   with check (host = auth.uid());
+drop policy if exists gs_update on public.game_sessions;
 create policy gs_update on public.game_sessions for update to authenticated
   using (host = auth.uid()) with check (host = auth.uid());
+drop policy if exists gs_delete on public.game_sessions;
 create policy gs_delete on public.game_sessions for delete to authenticated
   using (host = auth.uid());
+drop policy if exists sp_select on public.session_players;
 create policy sp_select on public.session_players for select to authenticated
   using (public.in_session(session_id));
+drop policy if exists sp_insert on public.session_players;
 create policy sp_insert on public.session_players for insert to authenticated
   with check (exists (select 1 from public.game_sessions g where g.id = session_id and g.host = auth.uid())
               and (user_id = auth.uid() or public.are_friends(auth.uid(), user_id)));
+drop policy if exists sp_update on public.session_players;
 create policy sp_update on public.session_players for update to authenticated
   using (public.in_session(session_id)) with check (public.in_session(session_id));
+drop policy if exists sp_delete on public.session_players;
 create policy sp_delete on public.session_players for delete to authenticated
   using (user_id = auth.uid()
     or exists (select 1 from public.game_sessions g where g.id = session_id and g.host = auth.uid()));
+drop policy if exists se_select on public.session_events;
 create policy se_select on public.session_events for select to authenticated
   using (public.in_session(session_id));
+drop policy if exists se_insert on public.session_events;
 create policy se_insert on public.session_events for insert to authenticated
   with check (public.in_session(session_id) and user_id = auth.uid());
 
-alter publication supabase_realtime add table public.game_sessions;
-alter publication supabase_realtime add table public.session_players;
-alter publication supabase_realtime add table public.session_events;
+-- Realtime-Publikation nur ergänzen, wenn die Tabelle noch nicht Mitglied ist
+-- ("add table" ist sonst nicht wiederholbar und bricht den zweiten Lauf ab).
+do $$
+declare t text;
+begin
+  foreach t in array array['game_sessions', 'session_players', 'session_events'] loop
+    if not exists (select 1 from pg_publication_tables
+                   where pubname = 'supabase_realtime'
+                     and schemaname = 'public' and tablename = t) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;
 
 -- Ablauf-RPCs (security invoker; RLS entscheidet).
 create or replace function public.create_session(p_start_life integer default 40)
@@ -1002,14 +1022,22 @@ language sql stable security definer set search_path=public as $$
 alter table public.game_events enable row level security; alter table public.game_events force row level security;
 alter table public.event_rsvp enable row level security;  alter table public.event_rsvp force row level security;
 revoke all on public.game_events from anon; revoke all on public.event_rsvp from anon;
+drop policy if exists ev_select on public.game_events;
 create policy ev_select on public.game_events for select to authenticated using (public.in_event(id));
+drop policy if exists ev_insert on public.game_events;
 create policy ev_insert on public.game_events for insert to authenticated with check (host = auth.uid());
+drop policy if exists ev_update on public.game_events;
 create policy ev_update on public.game_events for update to authenticated using (host = auth.uid()) with check (host = auth.uid());
+drop policy if exists ev_delete on public.game_events;
 create policy ev_delete on public.game_events for delete to authenticated using (host = auth.uid());
+drop policy if exists rsvp_select on public.event_rsvp;
 create policy rsvp_select on public.event_rsvp for select to authenticated using (public.in_event(event_id));
+drop policy if exists rsvp_insert on public.event_rsvp;
 create policy rsvp_insert on public.event_rsvp for insert to authenticated
   with check (public.event_host(event_id) = auth.uid() and (user_id = auth.uid() or public.are_friends(auth.uid(), user_id)));
+drop policy if exists rsvp_update on public.event_rsvp;
 create policy rsvp_update on public.event_rsvp for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists rsvp_delete on public.event_rsvp;
 create policy rsvp_delete on public.event_rsvp for delete to authenticated
   using (user_id = auth.uid() or public.event_host(event_id) = auth.uid());
 
@@ -1050,8 +1078,18 @@ begin
   return sid;
 end $$;
 revoke execute on function public.start_session_from_event(uuid,integer) from anon;
-alter publication supabase_realtime add table public.game_events;
-alter publication supabase_realtime add table public.event_rsvp;
+-- Wie oben: nur ergänzen, wenn noch nicht Mitglied — sonst bricht der zweite Lauf.
+do $$
+declare t text;
+begin
+  foreach t in array array['game_events', 'event_rsvp'] loop
+    if not exists (select 1 from pg_publication_tables
+                   where pubname = 'supabase_realtime'
+                     and schemaname = 'public' and tablename = t) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;
 
 -- =====================================================================
 --  Regelfrage-Verlauf: erfolgreich geklärte Regelfragen je Nutzer
