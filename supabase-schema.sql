@@ -118,6 +118,11 @@ alter table public.cards add column if not exists oracle_text text;
 -- bei einseitigen Karten. Nur für die Detailansicht — Suche/Sortierung laufen
 -- weiter über die flachen Spalten (name, type_line …).
 alter table public.cards add column if not exists faces jsonb;
+-- Farbidentität (Scryfalls color_identity): Farben aus Kosten, Farbindikator
+-- UND Regeltext-Mana-Symbolen — für Länder u. a. aussagekräftig, wo colors leer
+-- ist. Grundlage des Farbidentitäts-Filters in der Sammlung. {} = farblose
+-- Identität, NULL = noch nicht erfasst.
+alter table public.cards add column if not exists color_identity text[];
 -- Kuratierte Verkaufsliste: Karte für den Cardmarket-Verkauf markiert.
 alter table public.cards add column if not exists for_sale boolean not null default false;
 create index if not exists cards_for_sale_idx on public.cards(user_id) where for_sale;

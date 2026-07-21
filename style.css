@@ -510,6 +510,20 @@ td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000
    oben stellt Kartenbilder auf display:block, und sie trifft auch diese
    Symbole — ohne Gegensteuer stünde jedes Manasymbol auf einer eigenen Zeile. */
 .mana{width:1em;height:1em;display:inline-block;vertical-align:-0.1em;margin-left:1px}
+/* Farbidentitäts-Filter in der Sammlung: sechs Kästchen mit Farbsymbol als
+   Beschriftung. Die echte Checkbox liegt unsichtbar darunter; das Symbol-Kästchen
+   ist im Ruhezustand gedimmt und leuchtet mit Gold-Rahmen auf, wenn angehakt. */
+.ci-row{margin-top:-2px}
+.ci-filter{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.ci-box{cursor:pointer;display:inline-flex;position:relative}
+.ci-box input{position:absolute;opacity:0;width:0;height:0;margin:0}
+.ci-sym{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;
+  border-radius:8px;border:1px solid var(--line);background:var(--panel2);opacity:.5;
+  transition:opacity .15s,border-color .15s,box-shadow .15s}
+.ci-sym .mana{width:19px;height:19px;margin:0}
+.ci-box:hover .ci-sym{opacity:.85}
+.ci-box input:checked ~ .ci-sym{opacity:1;border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
+.ci-box input:focus-visible ~ .ci-sym{box-shadow:0 0 0 2px var(--acc)}
 /* In der Detailansicht stehen die Kosten hinter dem Namen (kein flex: so bleibt
    der Name normaler Textfluss und darf umbrechen). In den Tabellen haben sie
    eine eigene, rechtsbündige Spalte — dort sortiert man nach ihnen. */

@@ -125,20 +125,38 @@ async function reload() {
    durch diese Warteschlange, die 120 ms Abstand erzwingt. */
 const sf = (() => {
   let chain = Promise.resolve(), last = 0;
-  const call = async path => {
+  const run = async (path, init) => {
     const wait = 120 - (Date.now() - last);
     if (wait > 0) await sleep(wait);
     last = Date.now();
-    const r = await fetch("https://api.scryfall.com" + path, { headers: { Accept: "application/json" } });
+    const r = await fetch("https://api.scryfall.com" + path, init);
     if (r.status === 404) return null;
     if (!r.ok) throw new Error("Scryfall HTTP " + r.status);
     return r.json();
   };
-  return path => (chain = chain.then(() => call(path), () => call(path)));
+  const getInit = { headers: { Accept: "application/json" } };
+  const get = path => (chain = chain.then(() => run(path, getInit), () => run(path, getInit)));
+  // Gleiche Warteschlange (Scryfall bittet um ~10 Anfragen/Sekunde) auch für
+  // POST — z. B. /cards/collection zum Sammel-Nachladen der Farbidentität.
+  get.post = (path, body) => {
+    const init = { method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify(body) };
+    return (chain = chain.then(() => run(path, init), () => run(path, init)));
+  };
+  return get;
 })();
 
 const sfNamed = name => sf("/cards/named?fuzzy=" + encodeURIComponent(name));
 const sfById  = id   => sf("/cards/" + id);
+
+/* Sammel-Abruf mehrerer Karten über ihre scryfall_id (max. 75 je Aufruf).
+   Scryfalls /cards/collection liefert die vollen Kartenobjekte auf einen
+   Schlag — viel sparsamer als 75 Einzelabrufe. */
+async function sfCollection(ids) {
+  const r = await sf.post("/cards/collection", { identifiers: ids.map(id => ({ id })) });
+  return r?.data || [];
+}
 
 /* Volltextsuche. include_multilingual findet gedruckte Namen anderer
    Sprachen, include_extras auch Tokens — beides ist standardmäßig aus. */
@@ -831,14 +849,20 @@ async function addToCollection(card, el, detected) {
   });
   if (error) throw new Error(dbErr(error));
 
-  // Zweiseitige Karten: die Seiten dieser Auflage festhalten, damit die
-  // Detailansicht sie später ohne erneuten Scryfall-Abruf umdrehen kann.
-  // Getrennt vom add_card-Aufruf, um dessen Signatur nicht zu erweitern.
+  // Nachtrag getrennt vom add_card-Aufruf (spart eine Signatur-Erweiterung):
+  //  • faces = die Seiten zweiseitiger Karten (fürs Umdrehen in den Details),
+  //  • color_identity = Grundlage des Farbidentitäts-Filters in der Sammlung.
   const row = Array.isArray(data) ? data[0] : data;
-  const fc = facesOf(card);
-  if (fc && row?.id) {
-    try { await sb.from("cards").update({ faces: fc }).eq("id", row.id); }
-    catch { /* Anzeige klappt auch ohne gespeicherte Seiten */ }
+  if (row?.id) {
+    const patch = {};
+    const fc = facesOf(card);
+    if (fc) patch.faces = fc;
+    const ci = farbIdentOf(card);
+    if (ci) patch.color_identity = ci;
+    if (Object.keys(patch).length) {
+      try { await sb.from("cards").update(patch).eq("id", row.id); }
+      catch { /* Anzeige klappt auch ohne die Nachträge */ }
+    }
   }
 
   await reload(); renderAll();
@@ -1043,9 +1067,26 @@ function sortUm(zustand, key) {
   zustand.key = key;
 }
 
+/* Farbidentitäts-Filter: EXAKTE Übereinstimmung. Die angehakten Farbfelder
+   sind genau die gewünschte Identität. Eine farblose Identität ([]) wird als
+   „C" dargestellt, damit „nur Farblos angehakt" ≠ „nichts angehakt" ist. Noch
+   nicht erfasste Karten (color_identity == null) passen zu keiner Auswahl. */
+function farbidentPasst(c, sel) {
+  const ci = c.color_identity;
+  if (!Array.isArray(ci)) return false;
+  const sig = ci.length ? ci : ["C"];
+  if (sig.length !== sel.length) return false;
+  const s = new Set(sig);
+  return sel.every(x => s.has(x));
+}
+
+/* Aktuell angehakte Farbidentitäts-Felder (W/U/B/R/G/C). */
+const ciAuswahl = () => $$('#ci-filter input[data-ci]:checked').map(i => i.dataset.ci);
+
 function filtered() {
   const q = $("#q").value.trim().toLowerCase();
   const fs = $("#f-set").value, ff = $("#f-foil").value, ft = $("#f-type").value;
+  const ci = ciAuswahl();
   return CARDS.filter(c =>
     // qty 0 = „im Deck, aber nicht besessen" (aus einem Deck-Import). Gehört
     // NICHT in die Sammlung — nur ins Deck, wo es als „fehlen" erscheint.
@@ -1054,8 +1095,50 @@ function filtered() {
            (c.set_name || "").toLowerCase().includes(q)) &&
     (!fs || c.set === fs) &&
     (ff === "" || String(c.foil ? 1 : 0) === ff) &&
-    (!ft || typMatch(c.type_line, ft))
+    (!ft || typMatch(c.type_line, ft)) &&
+    (!ci.length || farbidentPasst(c, ci))
   ).sort((a, b) => cmpWert(sortWert(sortKey, a), sortWert(sortKey, b), sortDir));
+}
+
+/* Farbidentität für Altbestand einmalig nachladen: Karten ohne color_identity
+   sammelweise über Scryfalls /cards/collection holen (75 je Anfrage) und in
+   WENIGEN Sammel-Updates speichern (nach Identität gruppiert). Läuft im
+   Hintergrund beim ersten Laden; ist alles erfasst, tut die Funktion nichts. */
+async function backfillFarbident() {
+  if (backfillFarbident._laeuft) return;
+  const fehlen = CARDS.filter(c => c.color_identity == null && c.scryfall_id);
+  if (!fehlen.length) return;
+  backfillFarbident._laeuft = true;
+  try {
+    const sids = [...new Set(fehlen.map(c => c.scryfall_id))];
+    const ciBySid = new Map();
+    for (let i = 0; i < sids.length; i += 75) {
+      let cards = [];
+      try { cards = await sfCollection(sids.slice(i, i + 75)); } catch { continue; }
+      for (const card of cards) ciBySid.set(card.id, farbIdentOf(card) || []);
+    }
+    if (!ciBySid.size) return;
+    // Nach Identitätswert gruppieren → höchstens ~32 Sammel-Updates statt
+    // Hunderter Einzelschreibungen.
+    const grp = new Map();
+    for (const [sid, ci] of ciBySid) {
+      const key = JSON.stringify(ci);
+      if (!grp.has(key)) grp.set(key, { ci, sids: [] });
+      grp.get(key).sids.push(sid);
+    }
+    for (const { ci, sids: gs } of grp.values()) {
+      for (let i = 0; i < gs.length; i += 150) {   // .in()-Liste kurz halten (URL-Länge)
+        const chunk = gs.slice(i, i + 150);
+        try {
+          await sb.from("cards").update({ color_identity: ci })
+            .in("scryfall_id", chunk).eq("user_id", USER.id).is("color_identity", null);
+          const set = new Set(chunk);
+          for (const c of CARDS) if (set.has(c.scryfall_id) && c.color_identity == null) c.color_identity = ci;
+        } catch { /* beim nächsten Laden erneut versuchen */ }
+      }
+    }
+    if ($(".view.on")?.id === "v-coll") renderCollection();
+  } finally { backfillFarbident._laeuft = false; }
 }
 
 function spark(hist) {
@@ -1589,6 +1672,14 @@ const farbenOf = card => {
   return [...new Set(angaben.flat())].sort();
 };
 
+/* Farbidentität einer Karte (Scryfalls color_identity): die Farben aus Kosten,
+   Farbindikator UND Regeltext-Mana-Symbolen. Anders als colors ist sie IMMER
+   oben geführt (auch bei doppelseitigen Karten) und für Länder aussagekräftig
+   (z. B. eine Zweifarben-Zulande trägt colors=[], aber color_identity=[U,R]).
+   Deshalb ist SIE die richtige Grundlage für den Farbidentitäts-Filter. []
+   heißt farblose Identität (eine Aussage), null „noch nicht erfasst". */
+const farbIdentOf = card => Array.isArray(card?.color_identity) ? [...card.color_identity].sort() : null;
+
 /* Schlüsselwörter einer Scryfall-Karte. Scryfall führt sie OBEN gesammelt über
    alle Seiten — anders als mana_cost/colors nicht je Seite. [] heißt "keine"
    (gültig), null "noch nicht erfasst". Diese Liste ist die verbürgte Quelle
@@ -1649,6 +1740,11 @@ async function nachtragen(c, fresh) {
   if (c.faces == null) {
     const fc = facesOf(fresh);
     if (fc != null) patch.faces = fc;
+  }
+  // Farbidentität nachtragen (Grundlage des Farbidentitäts-Filters).
+  if (c.color_identity == null) {
+    const ci = farbIdentOf(fresh);
+    if (ci != null) patch.color_identity = ci;
   }
   if (!Object.keys(patch).length) return;
   const { error } = await sb.from("cards").update(patch).eq("id", c.id);
@@ -4687,6 +4783,10 @@ async function afterLogin(user) {
   showApp();
   try { await reload(); renderAll(); }
   catch (e) { toast(dbErr(e)); }
+  // Farbidentität für Altbestand einmalig im Hintergrund nachladen (Grundlage
+  // des Farbidentitäts-Filters). Nicht kritisch, blockiert den Start nicht; ist
+  // alles erfasst, kehrt es sofort zurück.
+  backfillFarbident().catch(() => {});
   // Spielrunde: Einladungs-Badge + laufende Session live, auch ohne die Ansicht
   // zu öffnen. Nicht kritisch — schlägt es fehl, läuft der Rest weiter.
   try { await ladeSession(); subscribeInvites(); if (SESSION) subscribeSession(); }
@@ -6848,6 +6948,9 @@ function wireApp() {
   $("#f-set").onchange = () => { collPage = 0; renderCollection(); };
   $("#f-foil").onchange = () => { collPage = 0; renderCollection(); };
   $("#f-type").onchange = () => { collPage = 0; renderCollection(); };
+  // Farbidentitäts-Filter: jede Checkbox zeichnet die Sammlung neu.
+  $$('#ci-filter input[data-ci]').forEach(inp =>
+    inp.onchange = () => { collPage = 0; renderCollection(); });
   $("#upd").onclick = updatePrices;
 
   // „Deine Combos": komplette Combos quer über den ganzen Bestand. Karten nach
