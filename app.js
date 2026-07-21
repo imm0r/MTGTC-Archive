@@ -932,9 +932,9 @@ function renderConfirm(card, el, detected) {
           `<option value="${x}"${x === cond0 ? " selected" : ""}>${x} · ${esc(CONDITION_BY[x].name)}</option>`).join("")}</select></div>
       </div>
       <div class="c-actions">
-        <button class="btn sm" data-take>${esc(t("scan.confirmAdd"))}</button>
-        <button class="btn ghost sm" data-fix>${esc(t("scan.wrongCard"))}</button>
-        <button class="btn ghost sm" data-drop>${esc(t("scan.discard"))}</button>
+        <button class="btn sm c-ok" data-take>${esc(t("scan.confirmAdd"))}</button>
+        <button class="btn sm c-warn" data-fix>${esc(t("scan.wrongCard"))}</button>
+        <button class="btn sm c-danger" data-drop>${esc(t("scan.discard"))}</button>
       </div>
     </div>`;
 
