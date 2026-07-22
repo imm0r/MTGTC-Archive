@@ -5926,18 +5926,9 @@ function zeigeDeckzahl() {
   if (g) { g.hidden = n == null; if (n != null) g.innerHTML = `&#127136; <b>${esc(n)}</b> ${esc(lbl)}`; }
 }
 
-/* Gesamtzahl erfasster Karten laden (SECURITY-DEFINER-RPC, da RLS nur
-   eigene Karten sichtbar macht) und anschließend im Header und auf dem
-   Login-Screen anzeigen. Anzeige ist optional — schlägt der Aufruf fehl,
-   bleibt sie einfach leer. */
 async function ladeKartenzahl() {
-  try {
-    const { data, error } = await sb.rpc("total_card_count");
-    if (error) { console.error("RPC total_card_count error:", error); }
-    if (!error && data != null) CARD_COUNT = Number(data);
-    else if (!error) console.warn("total_card_count returned null:", data);
-  }
-  catch (e) { console.error("ladeKartenzahl exception:", e); }
+  try { const { data, error } = await sb.rpc("total_card_count"); if (!error && data != null) CARD_COUNT = Number(data); }
+  catch { /* still ignorieren — Zahl ist nur informativ */ }
   zeigeKartenzahl();
 }
 function zeigeKartenzahl() {
