@@ -7346,7 +7346,13 @@ function initTooltip() {
     ziel = null;
   }
 
-  document.addEventListener("mouseover", e => {
+  // Pointer- statt Maus-Events: e.pointerType trennt Maus/Stift von Touch. Auf
+  // Touch gibt es kein Hover — dort bleibt der Tooltip aus (wie der native title
+  // auf dem Handy nie erschien). Sonst zeigte ihn jedes Tippen und er bliebe bis
+  // zum nächsten Tipp hängen. Maus, Trackpad und Stift (auch auf Hybridgeräten)
+  // bekommen ihn wie gehabt.
+  document.addEventListener("pointerover", e => {
+    if (e.pointerType === "touch") return;
     const el = e.target.closest?.("[title]");
     if (!el || el === ziel) return;
     // Große Kartenvorschau übernimmt hier — kein zusätzlicher Tooltip.
@@ -7360,14 +7366,16 @@ function initTooltip() {
     timer = setTimeout(zeige, 320);
   });
 
-  document.addEventListener("mouseout", e => {
-    if (!ziel) return;
+  document.addEventListener("pointerout", e => {
+    if (e.pointerType === "touch" || !ziel) return;
     if (e.relatedTarget && ziel.contains(e.relatedTarget)) return;   // noch im Ziel
     verstecke();
   });
 
   addEventListener("scroll", verstecke, true);
   addEventListener("wheel", verstecke, { passive: true });
+  // Sicherheitsnetz: hat die Maus einen Tooltip offen und es folgt eine Berührung
+  // (Hybridgerät), schließt ihn die Berührung.
   addEventListener("touchstart", verstecke, { passive: true });
 }
 
