@@ -5938,9 +5938,9 @@ async function ladeKartenzahl() {
 function zeigeKartenzahl() {
   const n = CARD_COUNT != null ? String(CARD_COUNT) : null, lbl = t("stats.totalCards");
   const h = $("#card-count");
-  if (h) { h.hidden = n == null; if (n != null) { h.innerHTML = `&#127136;&nbsp;<b>${esc(n)}</b>`; h.title = lbl; } }
+  if (h) { h.hidden = n == null; if (n != null) { h.innerHTML = `🗂️&nbsp;<b>${esc(n)}</b>`; h.title = lbl; } }
   const g = $("#gate-card-count");
-  if (g) { g.hidden = n == null; if (n != null) g.innerHTML = `&#127136; <b>${esc(n)}</b> ${esc(lbl)}`; }
+  if (g) { g.hidden = n == null; if (n != null) g.innerHTML = `🗂️ <b>${esc(n)}</b> ${esc(lbl)}`; }
 }
 
 async function oeffneFreunde() { await ladeFreunde(); renderFriends(); }
