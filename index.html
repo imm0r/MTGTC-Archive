@@ -22,7 +22,10 @@
   <div class="brand-hero">
     <img class="brand-hero-img" src="logo-login.png?v=61" alt="Arcanum Archive — Unearth your collection">
   </div>
-  <div id="gate-user-count" class="gate-usercount" hidden></div>
+  <div class="gate-stats">
+    <div id="gate-user-count" class="gate-usercount" hidden></div>
+    <div id="gate-deck-count" class="gate-deckcount" hidden></div>
+  </div>
 
   <!-- Erststart: Verbindung zur eigenen Supabase-Datenbank -->
   <div class="pane" data-pane="setup" style="display:none">
@@ -72,7 +75,10 @@
   <h1 class="brand">
     <img class="brand-logo" src="logo-header.png?v=61" alt="Arcanum Archive">
   </h1>
-  <span id="user-count" class="user-count" hidden></span>
+  <div class="header-stats">
+    <span id="user-count" class="user-count" hidden></span>
+    <span id="deck-count" class="deck-count" hidden></span>
+  </div>
   <nav>
     <button data-v="coll" class="on" data-i18n="nav.collection">Sammlung</button>
     <button data-v="decks" data-i18n="nav.decks">Decks</button>
