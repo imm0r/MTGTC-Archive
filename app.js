@@ -7426,6 +7426,7 @@ function wireApp() {
     if (b.dataset.v === "session") oeffneSession();
     if (b.dataset.v === "events") oeffneTermine();
     if (b.dataset.v === "rules") renderRules();
+    if (b.dataset.v === "status") renderStatus();
     if (b.dataset.v === "settings") renderSettings();
   });
   // Klick irgendwo anders schließt das per Klick geöffnete Benutzermenü (Touch)
@@ -7616,6 +7617,92 @@ function onLangChange() {
   wireSetup();
   const c = cfg();
   if (!c) return showGate("setup");
+
+function renderStatus() {
+  const el = $("#v-status");
+  if (!el) return;
+
+  const endpoints = [
+    { id: "app", name: "Arcanum Archive App", url: "https://imm0r.github.io/MTGTC-Archive/" },
+    { id: "keyrune", name: "Keyrune Font", url: "https://imm0r.github.io/MTGTC-Archive/assets/keyrune/keyrune.woff2" },
+    { id: "mana", name: "Mana Font", url: "https://imm0r.github.io/MTGTC-Archive/assets/mana/mana.woff2" },
+    { id: "supabase", name: "Supabase API", url: "https://api.supabase.co/health" }
+  ];
+
+  const statusRow = (ep) => `
+    <tr data-ep-id="${ep.id}">
+      <td style="flex: 1;">
+        <strong>${esc(ep.name)}</strong><br>
+        <small style="color: #666;">${esc(ep.url)}</small>
+      </td>
+      <td style="flex: none; text-align: right;">
+        <span class="status-badge" style="background: #999; color: white; padding: 4px 8px; border-radius: 3px;">Prüfung...</span>
+      </td>
+    </tr>
+  `;
+
+  el.innerHTML = `
+    <div class="card">
+      <h3 style="margin-top: 0;">🔍 Site Status</h3>
+      <p style="margin: 0 0 16px 0; color: #666;">Echtzeit-Überwachung der Arcanum Archive Infrastruktur</p>
+
+      <table style="width: 100%; border-collapse: collapse;">
+        <tbody>
+          ${endpoints.map(statusRow).join("")}
+        </tbody>
+      </table>
+
+      <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e5e5;">
+        <h4 style="margin: 0 0 12px 0;">📊 Vollständige Status-Seite</h4>
+        <p style="margin: 0 0 12px 0; color: #666; font-size: 0.95em;">
+          Für eine detaillierte Uptime-Historie, Performance-Metriken und öffentliche Status-Seite:
+        </p>
+        <ol style="margin: 0 0 16px 0; padding-left: 20px; color: #666; font-size: 0.95em;">
+          <li style="margin-bottom: 8px;">Erstelle ein neues GitHub Repository: <code>MTGTC-Archive-Status</code></li>
+          <li style="margin-bottom: 8px;">Folge den Anweisungen in <code>upptime-status-repo.md</code></li>
+          <li style="margin-bottom: 8px;">Status-Seite wird dann verfügbar unter: <code>https://imm0r.github.io/MTGTC-Archive-Status/</code></li>
+        </ol>
+        <a href="https://github.com/imm0r/MTGTC-Archive/blob/main/upptime-status-repo.md" target="_blank" rel="noopener" class="btn ghost" style="font-size: 0.95em;">📖 Setup-Anleitung öffnen</a>
+      </div>
+
+      <div style="margin-top: 24px; padding: 16px; background: #f5f5f5; border-radius: 6px; border-left: 4px solid #666;">
+        <h4 style="margin: 0 0 8px 0; font-size: 0.95em;">ℹ️ Automatische Überwachung aktiv</h4>
+        <p style="margin: 0; color: #666; font-size: 0.9em;">
+          GitHub Actions führt automatisch alle 5 Minuten Prüfungen durch.
+          <a href="https://github.com/imm0r/MTGTC-Archive/actions" target="_blank" rel="noopener" style="color: #0066cc;">Workflow-Logs anzeigen →</a>
+        </p>
+      </div>
+    </div>
+  `;
+
+  // Live-Status abrufen
+  checkEndpointStatus(endpoints);
+}
+
+async function checkEndpointStatus(endpoints) {
+  for (const ep of endpoints) {
+    try {
+      const start = performance.now();
+      await Promise.race([
+        fetch(ep.url, { method: "HEAD", mode: "no-cors" }),
+        new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 10000))
+      ]);
+      const time = Math.round(performance.now() - start);
+
+      const row = document.querySelector(`tr[data-ep-id="${ep.id}"]`);
+      if (row) {
+        row.querySelector(".status-badge").innerHTML = `✓ UP (${time}ms)`;
+        row.querySelector(".status-badge").style.background = "#4CAF50";
+      }
+    } catch (err) {
+      const row = document.querySelector(`tr[data-ep-id="${ep.id}"]`);
+      if (row) {
+        row.querySelector(".status-badge").innerHTML = "✗ DOWN";
+        row.querySelector(".status-badge").style.background = "#f44336";
+      }
+    }
+  }
+}
 
   connect(c);
   wireAuth(); wireApp();
