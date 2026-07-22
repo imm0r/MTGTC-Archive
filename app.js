@@ -7630,15 +7630,15 @@ function renderStatus() {
   ];
 
   const statusRows = endpoints.map(ep => `
-    <tr data-ep-id="${ep.id}" style="border-bottom: 1px solid #e5e5e5;">
-      <td style="padding: 12px 0; flex: 1;">
+    <div data-ep-id="${ep.id}" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #e5e5e5;">
+      <div style="flex: 1;">
         <strong>${esc(ep.name)}</strong><br>
         <small style="color: #888; font-size: 0.85em;">${esc(ep.url)}</small>
-      </td>
-      <td style="padding: 12px 0; flex: none; text-align: right;">
-        <span class="status-badge" style="background: #999; color: white; padding: 4px 8px; border-radius: 3px; font-size: 0.9em;">⏳ Prüfung...</span>
-      </td>
-    </tr>
+      </div>
+      <div style="flex: none; margin-left: 12px;">
+        <span class="status-badge" style="background: #999; color: white; padding: 4px 8px; border-radius: 3px; font-size: 0.9em; white-space: nowrap;">⏳ Prüfung...</span>
+      </div>
+    </div>
   `).join("");
 
   el.innerHTML = `
@@ -7646,7 +7646,7 @@ function renderStatus() {
       <h3 style="margin-top: 0;">🔍 Site Status</h3>
       <p style="margin: 0 0 16px 0; color: #666; font-size: 0.95em;">Echtzeit-Überwachung der Arcanum Archive Infrastruktur</p>
 
-      <div style="display: flex; flex-direction: column; gap: 0;">
+      <div style="display: flex; flex-direction: column;">
         ${statusRows}
       </div>
 
@@ -7680,14 +7680,14 @@ function checkEndpointStatus(endpoints) {
   endpoints.forEach(ep => {
     fetch(ep.url, { method: "HEAD", mode: "no-cors" })
       .then(() => {
-        const badge = document.querySelector(`tr[data-ep-id="${ep.id}"] .status-badge`);
+        const badge = document.querySelector(`div[data-ep-id="${ep.id}"] .status-badge`);
         if (badge) {
           badge.innerHTML = "✓ UP";
           badge.style.background = "#4CAF50";
         }
       })
       .catch(() => {
-        const badge = document.querySelector(`tr[data-ep-id="${ep.id}"] .status-badge`);
+        const badge = document.querySelector(`div[data-ep-id="${ep.id}"] .status-badge`);
         if (badge) {
           badge.innerHTML = "✗ DOWN";
           badge.style.background = "#f44336";
