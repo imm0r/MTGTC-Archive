@@ -7414,6 +7414,91 @@ function initTooltip() {
   addEventListener("touchstart", verstecke, { passive: true });
 }
 
+function renderStatus() {
+  const el = $("#v-status");
+  if (!el) {
+    console.error("❌ v-status element not found!");
+    return;
+  }
+  console.log("✓ renderStatus() called, el found:", el);
+
+  const endpoints = [
+    { id: "app", name: "Arcanum Archive App", url: "https://imm0r.github.io/MTGTC-Archive/" },
+    { id: "keyrune", name: "Keyrune Font", url: "https://imm0r.github.io/MTGTC-Archive/assets/keyrune/keyrune.woff2" },
+    { id: "mana", name: "Mana Font", url: "https://imm0r.github.io/MTGTC-Archive/assets/mana/mana.woff2" },
+    { id: "supabase", name: "Supabase API", url: "https://api.supabase.co/health" }
+  ];
+
+  const statusRows = endpoints.map(ep => `
+    <div data-ep-id="${ep.id}" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #e5e5e5;">
+      <div style="flex: 1;">
+        <strong>${esc(ep.name)}</strong><br>
+        <small style="color: #888; font-size: 0.85em;">${esc(ep.url)}</small>
+      </div>
+      <div style="flex: none; margin-left: 12px;">
+        <span class="status-badge" style="background: #999; color: white; padding: 4px 8px; border-radius: 3px; font-size: 0.9em; white-space: nowrap;">⏳ Prüfung...</span>
+      </div>
+    </div>
+  `).join("");
+
+  el.innerHTML = `
+    <div class="card">
+      <h3 style="margin-top: 0; color: green;">✓ Site Status Loaded Successfully</h3>
+      <p style="color: green; font-weight: bold;">If you see this text, renderStatus() is working!</p>
+
+      <h3 style="margin-top: 20px;">🔍 Site Status</h3>
+      <p style="margin: 0 0 16px 0; color: #666; font-size: 0.95em;">Echtzeit-Überwachung der Arcanum Archive Infrastruktur</p>
+
+      <div style="display: flex; flex-direction: column;">
+        ${statusRows}
+      </div>
+
+      <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e5e5;">
+        <h4 style="margin: 0 0 12px 0; font-size: 1em;">📊 Vollständige Status-Seite</h4>
+        <p style="margin: 0 0 12px 0; color: #666; font-size: 0.95em;">
+          Für eine detaillierte Uptime-Historie, Performance-Metriken und öffentliche Status-Seite:
+        </p>
+        <ol style="margin: 0 0 16px 0; padding-left: 20px; color: #666; font-size: 0.95em; line-height: 1.6;">
+          <li style="margin-bottom: 8px;">Erstelle ein neues GitHub Repository: <code style="background: #f5f5f5; padding: 2px 6px; border-radius: 3px;">MTGTC-Archive-Status</code></li>
+          <li style="margin-bottom: 8px;">Folge den Anweisungen in <code style="background: #f5f5f5; padding: 2px 6px; border-radius: 3px;">upptime-status-repo.md</code></li>
+          <li style="margin-bottom: 8px;">Status-Seite wird dann verfügbar unter: <code style="background: #f5f5f5; padding: 2px 6px; border-radius: 3px;">https://imm0r.github.io/MTGTC-Archive-Status/</code></li>
+        </ol>
+        <a href="https://github.com/imm0r/MTGTC-Archive/blob/main/upptime-status-repo.md" target="_blank" rel="noopener" class="btn ghost" style="font-size: 0.95em;">📖 Setup-Anleitung öffnen</a>
+      </div>
+
+      <div style="margin-top: 24px; padding: 16px; background: #f5f5f5; border-radius: 6px; border-left: 4px solid #666;">
+        <h4 style="margin: 0 0 8px 0; font-size: 0.95em;">ℹ️ Automatische Überwachung aktiv</h4>
+        <p style="margin: 0; color: #666; font-size: 0.9em; line-height: 1.5;">
+          GitHub Actions führt automatisch alle 5 Minuten Prüfungen durch.
+          <a href="https://github.com/imm0r/MTGTC-Archive/actions" target="_blank" rel="noopener" style="color: #0066cc; text-decoration: none;">Workflow-Logs anzeigen →</a>
+        </p>
+      </div>
+    </div>
+  `;
+
+  checkEndpointStatus(endpoints);
+}
+
+function checkEndpointStatus(endpoints) {
+  endpoints.forEach(ep => {
+    fetch(ep.url, { method: "HEAD", mode: "no-cors" })
+      .then(() => {
+        const badge = document.querySelector(`div[data-ep-id="${ep.id}"] .status-badge`);
+        if (badge) {
+          badge.innerHTML = "✓ UP";
+          badge.style.background = "#4CAF50";
+        }
+      })
+      .catch(() => {
+        const badge = document.querySelector(`div[data-ep-id="${ep.id}"] .status-badge`);
+        if (badge) {
+          badge.innerHTML = "✗ DOWN";
+          badge.style.background = "#f44336";
+        }
+      });
+  });
+}
+
 function wireApp() {
   initTooltip();
   $$("nav button[data-v]").forEach(b => b.onclick = () => {
@@ -7617,91 +7702,6 @@ function onLangChange() {
   wireSetup();
   const c = cfg();
   if (!c) return showGate("setup");
-
-function renderStatus() {
-  const el = $("#v-status");
-  if (!el) {
-    console.error("❌ v-status element not found!");
-    return;
-  }
-  console.log("✓ renderStatus() called, el found:", el);
-
-  const endpoints = [
-    { id: "app", name: "Arcanum Archive App", url: "https://imm0r.github.io/MTGTC-Archive/" },
-    { id: "keyrune", name: "Keyrune Font", url: "https://imm0r.github.io/MTGTC-Archive/assets/keyrune/keyrune.woff2" },
-    { id: "mana", name: "Mana Font", url: "https://imm0r.github.io/MTGTC-Archive/assets/mana/mana.woff2" },
-    { id: "supabase", name: "Supabase API", url: "https://api.supabase.co/health" }
-  ];
-
-  const statusRows = endpoints.map(ep => `
-    <div data-ep-id="${ep.id}" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #e5e5e5;">
-      <div style="flex: 1;">
-        <strong>${esc(ep.name)}</strong><br>
-        <small style="color: #888; font-size: 0.85em;">${esc(ep.url)}</small>
-      </div>
-      <div style="flex: none; margin-left: 12px;">
-        <span class="status-badge" style="background: #999; color: white; padding: 4px 8px; border-radius: 3px; font-size: 0.9em; white-space: nowrap;">⏳ Prüfung...</span>
-      </div>
-    </div>
-  `).join("");
-
-  el.innerHTML = `
-    <div class="card">
-      <h3 style="margin-top: 0; color: green;">✓ Site Status Loaded Successfully</h3>
-      <p style="color: green; font-weight: bold;">If you see this text, renderStatus() is working!</p>
-
-      <h3 style="margin-top: 20px;">🔍 Site Status</h3>
-      <p style="margin: 0 0 16px 0; color: #666; font-size: 0.95em;">Echtzeit-Überwachung der Arcanum Archive Infrastruktur</p>
-
-      <div style="display: flex; flex-direction: column;">
-        ${statusRows}
-      </div>
-
-      <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e5e5;">
-        <h4 style="margin: 0 0 12px 0; font-size: 1em;">📊 Vollständige Status-Seite</h4>
-        <p style="margin: 0 0 12px 0; color: #666; font-size: 0.95em;">
-          Für eine detaillierte Uptime-Historie, Performance-Metriken und öffentliche Status-Seite:
-        </p>
-        <ol style="margin: 0 0 16px 0; padding-left: 20px; color: #666; font-size: 0.95em; line-height: 1.6;">
-          <li style="margin-bottom: 8px;">Erstelle ein neues GitHub Repository: <code style="background: #f5f5f5; padding: 2px 6px; border-radius: 3px;">MTGTC-Archive-Status</code></li>
-          <li style="margin-bottom: 8px;">Folge den Anweisungen in <code style="background: #f5f5f5; padding: 2px 6px; border-radius: 3px;">upptime-status-repo.md</code></li>
-          <li style="margin-bottom: 8px;">Status-Seite wird dann verfügbar unter: <code style="background: #f5f5f5; padding: 2px 6px; border-radius: 3px;">https://imm0r.github.io/MTGTC-Archive-Status/</code></li>
-        </ol>
-        <a href="https://github.com/imm0r/MTGTC-Archive/blob/main/upptime-status-repo.md" target="_blank" rel="noopener" class="btn ghost" style="font-size: 0.95em;">📖 Setup-Anleitung öffnen</a>
-      </div>
-
-      <div style="margin-top: 24px; padding: 16px; background: #f5f5f5; border-radius: 6px; border-left: 4px solid #666;">
-        <h4 style="margin: 0 0 8px 0; font-size: 0.95em;">ℹ️ Automatische Überwachung aktiv</h4>
-        <p style="margin: 0; color: #666; font-size: 0.9em; line-height: 1.5;">
-          GitHub Actions führt automatisch alle 5 Minuten Prüfungen durch.
-          <a href="https://github.com/imm0r/MTGTC-Archive/actions" target="_blank" rel="noopener" style="color: #0066cc; text-decoration: none;">Workflow-Logs anzeigen →</a>
-        </p>
-      </div>
-    </div>
-  `;
-
-  checkEndpointStatus(endpoints);
-}
-
-function checkEndpointStatus(endpoints) {
-  endpoints.forEach(ep => {
-    fetch(ep.url, { method: "HEAD", mode: "no-cors" })
-      .then(() => {
-        const badge = document.querySelector(`div[data-ep-id="${ep.id}"] .status-badge`);
-        if (badge) {
-          badge.innerHTML = "✓ UP";
-          badge.style.background = "#4CAF50";
-        }
-      })
-      .catch(() => {
-        const badge = document.querySelector(`div[data-ep-id="${ep.id}"] .status-badge`);
-        if (badge) {
-          badge.innerHTML = "✗ DOWN";
-          badge.style.background = "#f44336";
-        }
-      });
-  });
-}
 
   connect(c);
   wireAuth(); wireApp();
