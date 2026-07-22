@@ -13,13 +13,19 @@ geräteübergreifend.
 | `index.html`          | Seitengerüst, Login- und Einrichtungsbereich        |
 | `app.js`              | Logik: OCR, Scryfall, Supabase, Ansichten           |
 | `style.css`           | Gestaltung                                          |
+| `assets/keyrune/`     | Set-Symbol-Font (Keyrune), selbst gehostet          |
+| `assets/mana/`        | Mana- und Kartensymbol-Font (Mana), selbst gehostet |
 | `supabase-schema.sql` | Tabellen, Row Level Security, Funktionen            |
 | `supabase/functions/` | Edge Functions (Scan, Regelfrage, Terminmail …)     |
 | `scripts/price-backfill/` | Node-Job: MTGJSON-Preisverlauf → Supabase       |
 | `.github/workflows/`  | GitHub Action, die den Preis-Job täglich fährt      |
 | `start.cmd`           | Nur für lokales Testen (braucht Python)             |
 
-Kein Build-Schritt: Die Seite lädt Supabase und Tesseract per CDN.
+Kein Build-Schritt: Die Seite lädt Supabase und Tesseract per CDN. Set- und
+Mana-Symbole kommen dagegen als selbst gehostete Icon-Fonts aus `assets/`
+(Keyrune, Mana) — kein Fremdanbieter, ein Font-Download statt vieler
+Einzelbilder. Ändert sich einer der Fonts, den `?v=` seiner CSS-Datei in
+`index.html` mit hochzählen (wie bei `app.js`/`style.css`).
 
 ## Einrichtung
 
@@ -340,6 +346,13 @@ rechnet, schreibt aber nichts).
   keine Schätzung: Cardmarket führt pro Auflage nur **ein** Produkt, die
   Sprache filtert dort lediglich einzelne Angebote.
 * Preise stammen von Scryfall und sind Marktbeobachtungen, keine Verkaufspreise.
+* Set- und Mana-Symbole zeichnen die Icon-Fonts [Keyrune] und [Mana] von Andrew
+  Gioia (in `assets/`, mit Lizenzen daneben). Set-Symbole gibt es nur zu Codes,
+  die Keyrune kennt — sonst bleibt es beim reinen Setnamen, wie bei den Flaggen
+  kein geratenes Symbol. Die Symbole selbst sind Marken von Wizards of the Coast.
+
+[Keyrune]: https://keyrune.andrewgioia.com/
+[Mana]: https://mana.andrewgioia.com/
 
 ### Warum Scryfall und nicht Cardmarket
 
