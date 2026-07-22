@@ -7286,47 +7286,85 @@ function onSessionChange(payload) {
 }
 
 /* ---------------------------------------------------- Tooltip -------- */
-/* Globaler Tooltip statt der nativen title-Tooltips. Native lassen sich weder
-   umplatzieren (sie sitzen unter dem Zeiger) noch gestalten. Deshalb wird beim
-   Überfahren der title entfernt (das unterdrückt den nativen Tooltip),
-   zwischengespeichert und stattdessen unser Feld ÜBER dem Element gezeigt.
+/* Globaler Tooltip statt der nativen title-Tooltips: die lassen sich weder
+   umplatzieren (sie landen unter dem Zeiger) noch gestalten. Beim Überfahren
+   wird der native Hinweis ausgehängt (unterdrückt den nativen Tooltip),
+   gemerkt und stattdessen unser gestaltetes Feld gezeigt — an der Zeigerposition,
+   aber nach rechts unten versetzt, damit es nie unter dem Zeiger liegt.
 
-   Delegiert am document — überlebt jedes Neuzeichnen der Tabellen. Elemente mit
-   großer Hover-Vorschau (data-view / data-cmd-img) bleiben außen vor, sonst
-   stünde neben der Kartenvorschau noch ein kleiner Tooltip. In Ruhe bleibt der
-   title am Element (für Screenreader); nur während des Überfahrens ist er kurz
-   ausgehängt. */
+   Erfasst wird BEIDES: das HTML-title-Attribut (Knöpfe, Zellen, Symbole) UND das
+   SVG-<title>-Kind (Sprachflaggen, Chart-Punkte, Marken-Logos) — Letzteres fiel
+   früher durch und blieb nativ. Delegiert am document, überlebt also jedes
+   Neuzeichnen; verschwindet das Ziel, schließt der Tooltip von selbst.
+
+   Elemente mit großer Hover-Vorschau (data-view / data-cmd-img) bekommen KEINEN
+   Tooltip — die Vorschau sagt schon alles —, ihr nativer title wird aber trotzdem
+   unterdrückt. In Ruhe bleibt der Hinweis am Element (für Screenreader); nur
+   während des Überfahrens ist er kurz ausgehängt. Auf Touch (pointerType "touch")
+   bleibt alles aus, dort gibt es kein Hover. */
 function initTooltip() {
   if (document.getElementById("aa-tip")) return;
+  const SVG_NS = "http://www.w3.org/2000/svg";
   const tip = document.createElement("div");
   tip.className = "aa-tip";
   tip.id = "aa-tip";
   tip.setAttribute("role", "tooltip");
   document.body.appendChild(tip);
 
-  let ziel = null, timer = 0, raf = 0;
+  let ziel = null, text = "", timer = 0, raf = 0, px = 0, py = 0;
+
+  // Text zum überfahrenen Element: erst ein title-Attribut (auch am Vorfahren),
+  // sonst ein SVG-<title>-Kind an der Form oder einem ihrer SVG-Vorfahren (bei
+  // der Flagge hängt <title> am <svg>, beim Chart-Punkt am <circle>).
+  const holeTip = tgt => {
+    if (!tgt || !tgt.closest) return null;
+    const a = tgt.closest("[title]");
+    if (a && a.getAttribute("title")) return { el: a, node: null, text: a.getAttribute("title") };
+    let n = tgt;
+    while (n && n.namespaceURI === SVG_NS) {
+      const ti = n.querySelector?.(":scope > title");
+      if (ti && ti.textContent.trim()) return { el: n, node: ti, text: ti.textContent };
+      n = n.parentNode;
+    }
+    return null;
+  };
+
+  // Nativen Hinweis aushängen (Attribut ODER <title>-Kind) und am Element merken.
+  const aushaengen = (el, node, txt) => {
+    if (node) { el._aaNode = node; node.remove(); }
+    else { el.dataset.aaTitle = txt; el.removeAttribute("title"); }
+  };
+  // … und beim Verlassen zurückgeben, sofern der Code nicht selbst einen neuen
+  // gesetzt hat (z. B. der Auf-/Zuklappen-Knopf beim Klick).
+  const einhaengen = el => {
+    if (el._aaNode) {
+      if (!el.querySelector(":scope > title")) el.appendChild(el._aaNode);
+      delete el._aaNode;
+    } else if (el.dataset.aaTitle != null) {
+      if (!el.hasAttribute("title")) el.setAttribute("title", el.dataset.aaTitle);
+      delete el.dataset.aaTitle;
+    }
+  };
 
   const platziere = () => {
-    if (!ziel || !ziel.isConnected) return verstecke();
-    const r = ziel.getBoundingClientRect();
-    const tw = tip.offsetWidth, th = tip.offsetHeight, rand = 6, lueck = 8;
-    let links = r.left + r.width / 2 - tw / 2;
+    const tw = tip.offsetWidth, th = tip.offsetHeight, rand = 6, dx = 16, dy = 24;
+    let links = px + dx;                                   // wie der native: rechts unter dem Zeiger …
+    if (links + tw > innerWidth - rand) links = px - dx - tw;   // … rechts kein Platz → nach links
     links = Math.max(rand, Math.min(links, innerWidth - tw - rand));
-    let oben = r.top - th - lueck;                 // standardmäßig ÜBER dem Element
-    const drunter = oben < rand;
-    if (drunter) oben = r.bottom + lueck;          // oben kein Platz → darunter
-    tip.classList.toggle("below", drunter);
+    let oben = py + dy;                                    // … nur weit genug weg, nie unter dem Zeiger
+    if (oben + th > innerHeight - rand) oben = py - 12 - th;    // unten kein Platz → nach oben
+    oben = Math.max(rand, Math.min(oben, innerHeight - th - rand));
     tip.style.left = Math.round(links) + "px";
-    tip.style.top = Math.round(Math.max(rand, oben)) + "px";
+    tip.style.top = Math.round(oben) + "px";
   };
 
   const zeige = () => {
     if (!ziel || !ziel.isConnected) return;
-    tip.textContent = ziel.dataset.aaTitle || "";
+    tip.textContent = text;
     tip.classList.add("on");
     platziere();
     cancelAnimationFrame(raf);
-    const tick = () => {                            // Ziel verschwindet (Neuzeichnen) → schließen
+    const tick = () => {                                   // Ziel verschwindet (Neuzeichnen) → schließen
       if (!ziel) return;
       if (!ziel.isConnected) return verstecke();
       raf = requestAnimationFrame(tick);
@@ -7337,37 +7375,42 @@ function initTooltip() {
   function verstecke() {
     clearTimeout(timer); cancelAnimationFrame(raf);
     tip.classList.remove("on");
-    if (ziel && ziel.dataset.aaTitle != null) {     // title zurückgeben …
-      // … außer der Code hat ihm zwischenzeitlich selbst einen neuen gesetzt
-      // (z. B. der Auf-/Zuklappen-Knopf beim Klick) — den nicht überschreiben.
-      if (!ziel.hasAttribute("title")) ziel.setAttribute("title", ziel.dataset.aaTitle);
-      delete ziel.dataset.aaTitle;
-    }
-    ziel = null;
+    if (ziel) einhaengen(ziel);
+    ziel = null; text = "";
   }
 
-  document.addEventListener("mouseover", e => {
-    const el = e.target.closest?.("[title]");
-    if (!el || el === ziel) return;
-    // Große Kartenvorschau übernimmt hier — kein zusätzlicher Tooltip.
-    if (el.closest("[data-view],[data-cmd-img]")) return;
-    const text = el.getAttribute("title");
-    if (!text) return;
-    verstecke();                                    // evtl. altes Ziel sauber schließen
-    ziel = el;
-    el.dataset.aaTitle = text;
-    el.removeAttribute("title");                    // nativen Tooltip unterdrücken
+  // Zeigerposition mitführen (Maus/Stift), damit der Tooltip nach der kurzen
+  // Verzögerung dort erscheint, wo der Zeiger dann steht.
+  document.addEventListener("pointermove", e => {
+    if (e.pointerType !== "touch") { px = e.clientX; py = e.clientY; }
+  }, { passive: true });
+
+  // Pointer- statt Maus-Events: e.pointerType trennt Maus/Stift von Touch. Auf
+  // Touch gibt es kein Hover — dort bleibt der Tooltip aus (wie der native title
+  // auf dem Handy nie erschien). Sonst zeigte ihn jedes Tippen und er bliebe bis
+  // zum nächsten Tipp hängen.
+  document.addEventListener("pointerover", e => {
+    if (e.pointerType === "touch") return;
+    const hit = holeTip(e.target);
+    if (!hit || hit.el === ziel) return;
+    verstecke();                                          // altes Ziel sauber schließen
+    ziel = hit.el; text = hit.text; px = e.clientX; py = e.clientY;
+    aushaengen(ziel, hit.node, hit.text);                 // nativen Tooltip immer unterdrücken
+    // Wo schon die große Kartenvorschau greift: kein zusätzlicher Tooltip.
+    if (ziel.closest?.("[data-view],[data-cmd-img]")) return;
     timer = setTimeout(zeige, 320);
   });
 
-  document.addEventListener("mouseout", e => {
-    if (!ziel) return;
+  document.addEventListener("pointerout", e => {
+    if (e.pointerType === "touch" || !ziel) return;
     if (e.relatedTarget && ziel.contains(e.relatedTarget)) return;   // noch im Ziel
     verstecke();
   });
 
   addEventListener("scroll", verstecke, true);
   addEventListener("wheel", verstecke, { passive: true });
+  // Sicherheitsnetz: hat die Maus einen Tooltip offen und es folgt eine Berührung
+  // (Hybridgerät), schließt ihn die Berührung.
   addEventListener("touchstart", verstecke, { passive: true });
 }
 
