@@ -5925,7 +5925,6 @@ function zeigeDeckzahl() {
   const g = $("#gate-deck-count");
   if (g) { g.hidden = n == null; if (n != null) g.innerHTML = `&#127136; <b>${esc(n)}</b> ${esc(lbl)}`; }
 }
-
 async function ladeKartenzahl() {
   try { const { data, error } = await sb.rpc("total_card_count"); if (!error && data != null) CARD_COUNT = Number(data); }
   catch { /* still ignorieren — Zahl ist nur informativ */ }
