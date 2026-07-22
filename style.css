@@ -13,14 +13,14 @@ nav{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;align-items:center}
 nav button{background:transparent;border:1px solid var(--line);color:var(--dim);
            padding:7px 14px;border-radius:999px;cursor:pointer;font-size:14px}
 nav button.on{background:var(--acc);border-color:var(--acc);color:#1a1400;font-weight:600}
-/* Statistiken im Header: Nutzer und Decks */
+/* Statistiken im Header: Nutzer, Decks und Karten */
 .header-stats{display:inline-flex;align-items:center;gap:16px;flex-wrap:wrap}
-.user-count,.deck-count{display:inline-flex;align-items:center;font-size:13px;color:var(--dim);white-space:nowrap}
-.user-count b,.deck-count b{color:var(--acc);font-weight:700}
+.user-count,.deck-count,.card-count{display:inline-flex;align-items:center;font-size:13px;color:var(--dim);white-space:nowrap}
+.user-count b,.deck-count b,.card-count b{color:var(--acc);font-weight:700}
 /* Statistiken auf dem Login-Screen, mittig unter dem Logo */
 .gate-stats{text-align:center}
-.gate-usercount,.gate-deckcount{color:var(--dim);font-size:14px;margin:2px 0 12px;display:block}
-.gate-usercount b,.gate-deckcount b{color:var(--acc);font-weight:700}
+.gate-usercount,.gate-deckcount,.gate-cardcount{color:var(--dim);font-size:14px;margin:2px 0 12px;display:block}
+.gate-usercount b,.gate-deckcount b,.gate-cardcount b{color:var(--acc);font-weight:700}
 #who{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--dim);
      cursor:pointer;max-width:190px}
 #who:hover{color:var(--txt)}

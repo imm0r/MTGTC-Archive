@@ -5160,7 +5160,7 @@ function showGate(mode) {
   $("#gate").style.display = "block";
   $("#app").style.display = "none";
   $$("#gate .pane").forEach(p => p.style.display = p.dataset.pane === mode ? "block" : "none");
-  if (mode === "auth") { ladeBenutzerzahl(); ladeDeckzahl(); }   // Statistiken auf dem Login-Screen (anon)
+  if (mode === "auth") { ladeBenutzerzahl(); ladeDeckzahl(); ladeKartenzahl(); }   // Statistiken auf dem Login-Screen (anon)
 }
 function showApp() {
   $("#gate").style.display = "none";
@@ -5168,6 +5168,7 @@ function showApp() {
   renderWho();
   ladeBenutzerzahl();                         // Nutzerzahl dauerhaft im Header
   ladeDeckzahl();                             // Decks-Zahl dauerhaft im Header
+  ladeKartenzahl();                           // Karten-Zahl dauerhaft im Header
 }
 
 async function afterLogin(user) {
@@ -5870,6 +5871,7 @@ async function passwortAendern() {
 let FRIENDS = { accepted: [], incoming: [], outgoing: [] };
 let USER_COUNT = null;   // Gesamtzahl registrierter Nutzer (Anzeige unter „Freunde")
 let DECK_COUNT = null;   // Gesamtzahl erstellter Decks (Anzeige im Header)
+let CARD_COUNT = null;   // Gesamtzahl erfasster Karten (Anzeige im Header)
 
 async function ladeFreunde() {
   const { data: fr, error } = await sb.from("friendships").select("*");
@@ -5921,6 +5923,23 @@ function zeigeDeckzahl() {
   const h = $("#deck-count");
   if (h) { h.hidden = n == null; if (n != null) { h.innerHTML = `&#127136;&nbsp;<b>${esc(n)}</b>`; h.title = lbl; } }
   const g = $("#gate-deck-count");
+  if (g) { g.hidden = n == null; if (n != null) g.innerHTML = `&#127136; <b>${esc(n)}</b> ${esc(lbl)}`; }
+}
+
+/* Gesamtzahl erfasster Karten laden (SECURITY-DEFINER-RPC, da RLS nur
+   eigene Karten sichtbar macht) und anschließend im Header und auf dem
+   Login-Screen anzeigen. Anzeige ist optional — schlägt der Aufruf fehl,
+   bleibt sie einfach leer. */
+async function ladeKartenzahl() {
+  try { const { data, error } = await sb.rpc("total_card_count"); if (!error && data != null) CARD_COUNT = Number(data); }
+  catch { /* still ignorieren — Zahl ist nur informativ */ }
+  zeigeKartenzahl();
+}
+function zeigeKartenzahl() {
+  const n = CARD_COUNT != null ? String(CARD_COUNT) : null, lbl = t("stats.totalCards");
+  const h = $("#card-count");
+  if (h) { h.hidden = n == null; if (n != null) { h.innerHTML = `&#127136;&nbsp;<b>${esc(n)}</b>`; h.title = lbl; } }
+  const g = $("#gate-card-count");
   if (g) { g.hidden = n == null; if (n != null) g.innerHTML = `&#127136; <b>${esc(n)}</b> ${esc(lbl)}`; }
 }
 

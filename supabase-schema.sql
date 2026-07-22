@@ -484,6 +484,15 @@ $$;
 revoke execute on function public.total_deck_count() from public;
 grant execute on function public.total_deck_count() to anon, authenticated;
 
+-- Gesamtzahl hinzugefügter Karten (Anzeige im Header und auf dem Login-Screen).
+-- Zählt eindeutige Karten-Einträge über alle Benutzer hinweg.
+create or replace function public.total_card_count()
+returns bigint language sql stable security definer set search_path=public as $$
+  select count(*) from public.cards
+$$;
+revoke execute on function public.total_card_count() from public;
+grant execute on function public.total_card_count() to anon, authenticated;
+
 -- =====================================================================
 --  Freunde und Deck-Teilen
 --
