@@ -10,7 +10,7 @@
      dort die Größen/Ausrichtung der Symbole nachjustiert werden können. -->
 <link rel="stylesheet" href="assets/keyrune/keyrune.css?v=1">
 <link rel="stylesheet" href="assets/mana/mana.css?v=1">
-<link rel="stylesheet" href="style.css?v=155">
+<link rel="stylesheet" href="style.css?v=156">
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PGRlZnM+PHJhZGlhbEdyYWRpZW50IGlkPSJsIiBjeD0iNDAlIiBjeT0iMzYlIiByPSI3MiUiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2RjZWZmZiIvPjxzdG9wIG9mZnNldD0iMjYlIiBzdG9wLWNvbG9yPSIjNWY4OGUyIi8+PHN0b3Agb2Zmc2V0PSI2MCUiIHN0b3AtY29sb3I9IiM2ZTM3YTQiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiMxNDBmMmMiLz48L3JhZGlhbEdyYWRpZW50PjwvZGVmcz48cmVjdCB4PSIxLjIiIHk9IjEuMiIgd2lkdGg9IjI5LjYiIGhlaWdodD0iMjkuNiIgcng9IjcuNSIgZmlsbD0iIzIxMWMzZiIgc3Ryb2tlPSIjYzlhMjI3IiBzdHJva2Utd2lkdGg9IjIiLz48bGluZSB4MT0iMTgiIHkxPSIxNy41IiB4Mj0iMjYiIHkyPSIyNS41IiBzdHJva2U9IiNlM2JmNGEiIHN0cm9rZS13aWR0aD0iMy42IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48Y2lyY2xlIGN4PSIxNCIgY3k9IjE0IiByPSI4IiBmaWxsPSJ1cmwoI2wpIiBzdHJva2U9IiNjOWEyMjciIHN0cm9rZS13aWR0aD0iMi40Ii8+PHBhdGggZD0iTTE0IDE0IEMxMSAxMS42IDExLjQgNy44IDE1IDciIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2UyZWVmZiIgc3Ryb2tlLXdpZHRoPSIxLjMiIG9wYWNpdHk9Ii44NSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGNpcmNsZSBjeD0iMTQiIGN5PSIxNCIgcj0iMS43IiBmaWxsPSIjZjJmOGZmIi8+PC9zdmc+">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
@@ -103,16 +103,28 @@
   <div class="card">
     <div class="row" style="margin-bottom:12px">
       <div style="flex:2"><label data-i18n="coll.search">Suche</label><input type="text" id="q" data-i18n-ph="coll.searchPh" placeholder="Name oder Set…"></div>
-      <div><label data-i18n="coll.set">Set</label><select id="f-set"><option value="" data-i18n="coll.all">Alle</option></select></div>
+      <div><label data-i18n="coll.set">Set</label>
+        <!-- Eigenes Set-Dropdown: ein natives <option> kann das Keyrune-Icon nicht
+             tragen. Aufbau/Verhalten wie das Sprach-Dropdown (Trigger + .open-Menü);
+             die Einträge füllt renderSetFilter(), Außenklick schließt (wireApp). -->
+        <div class="set-select" id="set-select">
+          <button type="button" class="set-trigger" id="set-trigger" aria-haspopup="listbox" aria-expanded="false">
+            <span class="set-trigger-inner" id="set-trigger-inner">Alle</span>
+            <span class="set-caret" aria-hidden="true">&#9662;</span>
+          </button>
+          <ul class="set-menu" id="set-menu" role="listbox"></ul>
+        </div>
+      </div>
       <div><label data-i18n="coll.finish">Ausführung</label><select id="f-foil">
         <option value="" data-i18n="coll.all">Alle</option><option value="1" data-i18n="coll.onlyFoil">Nur Foil</option><option value="0" data-i18n="coll.onlyNormal">Nur Normal</option></select></div>
-      <div><label data-i18n="coll.type">Typ</label><select id="f-type"><option value="" data-i18n="coll.all">Alle</option></select></div>
       <div style="flex:none"><button class="btn ghost" id="upd" data-i18n="coll.updatePrices">Preise aktualisieren</button></div>
       <div style="flex:none"><button class="btn ghost" id="sell-open">&#127991; Verkaufsliste (0)</button></div>
       <div style="flex:none"><button class="btn ghost" id="coll-combos" data-i18n="combo.collBtn" data-i18n-title="combo.collTitle">Deine Combos</button></div>
     </div>
-    <!-- Zweite Filterzeile: Farbidentität. Genau die angehakten Farben ergeben
-         die gesuchte Identität (exakte Übereinstimmung). Beschriftung = Farbsymbol. -->
+    <!-- Zweite Filterzeile: Farbidentität und Typ. Farben ergeben genau die
+         gesuchte Identität (exakte Übereinstimmung); die Typen filtern als
+         Mehrfachauswahl (eine Karte reicht, wenn sie einen der angehakten Typen
+         trägt). Beschriftung jeweils als Symbol, wie bei den Farben. -->
     <div class="row ci-row" style="margin-bottom:12px">
       <div style="flex:none">
         <label data-i18n="coll.colorId">Farbidentität</label>
@@ -123,6 +135,19 @@
           <label class="ci-box" data-i18n-title="color.R"><input type="checkbox" data-ci="R"><span class="ci-sym"><i class="ms ms-r ms-cost" aria-hidden="true"></i></span></label>
           <label class="ci-box" data-i18n-title="color.G"><input type="checkbox" data-ci="G"><span class="ci-sym"><i class="ms ms-g ms-cost" aria-hidden="true"></i></span></label>
           <label class="ci-box" data-i18n-title="color.C"><input type="checkbox" data-ci="C"><span class="ci-sym"><i class="ms ms-c ms-cost" aria-hidden="true"></i></span></label>
+        </div>
+      </div>
+      <div style="flex:none">
+        <label data-i18n="coll.type">Typ</label>
+        <div class="ci-filter" id="type-filter">
+          <label class="ci-box" data-i18n-title="type.creature"><input type="checkbox" data-typ="Creature"><span class="ci-sym"><i class="ms ms-creature" aria-hidden="true"></i></span></label>
+          <label class="ci-box" data-i18n-title="type.land"><input type="checkbox" data-typ="Land"><span class="ci-sym"><i class="ms ms-land" aria-hidden="true"></i></span></label>
+          <label class="ci-box" data-i18n-title="type.instant"><input type="checkbox" data-typ="Instant"><span class="ci-sym"><i class="ms ms-instant" aria-hidden="true"></i></span></label>
+          <label class="ci-box" data-i18n-title="type.sorcery"><input type="checkbox" data-typ="Sorcery"><span class="ci-sym"><i class="ms ms-sorcery" aria-hidden="true"></i></span></label>
+          <label class="ci-box" data-i18n-title="type.artifact"><input type="checkbox" data-typ="Artifact"><span class="ci-sym"><i class="ms ms-artifact" aria-hidden="true"></i></span></label>
+          <label class="ci-box" data-i18n-title="type.enchantment"><input type="checkbox" data-typ="Enchantment"><span class="ci-sym"><i class="ms ms-enchantment" aria-hidden="true"></i></span></label>
+          <label class="ci-box" data-i18n-title="type.planeswalker"><input type="checkbox" data-typ="Planeswalker"><span class="ci-sym"><i class="ms ms-planeswalker" aria-hidden="true"></i></span></label>
+          <label class="ci-box" data-i18n-title="type.battle"><input type="checkbox" data-typ="Battle"><span class="ci-sym"><i class="ms ms-battle" aria-hidden="true"></i></span></label>
         </div>
       </div>
     </div>
@@ -324,6 +349,6 @@
 <div class="toast" id="toast"></div>
 
 <script src="i18n.js?v=154"></script>
-<script src="app.js?v=155"></script>
+<script src="app.js?v=156"></script>
 </body>
 </html>

@@ -550,6 +550,10 @@ td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000
   border-radius:8px;border:1px solid var(--line);background:var(--panel2);opacity:.5;
   transition:opacity .15s,border-color .15s,box-shadow .15s}
 .ci-sym .ms{font-size:15px;margin:0}
+/* Typ-Symbole tragen keinen ms-cost-Kreis (Kartentypen haben keine Farbe),
+   sind als reine Glyphen aber feiner gezeichnet — etwas größer lesen sie sich
+   in den 30-px-Kästchen besser. */
+.ci-sym .ms:not(.ms-cost){font-size:18px}
 .ci-box:hover .ci-sym{opacity:.85}
 .ci-box input:checked ~ .ci-sym{opacity:1;border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
 .ci-box input:focus-visible ~ .ci-sym{box-shadow:0 0 0 2px var(--acc)}
@@ -561,12 +565,39 @@ td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000
    Sortierung springen: 1% zwingt die Tabelle, sie auf den Inhalt zu schrumpfen. */
 .mana-spalte{width:1%}
 
-/* Set-Symbol (Keyrune-Font, assets/keyrune): steht vor dem Setnamen in Tabelle
-   und Detailkopf, gefärbt nach Seltenheit (Farbe kommt inline aus RARITY,
-   siehe setSymbol). Größe = Zeilenschrift; der rechte Abstand trennt Symbol und
-   Name. In der dimmen Detailzeile hebt die Rarity-Farbe das Set leicht hervor. */
+/* Set-Symbol (Keyrune-Font, assets/keyrune): steht vor dem Setnamen bzw. -code,
+   gefärbt nach Seltenheit (Farbe kommt inline aus RARITY, siehe setSymbol).
+   Größe = Zeilenschrift; der rechte Abstand trennt Symbol und Text. In der
+   dimmen Detailzeile hebt die Rarity-Farbe das Set leicht hervor. */
 .ss{margin-right:.35em;vertical-align:-0.05em}
 .hint .ss{margin-right:.3em}
+/* Sammlungsspalte SET: nur Icon + Setcode (der volle Name steht im title und
+   erscheint beim Überfahren). Nicht umbrechen, damit Icon und Code beisammen
+   bleiben; die Spalte bleibt so schmal wie ihr Inhalt. */
+.set-spalte{white-space:nowrap;width:1%}
+
+/* Eigenes Set-Dropdown im Sammlungsfilter — wie das Sprach-Dropdown weiter unten,
+   nur schmaler (Setcodes sind kurz). Trägt das Keyrune-Icon, das ein natives
+   <option> nicht kann. Öffnen/Schließen über .open; Außenklick schließt (app.js). */
+.set-select{position:relative;min-width:130px}
+.set-trigger{display:flex;align-items:center;gap:8px;width:100%;text-align:left;cursor:pointer;
+  background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:9px 10px;border-radius:8px}
+.set-trigger:hover{border-color:var(--acc)}
+.set-trigger-inner{flex:1;display:flex;align-items:center;gap:7px;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.set-caret{color:var(--dim);font-size:12px;transition:transform .15s}
+.set-select.open .set-caret{transform:rotate(180deg)}
+.set-menu{position:absolute;z-index:40;left:0;top:100%;margin:3px 0 0;padding:4px;list-style:none;
+  display:none;min-width:100%;max-height:320px;overflow:auto;
+  background:var(--panel2);border:1px solid var(--acc);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.set-select.open .set-menu{display:block}
+.set-item{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:6px;cursor:pointer;
+  font-size:14px;white-space:nowrap}
+.set-item.on{font-weight:600;color:var(--acc)}
+.set-item:hover{background:var(--acc);color:#1a1400}
+/* Set-Icon in Trigger und Liste neutral (nicht nach Seltenheit gefärbt) — ein
+   Set enthält alle Raritäten. gap trennt schon, deshalb keine eigene Marge. */
+.set-item .ss,.set-trigger-inner .ss{margin-right:0}
 
 /* Sprachflagge. display:inline-block gegen dieselbe Falle wie bei den
    Manasymbolen: "td img" gilt zwar nur für img, aber SVG erbt hier nichts —

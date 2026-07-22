@@ -1201,9 +1201,17 @@ function farbidentPasst(c, sel) {
 /* Aktuell angehakte Farbidentitäts-Felder (W/U/B/R/G/C). */
 const ciAuswahl = () => $$('#ci-filter input[data-ci]:checked').map(i => i.dataset.ci);
 
+/* Angehakte Kartentypen des Typ-Filters (englische Schlüssel wie in TYPEN). */
+const typAuswahl = () => $$('#type-filter input[data-typ]:checked').map(i => i.dataset.typ);
+
+/* Gewähltes Set des eigenen Set-Dropdowns ("" = Alle). Kein natives <select>,
+   deshalb hält eine Variable den Zustand; renderSetFilter zeichnet ihn. */
+let setFilter = "";
+
 function filtered() {
   const q = $("#q").value.trim().toLowerCase();
-  const fs = $("#f-set").value, ff = $("#f-foil").value, ft = $("#f-type").value;
+  const ff = $("#f-foil").value;
+  const typen = typAuswahl();
   const ci = ciAuswahl();
   return CARDS.filter(c =>
     // qty 0 = „im Deck, aber nicht besessen" (aus einem Deck-Import). Gehört
@@ -1211,9 +1219,11 @@ function filtered() {
     c.qty > 0 &&
     (!q || c.name.toLowerCase().includes(q) || c.disp.toLowerCase().includes(q) ||
            (c.set_name || "").toLowerCase().includes(q)) &&
-    (!fs || c.set === fs) &&
+    (!setFilter || c.set === setFilter) &&
     (ff === "" || String(c.foil ? 1 : 0) === ff) &&
-    (!ft || typMatch(c.type_line, ft)) &&
+    // Typen als ODER-Mehrfachauswahl: eine Karte reicht, wenn sie einen der
+    // angehakten Typen trägt ("Artifact Creature" passt zu Artefakt UND Kreatur).
+    (!typen.length || typen.some(en => typMatch(c.type_line, en))) &&
     (!ci.length || farbidentPasst(c, ci))
   ).sort((a, b) => cmpWert(sortWert(sortKey, a), sortWert(sortKey, b), sortDir));
 }
@@ -1383,8 +1393,8 @@ function cardRow(c, o = {}) {
             ${c.foil ? '<span class="pill foil">Foil</span> ' : ""}#${esc(c.cn)}</div></td>
       <td class="num mana-spalte" title="${c.mana_cost == null ? esc(t("row.manaNone"))
         : esc(t("row.manaValue", { n: c.cmc ?? "?" }))}">${manaHtml(c.mana_cost)}</td>
-      <td class="hide-s">${setSymbol(c.set, c.rarity)}${esc(c.set_name || c.set || "")}
-          ${c.rarity ? `<div style="margin-top:3px">${rarityPill(c.rarity)}</div>` : ""}</td>
+      <td class="hide-s set-spalte" title="${esc(c.set_name || c.set || "")}">${
+        setSymbol(c.set, c.rarity)}${esc((c.set || "").toUpperCase())}</td>
       <td class="hide-s">${langHtml(c.lang)}</td>
       ${imDeck ? "" : `<td class="hide-s">${condBadge(c.condition)}</td>
       <td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap">${esc(datShort(c.released))}</td>
@@ -1738,6 +1748,25 @@ function seitenGroesse() {
   return Number.isFinite(n) && n >= 0 ? n : 50;
 }
 
+/* Zeichnet das eigene Set-Dropdown neu: „Alle" plus jedes besessene Set, jeweils
+   mit neutralem Keyrune-Icon und Setcode. Der aktuelle Filter (setFilter) bleibt
+   erhalten; zeigt die Sammlung das gewählte Set nicht mehr (letztes Exemplar
+   verkauft/gelöscht), fällt er auf „Alle" zurück. Trigger zeigt die Auswahl.
+   Klicks liegen delegiert auf #set-menu (in wireApp), deshalb genügt hier das
+   Neusetzen des innerHTML. */
+function renderSetFilter(besessen) {
+  const sets = [...new Set(besessen.map(c => c.set))].filter(Boolean).sort();
+  if (setFilter && !sets.includes(setFilter)) setFilter = "";
+  const eintrag = (code, label) =>
+    `<li role="option" class="set-item${code === setFilter ? " on" : ""}" data-set="${esc(code)}"
+         aria-selected="${code === setFilter}">${code ? setIcon(code) : ""}<span>${esc(label)}</span></li>`;
+  $("#set-menu").innerHTML =
+    eintrag("", t("coll.all")) + sets.map(s => eintrag(s, s.toUpperCase())).join("");
+  $("#set-trigger-inner").innerHTML = setFilter
+    ? `${setIcon(setFilter)}<span>${esc(setFilter.toUpperCase())}</span>`
+    : esc(t("coll.all"));
+}
+
 function renderCollection() {
   const rows = filtered();
   // Das Dashboard sitzt jetzt in einer eigenen Ansicht (renderDashboard) und
@@ -1745,14 +1774,7 @@ function renderCollection() {
   // sind nie Teil der Sammlung.
   const besessen = CARDS.filter(c => c.qty > 0);
 
-  const sets = [...new Set(besessen.map(c => c.set))].filter(Boolean).sort();
-  const cur = $("#f-set").value;
-  $("#f-set").innerHTML = `<option value="">${esc(t("coll.all"))}</option>` +
-    sets.map(s => `<option value="${esc(s)}"${s === cur ? " selected" : ""}>${esc(s)}</option>`).join("");
-  // Typ-Filter: feste Liste mit lokalisierten Etiketten, Auswahl bleibt erhalten.
-  const curTyp = $("#f-type").value;
-  $("#f-type").innerHTML = `<option value="">${esc(t("coll.all"))}</option>` +
-    TYPEN.map(([en]) => `<option value="${esc(en)}"${en === curTyp ? " selected" : ""}>${esc(typLabel(en))}</option>`).join("");
+  renderSetFilter(besessen);
 
   $("#coll-empty").textContent = besessen.length
     ? t("coll.emptyFilter")
@@ -2034,6 +2056,15 @@ function setSymbol(code, rarity) {
   if (!KEYRUNE_SETS.has(c)) return "";
   const farbe = (RARITY[rarity] || {}).farbe || "var(--dim)";
   return `<i class="ss ss-${c} ss-fw" style="color:${farbe}" aria-hidden="true"></i>`;
+}
+
+/* Dasselbe Glyph, aber neutral (ohne Seltenheitsfarbe) — für Stellen, an denen
+   kein einzelnes Rarity gemeint ist: das Set-Dropdown listet ganze Sets, die
+   alle Raritäten enthalten. currentColor greift, damit es beim Hover mitfärbt. */
+function setIcon(code) {
+  const c = (code || "").toLowerCase();
+  if (!KEYRUNE_SETS.has(c)) return "";
+  return `<i class="ss ss-${c} ss-fw" aria-hidden="true"></i>`;
 }
 
 /* ----------------------------------------------------- Sprache ------- */
@@ -7250,6 +7281,11 @@ function wireApp() {
     if (m && !m.contains(e.target)) m.classList.remove("open");
     const ls = $("#lang-select");
     if (ls && !ls.contains(e.target)) ls.classList.remove("open");
+    const ss = $("#set-select");
+    if (ss && !ss.contains(e.target)) {
+      ss.classList.remove("open");
+      $("#set-trigger")?.setAttribute("aria-expanded", "false");
+    }
   });
 
   // „Als Wunschkarte ins Deck" bei Synergie-/Analyse-Vorschlägen. Delegation, weil
@@ -7296,11 +7332,26 @@ function wireApp() {
 
   // Suche/Filter ändern die Treffermenge — immer zurück auf Seite 1.
   $("#q").oninput = () => { collPage = 0; renderCollection(); };
-  $("#f-set").onchange = () => { collPage = 0; renderCollection(); };
   $("#f-foil").onchange = () => { collPage = 0; renderCollection(); };
-  $("#f-type").onchange = () => { collPage = 0; renderCollection(); };
-  // Farbidentitäts-Filter: jede Checkbox zeichnet die Sammlung neu.
-  $$('#ci-filter input[data-ci]').forEach(inp =>
+  // Eigenes Set-Dropdown: Trigger klappt auf/zu, Klick auf einen Eintrag setzt
+  // den Filter. Klicks liegen delegiert auf dem Menü, weil renderSetFilter die
+  // Einträge neu baut. Außenklick schließt (Handler weiter unten).
+  const setSel = $("#set-select");
+  $("#set-trigger").onclick = ev => {
+    ev.stopPropagation();
+    const offen = setSel.classList.toggle("open");
+    $("#set-trigger").setAttribute("aria-expanded", offen);
+  };
+  $("#set-menu").onclick = ev => {
+    const li = ev.target.closest("[data-set]");
+    if (!li) return;
+    setFilter = li.dataset.set;
+    setSel.classList.remove("open");
+    $("#set-trigger").setAttribute("aria-expanded", "false");
+    collPage = 0; renderCollection();
+  };
+  // Farbidentitäts- und Typ-Filter: jede Checkbox zeichnet die Sammlung neu.
+  $$('#ci-filter input[data-ci], #type-filter input[data-typ]').forEach(inp =>
     inp.onchange = () => { collPage = 0; renderCollection(); });
   $("#upd").onclick = updatePrices;
 
