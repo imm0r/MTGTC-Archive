@@ -7620,7 +7620,11 @@ function onLangChange() {
 
 function renderStatus() {
   const el = $("#v-status");
-  if (!el) return;
+  if (!el) {
+    console.error("❌ v-status element not found!");
+    return;
+  }
+  console.log("✓ renderStatus() called, el found:", el);
 
   const endpoints = [
     { id: "app", name: "Arcanum Archive App", url: "https://imm0r.github.io/MTGTC-Archive/" },
@@ -7643,7 +7647,10 @@ function renderStatus() {
 
   el.innerHTML = `
     <div class="card">
-      <h3 style="margin-top: 0;">🔍 Site Status</h3>
+      <h3 style="margin-top: 0; color: green;">✓ Site Status Loaded Successfully</h3>
+      <p style="color: green; font-weight: bold;">If you see this text, renderStatus() is working!</p>
+
+      <h3 style="margin-top: 20px;">🔍 Site Status</h3>
       <p style="margin: 0 0 16px 0; color: #666; font-size: 0.95em;">Echtzeit-Überwachung der Arcanum Archive Infrastruktur</p>
 
       <div style="display: flex; flex-direction: column;">
