@@ -902,3 +902,53 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px}
 .regel-item-body{padding:4px 14px 14px}
 .regel-item-body .regel-frage{margin-top:6px}
 .regel-actions{margin-top:12px}
+
+/* ==================== Globaler Tooltip ==============================
+   Löst die nativen title-Tooltips ab: die lassen sich weder umplatzieren (sie
+   erschienen unter dem Mauszeiger) noch gestalten. app.js fängt jeden title ab
+   (initTooltip) und zeigt stattdessen dieses Feld — ÜBER dem Element, nie unter
+   dem Zeiger. Optik von unserem Poeformance-Tooltip übernommen, umgefärbt auf
+   die Arcanum-Palette (Gold --acc/--acc2). */
+
+/* Der Winkel des laufenden Lichts. Als @property registriert, sonst
+   interpoliert die Animation den Custom-Wert nicht (Kanten statt Lauf).
+   Fehlt @property im Browser, steht das Licht still — unkritisch. */
+@property --aa-tip-angle { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+
+.aa-tip{
+  position:fixed; left:0; top:0; z-index:9999; max-width:280px;
+  padding:7px 11px; border-radius:9px;
+  background:rgba(27,29,39,.97);                 /* --panel, leicht transluzent */
+  color:var(--txt); font-size:12.5px; line-height:1.4; font-weight:500;
+  border:1px solid rgba(201,162,39,.22);         /* dezenter Basis-Rahmen */
+  box-shadow:0 10px 30px rgba(0,0,0,.55), 0 0 14px rgba(201,162,39,.10);
+  -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px);
+  white-space:normal; overflow-wrap:break-word; text-align:left;
+  pointer-events:none; opacity:0; transform:translateY(4px) scale(.98);
+  transition:opacity .13s ease, transform .13s ease;
+}
+.aa-tip.on{ opacity:1; transform:translateY(0) scale(1); }
+
+/* Traveling frame light: rotierender Gold-Bogen, per Masken-XOR auf einen
+   1px-Ring am Rahmen beschränkt — ein weicher Streifen läuft ums Feld.
+   (Aus dem Poeformance-Schnipsel; Creme/Gold auf Arcanum-Gold gebracht.) */
+.aa-tip::after{
+  content:""; position:absolute; inset:0; display:block; border-radius:9px;
+  background:conic-gradient(from var(--aa-tip-angle),
+    transparent 0deg 300deg,
+    rgba(240,225,166,.95) 338deg,
+    rgba(201,162,39,.55) 350deg,
+    transparent 360deg);
+  padding:1px;
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor; mask-composite:exclude;
+  pointer-events:none;
+  animation:aaTipFrameSweep 3s linear infinite;
+}
+@keyframes aaTipFrameSweep{ to{ --aa-tip-angle:360deg; } }
+
+/* Wer Bewegung reduziert haben will, bekommt das Licht als ruhigen Rahmen. */
+@media (prefers-reduced-motion: reduce){
+  .aa-tip::after{ animation:none; }
+}
