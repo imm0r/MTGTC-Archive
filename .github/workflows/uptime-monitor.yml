@@ -1,0 +1,63 @@
+name: Uptime Monitor
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  uptime-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Arcanum Archive App
+        id: app_check
+        run: |
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -m 10 "https://imm0r.github.io/MTGTC-Archive/")
+          echo "app_status=$HTTP_CODE" >> $GITHUB_OUTPUT
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ App returned HTTP $HTTP_CODE"
+            exit 1
+          fi
+          echo "✅ App is healthy"
+
+      - name: Check Keyrune Font
+        id: keyrune_check
+        run: |
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -m 10 "https://imm0r.github.io/MTGTC-Archive/assets/keyrune/keyrune.woff2")
+          echo "keyrune_status=$HTTP_CODE" >> $GITHUB_OUTPUT
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Keyrune font returned HTTP $HTTP_CODE"
+            exit 1
+          fi
+          echo "✅ Keyrune font is healthy"
+
+      - name: Check Mana Font
+        id: mana_check
+        run: |
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -m 10 "https://imm0r.github.io/MTGTC-Archive/assets/mana/mana.woff2")
+          echo "mana_status=$HTTP_CODE" >> $GITHUB_OUTPUT
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Mana font returned HTTP $HTTP_CODE"
+            exit 1
+          fi
+          echo "✅ Mana font is healthy"
+
+      - name: Create uptime report
+        if: always()
+        run: |
+          echo "# Uptime Check Report" >> $GITHUB_STEP_SUMMARY
+          echo "**App Status:** HTTP ${{ steps.app_check.outputs.app_status }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Keyrune Font:** HTTP ${{ steps.keyrune_check.outputs.keyrune_status }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Mana Font:** HTTP ${{ steps.mana_check.outputs.mana_status }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Check Time:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+
+      - name: Report status check failure
+        if: failure()
+        run: |
+          echo "One or more services are down. Check the outputs above for details."
+          exit 1

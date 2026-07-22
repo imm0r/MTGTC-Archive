@@ -1,0 +1,74 @@
+owner: imm0r
+repo: MTGTC-Archive-Status
+userAgent: Upptime (https://upptime.js.org)
+commitMessages:
+  commitAuthorName: Upptime Bot
+  commitAuthorEmail: 73464110+upptime@users.noreply.github.com
+commitAuthor:
+  name: Upptime Bot
+  email: 73464110+upptime@users.noreply.github.com
+  avatar: https://avatars.githubusercontent.com/u/73464110?v=4
+assignees:
+  - imm0r
+timezone: Europe/Berlin
+checks:
+  domains:
+    enabled: true
+    interval: 300
+status-website:
+  cname: status.arcanum-archive.de
+  logoUrl: https://raw.githubusercontent.com/imm0r/MTGTC-Archive/main/logo-header.png
+  name: Arcanum Archive Status
+  introTitle: "Arcanum Archive Uptime Monitor"
+  introMessage: Status page for Arcanum Archive — Magic card collection tracker
+  navbar:
+    - title: Status
+      href: /
+    - title: GitHub
+      href: https://github.com/imm0r/MTGTC-Archive
+    - title: Arcanum Archive
+      href: https://imm0r.github.io/MTGTC-Archive/
+  metaTags:
+    - name: "robots"
+      content: "noindex"
+sites:
+  - name: Arcanum Archive (App)
+    url: https://imm0r.github.io/MTGTC-Archive/
+    icon: https://raw.githubusercontent.com/imm0r/MTGTC-Archive/main/logo-header.png
+    expectedStatusCodes:
+      - 200
+    timeout: 10000
+    headers:
+      - header: User-Agent
+        value: Upptime
+  - name: Arcanum Archive (Keyrune Font)
+    url: https://imm0r.github.io/MTGTC-Archive/assets/keyrune/keyrune.woff2
+    icon: https://raw.githubusercontent.com/imm0r/MTGTC-Archive/main/logo-header.png
+    expectedStatusCodes:
+      - 200
+    timeout: 10000
+  - name: Arcanum Archive (Mana Font)
+    url: https://imm0r.github.io/MTGTC-Archive/assets/mana/mana.woff2
+    icon: https://raw.githubusercontent.com/imm0r/MTGTC-Archive/main/logo-header.png
+    expectedStatusCodes:
+      - 200
+    timeout: 10000
+  - name: Supabase API (Auth)
+    url: https://api.supabase.co/health
+    icon: https://supabase.com/favicon.ico
+    expectedStatusCodes:
+      - 200
+    timeout: 10000
+responseTime:
+  - url: https://imm0r.github.io/MTGTC-Archive/
+    expectedTime: 3000
+  - url: https://imm0r.github.io/MTGTC-Archive/assets/keyrune/keyrune.woff2
+    expectedTime: 2000
+  - url: https://imm0r.github.io/MTGTC-Archive/assets/mana/mana.woff2
+    expectedTime: 2000
+  - url: https://api.supabase.co/health
+    expectedTime: 1000
+notifications:
+  - type: github
+    addCreatedLabel: true
+    addClosedLabel: true
