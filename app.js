@@ -1776,6 +1776,14 @@ function renderCollection() {
 
   renderSetFilter(besessen);
 
+  // Trefferzähler: wie viele Zeilen die aktuellen Filter zeigen, von allen
+  // besessenen. Ohne Filter nur die Gesamtzahl (kein „318 von 318"). Die
+  // hervorgehobene Zahl baut die CSS (.coll-count b).
+  const cc = $("#coll-count");
+  if (cc) cc.innerHTML = rows.length === besessen.length
+    ? t("coll.countAll", { total: `<b>${besessen.length}</b>` })
+    : t("coll.count", { n: `<b>${rows.length}</b>`, total: besessen.length });
+
   $("#coll-empty").textContent = besessen.length
     ? t("coll.emptyFilter")
     : t("coll.empty");
@@ -2051,20 +2059,36 @@ const KEYRUNE_SETS = new Set(`
   znr
 `.trim().split(/\s+/));
 
-function setSymbol(code, rarity) {
+/* Beste Keyrune-Klasse zu einem Setcode, oder null. Erst der Code selbst; kennt
+   Keyrune ihn nicht, wird ein führendes p/t (Promo- bzw. Token-Ausgabe) abgeworfen
+   und das Stammset probiert: PTHS → THS, TMKM → MKM. So erben Sonderausgaben das
+   Symbol ihres Sets. Abgeworfen wird NUR, wenn der volle Code unbekannt ist —
+   echte p-Sets (por, plc, pca …) behalten damit ihr eigenes Glyph. */
+function keyruneKlasse(code) {
   const c = (code || "").toLowerCase();
-  if (!KEYRUNE_SETS.has(c)) return "";
+  if (KEYRUNE_SETS.has(c)) return c;
+  if ((c[0] === "p" || c[0] === "t") && KEYRUNE_SETS.has(c.slice(1))) return c.slice(1);
+  return null;
+}
+
+/* Set-Symbol für die Sammlungsspalte, gefärbt nach Seltenheit. Findet sich kein
+   passendes Glyph (auch nicht über das Stammset), tritt das Keyrune-Standard-
+   zeichen (Kreis-M) als Platzhalter ein — WICHTIG: immer noch in der Rarity-Farbe,
+   denn die Seltenheit soll in jedem Fall an der Farbe ablesbar bleiben. */
+function setSymbol(code, rarity) {
   const farbe = (RARITY[rarity] || {}).farbe || "var(--dim)";
-  return `<i class="ss ss-${c} ss-fw" style="color:${farbe}" aria-hidden="true"></i>`;
+  const kl = keyruneKlasse(code);
+  return `<i class="ss${kl ? ` ss-${kl}` : ""} ss-fw" style="color:${farbe}" aria-hidden="true"></i>`;
 }
 
 /* Dasselbe Glyph, aber neutral (ohne Seltenheitsfarbe) — für Stellen, an denen
    kein einzelnes Rarity gemeint ist: das Set-Dropdown listet ganze Sets, die
-   alle Raritäten enthalten. currentColor greift, damit es beim Hover mitfärbt. */
+   alle Raritäten enthalten. currentColor greift, damit es beim Hover mitfärbt.
+   Auch hier das Standardzeichen als Rückfall, damit die Liste bündig bleibt. */
 function setIcon(code) {
-  const c = (code || "").toLowerCase();
-  if (!KEYRUNE_SETS.has(c)) return "";
-  return `<i class="ss ss-${c} ss-fw" aria-hidden="true"></i>`;
+  if (!code) return "";
+  const kl = keyruneKlasse(code);
+  return `<i class="ss${kl ? ` ss-${kl}` : ""} ss-fw" aria-hidden="true"></i>`;
 }
 
 /* ----------------------------------------------------- Sprache ------- */

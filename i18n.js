@@ -2129,31 +2129,36 @@ Object.assign(I18N.it, {
 
 /* ---- Teil 19: Kartentypen (Sammlungsfilter + Deck-Kategorien) ---- */
 Object.assign(I18N.de, {
-  "coll.type": "Typ",
+  "coll.type": "Kartentyp",
+  "coll.count": "{n} von {total} Karten", "coll.countAll": "{total} Karten",
   "type.creature": "Kreaturen", "type.land": "Länder", "type.instant": "Spontanzauber",
   "type.sorcery": "Hexereien", "type.artifact": "Artefakte", "type.enchantment": "Verzauberungen",
   "type.planeswalker": "Planeswalker", "type.battle": "Schlachten", "type.other": "Sonstige",
 });
 Object.assign(I18N.en, {
-  "coll.type": "Type",
+  "coll.type": "Card type",
+  "coll.count": "{n} of {total} cards", "coll.countAll": "{total} cards",
   "type.creature": "Creatures", "type.land": "Lands", "type.instant": "Instants",
   "type.sorcery": "Sorceries", "type.artifact": "Artifacts", "type.enchantment": "Enchantments",
   "type.planeswalker": "Planeswalkers", "type.battle": "Battles", "type.other": "Other",
 });
 Object.assign(I18N.fr, {
-  "coll.type": "Type",
+  "coll.type": "Type de carte",
+  "coll.count": "{n} sur {total} cartes", "coll.countAll": "{total} cartes",
   "type.creature": "Créatures", "type.land": "Terrains", "type.instant": "Éphémères",
   "type.sorcery": "Rituels", "type.artifact": "Artefacts", "type.enchantment": "Enchantements",
   "type.planeswalker": "Planeswalkers", "type.battle": "Batailles", "type.other": "Autres",
 });
 Object.assign(I18N.es, {
-  "coll.type": "Tipo",
+  "coll.type": "Tipo de carta",
+  "coll.count": "{n} de {total} cartas", "coll.countAll": "{total} cartas",
   "type.creature": "Criaturas", "type.land": "Tierras", "type.instant": "Instantáneos",
   "type.sorcery": "Conjuros", "type.artifact": "Artefactos", "type.enchantment": "Encantamientos",
   "type.planeswalker": "Planeswalkers", "type.battle": "Batallas", "type.other": "Otros",
 });
 Object.assign(I18N.it, {
-  "coll.type": "Tipo",
+  "coll.type": "Tipo di carta",
+  "coll.count": "{n} di {total} carte", "coll.countAll": "{total} carte",
   "type.creature": "Creature", "type.land": "Terre", "type.instant": "Istantanei",
   "type.sorcery": "Stregonerie", "type.artifact": "Artefatti", "type.enchantment": "Incantesimi",
   "type.planeswalker": "Planeswalker", "type.battle": "Battaglie", "type.other": "Altro",
