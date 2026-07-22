@@ -7285,7 +7285,94 @@ function onSessionChange(payload) {
   }
 }
 
+/* ---------------------------------------------------- Tooltip -------- */
+/* Globaler Tooltip statt der nativen title-Tooltips. Native lassen sich weder
+   umplatzieren (sie sitzen unter dem Zeiger) noch gestalten. Deshalb wird beim
+   Überfahren der title entfernt (das unterdrückt den nativen Tooltip),
+   zwischengespeichert und stattdessen unser Feld ÜBER dem Element gezeigt.
+
+   Delegiert am document — überlebt jedes Neuzeichnen der Tabellen. Elemente mit
+   großer Hover-Vorschau (data-view / data-cmd-img) bleiben außen vor, sonst
+   stünde neben der Kartenvorschau noch ein kleiner Tooltip. In Ruhe bleibt der
+   title am Element (für Screenreader); nur während des Überfahrens ist er kurz
+   ausgehängt. */
+function initTooltip() {
+  if (document.getElementById("aa-tip")) return;
+  const tip = document.createElement("div");
+  tip.className = "aa-tip";
+  tip.id = "aa-tip";
+  tip.setAttribute("role", "tooltip");
+  document.body.appendChild(tip);
+
+  let ziel = null, timer = 0, raf = 0;
+
+  const platziere = () => {
+    if (!ziel || !ziel.isConnected) return verstecke();
+    const r = ziel.getBoundingClientRect();
+    const tw = tip.offsetWidth, th = tip.offsetHeight, rand = 6, lueck = 8;
+    let links = r.left + r.width / 2 - tw / 2;
+    links = Math.max(rand, Math.min(links, innerWidth - tw - rand));
+    let oben = r.top - th - lueck;                 // standardmäßig ÜBER dem Element
+    const drunter = oben < rand;
+    if (drunter) oben = r.bottom + lueck;          // oben kein Platz → darunter
+    tip.classList.toggle("below", drunter);
+    tip.style.left = Math.round(links) + "px";
+    tip.style.top = Math.round(Math.max(rand, oben)) + "px";
+  };
+
+  const zeige = () => {
+    if (!ziel || !ziel.isConnected) return;
+    tip.textContent = ziel.dataset.aaTitle || "";
+    tip.classList.add("on");
+    platziere();
+    cancelAnimationFrame(raf);
+    const tick = () => {                            // Ziel verschwindet (Neuzeichnen) → schließen
+      if (!ziel) return;
+      if (!ziel.isConnected) return verstecke();
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+  };
+
+  function verstecke() {
+    clearTimeout(timer); cancelAnimationFrame(raf);
+    tip.classList.remove("on");
+    if (ziel && ziel.dataset.aaTitle != null) {     // title zurückgeben …
+      // … außer der Code hat ihm zwischenzeitlich selbst einen neuen gesetzt
+      // (z. B. der Auf-/Zuklappen-Knopf beim Klick) — den nicht überschreiben.
+      if (!ziel.hasAttribute("title")) ziel.setAttribute("title", ziel.dataset.aaTitle);
+      delete ziel.dataset.aaTitle;
+    }
+    ziel = null;
+  }
+
+  document.addEventListener("mouseover", e => {
+    const el = e.target.closest?.("[title]");
+    if (!el || el === ziel) return;
+    // Große Kartenvorschau übernimmt hier — kein zusätzlicher Tooltip.
+    if (el.closest("[data-view],[data-cmd-img]")) return;
+    const text = el.getAttribute("title");
+    if (!text) return;
+    verstecke();                                    // evtl. altes Ziel sauber schließen
+    ziel = el;
+    el.dataset.aaTitle = text;
+    el.removeAttribute("title");                    // nativen Tooltip unterdrücken
+    timer = setTimeout(zeige, 320);
+  });
+
+  document.addEventListener("mouseout", e => {
+    if (!ziel) return;
+    if (e.relatedTarget && ziel.contains(e.relatedTarget)) return;   // noch im Ziel
+    verstecke();
+  });
+
+  addEventListener("scroll", verstecke, true);
+  addEventListener("wheel", verstecke, { passive: true });
+  addEventListener("touchstart", verstecke, { passive: true });
+}
+
 function wireApp() {
+  initTooltip();
   $$("nav button[data-v]").forEach(b => b.onclick = () => {
     $$("nav button[data-v]").forEach(x => x.classList.toggle("on", x === b));
     $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + b.dataset.v));
