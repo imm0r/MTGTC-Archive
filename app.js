@@ -7447,6 +7447,10 @@ function renderStatus() {
       <div style="margin-top: 20px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 4px; font-size: 0.85em; color: #aaa;">
         <p style="margin: 0;">GitHub Actions prüft alle 5 Minuten automatisch die Verfügbarkeit.</p>
       </div>
+
+      <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.1);">
+        <a href="https://imm0r.github.io/MTGTC-Archive-Status/" target="_blank" rel="noopener" style="display: inline-block; padding: 8px 16px; background: rgba(76, 175, 80, 0.2); color: #4CAF50; text-decoration: none; border-radius: 4px; font-size: 0.9em; border: 1px solid rgba(76, 175, 80, 0.4); transition: all 0.2s;">📈 Vollständige Status-Seite öffnen</a>
+      </div>
     </div>
   `;
 
