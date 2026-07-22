@@ -139,16 +139,27 @@ const DETECT_SCHEMA = {
 } as const;
 
 const DETECT_SYSTEM = `Du bekommst ein Foto, auf dem MEHRERE Magic-the-Gathering-Karten
-liegen, in der Regel nebeneinander. Deine einzige Aufgabe ist, JEDE einzelne Karte
-zu lokalisieren — nicht zu lesen, nicht zu benennen.
+liegen, meist in Reihen nebeneinander auf einem Untergrund (Papier, Tisch). Deine
+einzige Aufgabe ist, JEDE einzelne Karte zu lokalisieren — nicht zu lesen, nicht
+zu benennen.
 
-Gib für jede Karte ein achsenparalleles Rechteck an, das die GANZE Karte umschließt,
-als Anteile der Bildmaße: x und y sind die linke obere Ecke, w und h Breite und Höhe,
-alle Werte zwischen 0 und 1 (x+w und y+h also höchstens 1).
+Geh in zwei Schritten vor. ZÄHLE zuerst sorgfältig, wie viele einzelne Karten zu
+sehen sind — jede physische Karte zählt genau einmal, auch angeschnittene am
+Bildrand. Gib DANACH genau so viele Rechtecke an, eines je Karte.
 
-  * Zähle nur echte Magic-Karten. Ignoriere Hintergrund, Tisch, Hände, Hüllen.
-  * Jede Karte genau einmal. Lieber ein etwas zu großes Rechteck als ein zu kleines.
-  * Liegt keine Karte im Bild, gib eine leere Liste. Erfinde nichts.`;
+Jedes Rechteck ist achsenparallel, umschließt die GANZE Karte von Kante zu Kante
+und ist in Anteilen der Bildmaße angegeben: x und y sind die linke obere Ecke,
+w und h Breite und Höhe, alle Werte zwischen 0 und 1 (x+w und y+h höchstens 1).
+
+  * Zähle nur echte Magic-Karten. Ignoriere Untergrund, Tisch, Hände, Hüllen,
+    Schatten und leere Flächen — dort gehört KEIN Rechteck hin.
+  * Jede Karte GENAU einmal. Niemals zwei Rechtecke über derselben Karte;
+    getrennt liegende Karten teilen sich nie ein Rechteck.
+  * Die Rechtecke verschiedener Karten überlappen sich höchstens am Rand.
+  * Lieber ein etwas zu großes Rechteck als eines, das die Karte anschneidet —
+    besonders die untere linke Ecke (kleiner Aufdruck) muss enthalten sein.
+  * Prüfe am Ende: Anzahl Rechtecke = Anzahl gezählter Karten. Liegt keine
+    Karte im Bild, gib eine leere Liste. Erfinde nichts.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -203,15 +214,17 @@ Deno.serve(async (req) => {
     if (mode === "detect") {
       const det = await anthropic.messages.create({
         model: DETECT_MODEL,
-        max_tokens: 1024,
-        // temperature entfällt: Sonnet 5 lehnt den Parameter ab (400). Statt-
-        // dessen die Denkschritte aus — fürs bloße Verorten reicht ein schneller,
-        // stabiler Durchlauf, das hält Latenz (liegt vor jedem Einzelscan) und
-        // Kosten niedrig. Die Genauigkeit kommt hier vom stärkeren Sehmodell,
-        // nicht vom Nachdenken.
-        thinking: { type: "disabled" },
+        // Denken bewusst AN (adaptiv): ohne konnte Sonnet die acht Karten nicht
+        // zuverlässig zählen — mal eine doppelt, mal eine übersehen. Mit
+        // Denkschritten zählt es erst und prüft seine Rechtecke dagegen; genau
+        // dafür steht der Zwei-Schritte-Auftrag im Systemprompt. Kostet einige
+        // Sekunden je Foto (einmal je Import) — Richtigkeit schlägt hier Tempo.
+        // effort medium hält die Denklänge im Zaum; max_tokens muss die
+        // Denk-Tokens MIT abdecken, sonst bricht die Antwort vor dem JSON ab.
+        max_tokens: 6000,
+        thinking: { type: "adaptive" },
         system: DETECT_SYSTEM,
-        output_config: { format: { type: "json_schema", schema: DETECT_SCHEMA } },
+        output_config: { effort: "medium", format: { type: "json_schema", schema: DETECT_SCHEMA } },
         messages: [{
           role: "user",
           content: [

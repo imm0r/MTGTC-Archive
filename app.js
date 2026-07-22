@@ -797,161 +797,22 @@ async function scanMultiFile(file) {
   }
 }
 
-/* 3x3-Morphologie auf einer 0/1-Maske: mode +1 dilatiert (Vordergrund wächst
-   um 1 px), mode -1 erodiert (schrumpft um 1 px). Der Bildrand zählt als
-   Hintergrund. Dilatieren und danach gleich oft erodieren = „Schließen":
-   kleine Löcher und Lücken (helle Stellen in der Illustration, ein dünner
-   heller Kartenrand) verschwinden, die Außenform bleibt. */
-function morph(src, W, H, mode) {
-  const out = new Uint8Array(W * H);
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W; x++) {
-      let v = mode > 0 ? 0 : 1;
-      for (let dy = -1; dy <= 1; dy++)
-        for (let dx = -1; dx <= 1; dx++) {
-          const nx = x + dx, ny = y + dy;
-          const s = (nx < 0 || ny < 0 || nx >= W || ny >= H) ? 0 : src[ny * W + nx];
-          v = mode > 0 ? (v || s) : (v && s);
-        }
-      out[y * W + x] = v ? 1 : 0;
-    }
-  return out;
-}
-
-/* Deterministische Rahmenerkennung ohne Modell. Karten auf hellem, ruhigem
-   Grund (ein Blatt Papier, ein Tisch) heben sich klar ab: dunkler oder
-   farbiger als der Untergrund, und selbst helle Karten haben eine Kante bzw.
-   einen Schatten am Rand und farbige Illustration in der Mitte. Daraus bauen
-   wir eine Vordergrundmaske, schließen kleine Lücken, suchen zusammenhängende
-   Flächen (Connected Components) und geben je Fläche ein Rechteck.
-   Reproduzierbar, ohne Dubletten/Phantome, kostenlos. Findet es nichts
-   Plausibles (unruhiger Hintergrund, verschmolzene Karten), kommt null zurück
-   und der Modell-detect übernimmt. Die Feinlage je Karte macht ohnehin
-   findCardBounds nach dem Zuschnitt — hier genügt die grobe Lage. */
-function detectCardsCV(img) {
-  const W = 240, H = Math.max(1, Math.round(img.height * (W / img.width)));
-  const cv = document.createElement("canvas");
-  cv.width = W; cv.height = H;
-  const cx = cv.getContext("2d", { willReadFrequently: true });
-  cx.imageSmoothingQuality = "high";
-  cx.drawImage(img, 0, 0, W, H);
-  const d = cx.getImageData(0, 0, W, H).data;
-
-  const L = new Float32Array(W * H);
-  for (let p = 0, i = 0; p < W * H; p++, i += 4)
-    L[p] = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-
-  // Hintergrund = Median der Randhelligkeit.
-  const rand = [];
-  for (let x = 0; x < W; x++) { rand.push(L[x]); rand.push(L[(H - 1) * W + x]); }
-  for (let y = 0; y < H; y++) { rand.push(L[y * W]); rand.push(L[y * W + W - 1]); }
-  rand.sort((a, b) => a - b);
-  const bg = rand[rand.length >> 1];
-
-  // Vordergrund: deutlich heller/dunkler ODER farbig gegenüber dem Grund, oder
-  // eine starke lokale Kante (fängt auch helle Karten auf hellem Grund).
-  let m = new Uint8Array(W * H);
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W; x++) {
-      const p = y * W + x, i = p * 4;
-      const sat = Math.max(d[i], d[i + 1], d[i + 2]) - Math.min(d[i], d[i + 1], d[i + 2]);
-      // Schwellen bewusst niedrig: eine weißrandige Karte auf weißem Papier
-      // (Temporäre Abriegelung!) hebt sich nur schwach ab. Was zu viel
-      // hereinkommt, räumen Schließen, Mindestfläche und Formfilter ab.
-      let f = Math.abs(L[p] - bg) > 30 || sat > 55;
-      if (!f) {
-        const gx = x < W - 1 ? Math.abs(L[p] - L[p + 1]) : 0;
-        const gy = y < H - 1 ? Math.abs(L[p] - L[p + W]) : 0;
-        f = gx + gy > 30;
-      }
-      m[p] = f ? 1 : 0;
-    }
-
-  // Schließen (2x dilatieren, 2x erodieren): Kartenkanten zu geschlossenen
-  // Flächen verbinden, Illustrations-Löcher füllen — ohne den ~halbe
-  // Kartenbreite großen Abstand zwischen den Karten zu überbrücken.
-  m = morph(m, W, H, 1); m = morph(m, W, H, 1);
-  m = morph(m, W, H, -1); m = morph(m, W, H, -1);
-
-  // Löcher füllen: Hintergrund vom Bildrand aus fluten; was danach weder
-  // Vordergrund noch erreichbarer Hintergrund ist, liegt IN einer Karte
-  // (helle Innenfläche hinter dunklem Rahmen) und wird Vordergrund. Erst
-  // damit zählt eine Karte, von der nur Rahmen und Illustration ansprangen,
-  // als volle Fläche statt als löchriger Ring.
-  {
-    const aussen = new Uint8Array(W * H), st = [];
-    for (let x = 0; x < W; x++) { st.push(x); st.push((H - 1) * W + x); }
-    for (let y = 0; y < H; y++) { st.push(y * W); st.push(y * W + W - 1); }
-    for (const p of st) if (!m[p]) aussen[p] = 1;
-    while (st.length) {
-      const p = st.pop();
-      if (m[p] || !aussen[p]) continue;
-      const x = p % W, y = (p / W) | 0;
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const nx = x + dx, ny = y + dy;
-        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
-        const q = ny * W + nx;
-        if (!m[q] && !aussen[q]) { aussen[q] = 1; st.push(q); }
-      }
-    }
-    for (let p = 0; p < W * H; p++) if (!m[p] && !aussen[p]) m[p] = 1;
-  }
-
-  // Connected Components (8er-Nachbarschaft, iterativer Flood Fill).
-  const seen = new Uint8Array(W * H), stack = [], boxes = [];
-  const minFlaeche = 0.004 * W * H;
-  for (let p0 = 0; p0 < W * H; p0++) {
-    if (!m[p0] || seen[p0]) continue;
-    let minX = W, minY = H, maxX = 0, maxY = 0, n = 0;
-    stack.length = 0; stack.push(p0); seen[p0] = 1;
-    while (stack.length) {
-      const p = stack.pop(), x = p % W, y = (p / W) | 0;
-      if (x < minX) minX = x; if (x > maxX) maxX = x;
-      if (y < minY) minY = y; if (y > maxY) maxY = y;
-      n++;
-      for (let dy = -1; dy <= 1; dy++)
-        for (let dx = -1; dx <= 1; dx++) {
-          const nx = x + dx, ny = y + dy;
-          if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
-          const q = ny * W + nx;
-          if (m[q] && !seen[q]) { seen[q] = 1; stack.push(q); }
-        }
-    }
-    const bw = maxX - minX + 1, bh = maxY - minY + 1, verh = bw / bh;
-    if (n < minFlaeche) continue;                       // Rauschen/Fussel
-    if (bw >= W * 0.94 && bh >= H * 0.94) continue;      // ganzes Bild, keine Karte
-    if (verh < 0.45 || verh > 1.15) continue;           // Magic-Karten stehen hochkant
-    if (n / (bw * bh) < 0.45) continue;                 // zu löchrig für eine Karte
-    boxes.push({ x: minX / W, y: minY / H, w: bw / W, h: bh / H });
-  }
-
-  // Nichts, zu viel Zerfaserung, oder eine dominierende Riesenfläche →
-  // unbrauchbar, lieber das Modell fragen.
-  if (!boxes.length || boxes.length > 40) return null;
-  if (boxes.length === 1 && boxes[0].w * boxes[0].h > 0.55) return null;
-
-  // Rechtecke etwas weiten, damit Rand und untere Ecke (Setcode!) sicher drin
-  // sind — die Feinlage macht findCardBounds nach dem Zuschnitt.
-  return boxes.map(b => {
-    const mx = b.w * 0.08, my = b.h * 0.08;
-    const x = Math.max(0, b.x - mx), y = Math.max(0, b.y - my);
-    return { x, y, w: Math.min(1 - x, b.w + 2 * mx), h: Math.min(1 - y, b.h + 2 * my) };
-  });
-}
-
-/* Kartenrechtecke (Anteile 0..1) für ein Foto mit mehreren Karten. Zuerst der
-   deterministische Bildweg (detectCardsCV) — reproduzierbar, ohne Dubletten
-   oder Phantome, kostenlos. Nur wenn der nichts Brauchbares findet (unruhiger
-   Hintergrund, verschmolzene Karten), fragt der alte Modell-Weg nach; dessen
-   Rechtecke können überlappen, daher dort weiter dedupeBoxes. */
+/* Kartenrechtecke (Anteile 0..1) für ein Foto mit mehreren Karten, über die
+   "detect"-Betriebsart der Edge Function. Eine browserseitige Segmentierung
+   gab es hier kurz (#52) — sie war nur an synthetischen Fotos verifiziert und
+   scheiterte am ersten echten: Blatt Papier auf dunkler Couch, der Bildrand
+   ist Couch, also hielt der Rand-Median das ganze Blatt für Vordergrund und
+   lieferte Fragmente statt Karten. Schlimmer: weil IRGENDWAS zurückkam, kam
+   der Modell-Weg nie zum Zug. Gelernt: der Bildweg kennt seine eigenen
+   Grenzfälle nicht — also wieder ausschließlich das Sehmodell, dessen
+   Rechtecke dedupeBoxes und je Ausschnitt findCardBounds nachschärfen.
+   1600 → 2400 px Kantenlänge: Sonnet 5 verarbeitet bis 2576 px nativ, und
+   mehr Auflösung heißt präzisere Rechtecke bei acht kleinen Karten. */
 async function detectCards(img) {
-  const cvBoxes = detectCardsCV(img);
-  if (cvBoxes && cvBoxes.length) return cvBoxes;
-
   if (visionAus) throw new Error(t("scan.visionDisabled"));
   const ganz = { x: 0, y: 0, w: img.width, h: img.height };
   const { data, error } = await sb.functions.invoke("scan-card", {
-    body: { mode: "detect", images: [{ b64: toJpegBase64(img, ganz, 1600), media_type: "image/jpeg" }] },
+    body: { mode: "detect", images: [{ b64: toJpegBase64(img, ganz, 2400), media_type: "image/jpeg" }] },
   });
   if (error) {
     let msg = "";
