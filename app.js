@@ -5931,8 +5931,13 @@ function zeigeDeckzahl() {
    Login-Screen anzeigen. Anzeige ist optional — schlägt der Aufruf fehl,
    bleibt sie einfach leer. */
 async function ladeKartenzahl() {
-  try { const { data, error } = await sb.rpc("total_card_count"); if (!error && data != null) CARD_COUNT = Number(data); }
-  catch { /* still ignorieren — Zahl ist nur informativ */ }
+  try {
+    const { data, error } = await sb.rpc("total_card_count");
+    if (error) { console.error("RPC total_card_count error:", error); }
+    if (!error && data != null) CARD_COUNT = Number(data);
+    else if (!error) console.warn("total_card_count returned null:", data);
+  }
+  catch (e) { console.error("ladeKartenzahl exception:", e); }
   zeigeKartenzahl();
 }
 function zeigeKartenzahl() {
