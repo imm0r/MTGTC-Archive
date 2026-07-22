@@ -5160,13 +5160,14 @@ function showGate(mode) {
   $("#gate").style.display = "block";
   $("#app").style.display = "none";
   $$("#gate .pane").forEach(p => p.style.display = p.dataset.pane === mode ? "block" : "none");
-  if (mode === "auth") ladeBenutzerzahl();   // Nutzerzahl auf dem Login-Screen (anon)
+  if (mode === "auth") { ladeBenutzerzahl(); ladeDeckzahl(); }   // Statistiken auf dem Login-Screen (anon)
 }
 function showApp() {
   $("#gate").style.display = "none";
   $("#app").style.display = "block";
   renderWho();
   ladeBenutzerzahl();                         // Nutzerzahl dauerhaft im Header
+  ladeDeckzahl();                             // Decks-Zahl dauerhaft im Header
 }
 
 async function afterLogin(user) {
@@ -5868,6 +5869,7 @@ async function passwortAendern() {
    geladen wird fremdes Material aber ausschließlich hier gezielt. */
 let FRIENDS = { accepted: [], incoming: [], outgoing: [] };
 let USER_COUNT = null;   // Gesamtzahl registrierter Nutzer (Anzeige unter „Freunde")
+let DECK_COUNT = null;   // Gesamtzahl erstellter Decks (Anzeige im Header)
 
 async function ladeFreunde() {
   const { data: fr, error } = await sb.from("friendships").select("*");
@@ -5903,6 +5905,23 @@ function zeigeBenutzerzahl() {
   if (h) { h.hidden = n == null; if (n != null) { h.innerHTML = `&#128101;&nbsp;<b>${esc(n)}</b>`; h.title = lbl; } }
   const g = $("#gate-user-count");
   if (g) { g.hidden = n == null; if (n != null) g.innerHTML = `&#128101; <b>${esc(n)}</b> ${esc(lbl)}`; }
+}
+
+/* Gesamtzahl erstellter Decks laden (SECURITY-DEFINER-RPC, da RLS nur
+   eigene Decks sichtbar macht) und anschließend im Header und auf dem
+   Login-Screen anzeigen. Anzeige ist optional — schlägt der Aufruf fehl,
+   bleibt sie einfach leer. */
+async function ladeDeckzahl() {
+  try { const { data, error } = await sb.rpc("total_deck_count"); if (!error && data != null) DECK_COUNT = Number(data); }
+  catch { /* still ignorieren — Zahl ist nur informativ */ }
+  zeigeDeckzahl();
+}
+function zeigeDeckzahl() {
+  const n = DECK_COUNT != null ? String(DECK_COUNT) : null, lbl = t("stats.totalDecks");
+  const h = $("#deck-count");
+  if (h) { h.hidden = n == null; if (n != null) { h.innerHTML = `&#127136;&nbsp;<b>${esc(n)}</b>`; h.title = lbl; } }
+  const g = $("#gate-deck-count");
+  if (g) { g.hidden = n == null; if (n != null) g.innerHTML = `&#127136; <b>${esc(n)}</b> ${esc(lbl)}`; }
 }
 
 async function oeffneFreunde() { await ladeFreunde(); renderFriends(); }

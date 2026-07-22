@@ -472,6 +472,18 @@ $$;
 revoke execute on function public.registered_user_count() from public;
 grant execute on function public.registered_user_count() to anon, authenticated;
 
+-- Gesamtzahl erstellter Decks (Anzeige im Header und auf dem Login-Screen).
+-- SECURITY DEFINER, um die RLS-Einschränkungen zu umgehen (ähnlich wie
+-- registered_user_count). Zurückgegeben wird ausschließlich die aggregierte
+-- Gesamtzahl (keine personenbezogenen Daten). Auch für anon, da sie schon vor
+-- der Anmeldung angezeigt wird.
+create or replace function public.total_deck_count()
+returns bigint language sql stable security definer set search_path=public as $$
+  select count(*) from public.decks
+$$;
+revoke execute on function public.total_deck_count() from public;
+grant execute on function public.total_deck_count() to anon, authenticated;
+
 -- =====================================================================
 --  Freunde und Deck-Teilen
 --
