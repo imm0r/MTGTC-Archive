@@ -1383,7 +1383,7 @@ function cardRow(c, o = {}) {
             ${c.foil ? '<span class="pill foil">Foil</span> ' : ""}#${esc(c.cn)}</div></td>
       <td class="num mana-spalte" title="${c.mana_cost == null ? esc(t("row.manaNone"))
         : esc(t("row.manaValue", { n: c.cmc ?? "?" }))}">${manaHtml(c.mana_cost)}</td>
-      <td class="hide-s">${esc(c.set_name || c.set || "")}
+      <td class="hide-s">${setSymbol(c.set, c.rarity)}${esc(c.set_name || c.set || "")}
           ${c.rarity ? `<div style="margin-top:3px">${rarityPill(c.rarity)}</div>` : ""}</td>
       <td class="hide-s">${langHtml(c.lang)}</td>
       ${imDeck ? "" : `<td class="hide-s">${condBadge(c.condition)}</td>
@@ -1989,6 +1989,53 @@ function rarityPill(r) {
   return `<span class="pill" style="border-color:${d.farbe};color:${d.farbe}">${esc(d.text)}</span>`;
 }
 
+/* ------------------------------------------------- Set-Symbol -------- */
+/* Das Set-Zeichen als Keyrune-Icon (assets/keyrune), gefärbt nach Seltenheit —
+   genau wie auf der Karte, wo die Farbe des Symbols die Rarität verrät.
+
+   Wie bei den Flaggen wird NICHT geraten: kennt Keyrune den Setcode nicht,
+   bleibt es beim Klartextnamen daneben. Keyrune hätte zwar ein generisches
+   Ersatzglyph, aber das wäre eine Aussage über das Set, die wir nicht treffen
+   können. Deshalb der Abgleich gegen KEYRUNE_SETS — die Liste aller Codes, zu
+   denen die Schrift wirklich ein Glyph führt (aus keyrune.css gezogen; beim
+   Aktualisieren der Schrift neu ziehen).
+
+   Die Farbe kommt aus RARITY (fürs dunkle Layout abgestimmt), NICHT aus
+   Keyrunes eigenen Rarity-Klassen: deren "common" ist fast schwarz und
+   verschwände hier. So stimmt das Symbol farblich mit der Rarity-Pille daneben
+   überein. Das Symbol ist Schmuck — der Setname steht immer daneben —, also
+   aria-hidden. */
+const KEYRUNE_SETS = new Set(`
+  10e 1e 2e 2ed 2u 2x2 2xm 30a 3e 3ed 40k 4ed 5dn 5ed 6ed 7ed 8ed 9ed a25 acr aer afc afr akh
+  akr ala all ann apc arb arc arn ath atq avr azorius bbd bcore bfz big blb blc bng bok boros
+  bot br brb brc bro brr btd c13 c14 c15 c16 c17 c18 c19 c20 c21 cc1 cc2 chk chr clb clu cm1
+  cm2 cma cmc cmd cmm cmr cn2 cns con csp dd2 ddc ddd dde ddf ddg ddh ddi ddj ddk ddl ddm ddn
+  ddo ddp ddq ddr dds ddt ddu dft dgm dimir dis dka dkm dmc dmr dmu dom dpa drb drc drk dsc
+  dsk dst dtk duels dvk e01 e02 ea1 ecc ecl eld ema emn eoc eoe eos eve evg exo exp fca fdc
+  fdn fem fic fin fra frf fut gk1 gk2 gn2 gn3 gnt golgari gpt grn gruul gs1 gtc h09 h17 ha1
+  hbg hml hob hoc hop hou htr htr17 ice ice2 iko ima inr inv isd izzet j20 j21 j22 j25 j25a
+  jmp jou jud khc khm kld klr ktk lcc lci lea leb leg lgn lrw ltc ltr m10 m11 m12 m13 m14 m15
+  m19 m20 m21 m3c mar mat mb1 mb2 mbs md1 me1 me2 me3 me4 med mh1 mh2 mh3 mic mid mir mkc mkm
+  mm2 mm3 mma mmq moc modo mom mor mp1 mp2 mps mrd msc msh mul ncc nec nem neo nms nph ody
+  ogw om1 omb onc one ons ori orzhov otc otj otp p02 papac parl parl2 parl3 past pbook pc2
+  pca pcy pd2 pd3 pdep pdrc peuro pfnm pgru pheart pidw pio pip plc pleaf pls pm2 pma pmei
+  pmodo pmps pmpu pmtg1 pmtg2 po2 por psalvat05 psalvat11 psega psld psum ptg ptk ptsa pxbox
+  pz1 pz2 pza rakdos rav ren rex rin rix rna roe rtr rvr s00 s99 scd scg selesnya shm simic
+  sir sis sld sld2 slu snc soa soc soi sok som sos spe spg spm ss1 ss2 ss3 sta sth stx tce
+  td2 tdc tdm thb ths tla tle tmc tmp tmt tor tpr tsp tsr uds ugl ulg uma una und unf unh usg
+  ust v09 v0x v10 v11 v12 v13 v14 v15 v16 v17 van vis vma voc vow w16 w17 war who woc woe wot
+  wth wwk x2ps x4ea xcle xdnd xduels xice xkld xlcu xln xmods xren xrin xssm y22 y23 y24 y25
+  y26 yblb ybro ydft ydmu ydsk yeoe ylci ymid ymkm yneo yone yotj ysnc ytdm ywoe zen znc zne
+  znr
+`.trim().split(/\s+/));
+
+function setSymbol(code, rarity) {
+  const c = (code || "").toLowerCase();
+  if (!KEYRUNE_SETS.has(c)) return "";
+  const farbe = (RARITY[rarity] || {}).farbe || "var(--dim)";
+  return `<i class="ss ss-${c} ss-fw" style="color:${farbe}" aria-hidden="true"></i>`;
+}
+
 /* ----------------------------------------------------- Sprache ------- */
 /* Flaggen als eingebettetes SVG. Zwei Wege scheiden aus:
    * Emoji-Flaggen (🇩🇪) zeigt Windows NICHT — gemessen: die beiden Regional
@@ -2080,24 +2127,36 @@ function langHtml(lang) {
 }
 
 /* --------------------------------------------------- Manakosten ------ */
-/* Scryfall liefert die Kosten als Zeichenkette ("{2}{G/W}{X}") und hostet zu
-   jedem Symbol ein SVG. Im Dateinamen entfallen Klammern und Schrägstrich:
-   {G/W} → GW, {2} → 2, {G/P} → GP.
-   Warum nicht selbst in CSS zeichnen: Hybrid- und Phyrexia-Mana sind geteilte
-   Kreise mit zwei Zeichen darin — das SVG ist die richtige Darstellung und
-   kommt von derselben CDN wie die Kartenbilder. Fällt sie aus, bleibt das
-   alt-Attribut ("{G}") lesbar stehen.
-   Alles ausserhalb der Klammern (bei geteilten Karten das " // ") wird
+/* Scryfall liefert die Kosten als Zeichenkette ("{2}{G/W}{X}"). Gezeichnet
+   werden die Symbole mit der selbst gehosteten Mana-Schrift (assets/mana):
+   je Symbol ein <i class="ms ms-… ms-cost">. Das löst die früheren
+   Einzelbild-Abrufe von der Scryfall-CDN ab — ein Fremdanbieter weniger und
+   ein Font-Download statt vieler Bilder, dieselbe Überlegung wie bei den
+   selbst gezeichneten Flaggen.
+
+   Vom Scryfall-Token zur Klasse: Klammern weg, Schrägstriche weg, klein.
+   {G/W} → gw → ms-gw, {2/W} → 2w → ms-2w, {G/P} → gp → ms-gp. Die
+   Reihenfolge der Hybridbuchstaben ist bei Scryfall dieselbe wie in der
+   Schrift (wu, wb, ub … gu), deshalb passt das direkt. Fünf Symbole heißen
+   in der Schrift anders als ihr Token und bekommen unten eine feste Zuordnung.
+
+   ms-cost gibt jedem Symbol den runden, farbigen Hintergrund wie auf der
+   Karte. Kennt die Schrift ein Symbol nicht, bleibt der leere Kreis stehen —
+   das aria-label/title mit dem Rohtoken ("{G}") sagt trotzdem, was gemeint
+   ist. Alles ausserhalb der Klammern (bei geteilten Karten das " // ") wird
    escaped durchgereicht, nicht als HTML. */
+const MANA_SONDER = { T: "tap", Q: "untap", A: "acorn", "½": "half", "∞": "infinity" };
+const manaKlasse = inhalt =>
+  MANA_SONDER[inhalt] || inhalt.replace(/\//g, "").toLowerCase();
+
 function mitSymbolen(text) {
   const re = /\{([^}]+)\}/g;
   let out = "", last = 0, m;
   while ((m = re.exec(text))) {
     out += esc(text.slice(last, m.index));
-    const datei = encodeURIComponent(m[1].replace(/\//g, "").toUpperCase());
     const roh = `{${m[1]}}`;
-    out += `<img class="mana" src="https://svgs.scryfall.io/card-symbols/${datei}.svg"
-                 alt="${esc(roh)}" title="${esc(roh)}" loading="lazy">`;
+    out += `<i class="ms ms-${esc(manaKlasse(m[1]))} ms-cost" role="img"
+               aria-label="${esc(roh)}" title="${esc(roh)}"></i>`;
     last = m.index + m[0].length;
   }
   return out + esc(text.slice(last));
@@ -2365,7 +2424,7 @@ function detailHtml(c, hover) {
       ${faced ? flipHtml(c) : (gross ? `<img class="detail-img" src="${esc(gross)}" alt="">` : "")}
       <div class="detail-info">
         ${!hover ? `<div class="detail-face-top" id="dt-face-top">${faceTopHtml(v)}</div>` : faceTopHtml(v)}
-        <div class="hint" style="margin-top:2px">${esc(c.set_name || c.set)} · #${esc(c.cn)}${
+        <div class="hint" style="margin-top:2px">${setSymbol(c.set, c.rarity)}${esc(c.set_name || c.set)} · #${esc(c.cn)}${
           c.released ? ` · erschienen ${esc(datShort(c.released))}` : ""}</div>
         ${!hover ? `<div class="detail-face-bottom" id="dt-face-bottom">${faceBottomHtml(v, hover)}</div>` : faceBottomHtml(v, hover)}
         <div class="detail-copy">

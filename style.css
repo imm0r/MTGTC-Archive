@@ -294,7 +294,7 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .combo-det-body a:hover{color:var(--acc)}
 .combo-steps{margin:4px 0 0;padding-left:18px}
 .combo-steps li{margin:2px 0}
-.combo-det-body .mana{width:.95em;height:.95em}
+.combo-det-body .ms{font-size:.9em}
 /* Kategorie-Akkordeon (Komplett / Fast komplett) — Überschrift als klickbare
    Zusammenfassung mit drehendem Pfeil. */
 .combo-cat{margin-top:8px}
@@ -528,15 +528,17 @@ td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000
 .cm-logo .brandlogo,.sf-logo .brandlogo{display:block;vertical-align:middle}
 .sf-logo .brandlogo{width:15px;height:15px}
 .cm-logo .brandlogo{width:14px;height:14px;fill:#fff}
-/* Manakosten: die Symbole kommen als SVG von Scryfall. Feste Größe in em,
-   damit sie mit der Schrift der Zeile mitwachsen — in der Tabelle stehen sie
-   neben dem Namen, in der Detailansicht neben der größeren Überschrift.
-   vertical-align statt flex: so bleiben sie im Textfluss und brechen bei
-   geteilten Karten ("{1}{R} // {1}{U}") sauber mit um. */
-/* display:inline-block ist Pflicht, nicht Geschmack: die Regel "td img" weiter
-   oben stellt Kartenbilder auf display:block, und sie trifft auch diese
-   Symbole — ohne Gegensteuer stünde jedes Manasymbol auf einer eigenen Zeile. */
-.mana{width:1em;height:1em;display:inline-block;vertical-align:-0.1em;margin-left:1px}
+/* Manasymbole (Mana-Font, assets/mana): je Symbol ein <i class="ms … ms-cost">.
+   ms-cost zeichnet den runden, farbigen Pip wie auf der Karte; die Grundregeln
+   stehen in mana.css (VOR style.css geladen), hier nur Größe/Ausrichtung fein.
+   Größe läuft über font-size, nicht width/height — der Pip ist ein Glyph, kein
+   Bild, und wächst so mit der Zeilenschrift mit. In der Tabelle stehen sie neben
+   dem Namen, in der Detailansicht neben der größeren Überschrift; sie bleiben im
+   Textfluss und brechen bei geteilten Karten ("{1}{R} // {1}{U}") sauber mit um.
+   Die frühere "td img"-Falle (Bilder auf display:block) ist mit dem Wechsel von
+   <img> auf <i> erledigt. */
+.ms.ms-cost{vertical-align:-0.09em}
+.mana-spalte .ms, .mana-kosten .ms{margin:0 .5px}
 /* Farbidentitäts-Filter in der Sammlung: sechs Kästchen mit Farbsymbol als
    Beschriftung. Die echte Checkbox liegt unsichtbar darunter; das Symbol-Kästchen
    ist im Ruhezustand gedimmt und leuchtet mit Gold-Rahmen auf, wenn angehakt. */
@@ -547,7 +549,7 @@ td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000
 .ci-sym{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;
   border-radius:8px;border:1px solid var(--line);background:var(--panel2);opacity:.5;
   transition:opacity .15s,border-color .15s,box-shadow .15s}
-.ci-sym .mana{width:19px;height:19px;margin:0}
+.ci-sym .ms{font-size:15px;margin:0}
 .ci-box:hover .ci-sym{opacity:.85}
 .ci-box input:checked ~ .ci-sym{opacity:1;border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
 .ci-box input:focus-visible ~ .ci-sym{box-shadow:0 0 0 2px var(--acc)}
@@ -558,6 +560,13 @@ td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000
 /* Die Spalte soll nur so breit sein wie ihr Inhalt, aber nicht bei jeder
    Sortierung springen: 1% zwingt die Tabelle, sie auf den Inhalt zu schrumpfen. */
 .mana-spalte{width:1%}
+
+/* Set-Symbol (Keyrune-Font, assets/keyrune): steht vor dem Setnamen in Tabelle
+   und Detailkopf, gefärbt nach Seltenheit (Farbe kommt inline aus RARITY,
+   siehe setSymbol). Größe = Zeilenschrift; der rechte Abstand trennt Symbol und
+   Name. In der dimmen Detailzeile hebt die Rarity-Farbe das Set leicht hervor. */
+.ss{margin-right:.35em;vertical-align:-0.05em}
+.hint .ss{margin-right:.3em}
 
 /* Sprachflagge. display:inline-block gegen dieselbe Falle wie bei den
    Manasymbolen: "td img" gilt zwar nur für img, aber SVG erbt hier nichts —
@@ -749,14 +758,14 @@ dialog::backdrop{background:#000a}
 .kw-tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
 .regeltext{font-size:13px;line-height:1.55;white-space:pre-line;
   background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
-.regeltext .mana{width:1em;height:1em;vertical-align:-0.12em}
+.regeltext .ms{font-size:.95em;vertical-align:-0.14em}
 .faehig{margin-top:8px}
 .faehig summary{cursor:pointer;color:var(--dim);font-size:13px;user-select:none}
 .faehig summary:hover{color:var(--txt)}
 .faehig-tbl{width:100%;margin-top:8px;font-size:12px}
 .faehig-tbl th{font-size:10px}
 .faehig-tbl td{vertical-align:top;padding:6px 6px}
-.faehig-tbl .mana{width:1em;height:1em;vertical-align:-0.12em}
+.faehig-tbl .ms{font-size:.95em;vertical-align:-0.14em}
 
 /* Hover-Vorschau: schwebt neben dem Zeiger, nimmt keine Mausereignisse an
    (sonst flackert sie, sobald der Zeiger sie berührt). */
