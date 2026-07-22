@@ -812,7 +812,7 @@ async function detectCards(img) {
   if (visionAus) throw new Error(t("scan.visionDisabled"));
   const ganz = { x: 0, y: 0, w: img.width, h: img.height };
   const { data, error } = await sb.functions.invoke("scan-card", {
-    body: { mode: "detect", images: [{ b64: toJpegBase64(img, ganz, 2400), media_type: "image/jpeg" }] },
+    body: { mode: "detect", images: [{ b64: toJpegBase64(img, ganz, 1600), media_type: "image/jpeg" }] },
   });
   if (error) {
     let msg = "";

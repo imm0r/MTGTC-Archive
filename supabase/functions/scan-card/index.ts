@@ -214,17 +214,14 @@ Deno.serve(async (req) => {
     if (mode === "detect") {
       const det = await anthropic.messages.create({
         model: DETECT_MODEL,
-        // Denken bewusst AN (adaptiv): ohne konnte Sonnet die acht Karten nicht
-        // zuverlässig zählen — mal eine doppelt, mal eine übersehen. Mit
-        // Denkschritten zählt es erst und prüft seine Rechtecke dagegen; genau
-        // dafür steht der Zwei-Schritte-Auftrag im Systemprompt. Kostet einige
-        // Sekunden je Foto (einmal je Import) — Richtigkeit schlägt hier Tempo.
-        // effort medium hält die Denklänge im Zaum; max_tokens muss die
-        // Denk-Tokens MIT abdecken, sonst bricht die Antwort vor dem JSON ab.
-        max_tokens: 6000,
-        thinking: { type: "adaptive" },
+        max_tokens: 1024,
+        // Denken hier bewusst AUS. Der Versuch mit adaptivem Denken (#53) lieferte
+        // die schlechtesten Rechtecke überhaupt — angeschnittene Ausschnitte, aus
+        // denen der Ableseschritt nur Bruchstücke las. Fürs Verorten reicht ein
+        // schneller, direkter Durchlauf; die Genauigkeit kommt vom Sehmodell.
+        thinking: { type: "disabled" },
         system: DETECT_SYSTEM,
-        output_config: { effort: "medium", format: { type: "json_schema", schema: DETECT_SCHEMA } },
+        output_config: { format: { type: "json_schema", schema: DETECT_SCHEMA } },
         messages: [{
           role: "user",
           content: [
