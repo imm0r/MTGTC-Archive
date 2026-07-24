@@ -5387,17 +5387,12 @@ function renderDashboard() {
       <p class="hint" style="margin-top:-4px">${decks} ${esc(decks === 1 ? t("common.deckOne") : t("common.deckMany"))} &middot; ${esc(t("profile.statAll"))}</p>
       ${profilHighlightsHtml()}
       <div id="dashboard-dash" style="margin-top:12px"></div>
-    </div>
-    ${communityHtml()}`;
+    </div>`;
   // Statistik über den GESAMTEN Bestand — dieselbe renderDash wie zuvor, nur in
   // eigener Ansicht statt im Profil.
   renderDash(CARDS.filter(c => c.qty > 0), $("#dashboard-dash"), false);
   // Highlight-Kacheln öffnen die Detailansicht der jeweiligen Karte.
   $$("#v-dashboard [data-hl]").forEach(k => k.onclick = () => showCardDetail(k.dataset.hl));
-  // Community-Daten kommen beim Login; steht die Ansicht schon vorher (oder war
-  // der erste Versuch erfolglos), hier einmal nachziehen. Kein Kreislauf:
-  // ladeCommunityFoundation() zeichnet nur den Block, nicht das Dashboard.
-  if (!COMMUNITY_STATS && !COMMUNITY_FEED.length) ladeCommunityFoundation().catch(() => {});
 }
 
 /* Ansicht „Einstellungen" — eigener Punkt im Benutzermenü hinter Avatar+Name.
@@ -5951,6 +5946,12 @@ function zeigeDeckzahl() {
 
 const COMMUNITY_FEED_LIMIT = 20;
 let communityFeedTimer = null;
+/* Realtime liefert nur die rohe Zeile — ohne Anzeigenamen. Eingehende
+   Ereignisse warten deshalb im Puffer, bis der gebündelte Neuabruf die Namen
+   nachgeliefert hat; erst dann entsteht eine Meldung. Die fertigen Meldungen
+   wandern in eine Schlange und werden nacheinander gezeigt, damit bei
+   gleichzeitiger Aktivität mehrerer Leute keine verloren geht. */
+let communityEventPuffer = [], communityToastSchlange = [], communityToastTimer = null;
 
 async function ladeCommunityStats() {
   try {
@@ -5974,7 +5975,7 @@ async function ladeCommunityFeed() {
    die Werte beim nächsten Wechsel ohnehin aus den Globals. */
 async function ladeCommunityFoundation() {
   await Promise.all([ladeCommunityStats(), ladeCommunityFeed()]);
-  if ($(".view.on")?.id === "v-dashboard") zeigeCommunity();
+  if ($(".view.on")?.id === "v-community") zeigeCommunity();
 }
 
 /* Realtime: jeder neue Eintrag in community_activity frischt Feed und Zahlen
@@ -5983,18 +5984,75 @@ async function ladeCommunityFoundation() {
 function subscribeCommunityActivity() {
   if (communityChannel || !USER) return;
   communityChannel = sb.channel("community:activity")
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "community_activity" }, () => {
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "community_activity" }, payload => {
+      if (payload.new) communityEventPuffer.push(payload.new);
       if (communityFeedTimer) clearTimeout(communityFeedTimer);
       communityFeedTimer = setTimeout(() => {
         communityFeedTimer = null;
-        ladeCommunityFoundation().catch(() => {});
+        ladeCommunityFoundation().then(meldeCommunityEreignisse).catch(() => {});
       }, 1500);
     })
     .subscribe();
 }
 function unsubscribeCommunityActivity() {
   if (communityFeedTimer) { clearTimeout(communityFeedTimer); communityFeedTimer = null; }
+  if (communityToastTimer) { clearTimeout(communityToastTimer); communityToastTimer = null; }
+  communityEventPuffer = []; communityToastSchlange = [];
+  $("#community-toast")?.classList.remove("on");
   if (communityChannel) { sb.removeChannel(communityChannel); communityChannel = null; }
+}
+
+/* Aus dem Puffer Meldungen bauen: pro Person eine, egal wie viele Ereignisse
+   sie ausgelöst hat. Sind mehrere Leute gleichzeitig aktiv, kommen alle in die
+   Schlange und werden nacheinander gezeigt — nichts fällt hinten runter. */
+function meldeCommunityEreignisse() {
+  if (!communityEventPuffer.length) return;
+  const puffer = communityEventPuffer;
+  communityEventPuffer = [];
+  // Die Anzeigenamen stehen erst im frisch geladenen Feed, nicht in der
+  // Realtime-Zeile. Fehlt einer (Feed schon weitergerückt), greift der
+  // anonyme Fallback.
+  const namen = new Map(COMMUNITY_FEED.map(r => [r.actor_id, r.actor_name]));
+  const proPerson = new Map();
+  for (const row of puffer) {
+    const k = row.actor_id || "";
+    if (!proPerson.has(k)) proPerson.set(k, { actor_id: row.actor_id, zeilen: [] });
+    proPerson.get(k).zeilen.push(row);
+  }
+  for (const g of proPerson.values())
+    communityToastSchlange.push(communityMeldung(g, namen.get(g.actor_id)));
+  zeigeNaechsteCommunityMeldung();
+}
+
+/* Eine Person, eine Art → der gewohnte Satz, bei mehreren Ereignissen mit
+   Anzahl. Gemischte Arten lassen sich nicht in einen Satz gießen, dafür gibt
+   es die neutrale Zählform. */
+function communityMeldung(gruppe, name) {
+  const anzeige = (name || "").trim() || t("community.anonMember");
+  const arten = new Set(gruppe.zeilen.map(r => r.kind));
+  if (arten.size === 1) {
+    const n = gruppe.zeilen.reduce((s, r) => s + (Number(r.metadata?.n) || 1), 0);
+    return aktivitaetText({ kind: [...arten][0], actor_name: anzeige, metadata: { n } });
+  }
+  return t("community.toast.multi", { name: anzeige, n: gruppe.zeilen.length });
+}
+
+/* Die Schlange nacheinander abarbeiten. Erst wenn eine Meldung abgelaufen ist,
+   kommt die nächste — sonst überschriebe eine die andere. */
+function zeigeNaechsteCommunityMeldung() {
+  if (communityToastTimer || !communityToastSchlange.length) return;
+  const el = $("#community-toast");
+  if (!el) { communityToastSchlange = []; return; }   // Markup fehlt — nicht sammeln
+  el.textContent = communityToastSchlange.shift();
+  el.classList.add("on");
+  communityToastTimer = setTimeout(() => {
+    el.classList.remove("on");
+    // Kurze Lücke, damit zwei Meldungen nicht ineinander blenden.
+    communityToastTimer = setTimeout(() => {
+      communityToastTimer = null;
+      zeigeNaechsteCommunityMeldung();
+    }, 300);
+  }, 3000);
 }
 
 /* Relative Zeit in Worten. Bewusst grob — auf die Minute genau zu sein wäre für
@@ -6061,28 +6119,58 @@ function communityFeedHtml() {
     `<span class="cf-time">${esc(relativeZeit(r.occurred_at))}</span></li>`).join("")}</ul>`;
 }
 
+/* Der Feed lässt sich zuklappen; die Wahl überlebt den Ansichtswechsel — wie
+   bei den offenen Decks. */
+function feedOffen() {
+  try { return localStorage.getItem("mtg-community-feed") !== "0"; }
+  catch { return true; }   // localStorage gesperrt — dann eben immer offen
+}
+function feedOffenSetzen(an) {
+  try { localStorage.setItem("mtg-community-feed", an ? "1" : "0"); } catch { /* gesperrt */ }
+}
+
 function communityBodyHtml() {
   if (!COMMUNITY_STATS && !COMMUNITY_FEED.length)
     return `<p class="hint" style="margin:0">${esc(t("community.unavailable"))}</p>`;
+  const offen = feedOffen();
   return `${communityStatsHtml()}
-    <h4 class="cf-title">${esc(t("community.feedTitle"))}</h4>
-    ${communityFeedHtml()}`;
+    <button type="button" class="cf-toggle" id="cf-toggle" aria-expanded="${offen}" aria-controls="cf-list">
+      <span class="cf-caret" aria-hidden="true">${offen ? "&#9662;" : "&#9656;"}</span>
+      <span>${esc(t("community.feedTitle"))}</span>
+      <span class="cf-count">${COMMUNITY_FEED.length}</span>
+    </button>
+    <div id="cf-list"${offen ? "" : " hidden"}>${communityFeedHtml()}</div>`;
 }
 
-function communityHtml() {
-  return `
+function wireCommunityFeedToggle() {
+  const b = $("#cf-toggle");
+  if (b) b.onclick = () => { feedOffenSetzen(!feedOffen()); zeigeCommunity(); };
+}
+
+/* Nur den Inhalt neu zeichnen. Ein Realtime-Update soll nicht die ganze
+   Ansicht samt Kennzahlen-Kacheln neu aufbauen. */
+function zeigeCommunity() {
+  const el = $("#community-body");
+  if (!el) return;
+  el.innerHTML = communityBodyHtml();
+  wireCommunityFeedToggle();
+}
+
+/* Eigene Ansicht statt Anhängsel am Dashboard: das Dashboard beantwortet „was
+   habe ich", die Community „was passiert bei den anderen". */
+function renderCommunity() {
+  const el = $("#v-community");
+  if (!el) return;
+  el.innerHTML = `
     <div class="card">
       <h3 style="margin-top:0">${esc(t("community.title"))}</h3>
       <p class="hint" style="margin-top:-4px">${esc(t("community.hint"))}</p>
       <div id="community-body">${communityBodyHtml()}</div>
     </div>`;
-}
-
-/* Nur den Community-Block neu zeichnen. Ein Realtime-Update soll nicht das
-   ganze Dashboard samt Diagrammen neu aufbauen. */
-function zeigeCommunity() {
-  const el = $("#community-body");
-  if (el) el.innerHTML = communityBodyHtml();
+  wireCommunityFeedToggle();
+  // Beim Login geladen; war das erfolglos oder steht die Ansicht früher, hier
+  // nachziehen. Kein Kreislauf: ladeCommunityFoundation() ruft nur zeigeCommunity().
+  if (!COMMUNITY_STATS && !COMMUNITY_FEED.length) ladeCommunityFoundation().catch(() => {});
 }
 
 async function oeffneFreunde() { await ladeFreunde(); renderFriends(); }
@@ -7667,6 +7755,7 @@ function wireApp() {
     $("#who-menu")?.classList.remove("open");   // Menüauswahl klappt das Menü zu
     if (b.dataset.v === "profile") renderProfile();
     if (b.dataset.v === "dashboard") renderDashboard();
+    if (b.dataset.v === "community") renderCommunity();
     if (b.dataset.v === "friends") oeffneFreunde();
     if (b.dataset.v === "session") oeffneSession();
     if (b.dataset.v === "events") oeffneTermine();
