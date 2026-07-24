@@ -71,6 +71,7 @@ function dialogBackdropSchliesst(dlg) {
 /* ============================== Supabase ============================== */
 let sb = null, USER = null, PROFILE = null;
 let FLAGS = {}, IS_ADMIN = false;   // globale Feature-Schalter + ob der Nutzer Admin ist
+let COMMUNITY_STATS = null, COMMUNITY_FEED = [], communityChannel = null;
 
 function cfg() {
   if (CONFIG.url && CONFIG.key) return CONFIG;
@@ -5191,6 +5192,11 @@ async function afterLogin(user) {
   // zu öffnen. Nicht kritisch — schlägt es fehl, läuft der Rest weiter.
   try { await ladeSession(); subscribeInvites(); if (SESSION) subscribeSession(); }
   catch (e) { /* Realtime optional */ }
+  // Community Foundation: optionale, öffentliche Community-Zahlen und ein
+  // datensparsamer Live-Feed. Fehler hier dürfen den persönlichen Archivstart
+  // niemals blockieren, falls die Sprint-1-Migration noch nicht installiert ist.
+  ladeCommunityFoundation().catch(() => {});
+  subscribeCommunityActivity();
 }
 
 function wireAuth() {
