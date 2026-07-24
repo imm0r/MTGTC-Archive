@@ -996,3 +996,7 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px}
   .cf-card[data-cmd-img]{ cursor:help; text-decoration:underline;
                           text-decoration-style:dotted; text-underline-offset:2px; }
 }
+/* Zusatzzeile der Hover-Vorschau (im Community-Feed der Preis). Ruhiger als
+   der Name darüber — eine Angabe, keine Überschrift. */
+.cmd-hover-zus{ text-align:center; font-size:13px; color:var(--dim);
+                margin-top:2px; font-variant-numeric:tabular-nums; }

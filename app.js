@@ -2647,7 +2647,9 @@ function showHover(id, x, y) {
    Spielrunde eine große Kartenvorschau + Name schweben lassen (eigenes Element,
    nicht #hovercard — das ist 430px breit für die Sammlungs-Detailkarte). */
 let cmdHoverEl = null;
-function zeigeCmdHover(img, name, x, y) {
+/* zusatz ist optional (z. B. der Preis im Community-Feed) — die bisherigen
+   Aufrufer übergeben ihn nicht und bekommen unverändert nur Bild und Name. */
+function zeigeCmdHover(img, name, x, y, zusatz) {
   if (!cmdHoverEl) { cmdHoverEl = document.createElement("div"); cmdHoverEl.className = "cmd-hover"; }
   // Ist ein modaler Dialog offen (Kartendetail via showModal → Top-Layer), muss
   // die Vorschau DARIN hängen — sonst rendert sie hinter dem Dialog, den kein
@@ -2655,7 +2657,8 @@ function zeigeCmdHover(img, name, x, y) {
   const ziel = document.querySelector("dialog[open]") || document.body;
   if (cmdHoverEl.parentElement !== ziel) ziel.appendChild(cmdHoverEl);
   const el = cmdHoverEl;
-  el.innerHTML = `<img src="${esc(img)}" alt=""><div class="cmd-hover-nm">${esc(name)}</div>`;
+  el.innerHTML = `<img src="${esc(img)}" alt=""><div class="cmd-hover-nm">${esc(name)}</div>` +
+    (zusatz ? `<div class="cmd-hover-zus">${esc(zusatz)}</div>` : "");
   el.style.left = "0px"; el.style.top = "0px"; el.style.display = "block";
   const r = el.getBoundingClientRect();
   let l = x + 18, o = y + 14;
@@ -6203,8 +6206,14 @@ function aktivitaetHtml(row) {
   const text = t(schluessel, { name: anzeige, karte: KARTEN_PLATZHALTER });
   if (text === schluessel) return esc(aktivitaetText(row));   // Übersetzung fehlt
 
-  const img = row.metadata?.img || "";
-  const el = `<span class="cf-card"${img ? ` data-cmd-img="${esc(img)}" data-cmd-name="${esc(karte)}"` : ""}>${esc(karte)}</span>`;
+  // Gespeichert ist die kleine Scryfall-Fassung (146px). Auf 220px hochgezogen
+  // wäre der Regeltext unlesbar — dieselbe Umschaltung wie bei Combo- und
+  // Deck-Karten. Bewusst hier und nicht beim Schreiben, damit auch die bereits
+  // erfassten Einträge davon profitieren.
+  const img = (row.metadata?.img || "").replace("/small/", "/normal/");
+  const preis = row.metadata?.price;
+  const el = `<span class="cf-card"${img ? ` data-cmd-img="${esc(img)}" data-cmd-name="${esc(karte)}"` : ""}` +
+    `${img && preis != null ? ` data-cmd-preis="${esc(eur(preis))}"` : ""}>${esc(karte)}</span>`;
   return esc(text).split(KARTEN_PLATZHALTER).join(el);
 }
 
@@ -6222,7 +6231,8 @@ function communityFeedHtml() {
 function wireCommunityKartenHover(root) {
   if (!HOVER_OK || !root) return;
   root.querySelectorAll(".cf-card[data-cmd-img]").forEach(el => {
-    el.addEventListener("mousemove", e => zeigeCmdHover(el.dataset.cmdImg, el.dataset.cmdName, e.clientX, e.clientY));
+    el.addEventListener("mousemove", e =>
+      zeigeCmdHover(el.dataset.cmdImg, el.dataset.cmdName, e.clientX, e.clientY, el.dataset.cmdPreis));
     el.addEventListener("mouseleave", versteckeCmdHover);
   });
 }
