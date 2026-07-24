@@ -5195,8 +5195,11 @@ async function afterLogin(user) {
   // Community Foundation: optionale, öffentliche Community-Zahlen und ein
   // datensparsamer Live-Feed. Fehler hier dürfen den persönlichen Archivstart
   // niemals blockieren, falls die Sprint-1-Migration noch nicht installiert ist.
-  ladeCommunityFoundation().catch(() => {});
-  subscribeCommunityActivity();
+  // Der try umschließt bewusst auch den Aufruf selbst: ein synchroner Fehler
+  // (fehlende Funktion, kein Realtime) käme am .catch() vorbei und würde sonst
+  // afterLogin abbrechen — samt allem, was danach am Aufrufer noch folgt.
+  try { ladeCommunityFoundation().catch(() => {}); subscribeCommunityActivity(); }
+  catch (e) { /* Community optional */ }
 }
 
 function wireAuth() {
@@ -5234,7 +5237,10 @@ function wireAuth() {
     } finally { $("#auth-go").disabled = false; }
   };
 
-  $("#logout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+  $("#logout").onclick = async () => {
+    unsubscribeCommunityActivity();   // Websocket sauber schließen, bevor neu geladen wird
+    await sb.auth.signOut(); location.reload();
+  };
 }
 
 function wireSetup() {
@@ -5381,12 +5387,17 @@ function renderDashboard() {
       <p class="hint" style="margin-top:-4px">${decks} ${esc(decks === 1 ? t("common.deckOne") : t("common.deckMany"))} &middot; ${esc(t("profile.statAll"))}</p>
       ${profilHighlightsHtml()}
       <div id="dashboard-dash" style="margin-top:12px"></div>
-    </div>`;
+    </div>
+    ${communityHtml()}`;
   // Statistik über den GESAMTEN Bestand — dieselbe renderDash wie zuvor, nur in
   // eigener Ansicht statt im Profil.
   renderDash(CARDS.filter(c => c.qty > 0), $("#dashboard-dash"), false);
   // Highlight-Kacheln öffnen die Detailansicht der jeweiligen Karte.
   $$("#v-dashboard [data-hl]").forEach(k => k.onclick = () => showCardDetail(k.dataset.hl));
+  // Community-Daten kommen beim Login; steht die Ansicht schon vorher (oder war
+  // der erste Versuch erfolglos), hier einmal nachziehen. Kein Kreislauf:
+  // ladeCommunityFoundation() zeichnet nur den Block, nicht das Dashboard.
+  if (!COMMUNITY_STATS && !COMMUNITY_FEED.length) ladeCommunityFoundation().catch(() => {});
 }
 
 /* Ansicht „Einstellungen" — eigener Punkt im Benutzermenü hinter Avatar+Name.
@@ -5928,6 +5939,150 @@ function zeigeDeckzahl() {
   if (h) { h.hidden = n == null; if (n != null) { h.innerHTML = `&#127136;&nbsp;<b>${esc(n)}</b>`; h.title = lbl; } }
   const g = $("#gate-deck-count");
   if (g) { g.hidden = n == null; if (n != null) g.innerHTML = `&#127136; <b>${esc(n)}</b> ${esc(lbl)}`; }
+}
+
+/* ========================= Community Foundation ======================= *
+   Sprint 1: die öffentliche, datensparsame Community-Ebene. Alle Zahlen und
+   Feed-Zeilen kommen aus SECURITY-DEFINER-RPCs (community_statistics,
+   community_activity_feed) — private Sammlungs-, Deck- und Termindaten
+   verlassen die Datenbank dabei nie, der Feed kennt nur Aktion, Akteur und
+   Zeitpunkt. Fehlt die Sprint-1-Migration, bleiben die Werte leer und der
+   Block zeigt einen Hinweis statt zu scheitern. */
+
+const COMMUNITY_FEED_LIMIT = 20;
+let communityFeedTimer = null;
+
+async function ladeCommunityStats() {
+  try {
+    const { data, error } = await sb.rpc("community_statistics");
+    if (error) throw error;
+    // returns table(...) → PostgREST liefert ein Array mit genau einer Zeile.
+    COMMUNITY_STATS = Array.isArray(data) ? (data[0] || null) : (data || null);
+  } catch { COMMUNITY_STATS = null; }
+}
+
+async function ladeCommunityFeed() {
+  try {
+    const { data, error } = await sb.rpc("community_activity_feed", { p_limit: COMMUNITY_FEED_LIMIT });
+    if (error) throw error;
+    COMMUNITY_FEED = Array.isArray(data) ? data : [];
+  } catch { COMMUNITY_FEED = []; }
+}
+
+/* Beide RPCs parallel — sie hängen nicht voneinander ab. Danach nur neu
+   zeichnen, wenn das Dashboard gerade offen ist; sonst holt renderDashboard()
+   die Werte beim nächsten Wechsel ohnehin aus den Globals. */
+async function ladeCommunityFoundation() {
+  await Promise.all([ladeCommunityStats(), ladeCommunityFeed()]);
+  if ($(".view.on")?.id === "v-dashboard") zeigeCommunity();
+}
+
+/* Realtime: jeder neue Eintrag in community_activity frischt Feed und Zahlen
+   auf. Mehrere Inserts kurz hintereinander (ein CSV-Import löst pro Karte einen
+   Trigger aus!) werden zu einem einzigen Nachladen gebündelt. */
+function subscribeCommunityActivity() {
+  if (communityChannel || !USER) return;
+  communityChannel = sb.channel("community:activity")
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "community_activity" }, () => {
+      if (communityFeedTimer) clearTimeout(communityFeedTimer);
+      communityFeedTimer = setTimeout(() => {
+        communityFeedTimer = null;
+        ladeCommunityFoundation().catch(() => {});
+      }, 1500);
+    })
+    .subscribe();
+}
+function unsubscribeCommunityActivity() {
+  if (communityFeedTimer) { clearTimeout(communityFeedTimer); communityFeedTimer = null; }
+  if (communityChannel) { sb.removeChannel(communityChannel); communityChannel = null; }
+}
+
+/* Relative Zeit in Worten. Bewusst grob — auf die Minute genau zu sein wäre für
+   einen Aktivitätsstrom weder nötig noch lesbarer. */
+function relativeZeit(iso) {
+  const ts = Date.parse(iso);
+  if (!Number.isFinite(ts)) return "";
+  const sek = Math.max(0, Math.round((Date.now() - ts) / 1000));
+  if (sek < 60) return t("community.justNow");
+  const min = Math.round(sek / 60);
+  if (min < 60) return t("community.minutesAgo", { n: min });
+  const std = Math.round(min / 60);
+  if (std < 24) return t("community.hoursAgo", { n: std });
+  const tage = Math.round(std / 24);
+  return tage === 1 ? t("community.dayAgo") : t("community.daysAgo", { n: tage });
+}
+
+/* Eine Feed-Zeile in Worte fassen. Unbekannte Arten (spätere Sprints bringen
+   z. B. Achievements) fallen auf eine neutrale Formulierung zurück, statt den
+   rohen Schlüssel anzuzeigen. */
+function aktivitaetText(row) {
+  const name = (row.actor_name || "").trim();
+  // Die Feed-RPC liefert für Mitglieder ohne Anzeigenamen NULL; die erste
+  // Sprint-1-Fassung lieferte stattdessen ein deutsches Literal. Beides wird
+  // hier in die aktuelle Oberflächensprache übersetzt.
+  const anzeige = (!name || name === "Ein Mitglied") ? t("community.anonMember") : name;
+  // Der einmalige Rückstand fasst pro Person und Tag zusammen und legt die
+  // Anzahl in metadata.n ab. Solche Zeilen bekommen einen Mehrzahl-Text;
+  // laufende Trigger-Einträge haben kein n und bleiben in der Einzahl.
+  const n = Number(row.metadata?.n) || 1;
+  const params = { name: anzeige, n };
+  const kandidaten = [
+    ...(n > 1 ? ["community.kind." + row.kind + "_n"] : []),
+    "community.kind." + row.kind,
+    "community.kind.unknown",
+  ];
+  for (const key of kandidaten) {
+    const txt = t(key, params);
+    if (txt !== key) return txt;   // t() gibt den Schlüssel zurück, wenn er fehlt
+  }
+  return t("community.kind.unknown", params);
+}
+
+function communityStatsHtml() {
+  const s = COMMUNITY_STATS;
+  if (!s) return "";
+  const zahl = v => Number(v ?? 0).toLocaleString(LANG);
+  return `<div class="stats" style="margin-bottom:14px">${[
+    [t("community.members"), s.member_count],
+    [t("community.decks"), s.deck_count],
+    [t("community.cards"), s.card_count],
+    [t("community.activeSessions"), s.active_session_count],
+    [t("community.upcomingEvents"), s.upcoming_event_count],
+    [t("community.activity7d"), s.activity_7d_count],
+  ].map(([k, v]) =>
+    `<div class="stat"><div class="v">${esc(zahl(v))}</div><div class="k">${esc(k)}</div></div>`).join("")}</div>`;
+}
+
+function communityFeedHtml() {
+  if (!COMMUNITY_FEED.length)
+    return `<p class="hint" style="margin:0">${esc(t("community.feedEmpty"))}</p>`;
+  return `<ul class="community-feed">${COMMUNITY_FEED.map(r =>
+    `<li><span class="cf-text">${esc(aktivitaetText(r))}</span>` +
+    `<span class="cf-time">${esc(relativeZeit(r.occurred_at))}</span></li>`).join("")}</ul>`;
+}
+
+function communityBodyHtml() {
+  if (!COMMUNITY_STATS && !COMMUNITY_FEED.length)
+    return `<p class="hint" style="margin:0">${esc(t("community.unavailable"))}</p>`;
+  return `${communityStatsHtml()}
+    <h4 class="cf-title">${esc(t("community.feedTitle"))}</h4>
+    ${communityFeedHtml()}`;
+}
+
+function communityHtml() {
+  return `
+    <div class="card">
+      <h3 style="margin-top:0">${esc(t("community.title"))}</h3>
+      <p class="hint" style="margin-top:-4px">${esc(t("community.hint"))}</p>
+      <div id="community-body">${communityBodyHtml()}</div>
+    </div>`;
+}
+
+/* Nur den Community-Block neu zeichnen. Ein Realtime-Update soll nicht das
+   ganze Dashboard samt Diagrammen neu aufbauen. */
+function zeigeCommunity() {
+  const el = $("#community-body");
+  if (el) el.innerHTML = communityBodyHtml();
 }
 
 async function oeffneFreunde() { await ladeFreunde(); renderFriends(); }
