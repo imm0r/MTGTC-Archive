@@ -10,6 +10,9 @@ Thumbs.db
 # "npm ci" im GitHub Action.
 node_modules/
 
+# Build output from Vite
+dist/
+
 # Roh-Logovorlagen (Quelle). Deployt werden nur die verarbeiteten logo-*.png;
 # die eigentliche Grafik stammt aus Logo2.png (Emblem + Schriftzug), per
 # Hintergrund-Matte auf die App-Flächen umgefärbt.
