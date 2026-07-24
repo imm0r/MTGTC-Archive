@@ -5992,6 +5992,7 @@ let communityFeedTimer = null;
    wandern in eine Schlange und werden nacheinander gezeigt, damit bei
    gleichzeitiger Aktivität mehrerer Leute keine verloren geht. */
 let communityEventPuffer = [], communityToastSchlange = [], communityToastTimer = null;
+let communityToastLaeuft = false;   // eine Meldung steht gerade — auch beim Anhalten per Hover
 
 async function ladeCommunityStats() {
   try {
@@ -6037,8 +6038,10 @@ function subscribeCommunityActivity() {
 function unsubscribeCommunityActivity() {
   if (communityFeedTimer) { clearTimeout(communityFeedTimer); communityFeedTimer = null; }
   if (communityToastTimer) { clearTimeout(communityToastTimer); communityToastTimer = null; }
+  communityToastLaeuft = false;
   communityEventPuffer = []; communityToastSchlange = [];
   $("#community-toast")?.classList.remove("on");
+  versteckeCmdHover();
   if (communityChannel) { sb.removeChannel(communityChannel); communityChannel = null; }
 }
 
@@ -6075,29 +6078,50 @@ function communityMeldung(gruppe, name) {
     const meta = { n };
     // Genau ein Ereignis: den Kartennamen mitnehmen, damit der Toast ihn nennt.
     // Bei mehreren wäre die Auswahl eines einzelnen Namens willkürlich.
-    if (gruppe.zeilen.length === 1 && gruppe.zeilen[0].metadata?.name)
+    if (gruppe.zeilen.length === 1 && gruppe.zeilen[0].metadata?.name) {
       meta.name = gruppe.zeilen[0].metadata.name;
-    return aktivitaetText({ kind: [...arten][0], actor_name: anzeige, metadata: meta });
+      meta.img = gruppe.zeilen[0].metadata.img;
+    }
+    // Als HTML, damit der Kartenname im Toast dieselbe Vorschau trägt wie im Feed.
+    return aktivitaetHtml({ kind: [...arten][0], actor_name: anzeige, metadata: meta });
   }
-  return t("community.toast.multi", { name: anzeige, n: gruppe.zeilen.length });
+  return esc(t("community.toast.multi", { name: anzeige, n: gruppe.zeilen.length }));
 }
 
 /* Die Schlange nacheinander abarbeiten. Erst wenn eine Meldung abgelaufen ist,
    kommt die nächste — sonst überschriebe eine die andere. */
+const COMMUNITY_TOAST_DAUER = 3000;
+
 function zeigeNaechsteCommunityMeldung() {
-  if (communityToastTimer || !communityToastSchlange.length) return;
+  if (communityToastLaeuft || !communityToastSchlange.length) return;
   const el = $("#community-toast");
   if (!el) { communityToastSchlange = []; return; }   // Markup fehlt — nicht sammeln
-  el.textContent = communityToastSchlange.shift();
+  communityToastLaeuft = true;
+  el.innerHTML = communityToastSchlange.shift();
   el.classList.add("on");
+  wireCommunityKartenHover(el);
+  // Wer auf den Kartennamen zeigt, will die Vorschau ansehen — solange hält die
+  // Meldung an, sonst verschwände sie unter dem Mauszeiger. Danach läuft die
+  // Zeit von vorn, statt sofort abzubrechen.
+  el.querySelectorAll(".cf-card").forEach(k => {
+    k.addEventListener("mouseenter", () => clearTimeout(communityToastTimer));
+    k.addEventListener("mouseleave", communityToastUhr);
+  });
+  communityToastUhr();
+}
+
+function communityToastUhr() {
+  clearTimeout(communityToastTimer);
   communityToastTimer = setTimeout(() => {
-    el.classList.remove("on");
+    $("#community-toast")?.classList.remove("on");
+    versteckeCmdHover();   // Vorschau nicht über die Meldung hinaus stehen lassen
     // Kurze Lücke, damit zwei Meldungen nicht ineinander blenden.
     communityToastTimer = setTimeout(() => {
       communityToastTimer = null;
+      communityToastLaeuft = false;
       zeigeNaechsteCommunityMeldung();
     }, 300);
-  }, 3000);
+  }, COMMUNITY_TOAST_DAUER);
 }
 
 /* Relative Zeit in Worten. Bewusst grob — auf die Minute genau zu sein wäre für
