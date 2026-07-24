@@ -5467,6 +5467,17 @@ function renderSettings() {
             value="${prefWert("synLimit") ?? ""}" placeholder="18"></div>
       </div>
       <p class="hint">${esc(t("set.searchHint"))}</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">${esc(t("community.vis.title"))}</h3>
+      <div class="row">
+        <div style="flex:none;min-width:260px"><select id="set-community-vis">${
+          SICHTBARKEITEN.map(v =>
+            `<option value="${v}"${v === communitySichtbarkeit() ? " selected" : ""}>${esc(t("community.vis." + v))}</option>`).join("")
+        }</select></div>
+      </div>
+      <p class="hint">${esc(t("community.vis." + communitySichtbarkeit() + "Hint"))}</p>
+      <p class="hint">${esc(t("community.vis.note"))}</p>
     </div>${IS_ADMIN ? `
     <div class="card">
       <h3 style="margin-top:0">${esc(t("admin.title"))}</h3>
@@ -5489,6 +5500,7 @@ function renderSettings() {
   });
   $("#set-pagesize").onchange = ev => pageSizeSpeichern(parseInt(ev.target.value));
   $("#set-synmode").onchange = ev => synModusSetzen(ev.target.value);
+  $("#set-community-vis").onchange = ev => communitySichtbarkeitSpeichern(ev.target.value);
   // Such- & Vorschlags-Einstellungen: sofort speichern (Profil, alle Geräte).
   $$("#v-settings [data-pref]").forEach(cb => cb.onchange = async () => {
     cb.disabled = true;
@@ -5786,6 +5798,34 @@ async function suchPrefSpeichern(patch) {
   const { error } = await sb.from("profiles").update({ search_prefs: neu }).eq("id", USER.id);
   if (error) throw error;
   PROFILE.search_prefs = neu;
+}
+
+/* Sichtbarkeit im Community-Feed (profiles.community_visibility). Durchgesetzt
+   wird sie in der Datenbank beim Schreiben — hier steht nur die Auswahl. */
+const SICHTBARKEITEN = ["public", "anonymous", "private"];
+function communitySichtbarkeit() {
+  const v = PROFILE?.community_visibility;
+  return SICHTBARKEITEN.includes(v) ? v : "public";
+}
+
+async function communitySichtbarkeitSpeichern(wert) {
+  if (!SICHTBARKEITEN.includes(wert)) return;
+  const vorher = communitySichtbarkeit();
+  if (wert === vorher) return;
+  // „anonym" und „privat" räumen die bisherigen Einträge mit auf; das lässt
+  // sich nicht zurücknehmen. Deshalb vorher fragen.
+  if (wert !== "public") {
+    const ok = await confirmDlg(`<p>${esc(t("community.vis.confirm" + (wert === "private" ? "Private" : "Anon")))}</p>`);
+    if (!ok) { renderSettings(); return; }
+  }
+  try {
+    const { error } = await sb.from("profiles").update({ community_visibility: wert }).eq("id", USER.id);
+    if (error) throw error;
+    PROFILE.community_visibility = wert;
+    // Der Feed sieht danach anders aus — frisch holen statt raten.
+    await ladeCommunityFoundation();
+    toast(t("community.vis.saved"));
+  } catch (e) { toast(dbErr(e)); renderSettings(); }
 }
 
 /* Karten je Sammlungsseite speichern (Profil-Einstellung, gilt damit auf allen
