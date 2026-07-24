@@ -981,3 +981,12 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px}
 .cf-caret{ font-size:10px; line-height:1; }
 .cf-count{ margin-left:auto; font-variant-numeric:tabular-nums;
            text-transform:none; letter-spacing:0; }
+
+/* Kartenname im Community-Feed: als anfassbar erkennbar, ohne wie ein Link zu
+   schreien. Die Vorschau haengt per JS daran (nur auf Hover-faehigen Geraeten,
+   deshalb der Cursor auch nur dort). */
+.cf-card{ color:var(--acc); font-weight:600; }
+@media (hover: hover){
+  .cf-card[data-cmd-img]{ cursor:help; text-decoration:underline;
+                          text-decoration-style:dotted; text-underline-offset:2px; }
+}

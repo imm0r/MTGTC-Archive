@@ -6032,7 +6032,12 @@ function communityMeldung(gruppe, name) {
   const arten = new Set(gruppe.zeilen.map(r => r.kind));
   if (arten.size === 1) {
     const n = gruppe.zeilen.reduce((s, r) => s + (Number(r.metadata?.n) || 1), 0);
-    return aktivitaetText({ kind: [...arten][0], actor_name: anzeige, metadata: { n } });
+    const meta = { n };
+    // Genau ein Ereignis: den Kartennamen mitnehmen, damit der Toast ihn nennt.
+    // Bei mehreren wäre die Auswahl eines einzelnen Namens willkürlich.
+    if (gruppe.zeilen.length === 1 && gruppe.zeilen[0].metadata?.name)
+      meta.name = gruppe.zeilen[0].metadata.name;
+    return aktivitaetText({ kind: [...arten][0], actor_name: anzeige, metadata: meta });
   }
   return t("community.toast.multi", { name: anzeige, n: gruppe.zeilen.length });
 }
@@ -6083,9 +6088,12 @@ function aktivitaetText(row) {
   // Anzahl in metadata.n ab. Solche Zeilen bekommen einen Mehrzahl-Text;
   // laufende Trigger-Einträge haben kein n und bleiben in der Einzahl.
   const n = Number(row.metadata?.n) || 1;
-  const params = { name: anzeige, n };
+  const karte = (row.metadata?.name || "").trim();
+  const params = { name: anzeige, n, karte };
   const kandidaten = [
     ...(n > 1 ? ["community.kind." + row.kind + "_n"] : []),
+    // Einzelnes Ereignis mit Kartenname → die Fassung, die die Karte nennt.
+    ...(karte && n === 1 ? ["community.kind." + row.kind + "_named"] : []),
     "community.kind." + row.kind,
     "community.kind.unknown",
   ];
@@ -6111,12 +6119,48 @@ function communityStatsHtml() {
     `<div class="stat"><div class="v">${esc(zahl(v))}</div><div class="k">${esc(k)}</div></div>`).join("")}</div>`;
 }
 
+/* Wie aktivitaetText, nur als HTML: Ist ein Kartenname hinterlegt, wird er zu
+   einem eigenen Element mit Hover-Vorschau. Der Name kommt aus fremden Daten
+   und darf kein Markup einschleusen — deshalb steht im Text zunächst ein
+   Platzhalter, der die Maskierung unbeschadet übersteht (esc() fasst nur
+   & < > " ' an) und erst danach durch das fertige Element ersetzt wird. */
+const KARTEN_PLATZHALTER = " karte ";
+
+function aktivitaetHtml(row) {
+  const karte = (row.metadata?.name || "").trim();
+  const n = Number(row.metadata?.n) || 1;
+  // Ohne Namen, bei anderer Art oder bei zusammengefassten Einträgen (die
+  // stehen für viele Karten) bleibt es beim bisherigen Satz.
+  if (!karte || row.kind !== "card_added" || n > 1) return esc(aktivitaetText(row));
+
+  const name = (row.actor_name || "").trim();
+  const anzeige = (!name || name === "Ein Mitglied") ? t("community.anonMember") : name;
+  const schluessel = "community.kind.card_added_named";
+  const text = t(schluessel, { name: anzeige, karte: KARTEN_PLATZHALTER });
+  if (text === schluessel) return esc(aktivitaetText(row));   // Übersetzung fehlt
+
+  const img = row.metadata?.img || "";
+  const el = `<span class="cf-card"${img ? ` data-cmd-img="${esc(img)}" data-cmd-name="${esc(karte)}"` : ""}>${esc(karte)}</span>`;
+  return esc(text).split(KARTEN_PLATZHALTER).join(el);
+}
+
 function communityFeedHtml() {
   if (!COMMUNITY_FEED.length)
     return `<p class="hint" style="margin:0">${esc(t("community.feedEmpty"))}</p>`;
   return `<ul class="community-feed">${COMMUNITY_FEED.map(r =>
-    `<li><span class="cf-text">${esc(aktivitaetText(r))}</span>` +
+    `<li><span class="cf-text">${aktivitaetHtml(r)}</span>` +
     `<span class="cf-time">${esc(relativeZeit(r.occurred_at))}</span></li>`).join("")}</ul>`;
+}
+
+/* Kartenvorschau an die Namen im Feed hängen — dieselbe schwebende Vorschau
+   wie bei Commander- und Combo-Karten. Nicht showHover(): das sucht in CARDS,
+   also der EIGENEN Sammlung, und fremde Karten stehen da nicht drin. */
+function wireCommunityKartenHover(root) {
+  if (!HOVER_OK || !root) return;
+  root.querySelectorAll(".cf-card[data-cmd-img]").forEach(el => {
+    el.addEventListener("mousemove", e => zeigeCmdHover(el.dataset.cmdImg, el.dataset.cmdName, e.clientX, e.clientY));
+    el.addEventListener("mouseleave", versteckeCmdHover);
+  });
 }
 
 /* Der Feed lässt sich zuklappen; die Wahl überlebt den Ansichtswechsel — wie
@@ -6154,6 +6198,7 @@ function zeigeCommunity() {
   if (!el) return;
   el.innerHTML = communityBodyHtml();
   wireCommunityFeedToggle();
+  wireCommunityKartenHover(el);
 }
 
 /* Eigene Ansicht statt Anhängsel am Dashboard: das Dashboard beantwortet „was
@@ -6168,6 +6213,7 @@ function renderCommunity() {
       <div id="community-body">${communityBodyHtml()}</div>
     </div>`;
   wireCommunityFeedToggle();
+  wireCommunityKartenHover(el);
   // Beim Login geladen; war das erfolglos oder steht die Ansicht früher, hier
   // nachziehen. Kein Kreislauf: ladeCommunityFoundation() ruft nur zeigeCommunity().
   if (!COMMUNITY_STATS && !COMMUNITY_FEED.length) ladeCommunityFoundation().catch(() => {});
