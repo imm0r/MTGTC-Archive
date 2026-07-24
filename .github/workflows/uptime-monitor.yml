@@ -53,10 +53,10 @@ jobs:
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -m 10 "https://api.supabase.com/health")
           echo "supabase_status=$HTTP_CODE" >> $GITHUB_OUTPUT
           if [ "$HTTP_CODE" != "200" ]; then
-            echo "❌ Supabase API (Auth) returned HTTP $HTTP_CODE"
+            echo "❌ Supabase API returned HTTP $HTTP_CODE"
             exit 1
           fi
-          echo "✅ Supabase API (Auth) is healthy"
+          echo "✅ Supabase API is healthy"
 
       - name: Create uptime report
         if: always()
