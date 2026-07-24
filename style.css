@@ -967,3 +967,26 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px}
 .cf-text{ flex:1; min-width:0; color:var(--txt); }
 .cf-time{ flex:none; font-size:12px; color:var(--dim);
           font-variant-numeric:tabular-nums; white-space:nowrap; }
+
+/* Community-Toast: sitzt oben unter der Kopfzeile, damit Meldungen aus dem
+   Feed die Rückmeldung zur eigenen Aktion (unten) nicht verdecken. */
+.toast-top{ top:76px; bottom:auto; }
+
+/* Feed-Kopf als Schalter zum Ein- und Ausklappen. */
+.cf-toggle{ display:flex; align-items:center; gap:8px; width:100%;
+            background:none; border:0; padding:0; margin:0 0 8px; cursor:pointer;
+            font-size:12px; color:var(--dim); text-transform:uppercase;
+            letter-spacing:.6px; text-align:left; }
+.cf-toggle:hover{ color:var(--txt); }
+.cf-caret{ font-size:10px; line-height:1; }
+.cf-count{ margin-left:auto; font-variant-numeric:tabular-nums;
+           text-transform:none; letter-spacing:0; }
+
+/* Kartenname im Community-Feed: als anfassbar erkennbar, ohne wie ein Link zu
+   schreien. Die Vorschau haengt per JS daran (nur auf Hover-faehigen Geraeten,
+   deshalb der Cursor auch nur dort). */
+.cf-card{ color:var(--acc); font-weight:600; }
+@media (hover: hover){
+  .cf-card[data-cmd-img]{ cursor:help; text-decoration:underline;
+                          text-decoration-style:dotted; text-underline-offset:2px; }
+}
