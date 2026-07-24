@@ -6021,9 +6021,21 @@ function aktivitaetText(row) {
   // Sprint-1-Fassung lieferte stattdessen ein deutsches Literal. Beides wird
   // hier in die aktuelle Oberflächensprache übersetzt.
   const anzeige = (!name || name === "Ein Mitglied") ? t("community.anonMember") : name;
-  const key = "community.kind." + row.kind;
-  const txt = t(key, { name: anzeige });
-  return txt === key ? t("community.kind.unknown", { name: anzeige }) : txt;
+  // Der einmalige Rückstand fasst pro Person und Tag zusammen und legt die
+  // Anzahl in metadata.n ab. Solche Zeilen bekommen einen Mehrzahl-Text;
+  // laufende Trigger-Einträge haben kein n und bleiben in der Einzahl.
+  const n = Number(row.metadata?.n) || 1;
+  const params = { name: anzeige, n };
+  const kandidaten = [
+    ...(n > 1 ? ["community.kind." + row.kind + "_n"] : []),
+    "community.kind." + row.kind,
+    "community.kind.unknown",
+  ];
+  for (const key of kandidaten) {
+    const txt = t(key, params);
+    if (txt !== key) return txt;   // t() gibt den Schlüssel zurück, wenn er fehlt
+  }
+  return t("community.kind.unknown", params);
 }
 
 function communityStatsHtml() {
