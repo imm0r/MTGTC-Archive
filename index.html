@@ -374,6 +374,12 @@
 
 <script src="i18n.js?v=156"></script>
 <script src="app.js?v=162"></script>
-<script type="module" src="/analytics.js"></script>
+<!-- Vercel Web Analytics. Bewusst als einfaches Script-Tag statt über das
+     npm-Paket: das Paket braucht einen Bundler, und ein Bundler passt nicht zu
+     einer Anwendung, die ihre Skripte direkt lädt und über ?v= frisch hält.
+     Der Endpunkt wird von Vercel selbst ausgeliefert, wenn Web Analytics für
+     das Projekt aktiviert ist; lokal gibt es ihn nicht und das Tag läuft
+     wirkungslos ins Leere. -->
+<script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>
