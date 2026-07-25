@@ -310,6 +310,11 @@ Lebenspunkte aller Mitspieler samt Friedhof. Die Hand liegt als Fächer darunter
 — da, wo man sie am Tisch hält. Ein quer gehaltenes Handy erreicht diese Breite
 und bekommt die Matte automatisch.
 
+Die Spielrunde darf dabei **breiter werden als der Rest der App** (1800 statt
+1100 px): die Mattenspalten sind fest, alles Zusätzliche geht ans Schlachtfeld,
+an die Länder und an den Handfächer. Auf einem 3440-px-Monitor wächst das
+Schlachtfeld damit von 628 auf 1328 px.
+
 Darunter — also auf einem hochkant gehaltenen Handy — steht dasselbe als
 **Akkordeon**: eine Zone auf einmal. Das ist keine Bequemlichkeit, sondern
 Notwendigkeit: von den schmalen Mattenspalten blieben bei 390 px rund 50 px
@@ -346,8 +351,16 @@ darf sie ihre Marken nicht der Zwillingsschwester dalassen.
 **Bibliothek: suchen statt scrollen.** Am Tisch ziehst du physisch und musst der
 App nur sagen, *welche* Karte es war — dafür steht dort ein Suchfeld statt einer
 Dauerliste. Die ganze Bibliothek ist einen Klick entfernt, wenn du sehen willst,
-was noch drin ist. Jede Zeile zeigt dieselben Angaben wie die Sammlung: Bild,
-Name, Manakosten, Set, Anzahl.
+was noch drin ist.
+
+Eine Zeile trägt dabei **nur Kartenname und Anzahl**. Alles Weitere steht in der
+**Kartenansicht für den Spielmodus**: Zeigen blendet sie neben dem Zeiger ein —
+Bild, Manakosten, Typzeile, Regeltext —, Klicken hält sie fest. Erst dann wird
+sie bedienbar und trägt die Zielknöpfe. Das ist bewusst nicht die Detailkarte aus
+der Sammlung: Preis, Preisverlauf, Zustand und Deckzugehörigkeit sind am Tisch
+ohne Belang und stünden nur im Weg. Und eine Bibliothek hat schnell 90 Zeilen —
+jede mit Bild, Set und vier Knöpfen zu bestücken machte sie in der schmalen
+Mattenspalte unlesbar.
 
 **Commander-Steuer.** Wanderst du deinen Commander aus der Kommandozone aufs
 Feld, zählt die App das Wirken mit und zeigt am Kartenbild, was das nächste Mal
