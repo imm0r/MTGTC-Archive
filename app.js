@@ -8429,27 +8429,92 @@ function zoneLibHtml() {
 }
 const libFilter = () => $("#lib-suche")?.value || "";
 
-/* Eine Bibliothekszeile: dieselben Angaben wie in der Sammlung (Bild, Name,
-   Mana, Set, Anzahl), aber als schmale Zeile statt als Tabelle — eine
-   Kopfzeile und Tabellenpolster brauchte hier niemand. */
+/* Eine Bibliothekszeile: NUR Name und Anzahl.
+   Alles andere — Bild, Manakosten, Typ, Regeltext und die Zielknöpfe — steht in
+   der Kartenansicht, die beim Zeigen aufgeht und beim Klick stehen bleibt. Eine
+   Bibliothek hat schnell 90 Zeilen; jede davon mit Bild, Set und vier Knöpfen
+   zu bestücken machte sie in der schmalen Mattenspalte unlesbar und auf dem
+   Handy unbedienbar. Der Name ist das, wonach man sucht — der Rest ist einen
+   Zeiger entfernt. */
 function libZeileHtml(c, n) {
-  const nm = trkName(c);
-  return `<div class="lib-zeile" data-id="${esc(c.id)}">
-    ${c.img ? `<img class="lib-bild" src="${esc(c.img)}" alt="" loading="lazy" data-view
-           title="${esc(t("row.viewTitle"))}">` : `<span class="lib-bild leer"></span>`}
-    <span class="lib-nm" data-view title="${esc(t("row.viewTitle"))}">${esc(nm)}</span>
-    <span class="lib-mana">${manaHtml(c.mana_cost)}</span>
-    <span class="lib-set" title="${esc(c.set_name || c.set || "")}">${
-      setSymbol(c.set, c.rarity)}${esc((c.set || "").toUpperCase())}</span>
+  return `<div class="lib-zeile" data-id="${esc(c.id)}" data-spk="${esc(c.id)}" tabindex="0"
+       role="button" title="${esc(t("spk.openHint"))}">
+    <span class="lib-nm">${esc(trkName(c))}</span>
     <span class="lib-n">${n}</span>
-    <span class="lib-akt">${zoneAktHtml(c.id, "lib")}</span>
   </div>`;
+}
+
+/* ---- Kartenansicht für den Spielmodus -------------------------------
+   Eine eigene Ansicht, nicht die aus der Sammlung: am Tisch zählt, was auf der
+   Karte steht — Bild, Kosten, Typ, Regeltext. Preis, Preisverlauf, Zustand und
+   Deckzugehörigkeit sind hier ohne Belang und stünden nur im Weg.
+
+   Zwei Zustände: beim Zeigen schwebt sie neben dem Zeiger und ist für Klicks
+   durchlässig; beim Klick friert sie an Ort und Stelle ein, wird bedienbar und
+   trägt dann die Zielknöpfe. So kostet Nachschlagen nichts und Verschieben
+   einen zweiten Klick — an einer Stelle, an der man die Karte gerade ohnehin
+   ansieht. */
+let spkEl = null, spkFest = null, spkTimer = null;
+
+function spkHuelle() {
+  if (!spkEl) {
+    spkEl = document.createElement("div");
+    spkEl.className = "spk";
+    document.body.appendChild(spkEl);
+    // Die angeheftete Ansicht hängt am body, nicht in #zonen — die Delegation
+    // dort greift also nicht, sie braucht ihren eigenen Klickfänger.
+    spkEl.onclick = e => {
+      const mv = e.target.closest("[data-move]");
+      if (mv) { versteckeSpielKarte(true); return zoneMove(mv.dataset.move, mv.dataset.von, mv.dataset.nach, mv.dataset.idx); }
+      if (e.target.closest("[data-spk-zu]")) versteckeSpielKarte(true);
+    };
+  }
+  return spkEl;
+}
+
+function spielKarteHtml(c, zone, fest) {
+  // Scryfall-Bild-URLs tragen die Größe im Pfad — aus small wird normal.
+  const gross = (c.img || "").replace("/small/", "/normal/");
+  return `${fest ? `<button class="spk-zu" data-spk-zu title="${esc(t("dlg.close"))}">&times;</button>` : ""}
+    ${gross ? `<img class="spk-bild" src="${esc(gross)}" alt="">` : ""}
+    <div class="spk-text">
+      ${faceTopHtml(c)}
+      ${faceBottomHtml(c, true)}
+      <div class="hint" style="margin-top:4px">${setSymbol(c.set, c.rarity)}${
+        esc(c.set_name || c.set || "")} &middot; #${esc(c.cn)}</div>
+    </div>
+    ${fest ? `<div class="spk-akt">${zoneAktHtml(c.id, zone)}</div>`
+           : `<div class="spk-tipp">${esc(t("spk.clickHint"))}</div>`}`;
+}
+
+function zeigeSpielKarte(id, x, y, zone, fest) {
+  const c = CARDS.find(k => k.id === id);
+  if (!c) return;
+  const el = spkHuelle();
+  el.innerHTML = spielKarteHtml(c, zone, fest);
+  el.classList.toggle("fest", !!fest);
+  el.style.display = "block";
+  spkFest = fest ? { id, zone } : null;
+  // Erst einblenden, dann messen und in den Schirm rücken.
+  el.style.left = "0px"; el.style.top = "0px";
+  const r = el.getBoundingClientRect();
+  let l = x + 18, o = y + 12;
+  if (l + r.width > innerWidth - 8) l = Math.max(8, x - r.width - 18);
+  if (o + r.height > innerHeight - 8) o = Math.max(8, innerHeight - r.height - 8);
+  el.style.left = l + "px"; el.style.top = o + "px";
+}
+
+function versteckeSpielKarte(auchFest) {
+  clearTimeout(spkTimer);
+  if (spkFest && !auchFest) return;   // Angeheftetes bleibt stehen
+  spkFest = null;
+  if (spkEl) { spkEl.style.display = "none"; spkEl.classList.remove("fest"); }
 }
 
 /* ---- Zeichnen und Verdrahten ---------------------------------------- */
 function renderZonen() {
   // Die Vorschauen hängen an Elementen, die es gleich nicht mehr gibt.
-  hideHover(); versteckeCmdHover();
+  hideHover(); versteckeCmdHover(); versteckeSpielKarte(true);
   const el = $("#zonen");
   if (!el) return;
   const suchtext = libFilter(), fokus = document.activeElement?.id === "lib-suche";
@@ -8493,18 +8558,18 @@ function wireZonenHover() {
     el.addEventListener("mousemove", e => zeigeCmdHover(el.dataset.handImg, el.dataset.handName, e.clientX, e.clientY));
     el.addEventListener("mouseleave", versteckeCmdHover);
   });
-  // Bibliothekszeilen: dieselbe große Detailkarte wie in der Sammlung.
-  $$("#zonen .lib-zeile").forEach(z => {
-    const id = z.dataset.id;
-    z.querySelectorAll("[data-view]").forEach(el => {
-      el.style.cursor = "pointer";
-      el.onclick = () => { hideHover(); showCardDetail(id); };
-      el.addEventListener("mouseenter", e => {
-        clearTimeout(hoverTimer);
-        hoverTimer = setTimeout(() => showHover(id, e.clientX, e.clientY), 300);
-      });
-      el.addEventListener("mouseleave", hideHover);
+  // Bibliothekszeilen: Zeigen blendet die Spielmodus-Kartenansicht ein, Klick
+  // heftet sie fest. Der Klick wird unten am ganzen Behälter delegiert, damit
+  // er auch ohne Maus (Touch, Tastatur) funktioniert.
+  $$("#zonen .lib-zeile[data-spk]").forEach(z => {
+    const id = z.dataset.spk;
+    z.addEventListener("mouseenter", e => {
+      if (spkFest) return;
+      clearTimeout(spkTimer);
+      const x = e.clientX, y = e.clientY;
+      spkTimer = setTimeout(() => zeigeSpielKarte(id, x, y, "lib", false), 250);
     });
+    z.addEventListener("mouseleave", () => versteckeSpielKarte());
   });
 }
 
@@ -8543,6 +8608,19 @@ function wireZonen() {
     if (st) return cmdSteuer(st.dataset.steuer, parseInt(st.dataset.d, 10));
     const alle = e.target.closest("#lib-alle");
     if (alle) { libAlle = !libAlle; return renderZonen(); }
+    const spk = e.target.closest("[data-spk]");
+    if (spk) {
+      const r = spk.getBoundingClientRect();
+      return zeigeSpielKarte(spk.dataset.spk, r.right, r.top, "lib", true);
+    }
+  };
+  zonen.onkeydown = e => {
+    const spk = e.target.closest?.("[data-spk]");
+    if (spk && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault();
+      const r = spk.getBoundingClientRect();
+      zeigeSpielKarte(spk.dataset.spk, r.right, r.top, "lib", true);
+    }
   };
   zonen.oninput = e => { if (e.target.id === "lib-suche") renderLibListe(); };
   wireZonenHover();
@@ -9184,6 +9262,10 @@ function wireApp() {
   $$("nav button[data-v]").forEach(b => b.onclick = () => {
     $$("nav button[data-v]").forEach(x => x.classList.toggle("on", x === b));
     $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + b.dataset.v));
+    // Die Spielrunde darf breiter werden als der Rest: die Matte hat feste
+    // schmale Spalten, alles Zusätzliche geht ans Schlachtfeld und die Hand.
+    // Auf einem 3440er saß sonst der ganze Tisch in 1100 px.
+    document.body.classList.toggle("breit", b.dataset.v === "session");
     $("#who-menu")?.classList.remove("open");   // Menüauswahl klappt das Menü zu
     if (b.dataset.v === "profile") renderProfile();
     if (b.dataset.v === "dashboard") renderDashboard();
@@ -9196,6 +9278,12 @@ function wireApp() {
     if (b.dataset.v === "status") renderStatus();
     if (b.dataset.v === "settings") renderSettings();
   });
+  // Angeheftete Spielmodus-Karte: Escape und ein Klick daneben schließen sie.
+  document.addEventListener("keydown", e => { if (e.key === "Escape") versteckeSpielKarte(true); });
+  document.addEventListener("click", e => {
+    if (spkFest && !e.target.closest(".spk") && !e.target.closest("[data-spk]")) versteckeSpielKarte(true);
+  });
+
   // Klick irgendwo anders schließt das per Klick geöffnete Benutzermenü (Touch)
   // und das Sprach-Dropdown in den Einstellungen.
   document.addEventListener("click", e => {

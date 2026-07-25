@@ -39,6 +39,13 @@ nav button.on{background:var(--acc);border-color:var(--acc);color:#1a1400;font-w
 .who-menu .menu button:hover{background:var(--panel)}
 .who-menu .menu button.on{color:var(--acc);font-weight:600}
 main{padding:14px;max-width:1100px;margin:0 auto}
+/* Die Spielrunde bekommt mehr Breite als der Rest der App. Die Matte hat feste
+   schmale Spalten (Steuer, Kommandozone, Bibliothek, Exil, Lebenspunkte,
+   Friedhof) — alles, was darüber hinaus da ist, geht ans Schlachtfeld, an die
+   Länder und an den Handfächer. Auf einem 3440-px-Monitor saß der ganze Tisch
+   sonst in 1100 px, während rechts und links je gut ein Meter Platz brachlag.
+   1800 px ist die eine Zahl, an der das hängt. */
+body.breit main{max-width:1800px}
 .view{display:none} .view.on{display:block}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:14px}
 button,select,input,textarea{font:inherit}
@@ -552,16 +559,7 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .mat-mitte .zone-gitter,.mat-rechts .zone-gitter{--zk-b:48px;--zk-h:67px;gap:5px}
 .mat-mitte .zone-leer,.mat-rechts .zone-leer{font-size:11px;padding:6px 2px}
 .mat-mitte .lib-liste{max-height:none;margin-top:6px}
-/* In der schmalen Spalte bricht die Zeile um: Name (mit Manakosten und Anzahl)
-   oben, die Zielknöpfe darunter. Nebeneinander fraßen die vier Knöpfe die ganze
-   Breite und der Name schrumpfte auf null — eine Liste ohne Kartennamen ist
-   keine Liste. Bild und Setcode bleiben weg, der Name trägt die Erkennung. */
-.mat-mitte .lib-zeile{flex-wrap:wrap;gap:2px 5px;padding:4px}
-.mat-mitte .lib-bild,.mat-mitte .lib-set{display:none}
-.mat-mitte .lib-nm{flex:1 1 auto;min-width:52px;font-size:12px}
-.mat-mitte .lib-mana{font-size:11px}
-.mat-mitte .lib-akt{flex:1 1 100%;justify-content:flex-start}
-.mat-mitte .lib-akt .btn{padding:1px 5px;font-size:13px}
+.mat-mitte .lib-nm{font-size:12px}
 /* Commander-Steuer: was das naechste Wirken aus der Kommandozone extra kostet.
    Zugleich der Knopf, um ein zu viel gezaehltes Wirken zurueckzunehmen. */
 .mat-steuer{flex:none}
@@ -591,37 +589,40 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
   font-size:12px;color:var(--dim)}
 
 /* ---- Bibliothek: suchen statt scrollen ----
-   Dieselben Angaben wie in der Sammlung (Bild, Name, Mana, Set, Anzahl), aber
-   als schmale Zeile statt als Tabelle — Kopfzeile und Tabellenpolster brauchte
-   hier niemand. */
+   Die Zeile traegt NUR Name und Anzahl. Alles Weitere — Bild, Manakosten, Typ,
+   Regeltext und die Zielknoepfe — steht in der Spielmodus-Kartenansicht (.spk),
+   die beim Zeigen aufgeht und beim Klick stehen bleibt. Eine Bibliothek hat
+   schnell 90 Zeilen; jede mit Bild, Set und vier Knoepfen zu bestuecken machte
+   sie in der schmalen Mattenspalte unlesbar und auf dem Handy unbedienbar. */
 .lib-suchzeile input{margin:0}
 .lib-liste{display:flex;flex-direction:column;gap:1px;max-height:300px;overflow-y:auto;margin-top:8px}
-.lib-zeile{display:flex;align-items:center;gap:8px;padding:3px 4px;border-radius:6px;position:relative}
-.lib-zeile:hover{background:var(--panel2)}
-.lib-bild{width:26px;height:36px;object-fit:cover;border-radius:3px;background:#000;flex:none;cursor:pointer}
-.lib-bild.leer{background:var(--panel2)}
-.lib-nm{flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
-.lib-mana{flex:none;white-space:nowrap}
-.lib-mana .ms{margin:0 .5px}
-.lib-set{flex:none;font-size:11px;color:var(--dim);white-space:nowrap}
-.lib-n{flex:none;min-width:18px;text-align:right;font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
-/* Anders als bei den Kartenbildern stehen die Zielknöpfe hier fest in der
-   Zeile: ein Treffer soll mit einem Klick auf die Hand wandern, ohne dass man
-   ihn erst „aufnehmen" muss. */
-.lib-akt{flex:none;display:flex;gap:3px}
-.lib-akt .btn{padding:2px 6px;font-size:14px;line-height:1.3}
+.lib-zeile{display:flex;align-items:center;gap:8px;padding:3px 6px;border-radius:6px;cursor:pointer;outline:none}
+.lib-zeile:hover,.lib-zeile:focus-visible{background:var(--panel2)}
+.lib-zeile:focus-visible{box-shadow:0 0 0 1px var(--acc) inset}
+.lib-nm{flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lib-n{flex:none;min-width:16px;text-align:right;font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
 .lib-alle{margin-top:8px}
-/* Schmale Schirme: dieselbe Umbruch-Behandlung wie in der Mattenspalte. Bild,
-   Name und Manakosten oben, die Zielknöpfe darunter — nebeneinander blieben
-   dem Namen keine 50 px, und eine Bibliothek, in der man die Karte nicht
-   lesen kann, ist keine Hilfe. */
-@media (max-width:640px){
-  .lib-zeile{flex-wrap:wrap;gap:3px 6px}
-  .lib-set{display:none}
-  .lib-nm{flex:1 1 auto;min-width:90px}
-  .lib-akt{flex:1 1 100%;justify-content:flex-start}
-  .lib-akt .btn{padding:2px 8px}
-}
+
+/* ===== Kartenansicht im Spielmodus =====
+   Beim Zeigen schwebt sie neben dem Zeiger und ist fuer Klicks durchlaessig;
+   beim Klick friert sie ein (.fest), wird bedienbar und traegt die Zielknoepfe.
+   Bewusst nicht die Sammlungs-Detailkarte: Preis, Preisverlauf, Zustand und
+   Deckzugehoerigkeit sind am Tisch ohne Belang und stuenden nur im Weg. */
+.spk{position:fixed;z-index:96;display:none;pointer-events:none;width:300px;max-width:88vw;
+  background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;
+  box-shadow:0 12px 38px #000d}
+.spk.fest{pointer-events:auto;border-color:var(--acc)}
+.spk-bild{display:block;width:100%;border-radius:8px}
+.spk-text{margin-top:8px}
+.spk-text .name-zeile{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.spk-tipp{margin-top:8px;font-size:11px;color:var(--dim);text-align:center}
+.spk-akt{display:flex;gap:5px;justify-content:center;margin-top:10px;
+  padding-top:9px;border-top:1px solid var(--line)}
+.spk-akt .btn{padding:4px 10px;font-size:16px}
+.spk-zu{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:12px;
+  border:1px solid var(--line);background:var(--panel2);color:var(--dim);cursor:pointer;
+  font-size:15px;line-height:1;z-index:2}
+.spk-zu:hover{border-color:var(--acc);color:var(--acc)}
 
 /* ---- Spielerkacheln: flach statt gestapelt ----
    Avatar, Name/Deck und Lebenspunkte nebeneinander; gestapelt füllten vier
@@ -666,7 +667,6 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
   [data-zone="hand"]{--hk-b:74px}
   .zone-name{font-size:11px}
   .zone-gitter{--zk-b:62px;--zk-h:86px}
-  .lib-set{display:none}
 }
 @media (max-width:430px){
   [data-zone="hand"]{--hk-b:60px;--hk-f:.7}
