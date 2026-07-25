@@ -44,7 +44,7 @@ const SCHEMA = {
           name: { type: "string", description: "Exakter englischer Kartenname einer ECHTEN Magic-Karte." },
           reason: { type: "string", description: "Ein einziger, konkreter Satz: der Synergie-MECHANISMUS (nicht bloß 'starke Karte'). In der gewünschten Sprache." },
           replaces: { type: "string", description: "Nur wenn das Deck voll ist: der EXAKTE englische Name EINER Karte aus der übergebenen Deckliste, die für diesen Vorschlag weichen sollte. Nicht der Commander. Sonst leerer String." },
-          replacesWhy: { type: "string", description: "Nur wenn replaces gesetzt ist: ein einziger, konkreter Satz, WARUM genau diese Karte weichen sollte — was sie im Deck schlechter leistet als der Vorschlag. Nicht 'sie ist schwächer', sondern der Grund. In der gewünschten Sprache. Sonst leerer String." },
+          replacesWhy: { type: "string", description: "Nur wenn replaces gesetzt ist: ein einziger, konkreter Satz, WARUM genau diese Karte weichen sollte — gestützt AUSSCHLIESSLICH auf den in der Kartenliste gelieferten Regeltext dieser Karte. Nicht 'sie ist schwächer', sondern der Grund. In der gewünschten Sprache. Sonst leerer String." },
         },
         required: ["name", "reason", "replaces", "replacesWhy"],
         additionalProperties: false,
@@ -52,6 +52,49 @@ const SCHEMA = {
     },
   },
   required: ["suggestions"],
+  additionalProperties: false,
+} as const;
+
+/* Verfahren C — der Beleg. Ein Zitat laesst sich pruefen, eine Behauptung
+   nicht: deshalb ist die Textstelle WOERTLICH verlangt und wird hinterher
+   gegen den gelieferten Regeltext gehalten. Findet sie sich dort nicht, hat
+   das Modell erfunden.
+
+   Der leere String ist ausdruecklich erlaubt: stuetzt sich die Begruendung
+   auf das FEHLEN eines Effekts oder auf die Manakosten, gibt es keine Stelle
+   zum Zitieren. Ohne diese Ausnahme wuerde das Modell eine erfinden — genau
+   das Verhalten, das wir abstellen wollen. */
+const SCHEMA_BELEG = structuredClone(SCHEMA) as Record<string, any>;
+{
+  const it = SCHEMA_BELEG.properties.suggestions.items;
+  it.properties.replacesQuote = {
+    type: "string",
+    description: "Nur wenn replaces gesetzt ist: die WÖRTLICHE Textstelle aus dem oben gelieferten Regeltext GENAU DIESER Karte, auf die sich replacesWhy stützt — Zeichen für Zeichen kopiert, englisch wie geliefert, nicht übersetzt und nicht umformuliert. Höchstens ein Satz. Stützt sich die Begründung auf das FEHLEN eines Effekts oder allein auf die Manakosten, dann leerer String — erfinde in dem Fall keine Stelle.",
+  };
+  it.required = [...it.required, "replacesQuote"];
+}
+
+/* Verfahren A — das Urteil. Eigener, knapper Aufruf: hier wird geprueft,
+   nicht formuliert. Vorgelegt werden nur die strittigen Karten mit ihrem
+   Regeltext und der Behauptung. */
+const SCHEMA_URTEIL = {
+  type: "object",
+  properties: {
+    verdicts: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          card: { type: "string", description: "Exakter englischer Name der geprüften Karte, wie vorgelegt." },
+          supported: { type: "boolean", description: "true, wenn der vorgelegte Regeltext die Behauptung trägt. false, wenn die Begründung der Karte etwas zuschreibt, was ihr Regeltext nicht hergibt." },
+          note: { type: "string", description: "Bei supported=false: in EINEM kurzen Satz, was die Begründung behauptet, das der Regeltext nicht deckt. Sonst leerer String." },
+        },
+        required: ["card", "supported", "note"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["verdicts"],
   additionalProperties: false,
 } as const;
 
@@ -152,6 +195,22 @@ Deno.serve(async (req) => {
     return json({ error: (e as Error).message }, 400);
   }
 
+  // Welche Prüfverfahren gelten für DIESE Person? effective_features() führt
+  // den globalen Schalter und die Einzelfreigabe zusammen — dieselbe Abfrage,
+  // die auch die Oberfläche stellt, damit beide nie Verschiedenes glauben.
+  // Entscheidend ist, dass die Antwort HIER fällt und nicht im Client: sonst
+  // könnte jeder ein Verfahren anfordern, für das er nicht freigeschaltet ist,
+  // und die Kosten dafür auf unsere Rechnung auslösen.
+  // Beide greifen nur beim vollen Deck — nur dort gibt es überhaupt eine
+  // Schnitt-Begründung, die sich prüfen ließe.
+  let features: string[] = [];
+  try {
+    const { data } = await sb.rpc("effective_features");
+    features = Array.isArray(data) ? data : [];
+  } catch { features = []; }
+  const mitBeleg  = mode === "deck" && deckVoll && features.includes("verify_cite");
+  const mitUrteil = mode === "deck" && deckVoll && features.includes("verify_model");
+
   const farbHinweis = colors
     ? `\n- Farbidentität: Jede genannte Karte muss in die Farbidentität {${colors}} passen (alle Mana-Symbole und Farbidentitäts-Anteile liegen innerhalb dieser Farben).`
     : "";
@@ -189,7 +248,7 @@ Strikte Regeln:
 Kartenliste (${deckCards.length})${hatText ? " mit Typzeile und Regeltext" : ""}:
 ${kartenBlock}
 
-Nenne ${n} Karten, die die Strategie dieses Decks am besten ergänzen.${deckVoll ? "\n\nDas Deck ist VOLL (100 Karten). Nenne deshalb je Vorschlag im Feld replaces den exakten englischen Namen EINER Karte aus der obigen Liste, die dafür weichen sollte — die schwächste oder am wenigsten zur Strategie passende. Niemals den Commander. Jede Karte höchstens einmal nennen.\n\nBegründe in replacesWhy in EINEM Satz, warum genau diese Karte weichen sollte: was sie in diesem Deck konkret schlechter leistet als der Vorschlag — zu langsam, redundant zu einer bereits vorhandenen Karte, passt nicht zur Farbidentität, zu hohe Kosten für den Effekt. Kein Allgemeinplatz wie 'sie ist schwächer'.\n\nDie Begründung muss sich auf den OBEN GELIEFERTEN Regeltext dieser Karte stützen. Schreibe der Karte nichts zu, was dort nicht steht — kein Effekt, kein Tokentyp, kein Zählmarken-Verhalten. Passt der gelieferte Text nicht zu dem, was du über den Namen zu wissen glaubst, gilt der Text." : ""}`
+Nenne ${n} Karten, die die Strategie dieses Decks am besten ergänzen.${deckVoll ? `\n\nDas Deck ist VOLL (100 Karten). Nenne deshalb je Vorschlag im Feld replaces den exakten englischen Namen EINER Karte aus der obigen Liste, die dafür weichen sollte — die schwächste oder am wenigsten zur Strategie passende. Niemals den Commander. Jede Karte höchstens einmal nennen.\n\nBegründe in replacesWhy in EINEM Satz, warum genau diese Karte weichen sollte: was sie in diesem Deck konkret schlechter leistet als der Vorschlag — zu langsam, redundant zu einer bereits vorhandenen Karte, passt nicht zur Farbidentität, zu hohe Kosten für den Effekt. Kein Allgemeinplatz wie 'sie ist schwächer'.\n\nDie Begründung muss sich auf den OBEN GELIEFERTEN Regeltext dieser Karte stützen. Schreibe der Karte nichts zu, was dort nicht steht — kein Effekt, kein Tokentyp, kein Zählmarken-Verhalten. Passt der gelieferte Text nicht zu dem, was du über den Namen zu wissen glaubst, gilt der Text.${mitBeleg ? "\n\nGib zusätzlich in replacesQuote die wörtliche Stelle aus dem oben gelieferten Regeltext an, auf die sich deine Begründung stützt — Zeichen für Zeichen kopiert, englisch wie geliefert. Stützt sich die Begründung auf das FEHLEN eines Effekts oder allein auf die Manakosten, lass das Feld leer; erfinde dann keine Stelle." : ""}` : ""}`
     : `Ausgangskarte:
 Name: ${name}
 Typzeile: ${typeLine}
@@ -204,7 +263,11 @@ Nenne ${n} synergistische Karten.`;
   // scheiterte dann mit „Unterminated string in JSON".
   // Die Grenze ist eine Decke, keine Vorgabe: bezahlt wird, was wirklich
   // geschrieben wird, nicht was erlaubt wäre.
-  const maxTokens = mode === "deck" ? Math.min(8000, 1000 + n * 220) : 1500;
+  // Mit Beleg traegt jeder Vorschlag zusaetzlich ein Zitat — dieselbe Lehre
+  // wie beim letzten Mal: waechst das Feld, muss das Budget mitwachsen.
+  const maxTokens = mode === "deck"
+    ? Math.min(8000, 1000 + n * (mitBeleg ? 300 : 220))
+    : 1500;
 
   try {
     const anthropic = new Anthropic({ apiKey: key });
@@ -212,7 +275,7 @@ Nenne ${n} synergistische Karten.`;
       model: MODEL,
       max_tokens: maxTokens,
       system: SYSTEM,
-      output_config: { format: { type: "json_schema", schema: SCHEMA } },
+      output_config: { format: { type: "json_schema", schema: mitBeleg ? SCHEMA_BELEG : SCHEMA } },
       messages: [{ role: "user", content: [{ type: "text", text: USER }] }],
     });
 
@@ -227,16 +290,76 @@ Nenne ${n} synergistische Karten.`;
     if (!text || text.type !== "text")
       return json({ error: "Keine verwertbare Antwort" }, 502);
 
-    let parsed: unknown;
+    let parsed: Record<string, any>;
     try {
       parsed = JSON.parse(text.text);
     } catch {
       return json({ error: "Die Antwort war unvollständig und konnte nicht gelesen werden.", code: "bad_json" }, 502);
     }
 
+    let inTok = res.usage.input_tokens, outTok = res.usage.output_tokens;
+    const vorschlaege: Record<string, any>[] = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
+
+    // ---- Verfahren C: den Beleg gegen den echten Regeltext halten ----------
+    // Reiner Textvergleich, kostet nichts. Normalisiert wird grosszuegig
+    // (Kleinschreibung, Satzzeichen, Mehrfach-Leerzeichen), damit das Modell
+    // nicht an einem Gedankenstrich scheitert — geprueft wird, ob die Stelle
+    // ueberhaupt aus dieser Karte stammt, nicht ob sie perfekt abgetippt ist.
+    const norm = (s: string) => (s || "").toLowerCase()
+      .replace(/[‐-―]/g, "-").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+    const textVon = new Map(deckCards.map((c) => [c.n.toLowerCase(), norm(c.o || "")]));
+
+    if (mitBeleg) {
+      for (const s of vorschlaege) {
+        if (!s.replaces) continue;
+        const quelle = textVon.get(String(s.replaces).toLowerCase()) ?? "";
+        const zitat = norm(String(s.replacesQuote ?? ""));
+        // Ohne Zitat bleibt es ungeprueft, nicht widerlegt: die Begruendung
+        // darf sich auf das Fehlen eines Effekts oder die Kosten stuetzen.
+        s.verify = !zitat
+          ? { ok: null, method: "cite", note: "" }
+          : { ok: quelle.includes(zitat), method: "cite", quote: String(s.replacesQuote), note: "" };
+      }
+    }
+
+    // ---- Verfahren A: nur die strittigen Faelle dem Modell vorlegen --------
+    // Eskalation, kein Rundumschlag: geprueft wird, was C durchfallen liess
+    // (oder alles, wenn C nicht laeuft). Vorgelegt werden nur Regeltext und
+    // Behauptung — nicht das ganze Deck, das braucht ein Urteil nicht.
+    if (mitUrteil) {
+      const strittig = vorschlaege.filter((s) =>
+        s.replaces && s.replacesWhy && (!mitBeleg || s.verify?.ok === false || s.verify?.ok === null));
+      if (strittig.length) {
+        const vorlage = strittig.map((s, i) =>
+          `${i + 1}. Karte: ${s.replaces}\n   Regeltext: ${deckCards.find((c) => c.n.toLowerCase() === String(s.replaces).toLowerCase())?.o || "(keiner geliefert)"}\n   Behauptung: ${s.replacesWhy}`).join("\n\n");
+        try {
+          const pruef = await anthropic.messages.create({
+            model: MODEL,
+            max_tokens: Math.min(2000, 300 + strittig.length * 90),
+            system: "Du prüfst Behauptungen über Magic-Karten gegen ihren Regeltext. Für jede vorgelegte Karte entscheidest du allein anhand des MITGELIEFERTEN Regeltextes, ob er die Behauptung trägt. Ziehe KEIN Wissen aus deinem Training heran — der vorgelegte Text ist die einzige Grundlage; die Karte kann aus einem Set stammen, das du nicht kennst. Aussagen über das Fehlen eines Effekts, über Manakosten oder über die Rolle im Deck sind getragen, solange der Regeltext ihnen nicht widerspricht. Nicht getragen ist, wenn der Karte ein Effekt, ein Tokentyp oder ein Verhalten zugeschrieben wird, das im Regeltext nicht vorkommt.",
+            output_config: { format: { type: "json_schema", schema: SCHEMA_URTEIL } },
+            messages: [{ role: "user", content: [{ type: "text", text: `Prüfe:\n\n${vorlage}` }] }],
+          });
+          inTok += pruef.usage.input_tokens; outTok += pruef.usage.output_tokens;
+          const ut = pruef.content.find((b) => b.type === "text");
+          if (ut && ut.type === "text" && pruef.stop_reason !== "max_tokens") {
+            const urteile: Record<string, any>[] = JSON.parse(ut.text)?.verdicts ?? [];
+            for (const u of urteile) {
+              const ziel = strittig.find((s) => String(s.replaces).toLowerCase() === String(u.card).toLowerCase());
+              if (ziel) ziel.verify = { ...(ziel.verify || {}), ok: !!u.supported, method: "model", note: String(u.note || "") };
+            }
+          }
+        } catch {
+          // Die Zweitpruefung ist eine Zugabe. Faellt sie aus, bleibt es beim
+          // Ergebnis von C — lieber ungeprueft als gar keine Vorschlaege.
+        }
+      }
+    }
+
     return json({
-      ...(parsed as Record<string, unknown>),
-      usage: { input: res.usage.input_tokens, output: res.usage.output_tokens, model: res.model },
+      ...parsed,
+      verify: { cite: mitBeleg, model: mitUrteil },
+      usage: { input: inTok, output: outTok, model: res.model },
     });
   } catch (e) {
     const m = (e as Error).message ?? "Unbekannter Fehler";

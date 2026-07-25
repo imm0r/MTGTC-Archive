@@ -82,6 +82,16 @@ function dialogBackdropSchliesst(dlg) {
 /* ============================== Supabase ============================== */
 let sb = null, USER = null, PROFILE = null;
 let FLAGS = {}, IS_ADMIN = false;   // globale Feature-Schalter + ob der Nutzer Admin ist
+// Was für DIESE Person gilt: global Eingeschaltetes plus die persönlichen
+// Freigaben, zusammengeführt von effective_features(). Dieselbe Abfrage stellt
+// die Edge Function — hier steht sie nur, damit die Oberfläche weiß, was sie
+// anzeigen darf. Entschieden wird serverseitig.
+let FEATURES = new Set();
+const hatFeature = k => FEATURES.has(k);
+/* Zeigt diese Person Prüfergebnisse? Nur wer eines der Verfahren freigeschaltet
+   hat, soll verworfene Begründungen samt Grund sehen — das ist die Arbeit der
+   Tester. Für alle anderen verschwindet eine unbelegte Begründung wortlos. */
+const zeigtPruefung = () => hatFeature("verify_cite") || hatFeature("verify_model");
 let AI_LIMITS = {};                 // Stundenkontingente je KI-Funktion (0 = unbegrenzt)
 let COMMUNITY_STATS = null, COMMUNITY_FEED = [], communityChannel = null;
 let COMMUNITY_HIGHLIGHTS = null;
@@ -3002,6 +3012,11 @@ async function ladeFlags() {
     FLAGS = {}; (data || []).forEach(f => { FLAGS[f.key] = f.enabled; });
   } catch { FLAGS = {}; }
   try { const { data } = await sb.rpc("is_admin"); IS_ADMIN = !!data; } catch { IS_ADMIN = false; }
+  // Global + persönlich freigeschaltete Funktionen in einem Zug.
+  try {
+    const { data } = await sb.rpc("effective_features");
+    FEATURES = new Set(Array.isArray(data) ? data : []);
+  } catch { FEATURES = new Set(); }
   // Stundenkontingente der KI-Funktionen. Jede angemeldete Person darf sie
   // lesen; ändern darf sie nur der Admin (Policy in der Datenbank).
   try {
@@ -4136,8 +4151,22 @@ function schnittAusModell(deckId, vorschlag, karte) {
     // Die Begründung des Modells gilt NUR für die Karte, die es selbst genannt
     // hat. Fällt der Name durch die Prüfung, greift unten die Heuristik — dann
     // wäre der Satz eine Begründung für eine ganz andere Karte.
-    if (treffer) return { karte: treffer, grund: "model",
-                          warum: String(vorschlag?.replacesWhy || "").trim() };
+    if (treffer) {
+      const warum = String(vorschlag?.replacesWhy || "").trim();
+      const pruef = vorschlag?.verify;
+      // Vom Server als unbelegt erkannt (ok === false; null heißt „nicht
+      // prüfbar", nicht „widerlegt"). Wer ein Prüfverfahren freigeschaltet hat,
+      // sieht die Begründung markiert samt Grund — genau das soll beurteilt
+      // werden. Für alle anderen fällt sie wortlos weg und der feste Satz
+      // greift, damit niemand eine Behauptung liest, die nicht trägt.
+      if (pruef?.ok === false) {
+        return zeigtPruefung()
+          ? { karte: treffer, grund: "model", warum, unbelegt: true,
+              hinweis: String(pruef.note || ""), verfahren: pruef.method || "" }
+          : { karte: treffer, grund: "model", warum: "" };
+      }
+      return { karte: treffer, grund: "model", warum };
+    }
   }
   return deckSchnittKandidat(d, karte);
 }
@@ -4151,9 +4180,15 @@ function schnittAusModell(deckId, vorschlag, karte) {
 function schnittHinweisHtml(schnitt) {
   if (!schnitt?.karte) return "";
   const warum = schnitt.warum || t("deck.cutWhy." + schnitt.grund);
+  // Als unbelegt erkannt: durchgestrichen, damit auf einen Blick klar ist, dass
+  // dieser Satz NICHT gilt, plus der Befund der Prüfung. Sieht nur, wer ein
+  // Verfahren freigeschaltet hat — schnittAusModell entscheidet das vorher.
+  const marke = schnitt.unbelegt
+    ? `<span class="syn-cut-bad" title="${esc(schnitt.hinweis || t("deck.cutUnverifiedHint"))}">
+        &#9888; ${esc(t("deck.cutUnverified"))}${schnitt.hinweis ? " — " + esc(schnitt.hinweis) : ""}</span>` : "";
   return `<div class="syn-cut" title="${esc(warum)}">
     &#9986; ${esc(t("deck.cutFor", { name: schnitt.karte.disp || schnitt.karte.name }))}
-    <span class="syn-cut-why">${esc(warum)}</span></div>`;
+    <span class="syn-cut-why${schnitt.unbelegt ? " strich" : ""}">${esc(warum)}</span>${marke}</div>`;
 }
 
 const DECK_FORMATE = ["Commander", "Standard", "Pioneer", "Modern", "Legacy",
@@ -5879,6 +5914,18 @@ function renderSettings() {
             value="${AI_LIMITS[k] ?? 5}"></div>`).join("")}
       </div>
       <p class="hint">${esc(t("admin.limitHint"))}</p>
+      <div class="sec-sep"></div>
+      <label>${esc(t("admin.verifyTitle"))}</label>
+      ${[["verify_cite", "admin.verifyCite"], ["verify_model", "admin.verifyModel"]].map(([k, lbl]) => `
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:14px;color:var(--txt);margin-top:6px">
+        <input type="checkbox" data-flag="${k}"${FLAGS[k] ? " checked" : ""} style="width:auto">
+        <span>${esc(t(lbl))}</span>
+      </label>`).join("")}
+      <p class="hint">${esc(t("admin.verifyHint"))}</p>
+      <div class="sec-sep"></div>
+      <label>${esc(t("admin.accessTitle"))}</label>
+      <div id="admin-access"><div class="meta"><span class="syn-spin">&#9881;</span></div></div>
+      <p class="hint">${esc(t("admin.accessHint"))}</p>
     </div>` : ""}
     <p class="hint app-version">${esc(t("settings.version", { v: APP_VERSION || "—" }))}</p>`;
   // Eigenes Sprach-Dropdown mit Flaggen (ein natives <option> kann kein SVG
@@ -5924,6 +5971,61 @@ function renderSettings() {
     catch (e) { fk.checked = !an; toast(dbErr(e)); }
     finally { fk.disabled = false; }
   };
+  // Die Prüfverfahren global schalten. Nach dem Umlegen die Personenliste neu
+  // zeichnen: was global an ist, braucht dort keine Einzelfreigabe mehr.
+  $$("#v-settings [data-flag]").forEach(cb => cb.onchange = async () => {
+    const an = cb.checked;
+    cb.disabled = true;
+    try { await flagSetzen(cb.dataset.flag, an); toast(t("set.saved")); await zeichneFreigaben(); }
+    catch (e) { cb.checked = !an; toast(dbErr(e)); }
+    finally { cb.disabled = false; }
+  });
+  if (IS_ADMIN) zeichneFreigaben();
+}
+
+/* Die Personenliste der Admin-Ansicht: wer ist für welches Verfahren einzeln
+   freigeschaltet. Steht ein Verfahren global an, ist das Kästchen fest
+   angehakt und gesperrt — die Einzelfreigabe wäre dann wirkungslos, und ein
+   klickbares Kästchen würde etwas anderes behaupten. */
+async function zeichneFreigaben() {
+  const box = $("#admin-access");
+  if (!box) return;
+  const VERFAHREN = [["verify_cite", "admin.verifyCiteShort"], ["verify_model", "admin.verifyModelShort"]];
+  let leute = [];
+  try {
+    const { data, error } = await sb.rpc("admin_feature_access");
+    if (error) throw error;
+    leute = data || [];
+  } catch (e) { box.innerHTML = `<div class="empty">${esc(dbErr(e))}</div>`; return; }
+  if (!leute.length) { box.innerHTML = `<div class="empty">${esc(t("admin.accessNone"))}</div>`; return; }
+
+  box.innerHTML = `<table class="tbl"><thead><tr>
+      <th>${esc(t("admin.accessPerson"))}</th>
+      ${VERFAHREN.map(([, l]) => `<th class="num">${esc(t(l))}</th>`).join("")}
+    </tr></thead><tbody>${leute.map(p => `
+    <tr><td>${esc(p.display_name || t("community.anonMember"))}</td>
+      ${VERFAHREN.map(([k]) => {
+        const global = !!FLAGS[k];
+        const an = global || (p.keys || []).includes(k);
+        return `<td class="num"><input type="checkbox" style="width:auto"
+          data-grant="${esc(k)}" data-user="${esc(p.user_id)}"${an ? " checked" : ""}${global ? " disabled" : ""}
+          title="${esc(t(global ? "admin.accessGlobalOn" : "admin.accessToggle"))}"></td>`;
+      }).join("")}
+    </tr>`).join("")}</tbody></table>`;
+
+  box.querySelectorAll("[data-grant]").forEach(cb => cb.onchange = async () => {
+    const { grant, user } = cb.dataset;
+    const an = cb.checked;
+    cb.disabled = true;
+    try {
+      const { error } = an
+        ? await sb.from("feature_access").insert({ user_id: user, key: grant })
+        : await sb.from("feature_access").delete().eq("user_id", user).eq("key", grant);
+      if (error) throw error;
+      toast(t(an ? "admin.accessGranted" : "admin.accessRevoked"));
+    } catch (e) { cb.checked = !an; toast(dbErr(e)); }
+    finally { cb.disabled = false; }
+  });
 }
 
 /* ===================== Regel-Assistent =====================
