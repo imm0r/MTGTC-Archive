@@ -277,6 +277,44 @@ Absender ist das eigene Postfach — dafür gelten dessen Tageslimits (Gmail
 ~500 Mails/Tag), was für eine Spielgruppe reichlich ist. Der `CRON_SECRET`
 gehört wie alle Secrets **nicht** ins Repository.
 
+## Live-Spielrunde: Hand und Deck am Tisch
+
+In der Spielrunde wählt jeder sein Deck; darunter steht der **private
+Kartenüberblick** — nur der Spieler selbst sieht ihn, Mitspieler sehen lediglich
+den Decknamen und den Commander.
+
+Die Deckliste ist dieselbe Tabelle wie in der Sammlung: Kartenbild, Name,
+Manakosten, Set, Anzahl, dazu die Spalte **gespielt**. Über ihr liegt die
+**Hand** als aufgefächerte Kartenreihe — jedes Exemplar eine eigene Karte, wie
+man sie am Tisch hält. Zeigen (bzw. antippen) hebt eine Karte an und blendet
+ihre Knöpfe ein.
+
+Jedes Exemplar liegt an genau einem von drei Orten:
+
+```
+Bibliothek  ──ziehen──▶  Hand  ──spielen──▶  gespielt
+     ▲                    │                     │
+     └──── zurück ────────┘                     │
+     └──────────── zurück ────────────────────-─┘
+```
+
+Ziehst du im Spiel eine Karte, tippst du in der Deckliste auf **ziehen** — sie
+wandert aus dem Deck auf die Hand. In der Spalte *Anzahl* steht dann, wie viele
+Exemplare noch in der Bibliothek liegen (`6/8`), daneben eine Pille mit dem, was
+davon auf der Hand ist. Karten, die direkt aus der Bibliothek ins Spiel kommen,
+gehen über **gespielt** dorthin. Jeder Schritt lässt sich zurücknehmen.
+
+Gespeichert werden nur die beiden „unterwegs"-Zahlen (`session_played.hand` und
+`.qty`); die Bibliothek ist der Rest aus der Deckmenge und wird bei jeder
+Anzeige neu gerechnet — so kann kein Exemplar doppelt existieren. Der Stand
+überlebt einen Neuladen der Seite, „Neues Spiel" des Gastgebers räumt ihn bei
+allen ab.
+
+> Kommt die Hand nach einem Update leer zurück und meldet die App „Spalte
+> fehlt", fehlt der Datenbank die Spalte `hand` — `supabase-schema.sql` erneut
+> im SQL Editor ausführen (oder
+> `supabase/migrations/20260725120000_session_hand.sql` einzeln).
+
 ## Preisverlauf: ~90 Tage aus MTGJSON
 
 Scryfall liefert nur den **Tagespreis** — einen Verlauf gibt es dort nicht. Die

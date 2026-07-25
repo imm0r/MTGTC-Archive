@@ -7361,6 +7361,8 @@ let SESSION_INVITES = [];      // offene Einladungen an mich [{...session, hostP
 let SESSION_LOG = [];          // jüngste Events (Würfe) für die Anzeige
 let sessionChannel = null, inviteChannel = null;
 let SESSION_PLAYED = {};        // card_id → gespielt-Anzahl (privat, nur mein Deck)
+let SESSION_HAND = {};          // card_id → Exemplare auf der Hand (privat, nur mein Deck)
+let HAND_SPALTE = true;         // false, sobald die DB die Spalte „hand" nicht kennt
 const lifeTimers = {}, playedTimers = {};   // entprellt das Schreiben je Spieler/Karte
 const meinSpieler = () => SESSION_PLAYERS.find(p => p.user_id === USER?.id);
 
@@ -7409,13 +7411,26 @@ async function ladeSpieler() {
   }));
 }
 
-/* Eigener Karten-Tracker der Partie laden (privat: nur die eigenen Zeilen). */
+/* Eigener Karten-Tracker der Partie laden (privat: nur die eigenen Zeilen).
+   Eine Zeile hält beide Orte außerhalb der Bibliothek: qty = gespielt, hand =
+   auf der Hand. Kennt die Datenbank „hand" noch nicht (Schema älter als die
+   App), lädt der Tracker wenigstens die gespielten Karten statt gar nichts —
+   die Hand bleibt dann bis zum Ausführen der Migration nur lokal. */
+const fehltHandSpalte = e => e?.code === "42703" || /\bhand\b/.test(e?.message || "");
 async function ladePlayed() {
-  SESSION_PLAYED = {};
+  SESSION_PLAYED = {}; SESSION_HAND = {};
   if (!SESSION || !USER) return;
-  const { data } = await sb.from("session_played").select("card_id,qty")
+  let { data, error } = await sb.from("session_played").select("card_id,qty,hand")
     .eq("session_id", SESSION.id).eq("user_id", USER.id);
-  (data || []).forEach(r => { if (r.qty > 0) SESSION_PLAYED[r.card_id] = r.qty; });
+  if (error && fehltHandSpalte(error)) {
+    HAND_SPALTE = false;
+    ({ data } = await sb.from("session_played").select("card_id,qty")
+      .eq("session_id", SESSION.id).eq("user_id", USER.id));
+  }
+  (data || []).forEach(r => {
+    if (r.qty > 0) SESSION_PLAYED[r.card_id] = r.qty;
+    if (r.hand > 0) SESSION_HAND[r.card_id] = r.hand;
+  });
 }
 
 async function ladeLog() {
@@ -7904,9 +7919,17 @@ function logZeile(ev) {
   return "";
 }
 
-/* Privater Karten-Tracker: die Karten des eigenen gewählten Decks, jede als
-   „gespielt" abhakbar → Überblick, was noch in der Bibliothek liegt. Nur der
-   Spieler selbst sieht das. */
+/* Privater Karten-Tracker: das eigene Deck in der laufenden Partie, aufgebaut
+   wie die Sammlung — Bild, Name, Mana, Set, Anzahl, gespielt. Jedes Exemplar
+   liegt an genau EINEM von drei Orten:
+
+       Bibliothek  ──ziehen──▶  Hand  ──spielen──▶  gespielt
+
+   Die Bibliothek wird nicht gespeichert, sie ist der Rest (Deckmenge minus Hand
+   minus gespielt) — so kann keine Karte doppelt existieren. Jeder Schritt lässt
+   sich zurücknehmen. Über der Deckliste steht die Hand als aufgefächerte
+   Kartenreihe, damit man sie sieht wie in der echten Hand. Alles davon ist
+   privat: nur der Spieler selbst sieht seine Karten. */
 function deckTrackerHtml() {
   const deckId = meinSpieler()?.deck_id;
   const deck = deckId && (DECKS || []).find(d => d.id === deckId);
@@ -7916,6 +7939,7 @@ function deckTrackerHtml() {
       <h3 style="margin:0">${esc(t("sess.trackerTitle", { deck: deck.name }))}</h3>
       <div style="flex:none"><button class="btn ghost sm" id="trk-reset">${esc(t("sess.trackerReset"))}</button></div>
     </div>
+    <div class="hand-sparte" id="trk-hand">${handInnerHtml()}</div>
     <div class="row" style="margin-top:8px"><div style="flex:1"><input type="text" id="trk-search"
       placeholder="${esc(t("sess.trackerSearch"))}"></div></div>
     <div id="trk-panel">${trackerInnerHtml("")}</div>
@@ -7926,63 +7950,188 @@ function deckTrackerHtml() {
 // aber für Phyrexianisch (unlesbare Glyphen) der englische Name.
 const trkName = c => ((c.lang === "ph" ? c.name : (c.disp || c.name)) || c.name || "");
 
+/* Die drei Orte einer Deckkarte. trkRest ist berechnet, nicht gespeichert. */
+const trkDeck   = () => (DECKS || []).find(d => d.id === meinSpieler()?.deck_id);
+const trkTotal  = id => trkDeck()?.entries?.find(e => e.cardId === id)?.qty || 0;
+const trkHand   = id => SESSION_HAND[id] || 0;
+const trkPlayed = id => SESSION_PLAYED[id] || 0;
+const trkRest   = id => Math.max(0, trkTotal(id) - trkHand(id) - trkPlayed(id));
+
+/* ---- Hand: aufgefächerte Karten über der Deckliste --------------------
+   Je Exemplar eine Karte. Der Fächer entsteht aus zwei Größen, die mit der
+   Kartenzahl schrumpfen: dem Winkel je Karte und dem Versatz zur nächsten.
+   Beides ist gedeckelt, damit sieben Karten großzügig liegen und zwanzig
+   trotzdem in den Kasten passen. Gerechnet wird hier, zusammengesetzt in CSS
+   (--rot dreht, --dy senkt die Ränder ab) — so behält der Hover-Zustand den
+   Grundwinkel und hebt die Karte nur an. Mehrere Exemplare derselben Karte
+   liegen als mehrere Karten in der Hand, genau wie am Tisch. */
+function handInnerHtml() {
+  const deck = trkDeck();
+  const kopf = n => `<div class="hand-kopf"><span class="hand-titel">${esc(t("sess.handTitle"))}</span>
+    <span class="hand-zahl">${n}</span></div>`;
+  if (!deck) return kopf(0);
+
+  const karten = [];
+  (deck.entries || []).forEach(e => {
+    const c = CARDS.find(x => x.id === e.cardId);
+    for (let i = 0; c && i < trkHand(e.cardId); i++) karten.push(c);
+  });
+  if (!karten.length) return kopf(0) + `<div class="hand-leer">${esc(t("sess.handEmpty"))}</div>`;
+  karten.sort((a, b) => trkName(a).localeCompare(trkName(b)));
+
+  const n = karten.length;
+  const spanne = n > 1 ? Math.min(44, n * 7) : 0;          // Gesamtwinkel des Fächers
+  const schritt = n > 1 ? spanne / (n - 1) : 0;
+  // Sichtbarer Anteil je Karte, gemessen in KARTENBREITEN statt in Pixeln: die
+  // Breite steckt als --hk-b im CSS und schrumpft auf schmalen Schirmen mit,
+  // der Fächer bleibt dabei von selbst stimmig.
+  const anteil = n > 1 ? Math.min(0.54, Math.max(0.17, 4.1 / (n - 1))) : 1;
+  const bogen = 18;                                        // wie tief die Ränder hängen
+  const fan = karten.map((c, i) => {
+    const rel = n > 1 ? (i - (n - 1) / 2) / ((n - 1) / 2) : 0;   // −1 … +1
+    const rot = (-spanne / 2 + i * schritt).toFixed(2);
+    const dy = (rel * rel * bogen).toFixed(1);
+    const nm = trkName(c);
+    return `<div class="hand-karte" tabindex="0" style="--rot:${rot}deg;--dy:${dy}px;--z:${i + 1};${
+      i ? `margin-left:calc(var(--hk-b) * ${(anteil - 1).toFixed(3)})` : ""}"
+         data-hand-id="${esc(c.id)}" data-hand-img="${esc(c.img || "")}" data-hand-name="${esc(nm)}" title="${esc(nm)}">
+      ${c.img ? `<img src="${esc(c.img)}" alt="${esc(nm)}" loading="lazy">`
+              : `<div class="hand-ohnebild">${esc(nm)}</div>`}
+      <div class="hand-akt">
+        <button class="btn ghost sm" data-hand-play="${esc(c.id)}" title="${esc(t("sess.handPlayTitle"))}">${esc(t("sess.handPlay"))}</button>
+        <button class="btn ghost sm" data-hand-back="${esc(c.id)}" title="${esc(t("sess.handBackTitle"))}">&#8617;</button>
+      </div>
+    </div>`;
+  }).join("");
+  return kopf(n) + `<div class="hand-fan">${fan}</div>`;
+}
+
+/* ---- Deckliste: dieselben Spalten wie in der Sammlung ---------------- */
+function trackerHeadHtml() {
+  return `<tr>
+    <th class="hide-s"></th>
+    <th>${esc(t("th.card"))}</th>
+    <th class="num">${esc(t("th.mana"))}</th>
+    <th class="hide-s">${esc(t("th.set"))}</th>
+    <th class="num">${esc(t("th.qty"))}</th>
+    <th class="num">${esc(t("sess.thPlayed"))}</th>
+    <th></th>
+  </tr>`;
+}
+
+function trackerRowHtml(c) {
+  const id = c.id, total = trkTotal(id), rest = trkRest(id), hand = trkHand(id), played = trkPlayed(id);
+  const nm = trkName(c);
+  return `<tr data-id="${esc(id)}"${rest <= 0 ? ' class="leer"' : ""}>
+    <td class="hide-s">${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy" data-view
+           style="cursor:pointer" title="${esc(t("row.viewTitle"))}">` : ""}</td>
+    <td><div data-view style="cursor:pointer" title="${esc(t("row.viewTitle"))}">${esc(nm)}</div>
+        <div style="font-size:12px;color:var(--dim)">${c.foil ? '<span class="pill foil">Foil</span> ' : ""}#${esc(c.cn)}</div></td>
+    <td class="num mana-spalte" title="${c.mana_cost == null ? esc(t("row.manaNone"))
+      : esc(t("row.manaValue", { n: c.cmc ?? "?" }))}">${manaHtml(c.mana_cost)}</td>
+    <td class="hide-s set-spalte" title="${esc(c.set_name || c.set || "")}">${
+      setSymbol(c.set, c.rarity)}${esc((c.set || "").toUpperCase())}</td>
+    <td class="num trk-anz"><b>${rest}</b><span class="trk-von">/${total}</span>${
+      hand ? `<span class="trk-hand-pille" title="${esc(t("sess.inHand", { n: hand }))}">&#9995;${hand}</span>` : ""}</td>
+    <td class="num trk-gespielt">${played ? `<b>${played}</b>` : "&ndash;"}</td>
+    <td class="num trk-akt">
+      <button class="btn ghost sm" data-trk-draw="${esc(id)}" title="${esc(t("sess.drawTitle"))}"${rest <= 0 ? " disabled" : ""}>${esc(t("sess.draw"))}</button>
+      <button class="btn ghost sm" data-trk-play="${esc(id)}" title="${esc(t("sess.markPlayedTitle"))}"${rest <= 0 ? " disabled" : ""}>${esc(t("sess.markPlayed"))}</button>
+      ${played > 0 ? `<button class="btn ghost sm" data-trk-undo="${esc(id)}" title="${esc(t("sess.undoPlayedTitle"))}">&#8617;</button>` : ""}
+    </td>
+  </tr>`;
+}
+
 function trackerInnerHtml(filter) {
-  const deck = (DECKS || []).find(d => d.id === meinSpieler()?.deck_id);
+  const deck = trkDeck();
   if (!deck) return "";
   const f = (filter || "").trim().toLowerCase();
-  const entries = (deck.entries || []).map(e => {
-    const card = CARDS.find(c => c.id === e.cardId);
-    return card ? { card, cardId: e.cardId, total: e.qty, played: SESSION_PLAYED[e.cardId] || 0 } : null;
-  }).filter(Boolean);
-  let restN = 0, gespieltN = 0;
-  entries.forEach(e => { restN += Math.max(0, e.total - e.played); gespieltN += Math.min(e.total, e.played); });
+  const karten = (deck.entries || []).map(e => CARDS.find(c => c.id === e.cardId)).filter(Boolean);
+  let restN = 0, handN = 0, gespieltN = 0;
+  karten.forEach(c => { restN += trkRest(c.id); handN += trkHand(c.id); gespieltN += trkPlayed(c.id); });
   // Noch in der Bibliothek zuerst, dann alphabetisch.
-  entries.sort((a, b) => ((b.total - b.played > 0) - (a.total - a.played > 0))
-    || trkName(a.card).localeCompare(trkName(b.card)));
-  const rows = entries
-    .filter(e => !f || trkName(e.card).toLowerCase().includes(f))
-    .map(e => {
-      const rest = e.total - e.played;
-      return `<div class="trk-row${rest <= 0 ? " leer" : ""}">
-        <span class="trk-q">${rest}${e.total > 1 ? `/${e.total}` : ""}</span>
-        <span class="trk-n">${esc(trkName(e.card))}</span>
-        <span class="trk-btns">
-          ${e.played > 0 ? `<button class="btn ghost sm" data-trk-undo="${esc(e.cardId)}" title="${esc(t("sess.undoPlayed"))}">&#8617;</button>` : ""}
-          <button class="btn ghost sm" data-trk-play="${esc(e.cardId)}"${rest <= 0 ? " disabled" : ""}>${esc(t("sess.markPlayed"))}</button>
-        </span>
-      </div>`;
-    }).join("");
-  return `<div class="trk-sum">${esc(t("sess.trackerSummary", { rest: restN, played: gespieltN }))}</div>
-    <div class="trk-list">${rows || `<div class="empty">${esc(t("sess.trackerEmpty"))}</div>`}</div>`;
+  karten.sort((a, b) => ((trkRest(b.id) > 0) - (trkRest(a.id) > 0)) || trkName(a).localeCompare(trkName(b)));
+  const rows = karten.filter(c => !f || trkName(c).toLowerCase().includes(f)).map(trackerRowHtml).join("");
+  return `<div class="trk-sum">${esc(t("sess.trackerSummary", { rest: restN, hand: handN, played: gespieltN }))}</div>
+    <div class="trk-scroll"><table class="trk-tbl">
+      <thead>${trackerHeadHtml()}</thead>
+      <tbody>${rows || `<tr><td colspan="7"><div class="empty">${esc(t("sess.trackerEmpty"))}</div></td></tr>`}</tbody>
+    </table></div>`;
 }
 
 function renderTracker() {
+  // Die Vorschauen hängen an Elementen, die es gleich nicht mehr gibt.
+  hideHover(); versteckeCmdHover();
+  const hand = $("#trk-hand");
+  if (hand) hand.innerHTML = handInnerHtml();
   const panel = $("#trk-panel");
   if (panel) panel.innerHTML = trackerInnerHtml($("#trk-search")?.value || "");
+  wireTrackerHover();
 }
 
-/* Eine Karte als gespielt markieren (+1) oder zurücknehmen (−1). Lokal sofort,
-   Schreiben entprellt. */
-function trackerMark(cardId, delta) {
-  const deck = (DECKS || []).find(d => d.id === meinSpieler()?.deck_id);
-  const total = deck?.entries?.find(e => e.cardId === cardId)?.qty || 0;
-  const next = Math.max(0, Math.min(total, (SESSION_PLAYED[cardId] || 0) + delta));
-  if (next > 0) SESSION_PLAYED[cardId] = next; else delete SESSION_PLAYED[cardId];
+/* Vorschau wie in der Sammlung: über Bild und Name der Deckliste die große
+   Detailkarte, über einer Handkarte Bild + Name. Nach jedem Neuzeichnen neu
+   gehängt (die Zeilen entstehen bei jedem Zug neu). */
+function wireTrackerHover() {
+  if (!HOVER_OK) return;
+  $$("#trk-panel tbody tr[data-id]").forEach(tr => {
+    const id = tr.dataset.id;
+    tr.querySelectorAll("[data-view]").forEach(el => {
+      el.onclick = () => { hideHover(); showCardDetail(id); };
+      el.addEventListener("mouseenter", e => {
+        clearTimeout(hoverTimer);
+        hoverTimer = setTimeout(() => showHover(id, e.clientX, e.clientY), 300);
+      });
+      el.addEventListener("mouseleave", hideHover);
+    });
+  });
+  $$("#trk-hand .hand-karte[data-hand-img]").forEach(el => {
+    if (!el.dataset.handImg) return;
+    el.addEventListener("mousemove", e => zeigeCmdHover(el.dataset.handImg, el.dataset.handName, e.clientX, e.clientY));
+    el.addEventListener("mouseleave", versteckeCmdHover);
+  });
+}
+
+/* Exemplare zwischen den drei Orten verschieben. Die Bibliothek ist der Rest,
+   sie darf also nie ins Minus laufen — deshalb die eine Prüfung über die Summe.
+   Lokal sofort, Schreiben entprellt. */
+function trackerMove(cardId, dHand, dPlayed) {
+  const hand = trkHand(cardId) + dHand, played = trkPlayed(cardId) + dPlayed;
+  if (hand < 0 || played < 0 || hand + played > trkTotal(cardId)) return;
+  if (hand > 0) SESSION_HAND[cardId] = hand; else delete SESSION_HAND[cardId];
+  if (played > 0) SESSION_PLAYED[cardId] = played; else delete SESSION_PLAYED[cardId];
   renderTracker();
+  trackerSchreiben(cardId);
+}
+
+/* Eine Zeile hält beide Orte; sind Hand und gespielt leer, verschwindet sie. */
+function trackerSchreiben(cardId) {
   clearTimeout(playedTimers[cardId]);
   playedTimers[cardId] = setTimeout(async () => {
-    const q = SESSION_PLAYED[cardId] || 0; delete playedTimers[cardId];
+    delete playedTimers[cardId];
+    const q = trkPlayed(cardId), h = trkHand(cardId);
+    const zeile = { session_id: SESSION.id, user_id: USER.id, card_id: cardId, qty: q };
+    if (HAND_SPALTE) zeile.hand = h;
     try {
-      if (q > 0) await sb.from("session_played")
-        .upsert({ session_id: SESSION.id, user_id: USER.id, card_id: cardId, qty: q }, { onConflict: "session_id,user_id,card_id" });
-      else await sb.from("session_played").delete()
-        .eq("session_id", SESSION.id).eq("user_id", USER.id).eq("card_id", cardId);
-    } catch (e) { toast(dbErr(e)); }
+      const { error } = (q > 0 || h > 0)
+        ? await sb.from("session_played").upsert(zeile, { onConflict: "session_id,user_id,card_id" })
+        : await sb.from("session_played").delete()
+            .eq("session_id", SESSION.id).eq("user_id", USER.id).eq("card_id", cardId);
+      if (error) throw error;
+    } catch (e) {
+      // Fehlt die Spalte, ist das Schema älter als die App: die Hand bleibt für
+      // diese Sitzung lokal, gespielt wird weiter gespeichert.
+      if (HAND_SPALTE && fehltHandSpalte(e)) { HAND_SPALTE = false; toast(t("toast.columnMissing")); trackerSchreiben(cardId); return; }
+      toast(dbErr(e));
+    }
   }, 350);
 }
 
 async function trackerReset() {
-  SESSION_PLAYED = {}; renderTracker();
+  SESSION_PLAYED = {}; SESSION_HAND = {};
+  // Noch offene Einzelschreiber verwerfen, sonst tragen sie ihre Karte wieder ein.
+  Object.keys(playedTimers).forEach(k => { clearTimeout(playedTimers[k]); delete playedTimers[k]; });
+  renderTracker();
   try { await sb.from("session_played").delete().eq("session_id", SESSION.id).eq("user_id", USER.id); }
   catch (e) { toast(dbErr(e)); }
 }
@@ -7993,7 +8142,7 @@ async function sessDeckWaehlen(deckId) {
   try {
     await sb.from("session_players").update({ deck_id: deckId || null })
       .eq("session_id", SESSION.id).eq("user_id", USER.id);
-    SESSION_PLAYED = {};
+    SESSION_PLAYED = {}; SESSION_HAND = {};
     await sb.from("session_played").delete().eq("session_id", SESSION.id).eq("user_id", USER.id);
     await ladeSpieler(); renderSession();
   } catch (e) { toast(dbErr(e)); }
@@ -8020,11 +8169,19 @@ function wireSession() {
   const deckSel = $("#sess-deck"); if (deckSel) deckSel.onchange = () => sessDeckWaehlen(deckSel.value);
   const trkReset = $("#trk-reset"); if (trkReset) trkReset.onclick = trackerReset;
   const trkSearch = $("#trk-search"); if (trkSearch) trkSearch.oninput = renderTracker;
-  const trkPanel = $("#trk-panel");   // Delegation: die Reihen entstehen bei jedem Abhaken neu
+  // Delegation: Deckliste und Hand entstehen bei jedem Zug neu.
+  const trkPanel = $("#trk-panel");
   if (trkPanel) trkPanel.onclick = e => {
-    const play = e.target.closest("[data-trk-play]"); if (play) return trackerMark(play.dataset.trkPlay, 1);
-    const undo = e.target.closest("[data-trk-undo]"); if (undo) return trackerMark(undo.dataset.trkUndo, -1);
+    const draw = e.target.closest("[data-trk-draw]"); if (draw) return trackerMove(draw.dataset.trkDraw, 1, 0);
+    const play = e.target.closest("[data-trk-play]"); if (play) return trackerMove(play.dataset.trkPlay, 0, 1);
+    const undo = e.target.closest("[data-trk-undo]"); if (undo) return trackerMove(undo.dataset.trkUndo, 0, -1);
   };
+  const trkHandEl = $("#trk-hand");
+  if (trkHandEl) trkHandEl.onclick = e => {
+    const play = e.target.closest("[data-hand-play]"); if (play) return trackerMove(play.dataset.handPlay, -1, 1);
+    const back = e.target.closest("[data-hand-back]"); if (back) return trackerMove(back.dataset.handBack, -1, 0);
+  };
+  wireTrackerHover();
   // Commander-Karten: beim Hover große Vorschau + Name.
   if (HOVER_OK) $$("#v-session .sp-deck[data-cmd-img]").forEach(el => {
     el.addEventListener("mousemove", e => zeigeCmdHover(el.dataset.cmdImg, el.dataset.cmdName, e.clientX, e.clientY));
@@ -8073,7 +8230,7 @@ async function sessionBeenden() {
 async function lebenReset() {
   try {
     await sb.rpc("reset_lives", { p_session: SESSION.id });
-    SESSION_PLAYED = {};   // eigener Tracker sofort leer; das reset-Event räumt die DB
+    SESSION_PLAYED = {}; SESSION_HAND = {};   // eigener Tracker sofort leer; das reset-Event räumt die DB
     await ladeSpieler(); renderSession();
   } catch (e) { toast(dbErr(e)); }
 }
@@ -8390,7 +8547,8 @@ function onEvent(payload) {
   const ev = payload.new;
   if (!ev || !SESSION || ev.session_id !== SESSION.id) return;
   if (ev.kind === "reset") {   // „Neues Spiel" → eigenen Tracker leeren (lokal + DB)
-    SESSION_PLAYED = {};
+    SESSION_PLAYED = {}; SESSION_HAND = {};
+    Object.keys(playedTimers).forEach(k => { clearTimeout(playedTimers[k]); delete playedTimers[k]; });
     sb.from("session_played").delete().eq("session_id", SESSION.id).eq("user_id", USER.id).then(() => {});
     if ($(".view.on")?.id === "v-session") renderTracker();
     return;
