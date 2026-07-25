@@ -2901,19 +2901,28 @@ function besessenAnzahl(card) {
    Karte ins Deck legt. Besitzt man die Karte schon (irgendeine Auflage), zeigt
    die Kachel ein Häkchen und der Knopf heißt „+ Deck" (die Karte wird verknüpft),
    sonst „+ Wunsch" (fehlende Karte kommt mit Bestand 0 ins Deck). */
-function synKachel(card, grundText, deckId) {
+function synKachel(card, grundText, deckId, schnitt) {
   const img = card.image_uris?.small || card.card_faces?.[0]?.image_uris?.small || "";
   const p = synPreis(card);
   const besessen = besessenAnzahl(card);
   const badge = besessen > 0
     ? `<span class="syn-owned" title="${esc(t("syn.ownedTitle", { n: besessen }))}">&#10003;</span>` : "";
-  let addBtn = "";
+  let addBtn = "", cut = "";
   if (deckId && card.id) {
     SYN_CACHE.set(card.id, card);
     const owned = besessen > 0;
-    addBtn = `<button class="syn-add${owned ? " owned" : ""}" data-deck="${esc(deckId)}" data-sid="${esc(card.id)}"
+    const deck = DECKS.find(d => d.id === deckId);
+    // Zwei Gründe, den Knopf ruhen zu lassen — der speziellere zuerst: liegt die
+    // Karte schon im Deck, hilft auch kein Schnitt, denn ein zweites Exemplar
+    // wäre im Commander ohnehin nicht erlaubt.
+    const schonDrin = singletonFrei(deck, card) === 0;
+    const voll = !schonDrin && deckFrei(deck) === 0;
+    addBtn = (schonDrin || voll)
+      ? `<button class="syn-add voll" disabled title="${esc(t(schonDrin ? "deck.singletonBtnTitle" : "deck.fullBtnTitle"))}">&#43;&#160;${esc(t(owned ? "syn.addDeck" : "syn.addWish"))}</button>`
+      : `<button class="syn-add${owned ? " owned" : ""}" data-deck="${esc(deckId)}" data-sid="${esc(card.id)}"
       title="${esc(t(owned ? "syn.addOwnedTitle" : "syn.addWishTitle"))}">&#43;&#160;${
         esc(t(owned ? "syn.addDeck" : "syn.addWish"))}</button>`;
+    if (voll) cut = schnittHinweisHtml(schnitt || deckSchnittKandidat(deck, card));
   }
   return `<div class="syn-card">
     <a class="syn-card-link" href="${esc(card.scryfall_uri || "#")}" target="_blank" rel="noopener noreferrer">
@@ -2922,6 +2931,7 @@ function synKachel(card, grundText, deckId) {
       <div class="syn-type">${esc(card.type_line || "")}</div>
       <div class="syn-exp" title="${esc(grundText)}">${esc(grundText)}</div>
     </a>
+    ${cut}
     <div class="syn-foot"><span class="syn-price">${p == null ? "–" : eur(p)}</span>${addBtn}</div>
   </div>`;
 }
@@ -3068,6 +3078,9 @@ async function kiSynergienDeck(deck, cards, box, opts = {}) {
       deck: {
         name: deck.name, format: deck.format || "", commander, colorIdentity: colors,
         cards: [...new Set(cards.map(c => c.name).filter(Boolean))].slice(0, 120),
+        // Ist das Deck voll, soll das Modell zu jedem Vorschlag gleich sagen,
+        // welche Karte dafür weichen sollte — es kennt die Liste ohnehin.
+        full: deckFrei(deck) === 0,
       },
       // Wie bei der Einzelkarte: das eingestellte Maximum geht ans Modell,
       // damit die Einstellung Ausgabe-Tokens spart und nicht nur die Anzeige
@@ -3165,7 +3178,7 @@ async function kiSynergieLauf(box, cfg) {
     if (cap && (synPreis(c) ?? 9e9) > cap) continue;
     if (suchPrefs().onlyOwned && !besessenAnzahl(c)) continue;   // Einstellung „nur eigene Sammlung"
     gesehen.add(c.oracle_id);
-    treffer.push(vorschlagCardHtml(c, s.reason, cfg.deckId));
+    treffer.push(vorschlagCardHtml(c, s.reason, cfg.deckId, schnittAusModell(cfg.deckId, s, c)));
     if (lim && treffer.length >= lim) break;
   }
   // Erst hier zählen: „treffer" ist, was tatsächlich angezeigt wird — nach
@@ -3232,7 +3245,7 @@ function deckAnalyse(cards) {
 
 /* Kachel für einen Vorschlag mit Kategorie-Etikett (Ramp, Entfernung …) oder
    KI-Begründung statt Synergie-Erklärung. */
-function vorschlagCardHtml(card, etikett, deckId) { return synKachel(card, etikett, deckId); }
+function vorschlagCardHtml(card, etikett, deckId, schnitt) { return synKachel(card, etikett, deckId, schnitt); }
 
 /* ====================== Combos (Commander Spellbook) ==================
    Über die Edge Function „combos" (Proxy zu commanderspellbook.com — CSB
@@ -3490,12 +3503,21 @@ function comboCardMini(card, deckId, alsAktion) {
   const besessen = besessenAnzahl(card);
   const badge = besessen > 0
     ? `<span class="syn-owned" title="${esc(t("syn.ownedTitle", { n: besessen }))}">&#10003;</span>` : "";
-  let addBtn = "";
+  let addBtn = "", cut = "";
   if (alsAktion && card.id) {
     SYN_CACHE.set(card.id, card);
     const owned = besessen > 0;
-    addBtn = `<button class="syn-add${owned ? " owned" : ""}" data-deck="${esc(deckId)}" data-sid="${esc(card.id)}"
+    // Volles Deck bzw. schon im Deck: derselbe gesperrte Zustand wie bei den
+    // Synergie-Kacheln — der Knopf soll überall gleich aussehen und gleich
+    // erklären.
+    const deck = DECKS.find(d => d.id === deckId);
+    const schonDrin = singletonFrei(deck, card) === 0;
+    const voll = !schonDrin && deckFrei(deck) === 0;
+    addBtn = (schonDrin || voll)
+      ? `<button class="syn-add voll" disabled title="${esc(t(schonDrin ? "deck.singletonBtnTitle" : "deck.fullBtnTitle"))}">&#43;&#160;${esc(t(owned ? "syn.addDeck" : "syn.addWish"))}</button>`
+      : `<button class="syn-add${owned ? " owned" : ""}" data-deck="${esc(deckId)}" data-sid="${esc(card.id)}"
       title="${esc(owned ? t("syn.addOwnedTitle") : t("syn.addWishTitle"))}">&#43;&#160;${esc(t(owned ? "syn.addDeck" : "syn.addWish"))}</button>`;
+    if (voll) cut = schnittHinweisHtml(deckSchnittKandidat(deck, card));
   }
   // Weder besessen noch (mangels Deck-Kontext) wünschbar — z. B. im
   // Kartendetail: direkt zum Kauf verlinken (Scryfalls Cardmarket-Link,
@@ -3509,7 +3531,7 @@ function comboCardMini(card, deckId, alsAktion) {
   return `<div class="combo-mini">
     <div class="combo-mini-card" data-cmd-img="${esc(gross)}" data-cmd-name="${esc(card.name)}">
       ${klein ? `<img src="${esc(klein)}" alt="${esc(card.name)}" loading="lazy">` : `<div class="syn-noimg">&#9670;</div>`}${badge}
-    </div>${addBtn}${buy}
+    </div>${addBtn}${cut}${buy}
   </div>`;
 }
 
@@ -3593,9 +3615,12 @@ async function deckCombosAnzeigen(box, cards, deckId) {
   }
   if (lauf !== combosLauf) return;
 
-  let included = data.included || [];
+  // „max. Anzahl Vorschläge" gilt laut Einstellung auch für Combo-Suchen —
+  // bisher kam sie hier nie an.
+  const cLim = prefWert("synLimit");
+  let included = (data.included || []).slice(0, cLim || undefined);
   // Einstellung „nur komplette Combos": die „Fast komplett"-Kategorie weglassen.
-  let almost = suchPrefs().onlyComplete ? [] : (data.almostIncluded || []);
+  let almost = suchPrefs().onlyComplete ? [] : (data.almostIncluded || []).slice(0, cLim || undefined);
   if (!included.length && !almost.length) { box.innerHTML = `<div class="empty">${esc(t("combo.none"))}</div>`; return; }
 
   // Legalität im Deck-Format: erst zählen (für die Zusammenfassung), dann —
@@ -3648,7 +3673,7 @@ async function sammlungCombosAnzeigen(box, cards) {
     return;
   }
   if (lauf !== combosLauf) return;
-  let included = data.included || [];
+  let included = (data.included || []).slice(0, prefWert("synLimit") || undefined);
   if (!included.length) { box.innerHTML = `<div class="empty">${esc(t("combo.collNone"))}</div>`; return; }
   // Legalität: ohne Deck-Kontext gegen Commander (siehe comboLegalKey).
   const gesamt = included.length;
@@ -3677,7 +3702,7 @@ async function karteCombosAnzeigen(box, card) {
   try {
     // Anführungszeichen im Namen raus, sonst bricht die CSB-Suche card:"…".
     const q = `card:"${(card.name || "").replace(/"/g, "")}"`;
-    data = await combosApi({ mode: "variants", q, limit: 12 });
+    data = await combosApi({ mode: "variants", q, limit: prefWert("synLimit") || 12 });
   } catch (e) {
     if (lauf === combosLauf) box.innerHTML = `<div class="empty">${esc(e.message)}</div>`;
     return;
@@ -3730,6 +3755,12 @@ async function deckAnalyseAnzeigen(box, cards, colors, deckId) {
   const suggBox = box.querySelector("#an-sugg");
   if (!duenn.length) { suggBox.innerHTML = `<div class="meta ok">${esc(t("an.allGood"))}</div>`; return; }
 
+  // Die am staerksten ueberbesetzte Kategorie: aus ihr wuerde man am ehesten
+  // schneiden, wenn eine andere zu duenn ist. Nur die Analyse weiss das.
+  const ueber = analyse.filter(a => a.ist > a.ziel)
+    .sort((x, y) => (y.ist / y.ziel) - (x.ist / x.ziel))[0];
+  const ueberKategorie = ueber ? AN_KATEGORIEN.find(k => k.key === ueber.key) : null;
+  const dAn = DECKS.find(x => x.id === deckId);
   const weg = excludeVon(cards);   // nur Karten DIESES Decks raus, Besessenes darf auftauchen
   const teile = [];
   for (const a of duenn) {
@@ -3744,7 +3775,8 @@ async function deckAnalyseAnzeigen(box, cards, colors, deckId) {
     const treffer = data.filter(c => c.oracle_id && !weg.ids.has(c.oracle_id) && !weg.names.has((c.name || "").toLowerCase())).slice(0, 6);
     if (treffer.length) teile.push(`<div class="an-block">
       <h4>${esc(t("an.needMore", { cat: label }))}</h4>
-      <div class="syn-grid">${treffer.map(c => vorschlagCardHtml(c, label, deckId)).join("")}</div>
+      <div class="syn-grid">${treffer.map(c => vorschlagCardHtml(c, label, deckId,
+        deckFrei(dAn) === 0 ? deckSchnittKandidat(dAn, c, { ueberKategorie }) : null)).join("")}</div>
     </div>`);
     await new Promise(res => setTimeout(res, 110));
   }
@@ -3905,6 +3937,187 @@ let deckFilter = { format: "", archetype: "" };
    Format = in welchem Rahmen gespielt wird, Archetyp = wie das Deck gewinnt.
    Reihenfolge ist Absicht (Geläufigstes zuerst); danach richtet sich auch die
    Sortierung im Filter. Frei lassbar — kein Deck MUSS eingeordnet sein. */
+/* ==================== Commander: 100-Karten-Grenze ====================
+   Die offiziellen Regeln erlauben genau 100 Karten EINSCHLIESSLICH des
+   Commanders. Der ist hier kein Sonderfall: main_card_id markiert nur eine
+   Karte, die ohnehin als Eintrag im Deck liegt — die Summe über qty ist
+   also bereits die Zahl, um die es geht.
+
+   Durchgesetzt wird die Grenze in der Datenbank (Trigger auf deck_entries),
+   weil vier Wege ins Deck schreiben. Was hier steht, ist die Vorwarnung:
+   Knöpfe sperren und erklären, statt den Nutzer in eine Absage laufen zu
+   lassen. */
+const DECK_MAX = 100;
+
+const istCommanderDeck = d => (d?.format || "") === "Commander";
+const deckGroesse = d => (d?.entries || []).reduce((s, e) => s + e.qty, 0);
+
+/* Wie viele Karten noch hineinpassen. Unbegrenzt für alles außer Commander.
+   Altbestände über 100 (die gab es, bevor es die Regel gab) geben 0, nicht
+   negativ — sie nehmen nichts mehr auf, blockieren aber nichts anderes. */
+function deckFrei(d) {
+  if (!istCommanderDeck(d)) return Infinity;
+  return Math.max(0, DECK_MAX - deckGroesse(d));
+}
+const deckFreiById = id => deckFrei(DECKS.find(d => d.id === id));
+
+/* Die Absage des Triggers erkennen. Sie trägt den hint „deck_full"; die
+   Meldung formuliert die Oberfläche selbst, damit sie übersetzt ist. */
+const istDeckVollFehler = e =>
+  e?.hint === "deck_full" || /deck_full/.test(e?.hint || e?.message || "");
+
+const istSingletonFehler = e =>
+  e?.hint === "deck_singleton" || /deck_singleton/.test(e?.hint || e?.message || "");
+
+/* ---- Singleton-Regel ----------------------------------------------------
+   Ein Commander-Deck darf von jeder Karte nur ein Exemplar enthalten.
+   Maßgeblich ist der englische KARTENNAME, nicht die Auflage: zwei Drucke
+   derselben Karte sind zwei Zeilen in der Sammlung, aber trotzdem zweimal
+   dieselbe Karte.
+
+   Ausnahmen sprechen die Karten selbst aus, deshalb steht die Erkennung im
+   Regeltext und nicht in einer gepflegten Liste — eine Liste wäre mit dem
+   nächsten Set veraltet. type_line und oracle_text liefert Scryfall auch bei
+   fremdsprachigen Drucken auf Englisch (die Landessprache steht in printed_*),
+   die Prüfung ist also sprachunabhängig.
+
+   Durchgesetzt wird auch das im Trigger; hier steht die Vorwarnung. */
+const ZAHLWORT = { one: 1, two: 2, three: 3, four: 4, five: 5,
+                   six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+
+function commanderMaxKopien(card) {
+  const typ = card?.type_line || "";
+  if (/basic/i.test(typ) && /land/i.test(typ)) return Infinity;   // Standardländer
+  const txt = card?.oracle_text || card?.card_faces?.[0]?.oracle_text || "";
+  if (/a deck can have any number of cards named/i.test(txt)) return Infinity;
+  const m = txt.match(/a deck can have up to (\w+) cards named/i);
+  if (m) return ZAHLWORT[m[1].toLowerCase()] || 1;
+  return 1;
+}
+
+/* Wie oft liegt diese Karte — über alle Auflagen — schon im Deck? */
+function deckKopien(d, card) {
+  const nm = (card?.name || "").toLowerCase();
+  if (!d || !nm) return 0;
+  let n = 0;
+  for (const e of d.entries || []) {
+    const c = CARDS.find(x => x.id === e.cardId);
+    if (c && (c.name || "").toLowerCase() === nm) n += e.qty;
+  }
+  return n;
+}
+
+/* Passt noch ein Exemplar dieser Karte ins Deck? Nur für Commander relevant. */
+function singletonFrei(d, card) {
+  if (!istCommanderDeck(d)) return Infinity;
+  return Math.max(0, commanderMaxKopien(card) - deckKopien(d, card));
+}
+
+/* Einheitliche Absage, wenn jemand trotz gesperrter Knöpfe durchkommt. */
+function deckVollMelden(d) {
+  toast(t("deck.fullToast", { n: deckGroesse(d), max: DECK_MAX }));
+}
+
+/* Dieselbe KARTE, egal welche Auflage — über die oracle_id, die alle Drucke,
+   Sprachen und Foil-Fassungen teilen; Name als Rückfall für Uralt-Zeilen ohne
+   oracle_id. Bewusst NICHT gleicheKarte(): das vergleicht Set + Sammlernummer,
+   also die einzelne Auflage, und beantwortet damit eine andere Frage (welches
+   Exemplar aus dem Regal steckt in welchem Deck). Hier geht es ums Spielen,
+   und dafür ist jede Auflage dieselbe Karte. */
+function selbeKarte(a, b) {
+  if (!a || !b) return false;
+  if (a.oracle_id && b.oracle_id) return a.oracle_id === b.oracle_id;
+  return (a.name || "").toLowerCase() === (b.name || "").toLowerCase();
+}
+
+/* Liegt dieselbe Karte bereits als UNERFÜLLTER Wunsch im Deck — in einer
+   anderen Auflage als der jetzt gewählten? Dann ist der Deckplatz längst
+   vergeben und der Wunsch mit der neu besessenen Auflage schlicht erfüllt.
+   Ohne diesen Fall stünde man vor einer Absage („Deck voll"), obwohl das Deck
+   gar nicht wachsen soll: die Karte war schon eingeplant. */
+function deckWunschEintrag(d, pick) {
+  if (!d || !pick) return null;
+  for (const e of d.entries || []) {
+    if (e.cardId === pick.id) continue;                 // dieselbe Zeile, kein Umhängen
+    const c = CARDS.find(x => x.id === e.cardId);
+    if (!c || !selbeKarte(c, pick)) continue;
+    if (e.qty > bestandVon(c)) return { eintrag: e, karte: c };   // fehlt noch
+  }
+  return null;
+}
+
+/* Welche Karte im Deck würde man für einen Vorschlag am ehesten schneiden?
+   Die Reihenfolge der Argumente, vom stärksten zum schwächsten:
+
+     1. Eine Karte, die gar nicht besessen wird. Das Deck ist mit ihr ohnehin
+        nicht spielbar — der schmerzloseste Schnitt, und er erklärt sich selbst.
+     2. Eine Karte aus einer überbesetzten Kategorie. Nur die Deck-Analyse
+        weiß das; sie reicht sie über opts.ueberKategorie herein.
+     3. Gleicher Kartentyp wie der Vorschlag, teuerste zuerst — Gleiches
+        gegen Gleiches zu tauschen hält die Kurve stabil.
+     4. Sonst schlicht die teuerste Karte.
+
+   Commander und Zweit-Commander bleiben immer außen vor, Länder ebenfalls:
+   an der Manabasis herumzuschneiden ist selten das, was jemand will. */
+const HAUPT_TYPEN = ["Creature", "Instant", "Sorcery", "Artifact",
+                     "Enchantment", "Planeswalker", "Battle", "Land"];
+const hauptTyp = tl => HAUPT_TYPEN.find(x => new RegExp(`\\b${x}\\b`, "i").test(tl || "")) || "";
+
+function deckSchnittKandidat(d, vorschlag, opts = {}) {
+  if (!d) return null;
+  const tabu = new Set([d.main_card_id, d.second_card_id].filter(Boolean));
+  const karten = (d.entries || [])
+    .filter(e => !tabu.has(e.cardId))
+    .map(e => CARDS.find(c => c.id === e.cardId))
+    .filter(c => c && !istLand(c));
+  if (!karten.length) return null;
+
+  const teuerst = liste => [...liste].sort((a, b) => (Number(b.cmc) || 0) - (Number(a.cmc) || 0))[0];
+  const mit = (karte, grund) => karte ? { karte, grund } : null;
+
+  const nichtBesessen = karten.filter(c => bestandVon(c) < 1);
+  if (nichtBesessen.length) return mit(teuerst(nichtBesessen), "unowned");
+
+  if (opts.ueberKategorie) {
+    const drin = karten.filter(opts.ueberKategorie.test);
+    if (drin.length) return mit(teuerst(drin), "category");
+  }
+
+  const typ = hauptTyp(vorschlag?.type_line);
+  if (typ) {
+    const gleich = karten.filter(c => hauptTyp(c.type_line) === typ);
+    if (gleich.length) return mit(teuerst(gleich), "sameType");
+  }
+
+  return mit(teuerst(karten), "highCmc");
+}
+
+/* Der Schnitt-Vorschlag des Modells, gegen die Deckliste geprüft. Ein Name,
+   der dort nicht steht oder der Commander ist, wird verworfen — dann greift
+   die Heuristik. Das Modell schlägt vor, die Deckliste entscheidet; genauso
+   wie bei den Kartennamen selbst wird nichts ungeprüft übernommen. */
+function schnittAusModell(deckId, vorschlag, karte) {
+  const d = DECKS.find(x => x.id === deckId);
+  if (!d || deckFrei(d) !== 0) return null;
+  const name = String(vorschlag?.replaces || "").trim().toLowerCase();
+  if (name) {
+    const tabu = new Set([d.main_card_id, d.second_card_id].filter(Boolean));
+    const treffer = (d.entries || [])
+      .filter(e => !tabu.has(e.cardId))
+      .map(e => CARDS.find(c => c.id === e.cardId))
+      .find(c => c && (c.name || "").toLowerCase() === name);
+    if (treffer) return { karte: treffer, grund: "model" };
+  }
+  return deckSchnittKandidat(d, karte);
+}
+
+/* Die Zeile unter einem Vorschlag, wenn das Deck voll ist. */
+function schnittHinweisHtml(schnitt) {
+  if (!schnitt?.karte) return "";
+  return `<div class="syn-cut" title="${esc(t("deck.cutWhy." + schnitt.grund))}">
+    &#9986; ${esc(t("deck.cutFor", { name: schnitt.karte.disp || schnitt.karte.name }))}</div>`;
+}
+
 const DECK_FORMATE = ["Commander", "Standard", "Pioneer", "Modern", "Legacy",
                       "Vintage", "Pauper", "Draft", "Brawl", "Casual"];
 const DECK_ARCHETYPEN = ["Aggro", "Midrange", "Control", "Combo", "Tempo",
@@ -4215,6 +4428,8 @@ function renderDecks() {
             d.archetype ? `<span class="pill">${esc(d.archetype)}</span>` : ""
           }<span class="deck-legal-wrap" data-legalpill="${d.id}">${deckLegalPillInner(DECK_LEGAL.get(d.id))}</span></div>
           <div class="hint" style="margin:2px 0 0">${n} ${esc(t("common.cards"))} &middot; ${eur(v)}${
+            istCommanderDeck(d) && deckFrei(d) === 0
+              ? ` &middot; <span class="deck-full-note">${esc(t("deck.fullShort", { n, max: DECK_MAX }))}</span>` : ""}${
             d.shared ? ` &middot; <span style="color:var(--ok)">${esc(t("deck.shared"))}</span>` : ""}${
             fehlt ? ` &middot; <span style="color:var(--err)">${esc(t("deck.incomplete", { n: fehlt }))}</span>` : ""}</div>
         </div>
@@ -4530,6 +4745,45 @@ function renderDecks() {
     if (!d) return;
     const add = Math.max(1, parseInt($(`[data-dqty="${deckId}"]`).value) || 1);
     const ex = d.entries.find(e => e.cardId === cardId);
+    const pick = CARDS.find(x => x.id === cardId);
+
+    // Wunschkarte einlösen: Steht dieselbe Karte schon als fehlender Eintrag im
+    // Deck, nur in einer anderen Auflage, dann will man sie nicht ZUSÄTZLICH
+    // einplanen — man hat sie inzwischen gekauft und der Wunsch ist erfüllt. Der
+    // Eintrag wird umgehängt, das Deck bleibt gleich groß. Muss VOR der
+    // Voll-Prüfung stehen: gerade im vollen Deck ist das der einzige Weg, eine
+    // Wunschkarte noch zu ersetzen.
+    const wunsch = deckWunschEintrag(d, pick);
+    if (wunsch) {
+      const n = Math.min(add, wunsch.eintrag.qty);
+      btn.disabled = true;
+      try {
+        const { error } = await sb.rpc("fulfil_wish_in_deck", {
+          p_deck: deckId, p_from_card: wunsch.karte.id, p_to_card: cardId, p_n: n,
+        });
+        if (error) throw error;
+        await reload(); renderAll();
+        toast(t("deck.wishFilled", { name: pick.disp || pick.name, n }));
+      } catch (e) { toast(dbErr(e)); btn.disabled = false; }
+      return;
+    }
+
+    // Singleton: Im Commander-Deck ist jede Karte nur einmal erlaubt (Ausnahmen
+    // stehen im Regeltext der Karte). Das gilt unabhängig davon, ob noch Platz
+    // ist — und es ist die richtige Auskunft, wo vorher pauschal „Deck voll"
+    // stand: der Platz ist nicht weg, sondern an genau diese Karte vergeben.
+    // Fehlt sie einem noch, führt der Weg über die Sammlung, nicht übers Deck.
+    if (pick && add > singletonFrei(d, pick)) {
+      const name = pick.disp || pick.name;
+      toast(ex && ex.qty > bestandVon(pick)
+        ? t("deck.alreadyInWish", { name })
+        : t("deck.singleton", { name, max: commanderMaxKopien(pick), n: deckKopien(d, pick) }));
+      return;
+    }
+
+    // Commander-Grenze: lieber hier erklären als den Trigger absagen lassen.
+    const frei = deckFrei(d);
+    if (add > frei) { deckVollMelden(d); return; }
 
     // Kontingent: eine besessene Karte, deren Exemplare bereits alle in ANDEREN
     // Decks stecken, lässt sich nicht zusätzlich hier einbauen — außer sie ist in
@@ -4556,7 +4810,18 @@ function renderDecks() {
                 { onConflict: "deck_id,card_id" });
       if (error) throw error;
       await reload(); renderAll();
-    } catch (e) { toast(dbErr(e)); btn.disabled = false; }
+    } catch (e) {
+      // Der Trigger ist die letzte Instanz — etwa wenn ein zweites Gerät
+      // parallel Karten hinzugefügt hat, seit diese Ansicht gezeichnet wurde.
+      if (istDeckVollFehler(e)) { await reload(); renderAll(); deckVollMelden(DECKS.find(x => x.id === deckId)); }
+      else if (istSingletonFehler(e)) {
+        await reload(); renderAll();
+        const dd = DECKS.find(x => x.id === deckId);
+        toast(t("deck.singleton", { name: pick?.disp || pick?.name || "",
+          max: pick ? commanderMaxKopien(pick) : 1, n: pick ? deckKopien(dd, pick) : 0 }));
+      }
+      else { toast(dbErr(e)); btn.disabled = false; }
+    }
   });
 }
 
@@ -6765,6 +7030,14 @@ async function deckNamenAufloesen(namen) {
 async function deckImportieren(text, btn) {
   const { deckName, commanders, eintraege } = parseDeckliste(text);
   if (!eintraege.length) return toast(t("imp.empty"));
+  // Commander-Grenze VOR dem Anlegen prüfen: der Trigger würde die Liste
+  // mittendrin abweisen und ein halb gefülltes Deck hinterlassen — schlimmer
+  // als gar keins.
+  if (commanders.length) {
+    const gesamt = eintraege.reduce((s, e) => s + (e.qty || 1), 0);
+    if (gesamt > DECK_MAX)
+      return toast(t("deck.importTooBig", { n: gesamt, max: DECK_MAX }));
+  }
   const busy = (an, txt) => { if (btn) { btn.disabled = an;
     btn.innerHTML = an ? `<span class="syn-spin">&#9881;</span> ${esc(txt || t("imp.busy"))}` : esc(t("imp.btn")); } };
   busy(true);
@@ -8120,7 +8393,20 @@ function wireApp() {
       btn.innerHTML = "&#10003;";
       const d = DECKS.find(x => x.id === deckId);
       toast(t("syn.addedWish", { name: card.name, deck: d?.name || "" }));
-    } catch (err) { btn.disabled = false; toast(dbErr(err)); }
+    } catch (err) {
+      // Der Trigger kann trotz gesperrter Kachel absagen — etwa wenn die Karte
+      // seit der Suche von einem zweiten Gerät ins Deck gelegt wurde.
+      if (istSingletonFehler(err)) {
+        await reload();
+        const d = DECKS.find(x => x.id === deckId);
+        toast(t("deck.singleton", { name: card.name,
+          max: commanderMaxKopien(card), n: deckKopien(d, card) }));
+        btn.classList.add("voll");
+      } else if (istDeckVollFehler(err)) {
+        await reload(); deckVollMelden(DECKS.find(x => x.id === deckId));
+        btn.classList.add("voll");
+      } else { btn.disabled = false; toast(dbErr(err)); }
+    }
   });
 
   // Treffer direkt übernehmen oder erst bestätigen (gerätelokal gemerkt).

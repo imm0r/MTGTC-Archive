@@ -1018,3 +1018,10 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px}
 .ch-img{ width:48px; flex:none; border-radius:4px; display:block; }
 .ch-card-txt{ min-width:0; }
 .ch-card-txt .ch-v{ margin-top:0; font-size:15px; }
+
+/* Volles Commander-Deck: gesperrter Aufnahme-Knopf und die Zeile darunter,
+   welche Karte dafuer weichen koennte. */
+.syn-add.voll{ opacity:.45; cursor:not-allowed; }
+.syn-cut{ font-size:11px; color:var(--dim); padding:0 8px 6px;
+          overflow-wrap:anywhere; cursor:help; }
+.deck-full-note{ color:var(--err); }
