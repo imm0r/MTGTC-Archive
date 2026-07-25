@@ -3000,6 +3000,7 @@ async function synergieAnzeigen(box, hooks, opts = {}) {
   const res = await synergieSuchen(hooks, opts);
   if (lauf !== synergyLauf) return;                  // ein neuerer Lauf hat übernommen
   if (!res.length) { box.innerHTML = `<div class="empty">${esc(t("syn.none"))}</div>`; return; }
+  zaehleCommunitySuche("synergies", res.length);
   let kopf = "";
   if (opts.totalBudget) {                            // Summenzeile beim Deck-Budget
     const summe = res.reduce((s, e) => s + (synPreis(e.card) || 0), 0);
@@ -3095,6 +3096,7 @@ async function kiSynergieLauf(box, cfg) {
 
   const sugg = (data?.suggestions || []).filter(s => s && s.name);
   if (!sugg.length) { box.innerHTML = `<div class="empty">${esc(t("syn.none"))}</div>`; return; }
+  zaehleCommunitySuche("synergies", sugg.length);
 
   // Namen gegen Scryfall prüfen (POST /cards/collection, ein Request bis 75 Namen).
   let karten = [];
@@ -3553,6 +3555,7 @@ async function deckCombosAnzeigen(box, cards, deckId) {
   // Einstellung „nur komplette Combos": die „Fast komplett"-Kategorie weglassen.
   let almost = suchPrefs().onlyComplete ? [] : (data.almostIncluded || []);
   if (!included.length && !almost.length) { box.innerHTML = `<div class="empty">${esc(t("combo.none"))}</div>`; return; }
+  zaehleCommunitySuche("combos", included.length + almost.length);
 
   // Legalität im Deck-Format: erst zählen (für die Zusammenfassung), dann —
   // je nach Einstellung — die nicht legalen Combos ganz ausblenden.
@@ -3604,6 +3607,7 @@ async function sammlungCombosAnzeigen(box, cards) {
   if (lauf !== combosLauf) return;
   let included = data.included || [];
   if (!included.length) { box.innerHTML = `<div class="empty">${esc(t("combo.collNone"))}</div>`; return; }
+  zaehleCommunitySuche("combos", included.length);
   // Legalität: ohne Deck-Kontext gegen Commander (siehe comboLegalKey).
   const gesamt = included.length;
   const illegal = included.filter(c => !comboIstLegal(c, "commander")).length;
@@ -3637,6 +3641,7 @@ async function karteCombosAnzeigen(box, card) {
   if (lauf !== combosLauf) return;
   let combos = data.combos || [];
   if (!combos.length) { box.innerHTML = `<div class="empty">${esc(t("combo.cardNone"))}</div>`; return; }
+  zaehleCommunitySuche("combos", combos.length);
   // Legalität: ohne Deck-Kontext gegen Commander (siehe comboLegalKey).
   const gesamt = combos.length;
   const illegal = combos.filter(c => !comboIstLegal(c, "commander")).length;
@@ -6035,6 +6040,17 @@ async function ladeCommunityStats() {
   } catch { COMMUNITY_STATS = null; }
 }
 
+/* Gefundene Combos und Synergien für die Community-Kacheln mitzählen. Beides
+   entsteht außerhalb der Datenbank (Commander Spellbook bzw. Scryfall), also
+   führt kein Weg an einer eigenen Zählung vorbei. Gespeichert wird nur eine
+   Gesamtsumme je Art — keine Zeile je Suche, keine Kennung, nichts, was sich
+   einer Person zuordnen ließe. Schlägt der Aufruf fehl, ist das folgenlos:
+   eine Kachel ist keinen Fehler wert. */
+function zaehleCommunitySuche(art, n) {
+  if (!sb || !USER || !(n > 0)) return;
+  sb.rpc("record_community_search", { p_kind: art, p_n: n }).catch(() => {});
+}
+
 async function ladeCommunityHighlights() {
   try {
     const { data, error } = await sb.rpc("community_highlights");
@@ -6219,6 +6235,8 @@ function communityStatsHtml() {
     [t("community.activeSessions"), s.active_session_count],
     [t("community.upcomingEvents"), s.upcoming_event_count],
     [t("community.activity7d"), s.activity_7d_count],
+    [t("community.combos"), s.combo_count],
+    [t("community.synergies"), s.synergy_count],
   ].map(([k, v]) =>
     `<div class="stat"><div class="v">${esc(zahl(v))}</div><div class="k">${esc(k)}</div></div>`).join("")}</div>`;
 }
