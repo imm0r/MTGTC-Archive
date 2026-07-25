@@ -6067,7 +6067,15 @@ async function ladeCommunityStats() {
    eine Kachel ist keinen Fehler wert. */
 function zaehleCommunitySuche(art, n) {
   if (!sb || !USER || !(n > 0)) return;
-  sb.rpc("record_community_search", { p_kind: art, p_n: n }).catch(() => {});
+  // Die Zählung ist Beiwerk und darf die Suche unter keinen Umständen
+  // abbrechen — sie steht mitten in den Anzeigefunktionen, VOR dem Rendern.
+  // sb.rpc() liefert einen Builder, der then() kennt, aber kein catch(); ein
+  // .catch() daran wirft synchron. Deshalb erst in ein echtes Promise heben
+  // und zusätzlich synchron absichern.
+  try {
+    Promise.resolve(sb.rpc("record_community_search", { p_kind: art, p_n: n }))
+      .catch(() => {});
+  } catch { /* nebensächlich */ }
 }
 
 async function ladeCommunityHighlights() {
