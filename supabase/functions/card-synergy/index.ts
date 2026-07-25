@@ -44,8 +44,9 @@ const SCHEMA = {
           name: { type: "string", description: "Exakter englischer Kartenname einer ECHTEN Magic-Karte." },
           reason: { type: "string", description: "Ein einziger, konkreter Satz: der Synergie-MECHANISMUS (nicht bloß 'starke Karte'). In der gewünschten Sprache." },
           replaces: { type: "string", description: "Nur wenn das Deck voll ist: der EXAKTE englische Name EINER Karte aus der übergebenen Deckliste, die für diesen Vorschlag weichen sollte. Nicht der Commander. Sonst leerer String." },
+          replacesWhy: { type: "string", description: "Nur wenn replaces gesetzt ist: ein einziger, konkreter Satz, WARUM genau diese Karte weichen sollte — was sie im Deck schlechter leistet als der Vorschlag. Nicht 'sie ist schwächer', sondern der Grund. In der gewünschten Sprache. Sonst leerer String." },
         },
-        required: ["name", "reason", "replaces"],
+        required: ["name", "reason", "replaces", "replacesWhy"],
         additionalProperties: false,
       },
     },
@@ -163,7 +164,7 @@ Strikte Regeln:
 Kartenliste (${deckCards.length}):
 ${deckCards.join(", ")}
 
-Nenne ${n} Karten, die die Strategie dieses Decks am besten ergänzen.${deckVoll ? "\n\nDas Deck ist VOLL (100 Karten). Nenne deshalb je Vorschlag im Feld replaces den exakten englischen Namen EINER Karte aus der obigen Liste, die dafür weichen sollte — die schwächste oder am wenigsten zur Strategie passende. Niemals den Commander. Jede Karte höchstens einmal nennen." : ""}`
+Nenne ${n} Karten, die die Strategie dieses Decks am besten ergänzen.${deckVoll ? "\n\nDas Deck ist VOLL (100 Karten). Nenne deshalb je Vorschlag im Feld replaces den exakten englischen Namen EINER Karte aus der obigen Liste, die dafür weichen sollte — die schwächste oder am wenigsten zur Strategie passende. Niemals den Commander. Jede Karte höchstens einmal nennen.\n\nBegründe in replacesWhy in EINEM Satz, warum genau diese Karte weichen sollte: was sie in diesem Deck konkret schlechter leistet als der Vorschlag — zu langsam, redundant zu einer bereits vorhandenen Karte, passt nicht zur Farbidentität, zu hohe Kosten für den Effekt. Kein Allgemeinplatz wie 'sie ist schwächer'." : ""}`
     : `Ausgangskarte:
 Name: ${name}
 Typzeile: ${typeLine}
