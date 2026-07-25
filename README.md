@@ -296,7 +296,32 @@ Bibliothek zuunterst.
 | ✋ | Hand | aufgefächert, jedes Exemplar eine eigene Karte |
 | 📚 | Bibliothek | was noch im Deck steckt |
 
-**Aufgeklappt ist immer genau eine Zone** — die, über der die Maus steht; auf
+Die **Länder** stehen dabei getrennt vom übrigen Schlachtfeld — in der Matte als
+eigener Streifen, im Akkordeon unter einer eigenen Überschrift. Eine Zone bleibt
+es trotzdem: eine Karte wandert nicht „aufs Land", sondern aufs Schlachtfeld,
+und ob sie ein Land ist, weiß die App aus der Typzeile.
+
+### Zwei Anordnungen
+
+Ab **820 px Breite** liegen die Felder wie auf der offiziellen Spielmatte:
+Schlachtfeld groß links, Länder als Streifen darunter, rechts die schmalen
+Spalten (Commander-Steuer, Kommandozone, Bibliothek, Exil) und ganz rechts die
+Lebenspunkte aller Mitspieler samt Friedhof. Die Hand liegt als Fächer darunter
+— da, wo man sie am Tisch hält. Ein quer gehaltenes Handy erreicht diese Breite
+und bekommt die Matte automatisch.
+
+Darunter — also auf einem hochkant gehaltenen Handy — steht dasselbe als
+**Akkordeon**: eine Zone auf einmal. Das ist keine Bequemlichkeit, sondern
+Notwendigkeit: von den schmalen Mattenspalten blieben bei 390 px rund 50 px
+übrig, eine Kartenminiatur ist 62 px breit. Beide Anordnungen zeigen dieselben
+Zonen, dieselben Zielknöpfe, denselben Zustand.
+
+> Drehen kann die App das Gerät nicht selbst — `screen.orientation.lock()` gibt
+> es nur im Vollbild und nur auf Android, iOS Safari kennt es gar nicht. Im
+> Hochformat steht deshalb nur ein Hinweis, kein Knopf, der auf dem iPhone still
+> nichts täte.
+
+**Aufgeklappt ist im Akkordeon immer genau eine Zone** — die, über der die Maus steht; auf
 dem Handy die zuletzt angetippte. So bleibt die Ansicht kurz, statt sechs Listen
 untereinander zu stapeln. Die zugeklappten Kopfzeilen zeigen Anzahl und ein paar
 Miniaturen, damit man auch ohne Aufklappen sieht, was drinliegt.

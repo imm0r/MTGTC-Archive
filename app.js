@@ -7849,34 +7849,37 @@ function sessionLobbyHtml() {
     ${inv ? `<div class="card"><h3 style="margin-top:0">${esc(t("sess.invitesTitle"))}</h3>${inv}</div>` : ""}`;
 }
 
+/* Eine Spielerkachel: Avatar, Name/Deck und Lebenspunkte NEBENeinander.
+   Gestapelt füllten vier Mitspieler den halben Schirm, bevor die eigenen Karten
+   überhaupt anfingen. In der Matte stehen dieselben Kacheln schmal untereinander
+   im Feld „Lebenspunkte" — deshalb eine Funktion für beide Anordnungen. */
+function spielerKachelHtml(p) {
+  const joined = p.status === "joined";
+  const besiegt = joined && p.life <= 0;   // bei 0 Leben ausgeschieden
+  const name = p.profile?.display_name
+    || (p.user_id === USER.id ? (PROFILE?.display_name || t("sess.you")) : t("friends.unknown"));
+  return `<div class="sp-card${joined ? "" : " wartet"}${besiegt ? " besiegt" : ""}">
+    ${avatarHtml(38, p.profile)}
+    <div class="sp-mitte">
+      <div class="sp-name">${esc(name)}${p.user_id === SESSION.host ? ` <span class="sp-host" title="${esc(t("sess.host"))}">&#9733;</span>` : ""}</div>
+      ${p.deck_name ? `<div class="sp-deck"${p.commander_img ? ` data-cmd-img="${esc(p.commander_img)}" data-cmd-name="${esc(p.commander || p.deck_name)}"` : ""} title="${esc(p.commander || p.deck_name)}">${p.commander_img ? `<img class="sp-cmd" src="${esc(p.commander_img)}" alt="">` : ""}<span class="sp-deckname">${esc(p.deck_name)}</span></div>` : ""}
+      <div class="sp-besiegt">&#9760; ${esc(t("sess.defeated"))}</div>
+    </div>
+    ${joined
+      ? `<div class="sp-life" data-u="${esc(p.user_id)}">${Math.max(0, p.life)}</div>
+         <div class="sp-ctrl">
+           <button class="btn ghost sm" data-life="${esc(p.user_id)}" data-d="-5">&minus;5</button>
+           <button class="btn ghost sm" data-life="${esc(p.user_id)}" data-d="-1">&minus;1</button>
+           <button class="btn ghost sm" data-life="${esc(p.user_id)}" data-d="1">+1</button>
+           <button class="btn ghost sm" data-life="${esc(p.user_id)}" data-d="5">+5</button>
+         </div>`
+      : `<div class="sp-wait">${esc(t("sess.waiting"))}</div>`}
+  </div>`;
+}
+
 function sessionBoardHtml() {
   const istHost = SESSION.host === USER.id;
-  const spieler = SESSION_PLAYERS.map(p => {
-    const joined = p.status === "joined";
-    const besiegt = joined && p.life <= 0;   // bei 0 Leben ausgeschieden
-    const name = p.profile?.display_name
-      || (p.user_id === USER.id ? (PROFILE?.display_name || t("sess.you")) : t("friends.unknown"));
-    // Flache Kachel: Avatar, Name/Deck und Lebenspunkte stehen NEBENeinander.
-    // Gestapelt füllten vier Mitspieler den halben Schirm, bevor die eigenen
-    // Karten überhaupt anfingen.
-    return `<div class="sp-card${joined ? "" : " wartet"}${besiegt ? " besiegt" : ""}">
-      ${avatarHtml(38, p.profile)}
-      <div class="sp-mitte">
-        <div class="sp-name">${esc(name)}${p.user_id === SESSION.host ? ` <span class="sp-host" title="${esc(t("sess.host"))}">&#9733;</span>` : ""}</div>
-        ${p.deck_name ? `<div class="sp-deck"${p.commander_img ? ` data-cmd-img="${esc(p.commander_img)}" data-cmd-name="${esc(p.commander || p.deck_name)}"` : ""} title="${esc(p.commander || p.deck_name)}">${p.commander_img ? `<img class="sp-cmd" src="${esc(p.commander_img)}" alt="">` : ""}<span class="sp-deckname">${esc(p.deck_name)}</span></div>` : ""}
-        <div class="sp-besiegt">&#9760; ${esc(t("sess.defeated"))}</div>
-      </div>
-      ${joined
-        ? `<div class="sp-life" data-u="${esc(p.user_id)}">${Math.max(0, p.life)}</div>
-           <div class="sp-ctrl">
-             <button class="btn ghost sm" data-life="${esc(p.user_id)}" data-d="-5">&minus;5</button>
-             <button class="btn ghost sm" data-life="${esc(p.user_id)}" data-d="-1">&minus;1</button>
-             <button class="btn ghost sm" data-life="${esc(p.user_id)}" data-d="1">+1</button>
-             <button class="btn ghost sm" data-life="${esc(p.user_id)}" data-d="5">+5</button>
-           </div>`
-        : `<div class="sp-wait">${esc(t("sess.waiting"))}</div>`}
-    </div>`;
-  }).join("");
+  const spieler = SESSION_PLAYERS.map(spielerKachelHtml).join("");
 
   const drin = new Set(SESSION_PLAYERS.map(p => p.user_id));
   const einladbar = (FRIENDS?.accepted || []).map(f => f.other).filter(o => o && !drin.has(o.id));
@@ -7897,7 +7900,9 @@ function sessionBoardHtml() {
                     : `<button class="btn danger sm" id="sess-leave">${esc(t("sess.leave"))}</button>`}
         </div>
       </div>
-      <div class="sp-grid">${spieler}</div>
+      <!-- In der Matte stehen die Spieler im Feld „Lebenspunkte"; hier wäre
+           dieselbe Reihe ein zweites Mal. -->
+      ${MAT_AN ? "" : `<div class="sp-grid">${spieler}</div>`}
       <div class="row" style="align-items:center;margin-top:12px">
         <div style="flex:none"><label style="margin:0">${esc(t("sess.myDeck"))}</label></div>
         <div style="flex:none;min-width:200px"><select id="sess-deck">
@@ -8172,7 +8177,32 @@ async function trackerReset() {
   catch (e) { toast(dbErr(e)); }
 }
 
-/* ---- Aufbau --------------------------------------------------------- */
+/* ---- Aufbau ---------------------------------------------------------
+   Zwei Anordnungen derselben Zonen:
+
+   • Die SPIELMATTE ab MAT_AB Pixeln Breite — die Felder liegen wie auf der
+     offiziellen Matte: Schlachtfeld groß links, Länder als Streifen darunter,
+     rechts die schmalen Spalten (Steuer, Kommandozone, Bibliothek, Exil) und
+     ganz rechts Lebenspunkte und Friedhof. Die Hand liegt als Fächer darunter,
+     da, wo man sie am Tisch hält.
+   • Darunter das AKKORDEON — eine Zone auf einmal. Auf einem hochkant
+     gehaltenen Handy blieben von den schmalen Mattenspalten rund 50 px übrig;
+     eine Kartenminiatur ist 62 px breit. Die Matte ist dort schlicht nicht
+     bedienbar, deshalb wird sie nicht gezeigt.
+
+   Gemeinsam ist beiden alles außer der Anordnung: dieselben Zonen, dieselben
+   Zielknöpfe, derselbe Zustand. */
+const MAT_AB = 820;   // ab hier passt die Matte (Handy quer erreicht das)
+let MAT_AN = matchMedia(`(min-width:${MAT_AB}px)`).matches;
+/* Wechselt der Schirm über die Schwelle (Gerät gedreht, Fenster gezogen), die
+   Ansicht einmal neu bauen — die beiden Anordnungen unterscheiden sich zu sehr
+   für reines CSS. Steht hier und nicht weiter oben: MAT_AB muss vorher stehen,
+   sonst liefe die Zeile beim Laden in die temporale Totzone. */
+matchMedia(`(min-width:${MAT_AB}px)`).addEventListener("change", e => {
+  MAT_AN = e.matches;
+  if (SESSION && $(".view.on")?.id === "v-session") renderSession();
+});
+
 function deckTrackerHtml() {
   const deck = trkDeck();
   if (!deck) return "";
@@ -8182,11 +8212,76 @@ function deckTrackerHtml() {
       <h3 style="margin:0">${esc(t("sess.trackerTitle", { deck: deck.name }))}</h3>
       <div style="flex:none"><button class="btn ghost sm" id="trk-reset">${esc(t("sess.trackerReset"))}</button></div>
     </div>
-    <div class="zonen" id="zonen">${zonenInnerHtml()}</div>
+    ${querHinweisHtml()}<div class="${MAT_AN ? "mat" : "zonen"}" id="zonen">${zonenInnerHtml()}</div>
   </div>`;
 }
 
+/* Hochkant auf einem Gerät, das quer breit genug WÄRE: ein Hinweis, kein Knopf.
+   Drehen kann eine Webseite das Gerät nicht — screen.orientation.lock() gibt es
+   nur im Vollbild und nur auf Android, auf iOS gar nicht. Ein Knopf, der dort
+   still nichts täte, wäre schlechter als der Satz. */
+function querHinweisHtml() {
+  const laengsteSeite = Math.max(screen?.width || 0, screen?.height || 0);
+  if (laengsteSeite < MAT_AB || innerWidth > innerHeight) return "";
+  return `<div class="quer-hinweis">&#8635; ${esc(t("mat.rotateHint"))}</div>`;
+}
+
+/* Die Matte. Jedes Feld ist derselbe Zonenkorb wie im Akkordeon, nur ohne
+   Kopfzeile zum Aufklappen — hier ist alles gleichzeitig offen. */
+function matInnerHtml() {
+  const feld = (key, titel, inhalt, extra = "") => `
+    <section class="mat-feld${extra}" data-zone="${esc(key)}">
+      <div class="mat-titel">${zoneDef(key)?.icon || ""} ${esc(titel)}
+        <span class="mat-n">${inhalt.n}</span></div>
+      <div class="mat-korb">${inhalt.html}</div>
+    </section>`;
+
+  // Schlachtfeld ohne Länder — die stehen im eigenen Streifen darunter.
+  const feldKarten = zoneKarten("field");
+  const bleibend = feldKarten.filter(x => !istLand(x.card));
+  const laender  = feldKarten.filter(x => istLand(x.card));
+  const stapelHtml = liste => liste.length
+    ? `<div class="zone-gitter">${liste.flatMap(({ card }) => feldStapel(card.id)
+        .map(s => zoneKarteHtml(card, "field", s.n, s))).join("")}</div>`
+    : `<div class="zone-leer">${esc(t("zone.empty"))}</div>`;
+  const summe = liste => liste.reduce((s, x) => s + x.n, 0);
+
+  const cmdKarte = zoneKarten("cmd")[0]?.card;
+  const steuer = cmdKarte ? (zStand(cmdKarte.id).cast || 0) : 0;
+  const getappt = feldKarten.some(({ card }) => feldListe(card.id).some(x => x.t));
+
+  return `
+    <div class="mat-links">
+      ${feld("field", t("zone.field"), { n: summe(bleibend), html:
+        `${getappt ? `<div class="feld-werkzeug"><button class="btn ghost sm" id="feld-enttappen"
+            title="${esc(t("zone.untapAllTitle"))}">&#8635; ${esc(t("zone.untapAll"))}</button></div>` : ""}
+         ${stapelHtml(bleibend)}` }, " mat-gross")}
+      ${feld("field", t("mat.lands"), { n: summe(laender), html: stapelHtml(laender) }, " mat-laender")}
+    </div>
+    <div class="mat-mitte">
+      <section class="mat-feld mat-steuer">
+        <div class="mat-titel">${esc(t("mat.tax"))}</div>
+        <div class="mat-korb">${cmdKarte
+          ? `<button class="mat-steuerwert" data-steuer="${esc(cmdKarte.id)}" data-d="-1"
+               title="${esc(t("sess.cmdTaxTitle", { mana: steuer * 2, n: steuer }))}">+${steuer * 2}</button>`
+          : `<span class="mat-steuerwert leer">&ndash;</span>`}</div>
+      </section>
+      ${feld("cmd", t("zone.cmd"), { n: zoneSumme("cmd"), html: zoneKorbHtml("cmd") })}
+      ${feld("lib", t("zone.lib"), { n: zoneSumme("lib"), html: zoneKorbHtml("lib") }, " mat-lib")}
+      ${feld("exile", t("zone.exile"), { n: zoneSumme("exile"), html: zoneKorbHtml("exile") })}
+    </div>
+    <div class="mat-rechts">
+      <section class="mat-feld mat-leben">
+        <div class="mat-titel">${esc(t("mat.life"))}</div>
+        <div class="mat-korb"><div class="sp-grid schmal">${SESSION_PLAYERS.map(spielerKachelHtml).join("")}</div></div>
+      </section>
+      ${feld("grave", t("zone.grave"), { n: zoneSumme("grave"), html: zoneKorbHtml("grave") })}
+    </div>
+    ${feld("hand", t("zone.hand"), { n: zoneSumme("hand"), html: zoneKorbHtml("hand") }, " mat-hand")}`;
+}
+
 function zonenInnerHtml() {
+  if (MAT_AN) return matInnerHtml();
   return sichtbareZonen().map(z => `
     <section class="zone${z.key === ZONE_OFFEN ? " offen" : ""}" data-zone="${z.key}">
       ${zoneKopfHtml(z)}
@@ -8223,11 +8318,19 @@ function zoneKorbHtml(zone) {
    Tapp-Zustand, gleiche Marken. „Alle enttappen" steht nur da, wenn überhaupt
    etwas getappt ist — der Enttappen-Schritt in einem Klick. */
 function zoneFeldHtml(karten) {
-  const stapel = karten.flatMap(({ card }) => feldStapel(card.id).map(s => ({ card, ...s })));
-  const getappt = stapel.some(s => s.t);
+  const getappt = karten.some(({ card }) => feldListe(card.id).some(x => x.t));
+  // Länder stehen hinten, unter eigener Überschrift — dieselbe Zweiteilung wie
+  // in der Matte, wo sie ihren eigenen Streifen haben. Eine Zone bleibt es
+  // trotzdem: eine Karte wandert nicht „aufs Land", sondern aufs Schlachtfeld.
+  const gitter = liste => `<div class="zone-gitter">${liste.flatMap(({ card }) =>
+    feldStapel(card.id).map(s => zoneKarteHtml(card, "field", s.n, s))).join("")}</div>`;
+  const bleibend = karten.filter(x => !istLand(x.card));
+  const laender  = karten.filter(x => istLand(x.card));
   return `${getappt ? `<div class="feld-werkzeug"><button class="btn ghost sm" id="feld-enttappen"
       title="${esc(t("zone.untapAllTitle"))}">&#8635; ${esc(t("zone.untapAll"))}</button></div>` : ""}
-    <div class="zone-gitter">${stapel.map(s => zoneKarteHtml(s.card, "field", s.n, s)).join("")}</div>`;
+    ${bleibend.length ? gitter(bleibend) : ""}
+    ${laender.length ? `<div class="feld-trenner">${esc(t("mat.lands"))}
+      <span class="feld-trenner-n">${laender.reduce((s, x) => s + x.n, 0)}</span></div>${gitter(laender)}` : ""}`;
 }
 
 /* Eine Karte in Feld/Friedhof/Exil/Kommandozone: ein Bild je KARTE mit Anzahl —
@@ -8246,7 +8349,7 @@ function zoneKarteHtml(c, zone, n, st) {
             : `<div class="zk-ohnebild">${esc(nm)}</div>`}
     ${n > 1 ? `<span class="zk-n">&times;${n}</span>` : ""}
     ${st?.c ? `<span class="zk-marke" title="${esc(t("zone.counters", { n: st.c }))}">+${st.c}/+${st.c}</span>` : ""}
-    ${zone === "cmd" ? `<button class="zk-steuer" data-steuer="${esc(c.id)}" data-d="-1"
+    ${zone === "cmd" && !MAT_AN ? `<button class="zk-steuer" data-steuer="${esc(c.id)}" data-d="-1"
          title="${esc(t("sess.cmdTaxTitle", { mana: steuer * 2, n: steuer }))}">+${steuer * 2}</button>` : ""}
     <div class="zk-akt">${zone === "field" ? `<div class="zk-akt-reihe">
         <button class="btn ghost sm" data-tap="${esc(c.id)}" data-idx="${idx}"
@@ -8350,7 +8453,9 @@ function renderZonen() {
   const el = $("#zonen");
   if (!el) return;
   const suchtext = libFilter(), fokus = document.activeElement?.id === "lib-suche";
+  el.className = MAT_AN ? "mat" : "zonen";
   el.innerHTML = zonenInnerHtml();
+  wireSpielerKacheln();
   const suche = $("#lib-suche");
   if (suche) { suche.value = suchtext; if (fokus) { suche.focus(); suche.selectionStart = suche.selectionEnd = suchtext.length; } }
   wireZonenHover();
@@ -8460,7 +8565,6 @@ function wireSession() {
   }
   $$("[data-sess-join]").forEach(b => b.onclick = () => sessionBeitreten(b.dataset.sessJoin));
   $$("[data-sess-decline]").forEach(b => b.onclick = () => sessionAblehnen(b.dataset.sessDecline));
-  $$("[data-life]").forEach(b => b.onclick = () => lebenAendern(b.dataset.life, parseInt(b.dataset.d)));
   $$("[data-sess-invite]").forEach(b => b.onclick = () => sessionEinladen(b.dataset.sessInvite, b));
   const reset = $("#sess-reset"); if (reset) reset.onclick = lebenReset;
   const end = $("#sess-end"); if (end) end.onclick = sessionBeenden;
@@ -8476,8 +8580,18 @@ function wireSession() {
   // Auf-/Zugeklappt merken, damit ein Neuzeichnen (Realtime) es nicht aufreißt.
   const dbox = $("#dice-box"); if (dbox) dbox.ontoggle = () => wuerfelOffen = dbox.open;
   const ibox = $("#invite-box"); if (ibox) ibox.ontoggle = () => einladenOffen = ibox.open;
-  // Commander-Karten: beim Hover große Vorschau + Name.
-  if (HOVER_OK) $$("#v-session .sp-deck[data-cmd-img]").forEach(el => {
+  wireSpielerKacheln();
+}
+
+/* Lebenspunkt-Knöpfe und Commander-Vorschau der Spielerkacheln. Steht für sich,
+   weil die Kacheln in der Matte im Zonenbehälter sitzen und dort bei jedem Zug
+   neu entstehen — renderZonen() ruft das deshalb ebenfalls auf. */
+function wireSpielerKacheln() {
+  $$("#v-session [data-life]").forEach(b => b.onclick = () => lebenAendern(b.dataset.life, parseInt(b.dataset.d)));
+  if (!HOVER_OK) return;
+  $$("#v-session .sp-deck[data-cmd-img]").forEach(el => {
+    if (el.dataset.cmdWired) return;   // addEventListener stapelt sich sonst
+    el.dataset.cmdWired = "1";
     el.addEventListener("mousemove", e => zeigeCmdHover(el.dataset.cmdImg, el.dataset.cmdName, e.clientX, e.clientY));
     el.addEventListener("mouseleave", versteckeCmdHover);
   });
