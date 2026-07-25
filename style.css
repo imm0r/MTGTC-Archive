@@ -1029,4 +1029,8 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px}
    ganze Satz steht weiterhin im title. */
 .syn-cut-why{ display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical;
               overflow:hidden; margin-top:2px; opacity:.75; font-style:italic; }
+/* Von der Prüfung verworfen: durchgestrichen, damit auf einen Blick klar ist,
+   dass dieser Satz NICHT gilt — sichtbar nur für freigeschaltete Tester. */
+.syn-cut-why.strich{ text-decoration:line-through; opacity:.45; }
+.syn-cut-bad{ display:block; margin-top:2px; color:var(--err); font-style:normal; }
 .deck-full-note{ color:var(--err); }
