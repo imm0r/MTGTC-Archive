@@ -3026,7 +3026,11 @@ async function synergieAnzeigen(box, hooks, opts = {}) {
    opts.maxPrice filtert wie bei der heuristischen Suche. */
 async function kiSynergien(card, box, opts = {}) {
   return kiSynergieLauf(box, {
-    body: { card: { name: card.name, type_line: card.type_line, oracle_text: card.oracle_text }, lang: LANG, n: 10 },
+    // Das eingestellte Maximum ans Modell durchreichen, statt die Antwort
+    // hinterher zu kürzen: Wer weniger Vorschläge will, soll auch weniger
+    // Ausgabe-Tokens bezahlen. Die Function klemmt selbst auf 3..15.
+    body: { card: { name: card.name, type_line: card.type_line, oracle_text: card.oracle_text },
+            lang: LANG, n: prefWert("synLimit") || 10 },
     selfName: card.name,
     maxPrice: opts.maxPrice,
   });
@@ -3048,7 +3052,10 @@ async function kiSynergienDeck(deck, cards, box, opts = {}) {
         name: deck.name, format: deck.format || "", commander, colorIdentity: colors,
         cards: [...new Set(cards.map(c => c.name).filter(Boolean))].slice(0, 120),
       },
-      lang: LANG, n: 12,
+      // Wie bei der Einzelkarte: das eingestellte Maximum geht ans Modell,
+      // damit die Einstellung Ausgabe-Tokens spart und nicht nur die Anzeige
+      // kürzt. Ohne Einstellung bleibt es beim bisherigen Wert.
+      lang: LANG, n: prefWert("synLimit") || 12,
     },
     colors,
     exclude: excludeVon(cards),   // nur Karten DIESES Decks raus, Besessenes darf auftauchen
