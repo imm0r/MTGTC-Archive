@@ -3093,6 +3093,12 @@ function farbIdentPasst(ci, erlaubt) { return (ci || []).every(f => erlaubt.has(
    Rest wird bei 300 Zeichen gekappt: das deckt auch lange Karten ab, ohne
    dass 100 Karten die Anfrage sprengen. */
 function deckKartenFuersModell(cards) {
+  // Manakosten nur, wenn das Verfahren an ist. Sie stehen NICHT im Regeltext,
+  // deshalb konnte der Prüfer eine Aussage wie „kostet vier Mana" nie
+  // bestätigen und hat sie als unbelegt verworfen — ein Falschpositiver, der
+  // nicht am Urteil lag, sondern an fehlenden Daten. Kostet etwa ein Token je
+  // Karte, deshalb zuschaltbar statt immer.
+  const mitKosten = hatFeature("verify_cost");
   const gesehen = new Set();
   const raus = [];
   for (const c of cards) {
@@ -3100,9 +3106,12 @@ function deckKartenFuersModell(cards) {
     if (!nm || gesehen.has(nm)) continue;
     gesehen.add(nm);
     const typ = c.type_line || "";
-    raus.push(/basic/i.test(typ) && /land/i.test(typ)
-      ? { n: nm }
-      : { n: nm, t: typ, o: (c.oracle_text || "").slice(0, 300) });
+    if (/basic/i.test(typ) && /land/i.test(typ)) { raus.push({ n: nm }); }
+    else {
+      const k = { n: nm, t: typ, o: (c.oracle_text || "").slice(0, 300) };
+      if (mitKosten && c.mana_cost) k.m = String(c.mana_cost).slice(0, 40);
+      raus.push(k);
+    }
     if (raus.length >= 120) break;
   }
   return raus;
@@ -5597,6 +5606,10 @@ async function afterLogin(user) {
   // (z. B. Tabelle noch nicht angelegt), zeigt die App die E-Mail und läuft weiter.
   try { await ladeProfile(); } catch (e) { PROFILE = null; }
   await ladeFlags();   // globale Schalter + Admin-Status, bevor gezeichnet wird
+  // Anwesenheit und Postfach: beides nebenher, beides ohne Auswirkung auf den
+  // Start. Schlaegt es fehl, fehlt hoechstens die Zahl am Navigationseintrag.
+  sb.rpc("touch_last_seen").catch(() => {});
+  dmBadgeAktualisieren().catch(() => {});
   showApp();
   try { await reload(); renderAll(); }
   catch (e) { toast(dbErr(e)); }
@@ -5774,6 +5787,32 @@ function renderProfile() {
     </div>
 
     <div class="card">
+      <h3 style="margin-top:0">${esc(t("profile.aboutTitle"))}</h3>
+      <p class="hint" style="margin-top:-4px">${esc(t("profile.aboutHint"))}</p>
+      <label>${esc(t("profile.bio"))}</label>
+      <textarea id="pf-bio" rows="3" maxlength="600" placeholder="${esc(t("profile.bioPh"))}">${esc(PROFILE?.bio || "")}</textarea>
+      <div class="row" style="margin-top:8px">
+        <div><label>${esc(t("profile.location"))}</label>
+          <input type="text" id="pf-location" maxlength="80" value="${esc(PROFILE?.location || "")}"></div>
+        <div><label>${esc(t("profile.favFormat"))}</label>
+          <input type="text" id="pf-favformat" maxlength="40" value="${esc(PROFILE?.favourite_format || "")}"
+            placeholder="${esc(t("profile.favFormatPh"))}"></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div style="flex:1"><label>${esc(t("profile.website"))}</label>
+          <input type="url" id="pf-website" maxlength="200" value="${esc(PROFILE?.website || "")}" placeholder="https://"></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:14px;color:var(--txt);margin-top:12px">
+        <input type="checkbox" id="pf-findable"${PROFILE?.findable === false ? "" : " checked"} style="width:auto">
+        <span>${esc(t("profile.findable"))}</span>
+      </label>
+      <p class="hint">${esc(t("profile.findableHint"))}</p>
+      <div class="row" style="margin-top:8px">
+        <div style="flex:none"><button class="btn" id="pf-about-save">${esc(t("common.save"))}</button></div>
+      </div>
+    </div>
+
+    <div class="card">
       <h3 style="margin-top:0">${esc(t("profile.account"))}</h3>
       <label>${esc(t("profile.newPassword"))}</label>
       <div class="row" style="margin-bottom:6px">
@@ -5789,6 +5828,8 @@ function renderProfile() {
   $("#pf-avatar-file").onchange = e => { const f = e.target.files[0]; e.target.value = ""; if (f) avatarHochladen(f); };
   const del = $("#pf-avatar-del"); if (del) del.onclick = avatarEntfernen;
   $("#pf-name-save").onclick = nameSpeichern;
+  const ab = $("#pf-about-save");
+  if (ab) ab.onclick = profilTextSpeichern;
   $("#pf-name").addEventListener("keydown", e => { if (e.key === "Enter") nameSpeichern(); });
   $("#pf-pw-save").onclick = passwortAendern;
   $("#pf-logout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
@@ -5916,7 +5957,8 @@ function renderSettings() {
       <p class="hint">${esc(t("admin.limitHint"))}</p>
       <div class="sec-sep"></div>
       <label>${esc(t("admin.verifyTitle"))}</label>
-      ${[["verify_cite", "admin.verifyCite"], ["verify_model", "admin.verifyModel"]].map(([k, lbl]) => `
+      ${[["verify_cite", "admin.verifyCite"], ["verify_model", "admin.verifyModel"],
+          ["verify_cost", "admin.verifyCost"], ["verify_pair", "admin.verifyPair"]].map(([k, lbl]) => `
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:14px;color:var(--txt);margin-top:6px">
         <input type="checkbox" data-flag="${k}"${FLAGS[k] ? " checked" : ""} style="width:auto">
         <span>${esc(t(lbl))}</span>
@@ -5926,6 +5968,10 @@ function renderSettings() {
       <label>${esc(t("admin.accessTitle"))}</label>
       <div id="admin-access"><div class="meta"><span class="syn-spin">&#9881;</span></div></div>
       <p class="hint">${esc(t("admin.accessHint"))}</p>
+      <div class="sec-sep"></div>
+      <label>${esc(t("admin.rolesTitle"))}</label>
+      <div id="admin-rechte"><div class="meta"><span class="syn-spin">&#9881;</span></div></div>
+      <p class="hint">${esc(t("admin.rolesHint"))}</p>
     </div>` : ""}
     <p class="hint app-version">${esc(t("settings.version", { v: APP_VERSION || "—" }))}</p>`;
   // Eigenes Sprach-Dropdown mit Flaggen (ein natives <option> kann kein SVG
@@ -5980,7 +6026,7 @@ function renderSettings() {
     catch (e) { cb.checked = !an; toast(dbErr(e)); }
     finally { cb.disabled = false; }
   });
-  if (IS_ADMIN) zeichneFreigaben();
+  if (IS_ADMIN) { zeichneFreigaben(); zeichneRechte(); }
 }
 
 /* Die Personenliste der Admin-Ansicht: wer ist für welches Verfahren einzeln
@@ -5990,7 +6036,8 @@ function renderSettings() {
 async function zeichneFreigaben() {
   const box = $("#admin-access");
   if (!box) return;
-  const VERFAHREN = [["verify_cite", "admin.verifyCiteShort"], ["verify_model", "admin.verifyModelShort"]];
+  const VERFAHREN = [["verify_cite", "admin.verifyCiteShort"], ["verify_model", "admin.verifyModelShort"],
+                     ["verify_cost", "admin.verifyCostShort"], ["verify_pair", "admin.verifyPairShort"]];
   let leute = [];
   try {
     const { data, error } = await sb.rpc("admin_feature_access");
@@ -6929,6 +6976,15 @@ function renderFriends() {
       </div>
     </div>
 
+    <div class="card">
+      <h3 style="margin-top:0">${esc(t("friends.searchTitle"))}</h3>
+      <p class="hint" style="margin-top:-4px">${esc(t("friends.searchHint"))}</p>
+      <div class="row">
+        <div style="flex:1"><input type="search" id="people-q" placeholder="${esc(t("friends.searchPh"))}" autocomplete="off"></div>
+      </div>
+      <div id="people-res"></div>
+    </div>
+
     ${FRIENDS.incoming.length ? `<div class="card">
       <h3 style="margin-top:0">${esc(t("friends.incoming"))}</h3>
       ${FRIENDS.incoming.map(f => zeile(f, `
@@ -6946,6 +7002,7 @@ function renderFriends() {
     <div class="card">
       <h3 style="margin-top:0">${esc(t("friends.title"))}${FRIENDS.accepted.length ? ` (${FRIENDS.accepted.length})` : ""}</h3>
       ${FRIENDS.accepted.length ? FRIENDS.accepted.map(f => zeile(f, `
+        <div style="flex:none"><button class="btn ghost sm" data-dmwith="${esc(f.other.id)}">${esc(t("dm.write"))}</button></div>
         <div style="flex:none"><button class="btn ghost sm" data-viewdecks="${esc(f.other.id)}">${esc(t("friends.sharedDecks"))}</button></div>
         <div style="flex:none"><button class="btn ghost sm" data-unfriend="${esc(f.other.id)}">${esc(t("friends.remove"))}</button></div>`)).join("")
         : `<div class="empty">${esc(t("friends.none"))}</div>`}
@@ -6961,6 +7018,63 @@ function renderFriends() {
   $$("[data-cancel]").forEach(b => b.onclick = () => freundEntfernen(b.dataset.cancel));
   $$("[data-unfriend]").forEach(b => b.onclick = () => freundEntfernen(b.dataset.unfriend));
   $$("[data-viewdecks]").forEach(b => b.onclick = () => zeigeFreundDecks(b.dataset.viewdecks));
+  $$("[data-dmwith]").forEach(b => b.onclick = () => dmMitPerson(b.dataset.dmwith));
+  wirePersonensuche();
+}
+
+/* Personensuche: der eigentliche Ersatz fuer die Weitergabe des Codes.
+   Serverseitig (search_people) kommt zu jedem Treffer gleich mit, wie das
+   Verhaeltnis steht — so zeigt die Zeile direkt den richtigen Knopf, statt
+   erst auf einen Klick hin nachzufragen. */
+let personenSuchLauf = 0;
+function wirePersonensuche() {
+  const feld = $("#people-q"), box = $("#people-res");
+  if (!feld || !box) return;
+  let timer = 0;
+  const suchen = async () => {
+    const q = (feld.value || "").trim();
+    const lauf = ++personenSuchLauf;
+    if (q.length < 2) { box.innerHTML = ""; return; }
+    box.innerHTML = `<div class="meta"><span class="syn-spin">&#9881;</span></div>`;
+    try {
+      const { data, error } = await sb.rpc("search_people", { q });
+      if (error) throw error;
+      if (lauf !== personenSuchLauf) return;   // veraltete Antwort verwerfen
+      const treffer = data || [];
+      box.innerHTML = treffer.length ? treffer.map(p => {
+        const knopf = {
+          friend:   `<button class="btn ghost sm" data-dmwith="${esc(p.id)}">${esc(t("dm.write"))}</button>`,
+          sent:     `<span class="pill">${esc(t("friends.waiting"))}</span>`,
+          incoming: `<button class="btn sm" data-accept2="${esc(p.id)}">${esc(t("friends.accept"))}</button>`,
+          none:     `<button class="btn sm" data-req="${esc(p.id)}">${esc(t("friends.sendReq"))}</button>`,
+        }[p.status] || "";
+        return `<div class="freund-zeile">
+          ${avatarHtml(34, p)}
+          <div style="flex:1;min-width:0"><b>${esc(p.display_name || t("friends.unknown"))}</b></div>
+          <div style="flex:none">${knopf}</div>
+        </div>`;
+      }).join("") : `<div class="empty">${esc(t("friends.searchNone"))}</div>`;
+      box.querySelectorAll("[data-req]").forEach(b => b.onclick = () => freundAnfragenAn(b.dataset.req));
+      box.querySelectorAll("[data-accept2]").forEach(b => b.onclick = () => freundAntwort(b.dataset.accept2, true));
+      box.querySelectorAll("[data-dmwith]").forEach(b => b.onclick = () => dmMitPerson(b.dataset.dmwith));
+    } catch (e) { box.innerHTML = `<div class="empty">${esc(dbErr(e))}</div>`; }
+  };
+  feld.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(suchen, 250); });
+}
+
+/* Anfrage an eine gefundene Person. Gleiche Rueckmeldungen wie beim Code —
+   die Datenbank benutzt fuer beide Wege dieselben Rueckgabewerte. */
+async function freundAnfragenAn(userId) {
+  try {
+    const { data, error } = await sb.rpc("send_friend_request_to", { p_user: userId });
+    if (error) throw error;
+    toast({
+      sent: t("fr.sent"), accepted: t("fr.accepted"), pending: t("fr.pending"),
+      already: t("fr.already"), self: t("fr.self"),
+      notfound: t("fr.notfound"), unauth: t("fr.unauth"),
+    }[data] || t("fr.done"));
+    await ladeFreunde(); renderFriends();
+  } catch (e) { toast(dbErr(e)); }
 }
 
 async function freundAnfragen() {
@@ -8494,6 +8608,7 @@ function wireApp() {
     if (b.dataset.v === "dashboard") renderDashboard();
     if (b.dataset.v === "community") renderCommunity();
     if (b.dataset.v === "friends") oeffneFreunde();
+    if (b.dataset.v === "messages") oeffneNachrichten();
     if (b.dataset.v === "session") oeffneSession();
     if (b.dataset.v === "events") oeffneTermine();
     if (b.dataset.v === "rules") renderRules();
@@ -8713,3 +8828,249 @@ function onLangChange() {
     if (ev === "SIGNED_OUT") location.reload();
   });
 })();
+
+/* =====================================================================
+   Nachrichten
+
+   Ein internes Postfach statt Umwegen über Karten-Kommentare oder das
+   Weitergeben von Kontaktdaten. Bewusst schlicht: ein Gespräch je Person,
+   Verlauf chronologisch, Ungelesenes als Zahl in der Navigation.
+
+   Die Sichtbarkeit erzwingt die Datenbank (RLS auf dm_threads/dm_messages);
+   der Client zeichnet nur, was er ohnehin lesen dürfte.
+   ===================================================================== */
+let DM_INBOX = [], DM_OFFEN = null, DM_NACHRICHTEN = [], DM_UNREAD = 0;
+
+/* Die Zahl am Navigationseintrag. Wird nach jedem Laden und nach jedem
+   Senden/Lesen neu gesetzt — eine Abfrage, kein Abonnement. */
+async function dmBadgeAktualisieren() {
+  try {
+    const { data } = await sb.rpc("dm_unread_total");
+    DM_UNREAD = Number(data) || 0;
+  } catch { DM_UNREAD = 0; }
+  const b = $("#dm-badge");
+  if (!b) return;
+  b.textContent = DM_UNREAD > 99 ? "99+" : String(DM_UNREAD);
+  b.hidden = DM_UNREAD === 0;
+}
+
+async function oeffneNachrichten() {
+  await ladeInbox();
+  renderMessages();
+}
+
+async function ladeInbox() {
+  try {
+    const { data, error } = await sb.rpc("dm_inbox");
+    if (error) throw error;
+    DM_INBOX = data || [];
+  } catch { DM_INBOX = []; }
+  await dmBadgeAktualisieren();
+}
+
+/* Ein Gespräch öffnen: Verlauf holen und sofort als gelesen markieren. Das
+   Markieren läuft absichtlich VOR dem Zeichnen, damit die Zahl in der
+   Navigation nicht noch kurz das Gegenteil behauptet. */
+async function dmOeffnen(threadId) {
+  DM_OFFEN = threadId;
+  try {
+    await sb.rpc("dm_mark_read", { p_thread: threadId });
+    const { data, error } = await sb
+      .from("dm_messages")
+      .select("id,sender,body,created,deleted")
+      .eq("thread_id", threadId)
+      .order("created", { ascending: true })
+      .limit(500);
+    if (error) throw error;
+    DM_NACHRICHTEN = data || [];
+  } catch (e) { DM_NACHRICHTEN = []; toast(dbErr(e)); }
+  await ladeInbox();
+  renderMessages();
+  const v = $("#dm-verlauf");
+  if (v) v.scrollTop = v.scrollHeight;
+}
+
+async function dmSenden() {
+  const feld = $("#dm-text");
+  const text = (feld?.value || "").trim();
+  if (!text || !DM_OFFEN) return;
+  feld.disabled = true;
+  try {
+    const { error } = await sb.from("dm_messages")
+      .insert({ thread_id: DM_OFFEN, sender: USER.id, body: text.slice(0, 4000) });
+    if (error) throw error;
+    feld.value = "";
+    await dmOeffnen(DM_OFFEN);
+  } catch (e) { toast(dbErr(e)); }
+  finally { feld.disabled = false; feld.focus?.(); }
+}
+
+/* Ein Gespräch mit einer Person öffnen — legt es an, falls es noch keines
+   gibt. Von der Freundesliste und vom Profil aus benutzt. */
+async function dmMitPerson(userId) {
+  try {
+    const { data, error } = await sb.rpc("dm_thread_with", { p_other: userId });
+    if (error) throw error;
+    $$('nav button[data-v], #who-menu button[data-v]').forEach(x => x.classList.toggle("on", x.dataset.v === "messages"));
+    $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-messages"));
+    $("#who-menu")?.classList.remove("open");
+    await ladeInbox();
+    await dmOeffnen(Number(data));
+  } catch (e) { toast(dbErr(e)); }
+}
+
+function dmZeitKurz(iso) {
+  const d = new Date(iso), jetzt = new Date();
+  const gleicherTag = d.toDateString() === jetzt.toDateString();
+  return gleicherTag
+    ? d.toLocaleTimeString(LANG, { hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleDateString(LANG, { day: "2-digit", month: "2-digit", year: "2-digit" });
+}
+
+function renderMessages() {
+  const el = $("#v-messages");
+  if (!el) return;
+  const offen = DM_INBOX.find(x => x.thread_id === DM_OFFEN);
+
+  const liste = DM_INBOX.length ? DM_INBOX.map(g => `
+    <button class="dm-eintrag${g.thread_id === DM_OFFEN ? " on" : ""}" data-dm="${g.thread_id}">
+      ${avatarHtml(34, { display_name: g.other_name, avatar_url: g.other_avatar })}
+      <div class="dm-eintrag-txt">
+        <div class="dm-eintrag-kopf">
+          <b>${esc(g.other_name || t("friends.unknown"))}</b>
+          ${g.last_created ? `<span class="dm-zeit">${esc(dmZeitKurz(g.last_created))}</span>` : ""}
+        </div>
+        <div class="dm-vorschau">${esc(g.last_body || t("dm.noMessages"))}</div>
+      </div>
+      ${Number(g.unread) > 0 ? `<span class="dm-unread">${Number(g.unread)}</span>` : ""}
+    </button>`).join("") : `<div class="empty">${esc(t("dm.empty"))}</div>`;
+
+  const verlauf = !DM_OFFEN
+    ? `<div class="empty">${esc(t("dm.pick"))}</div>`
+    : `<div class="dm-verlauf" id="dm-verlauf">${
+        DM_NACHRICHTEN.length ? DM_NACHRICHTEN.map(m => `
+          <div class="dm-blase${m.sender === USER.id ? " eigen" : ""}">
+            <div class="dm-blase-txt">${m.deleted ? `<i>${esc(t("dm.deleted"))}</i>` : esc(m.body)}</div>
+            <div class="dm-blase-zeit">${esc(dmZeitKurz(m.created))}</div>
+          </div>`).join("") : `<div class="empty">${esc(t("dm.noMessages"))}</div>`
+      }</div>
+      <div class="dm-senden">
+        <textarea id="dm-text" rows="2" maxlength="4000" placeholder="${esc(t("dm.placeholder"))}"></textarea>
+        <button class="btn" id="dm-go">${esc(t("dm.send"))}</button>
+      </div>`;
+
+  el.innerHTML = `
+    <div class="dm-raster">
+      <div class="card dm-liste">
+        <h3 style="margin-top:0">${esc(t("dm.title"))}</h3>
+        ${liste}
+      </div>
+      <div class="card dm-fenster">
+        <h3 style="margin-top:0">${offen ? esc(offen.other_name || t("friends.unknown")) : esc(t("dm.title"))}</h3>
+        ${verlauf}
+      </div>
+    </div>`;
+
+  $$("[data-dm]").forEach(b => b.onclick = () => dmOeffnen(Number(b.dataset.dm)));
+  const go = $("#dm-go");
+  if (go) go.onclick = dmSenden;
+  const feld = $("#dm-text");
+  // Enter sendet, Shift+Enter macht einen Absatz — wie in jedem Messenger.
+  if (feld) feld.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); dmSenden(); }
+  });
+  const v = $("#dm-verlauf");
+  if (v) v.scrollTop = v.scrollHeight;
+}
+
+/* =====================================================================
+   Rechte: Rollen und Gruppen
+
+   Drei Ebenen, absichtlich flach gehalten:
+     Rolle   trägt Berechtigungen   (admin, moderator, tester, member)
+     Gruppe  trägt Rollen           (wer drin ist, erbt sie)
+     Person  trägt Rollen direkt    und/oder über Gruppen
+
+   Damit lässt sich „alle Tester bekommen die Vorschau" in einem Zug regeln,
+   statt Person für Person. Die Berechtigungen selbst prüft ausschließlich die
+   Datenbank (has_perm); hier wird nur zugewiesen.
+
+   is_admin() bleibt daneben als harter Rückfall auf den Eigentümer — sonst
+   könnte eine falsch gesetzte Rolle den Betreiber aus der eigenen Instanz
+   aussperren.
+   ===================================================================== */
+let RECHTE = { rollen: [], gruppen: [], leute: [] };
+
+async function ladeRechte() {
+  try {
+    const [r, g, l] = await Promise.all([
+      sb.from("roles").select("key,name,rang").order("rang", { ascending: false }),
+      sb.from("groups").select("key,name").order("key"),
+      sb.rpc("admin_people"),
+    ]);
+    RECHTE = { rollen: r.data || [], gruppen: g.data || [], leute: l.data || [] };
+  } catch { RECHTE = { rollen: [], gruppen: [], leute: [] }; }
+}
+
+async function zeichneRechte() {
+  const box = $("#admin-rechte");
+  if (!box) return;
+  await ladeRechte();
+  if (!RECHTE.leute.length) { box.innerHTML = `<div class="empty">${esc(t("admin.accessNone"))}</div>`; return; }
+
+  box.innerHTML = `<div style="overflow-x:auto"><table class="tbl"><thead><tr>
+      <th>${esc(t("admin.accessPerson"))}</th>
+      ${RECHTE.rollen.map(r => `<th class="num" title="${esc(r.key)}">${esc(r.name)}</th>`).join("")}
+      ${RECHTE.gruppen.map(g => `<th class="num" title="${esc(g.key)}">${esc(g.name)}</th>`).join("")}
+    </tr></thead><tbody>${RECHTE.leute.map(p => `
+    <tr><td>${esc(p.display_name || t("community.anonMember"))}</td>
+      ${RECHTE.rollen.map(r => `<td class="num"><input type="checkbox" style="width:auto"
+          data-role="${esc(r.key)}" data-user="${esc(p.user_id)}"${(p.roles || []).includes(r.key) ? " checked" : ""}></td>`).join("")}
+      ${RECHTE.gruppen.map(g => `<td class="num"><input type="checkbox" style="width:auto"
+          data-group="${esc(g.key)}" data-user="${esc(p.user_id)}"${(p.groups || []).includes(g.key) ? " checked" : ""}></td>`).join("")}
+    </tr>`).join("")}</tbody></table></div>`;
+
+  const schalten = async (cb, tabelle, spalte, wert) => {
+    const an = cb.checked, user = cb.dataset.user;
+    cb.disabled = true;
+    try {
+      const { error } = an
+        ? await sb.from(tabelle).insert({ user_id: user, [spalte]: wert })
+        : await sb.from(tabelle).delete().eq("user_id", user).eq(spalte, wert);
+      if (error) throw error;
+      toast(t(an ? "admin.accessGranted" : "admin.accessRevoked"));
+    } catch (e) { cb.checked = !an; toast(dbErr(e)); }
+    finally { cb.disabled = false; }
+  };
+  box.querySelectorAll("[data-role]").forEach(cb =>
+    cb.onchange = () => schalten(cb, "user_roles", "role_key", cb.dataset.role));
+  box.querySelectorAll("[data-group]").forEach(cb =>
+    cb.onchange = () => schalten(cb, "group_members", "group_key", cb.dataset.group));
+}
+
+/* Die frei formulierbaren Profilfelder in einem Zug speichern.
+
+   Die Webseite wird beim Speichern auf http/https eingegrenzt: ein Feld, in
+   das jeder schreiben kann und das andere später anklicken, darf kein
+   javascript:-Ziel tragen. Beim Anzeigen wird zusätzlich escaped — geprüft
+   wird an beiden Enden, nicht nur an einem. */
+async function profilTextSpeichern() {
+  const url = ($("#pf-website")?.value || "").trim();
+  if (url && !/^https?:\/\//i.test(url)) return toast(t("profile.websiteBad"));
+  const felder = {
+    bio: ($("#pf-bio")?.value || "").trim().slice(0, 600) || null,
+    location: ($("#pf-location")?.value || "").trim().slice(0, 80) || null,
+    favourite_format: ($("#pf-favformat")?.value || "").trim().slice(0, 40) || null,
+    website: url.slice(0, 200) || null,
+    findable: !!$("#pf-findable")?.checked,
+  };
+  const btn = $("#pf-about-save");
+  if (btn) btn.disabled = true;
+  try {
+    const { error } = await sb.from("profiles").update(felder).eq("id", USER.id);
+    if (error) throw error;
+    Object.assign(PROFILE, felder);
+    toast(t("set.saved"));
+  } catch (e) { toast(dbErr(e)); }
+  finally { if (btn) btn.disabled = false; }
+}

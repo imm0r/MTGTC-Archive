@@ -1034,3 +1034,33 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px}
 .syn-cut-why.strich{ text-decoration:line-through; opacity:.45; }
 .syn-cut-bad{ display:block; margin-top:2px; color:var(--err); font-style:normal; }
 .deck-full-note{ color:var(--err); }
+
+/* ---- Nachrichten ----------------------------------------------------
+   Zwei Spalten am Schreibtisch, untereinander am Telefon. Die Liste bleibt
+   stehen, der Verlauf scrollt — sonst verliert man beim Lesen die
+   Gesprächsauswahl aus dem Blick. */
+.dm-raster{ display:grid; grid-template-columns:minmax(240px,320px) 1fr; gap:12px; align-items:start; }
+@media (max-width:860px){ .dm-raster{ grid-template-columns:1fr; } }
+
+.dm-eintrag{ display:flex; align-items:center; gap:10px; width:100%; padding:8px;
+             background:none; border:0; border-radius:8px; cursor:pointer;
+             color:var(--txt); text-align:left; font:inherit; }
+.dm-eintrag:hover{ background:var(--hover, rgba(255,255,255,.05)); }
+.dm-eintrag.on{ background:var(--hover, rgba(255,255,255,.08)); }
+.dm-eintrag-txt{ flex:1; min-width:0; }
+.dm-eintrag-kopf{ display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
+.dm-zeit{ font-size:11px; color:var(--dim); flex:none; }
+.dm-vorschau{ font-size:12px; color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dm-unread{ flex:none; min-width:18px; height:18px; padding:0 5px; border-radius:9px;
+            background:var(--acc); color:#000; font-size:11px; font-weight:700;
+            display:grid; place-items:center; }
+
+.dm-verlauf{ max-height:52vh; overflow-y:auto; display:flex; flex-direction:column; gap:8px; padding:4px 2px; }
+.dm-blase{ max-width:78%; padding:8px 10px; border-radius:12px;
+           background:var(--hover, rgba(255,255,255,.06)); align-self:flex-start; }
+.dm-blase.eigen{ align-self:flex-end; background:var(--acc); color:#000; }
+/* Fremder Text bricht um, statt die Blase aufzureissen. */
+.dm-blase-txt{ white-space:pre-wrap; overflow-wrap:anywhere; }
+.dm-blase-zeit{ font-size:10px; opacity:.7; margin-top:3px; text-align:right; }
+.dm-senden{ display:flex; gap:8px; align-items:flex-end; margin-top:10px; }
+.dm-senden textarea{ flex:1; resize:vertical; }

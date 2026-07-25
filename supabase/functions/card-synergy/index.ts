@@ -153,7 +153,7 @@ Deno.serve(async (req) => {
   // Deckkarte fürs Modell: Name, Typzeile, Regeltext. Der Regeltext ist der
   // Punkt — ohne ihn muss das Modell über jede Karte raten, die es nicht aus
   // dem Training kennt, und rät bei neuen Sets aus dem Namen.
-  type DeckKarte = { n: string; t?: string; o?: string };
+  type DeckKarte = { n: string; t?: string; o?: string; m?: string };
   let deckName = "", deckFormat = "", commander = "", deckCards: DeckKarte[] = [];
   let deckVoll = false;
   try {
@@ -178,6 +178,7 @@ Deno.serve(async (req) => {
                 n: String((x as DeckKarte)?.n ?? "").slice(0, 80),
                 t: String((x as DeckKarte)?.t ?? "").slice(0, 120),
                 o: String((x as DeckKarte)?.o ?? "").slice(0, 300),
+                m: String((x as DeckKarte)?.m ?? "").slice(0, 40),
               })
           .filter((c) => c.n).slice(0, 120)
         : [];
@@ -210,6 +211,15 @@ Deno.serve(async (req) => {
   } catch { features = []; }
   const mitBeleg  = mode === "deck" && deckVoll && features.includes("verify_cite");
   const mitUrteil = mode === "deck" && deckVoll && features.includes("verify_model");
+  // Zwei Datenlücken, die Falschpositive erzeugt haben, jeweils einzeln
+  // zuschaltbar:
+  //   verify_cost — Manakosten stehen nicht im Regeltext. Ohne sie kann der
+  //                 Prüfer „kostet vier Mana" nicht bestätigen und verwirft
+  //                 eine richtige Begründung.
+  //   verify_pair — die vorgeschlagene Karte lag dem Prüfer gar nicht vor.
+  //                 Ein Vergleichssatz war damit strukturell halb unbelegbar.
+  const mitKosten = mode === "deck" && features.includes("verify_cost");
+  const mitPaar   = mitUrteil && features.includes("verify_pair");
 
   const farbHinweis = colors
     ? `\n- Farbidentität: Jede genannte Karte muss in die Farbidentität {${colors}} passen (alle Mana-Symbole und Farbidentitäts-Anteile liegen innerhalb dieser Farben).`
@@ -238,14 +248,15 @@ Strikte Regeln:
   // Karte eine Zeile bleibt und die Liste lesbar ist.
   const kartenBlock = deckCards
     .map((c) => c.t || c.o
-      ? `- ${c.n}${c.t ? ` — ${c.t}` : ""}${c.o ? `: ${c.o.replace(/\s*\n\s*/g, " ")}` : ""}`
+      ? `- ${c.n}${mitKosten && c.m ? ` ${c.m}` : ""}${c.t ? ` — ${c.t}` : ""}${c.o ? `: ${c.o.replace(/\s*\n\s*/g, " ")}` : ""}`
       : `- ${c.n}`)
     .join("\n");
   const hatText = deckCards.some((c) => c.o);
+  const hatKosten = mitKosten && deckCards.some((c) => c.m);
 
   const USER = mode === "deck"
     ? `Deck: ${deckName || "(ohne Namen)"}${deckFormat ? ` — Format: ${deckFormat}` : ""}${commander ? `\nCommander/Schlüsselkarte: ${commander}` : ""}${colors ? `\nFarbidentität: {${colors}}` : ""}
-Kartenliste (${deckCards.length})${hatText ? " mit Typzeile und Regeltext" : ""}:
+Kartenliste (${deckCards.length})${hatText ? `${hatKosten ? " mit Manakosten, Typzeile" : " mit Typzeile"} und Regeltext` : ""}:
 ${kartenBlock}
 
 Nenne ${n} Karten, die die Strategie dieses Decks am besten ergänzen.${deckVoll ? `\n\nDas Deck ist VOLL (100 Karten). Nenne deshalb je Vorschlag im Feld replaces den exakten englischen Namen EINER Karte aus der obigen Liste, die dafür weichen sollte — die schwächste oder am wenigsten zur Strategie passende. Niemals den Commander. Jede Karte höchstens einmal nennen.\n\nBegründe in replacesWhy in EINEM Satz, warum genau diese Karte weichen sollte: was sie in diesem Deck konkret schlechter leistet als der Vorschlag — zu langsam, redundant zu einer bereits vorhandenen Karte, passt nicht zur Farbidentität, zu hohe Kosten für den Effekt. Kein Allgemeinplatz wie 'sie ist schwächer'.\n\nDie Begründung muss sich auf den OBEN GELIEFERTEN Regeltext dieser Karte stützen. Schreibe der Karte nichts zu, was dort nicht steht — kein Effekt, kein Tokentyp, kein Zählmarken-Verhalten. Passt der gelieferte Text nicht zu dem, was du über den Namen zu wissen glaubst, gilt der Text.${mitBeleg ? "\n\nGib zusätzlich in replacesQuote die wörtliche Stelle aus dem oben gelieferten Regeltext an, auf die sich deine Begründung stützt — Zeichen für Zeichen kopiert, englisch wie geliefert. Stützt sich die Begründung auf das FEHLEN eines Effekts oder allein auf die Manakosten, lass das Feld leer; erfinde dann keine Stelle." : ""}` : ""}`
@@ -330,13 +341,42 @@ Nenne ${n} synergistische Karten.`;
       const strittig = vorschlaege.filter((s) =>
         s.replaces && s.replacesWhy && (!mitBeleg || s.verify?.ok === false || s.verify?.ok === null));
       if (strittig.length) {
-        const vorlage = strittig.map((s, i) =>
-          `${i + 1}. Karte: ${s.replaces}\n   Regeltext: ${deckCards.find((c) => c.n.toLowerCase() === String(s.replaces).toLowerCase())?.o || "(keiner geliefert)"}\n   Behauptung: ${s.replacesWhy}`).join("\n\n");
+        // Mit verify_pair bekommt der Prüfer auch die VORGESCHLAGENE Karte.
+        // Ihr Text liegt hier nicht vor — das Modell hat sie nur benannt —,
+        // also von Scryfall holen. Kostet keine Tokens, nur einen Request.
+        const paarTexte = new Map<string, string>();
+        if (mitPaar) {
+          const namen = [...new Set(strittig.map((s) => String(s.name || "")).filter(Boolean))].slice(0, 40);
+          if (namen.length) {
+            try {
+              const r = await fetch("https://api.scryfall.com/cards/collection", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Accept: "application/json" },
+                body: JSON.stringify({ identifiers: namen.map((n) => ({ name: n })) }),
+              });
+              if (r.ok) {
+                for (const c of (await r.json()).data || []) {
+                  const txt = c.oracle_text ?? c.card_faces?.[0]?.oracle_text ?? "";
+                  paarTexte.set(String(c.name).toLowerCase(),
+                    `${c.mana_cost || ""} — ${c.type_line || ""}: ${String(txt).replace(/\s*\n\s*/g, " ").slice(0, 300)}`);
+                }
+              }
+            } catch { /* ohne Vergleichstext prueft er eben nur die Deckkarte */ }
+          }
+        }
+        const vorlage = strittig.map((s, i) => {
+          const dk = deckCards.find((c) => c.n.toLowerCase() === String(s.replaces).toLowerCase());
+          const paar = paarTexte.get(String(s.name || "").toLowerCase());
+          return `${i + 1}. Karte: ${s.replaces}${mitKosten && dk?.m ? `\n   Manakosten: ${dk.m}` : ""}`
+            + `\n   Regeltext: ${dk?.o || "(keiner geliefert)"}`
+            + (paar ? `\n   Verglichen mit (Vorschlag): ${s.name} ${paar}` : "")
+            + `\n   Behauptung: ${s.replacesWhy}`;
+        }).join("\n\n");
         try {
           const pruef = await anthropic.messages.create({
             model: MODEL,
             max_tokens: Math.min(2000, 300 + strittig.length * 90),
-            system: "Du prüfst Behauptungen über Magic-Karten gegen ihren Regeltext. Für jede vorgelegte Karte entscheidest du allein anhand des MITGELIEFERTEN Regeltextes, ob er die Behauptung trägt. Ziehe KEIN Wissen aus deinem Training heran — der vorgelegte Text ist die einzige Grundlage; die Karte kann aus einem Set stammen, das du nicht kennst. Aussagen über das Fehlen eines Effekts, über Manakosten oder über die Rolle im Deck sind getragen, solange der Regeltext ihnen nicht widerspricht. Nicht getragen ist, wenn der Karte ein Effekt, ein Tokentyp oder ein Verhalten zugeschrieben wird, das im Regeltext nicht vorkommt.",
+            system: "Du prüfst Behauptungen über Magic-Karten gegen die vorgelegten Kartendaten. Für jede Karte entscheidest du allein anhand dessen, was MITGELIEFERT wurde, ob es die Behauptung trägt. Ziehe KEIN Wissen aus deinem Training heran — die Karte kann aus einem Set stammen, das du nicht kennst.\n\nGetragen ist eine Behauptung, solange die vorgelegten Daten ihr nicht widersprechen. Das gilt ausdrücklich auch für Aussagen über Manakosten (wenn Manakosten vorgelegt wurden), über das Fehlen eines Effekts, über die Rolle im Deck und für Vergleiche mit der vorgeschlagenen Karte (wenn diese vorgelegt wurde). Fehlt eine Angabe, die die Behauptung bräuchte, gilt sie als getragen — beurteile nur, was du prüfen kannst.\n\nNicht getragen ist allein: wenn der Karte ein Effekt, ein Tokentyp oder ein Verhalten zugeschrieben wird, das in ihrem Regeltext nicht vorkommt.",
             output_config: { format: { type: "json_schema", schema: SCHEMA_URTEIL } },
             messages: [{ role: "user", content: [{ type: "text", text: `Prüfe:\n\n${vorlage}` }] }],
           });
