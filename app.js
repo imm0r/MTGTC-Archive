@@ -82,6 +82,7 @@ function dialogBackdropSchliesst(dlg) {
 /* ============================== Supabase ============================== */
 let sb = null, USER = null, PROFILE = null;
 let FLAGS = {}, IS_ADMIN = false;   // globale Feature-Schalter + ob der Nutzer Admin ist
+let AI_LIMITS = {};                 // Stundenkontingente je KI-Funktion (0 = unbegrenzt)
 let COMMUNITY_STATS = null, COMMUNITY_FEED = [], communityChannel = null;
 let COMMUNITY_HIGHLIGHTS = null;
 
@@ -2991,7 +2992,23 @@ async function ladeFlags() {
     FLAGS = {}; (data || []).forEach(f => { FLAGS[f.key] = f.enabled; });
   } catch { FLAGS = {}; }
   try { const { data } = await sb.rpc("is_admin"); IS_ADMIN = !!data; } catch { IS_ADMIN = false; }
+  // Stundenkontingente der KI-Funktionen. Jede angemeldete Person darf sie
+  // lesen; ändern darf sie nur der Admin (Policy in der Datenbank).
+  try {
+    const { data } = await sb.from("ai_limits").select("kind,per_hour");
+    AI_LIMITS = {}; (data || []).forEach(l => { AI_LIMITS[l.kind] = l.per_hour; });
+  } catch { AI_LIMITS = {}; }
   document.documentElement.dataset.kiGlobal = FLAGS.ki_synergy ? "on" : "off";
+}
+
+/* Kontingent einer KI-Funktion setzen. 0 = unbegrenzt. Nur der Admin kommt
+   durch — die Datenbank weist andere ab, der Knopf ist bloß die Bequemlichkeit. */
+async function aiLimitSetzen(kind, n) {
+  const wert = Math.max(0, Math.min(1000, Math.floor(Number(n) || 0)));
+  const { error } = await sb.from("ai_limits").update({ per_hour: wert }).eq("kind", kind);
+  if (error) throw error;
+  AI_LIMITS[kind] = wert;
+  return wert;
 }
 
 /* Einen globalen Schalter umlegen — nur der Admin darf; die RLS auf
@@ -5551,6 +5568,14 @@ function renderSettings() {
         <span>${esc(t("admin.kiFlag"))}</span>
       </label>
       <p class="hint">${esc(t("admin.hint"))}</p>
+      <label style="margin-top:12px">${esc(t("admin.limitsTitle"))}</label>
+      <div class="row">
+        ${[["ki_synergy", "admin.limitKiSyn"], ["rules_question", "admin.limitRules"]].map(([k, lbl]) => `
+        <div style="flex:none"><label>${esc(t(lbl))}</label>
+          <input type="number" data-ailimit="${k}" min="0" max="1000" step="1" style="width:150px"
+            value="${AI_LIMITS[k] ?? 5}"></div>`).join("")}
+      </div>
+      <p class="hint">${esc(t("admin.limitHint"))}</p>
     </div>` : ""}
     <p class="hint app-version">${esc(t("settings.version", { v: APP_VERSION || "—" }))}</p>`;
   // Eigenes Sprach-Dropdown mit Flaggen (ein natives <option> kann kein SVG
@@ -5577,6 +5602,16 @@ function renderSettings() {
     const v = inp.value === "" ? null : Math.max(0, parseFloat(inp.value));
     try { await suchPrefSpeichern({ [inp.dataset.prefnum]: Number.isFinite(v) && v > 0 ? v : null }); toast(t("set.saved")); }
     catch (e) { toast(dbErr(e)); }
+  });
+  $$("#v-settings [data-ailimit]").forEach(inp => inp.onchange = async () => {
+    const kind = inp.dataset.ailimit;
+    inp.disabled = true;
+    try {
+      const wert = await aiLimitSetzen(kind, inp.value);
+      inp.value = wert;   // auf den tatsächlich gespeicherten Wert zurückschreiben
+      toast(wert === 0 ? t("admin.limitOff") : t("admin.limitSaved", { n: wert }));
+    } catch (e) { inp.value = AI_LIMITS[kind] ?? 5; toast(dbErr(e)); }
+    finally { inp.disabled = false; }
   });
   const fk = $("#flag-ki");
   if (fk) fk.onchange = async ev => {
