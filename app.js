@@ -7419,12 +7419,12 @@ async function ladeSpieler() {
    nicht (Schema älter als die App), läuft die Partie im Browser trotzdem — die
    alte Spalte qty zählte „gespielt" und wird als Schlachtfeld gelesen, damit
    eine laufende Runde nichts verliert. */
-const fehltZonenSpalte = e => e?.code === "42703" || /\b(field|graveyard|exile|cast_count)\b/.test(e?.message || "");
+const fehltZonenSpalte = e => e?.code === "42703" || /\b(field|graveyard|exile|cast_count|field_state)\b/.test(e?.message || "");
 async function ladePlayed() {
   SESSION_ZONEN = {};
   if (!SESSION || !USER) return;
   let { data, error } = await sb.from("session_played")
-    .select("card_id,qty,hand,field,graveyard,exile,cast_count")
+    .select("card_id,qty,hand,field,graveyard,exile,cast_count,field_state")
     .eq("session_id", SESSION.id).eq("user_id", USER.id);
   if (error && fehltZonenSpalte(error)) {
     ZONEN_SPALTEN = false;
@@ -7437,6 +7437,9 @@ async function ladePlayed() {
       field: r.field != null ? r.field : (r.qty || 0),   // Altbestand: „gespielt" lag auf dem Feld
       grave: r.graveyard || 0, exile: r.exile || 0, cast: r.cast_count || 0,
     };
+    // Exemplarliste des Feldes; feldListe() rückt sie später ohnehin auf die
+    // richtige Länge, hier reicht die Prüfung auf „ist überhaupt eine Liste".
+    if (Array.isArray(r.field_state) && r.field_state.length) st.fs = r.field_state;
     if (st.hand || st.field || st.grave || st.exile || st.cast) SESSION_ZONEN[r.card_id] = st;
   });
 }
@@ -8029,17 +8032,93 @@ function zoneKarten(zone) {
 }
 const zoneSumme = zone => zoneKarten(zone).reduce((s, x) => s + x.n, 0);
 
+/* ---- Schlachtfeld: die einzelnen Exemplare ---------------------------
+   Überall sonst genügt eine Zahl je Karte — im Friedhof ist eine Karte eine
+   Karte. Auf dem Feld nicht: von zwei gleichen Kreaturen kann eine getappt
+   sein und die andere zwei Marken tragen. Deshalb führt allein diese Zone eine
+   Liste je Exemplar, `fs`:
+
+       [{t:1, c:0}, {t:0, c:2}]   →  eine getappt, eine mit +2/+2
+
+   Die Liste ist genau so lang wie `field`. Weicht sie ab — Karte anderswohin
+   geschoben, Datenbank älter als die App —, rückt feldListe() sie beim Lesen
+   zurecht, statt sich auf eine Zusicherung zu verlassen, die niemand erzwingt.
+   Sind alle Exemplare ungetappt und ohne Marken, entfällt `fs` ganz; der
+   Regelfall kostet also kein Byte. */
+const feldStandard = fs => fs.every(x => !x.t && !x.c);
+
+function feldListe(id) {
+  const n = zVon(id, "field");
+  const roh = Array.isArray(zStand(id).fs) ? zStand(id).fs : [];
+  const fs = roh.slice(0, n).map(x => ({ t: x?.t ? 1 : 0, c: Math.max(0, x?.c | 0) }));
+  while (fs.length < n) fs.push({ t: 0, c: 0 });   // neu dazugekommene: ungetappt, ohne Marken
+  return fs;
+}
+
+/* Gleiche Exemplare zu einem Stapel zusammenfassen: fünf ungetappte Wälder sind
+   ein Bild mit „×5", tappt man einen, spaltet sich „×4" und „×1 getappt" ab.
+   `idx` zeigt auf das erste Exemplar des Stapels — daran hängen die Aktionen. */
+function feldStapel(id) {
+  const gruppen = new Map();
+  feldListe(id).forEach((x, i) => {
+    const k = x.t + "|" + x.c;
+    if (!gruppen.has(k)) gruppen.set(k, { t: x.t, c: x.c, n: 0, idx: i });
+    gruppen.get(k).n++;
+  });
+  return [...gruppen.values()].sort((a, b) => a.t - b.t || b.c - a.c);
+}
+
+/* Exemplarliste zurückschreiben (ohne Neuzeichnen — die Aufrufer tun das). */
+function feldSetzen(id, fs) {
+  const st = { hand: 0, field: 0, grave: 0, exile: 0, cast: 0, ...(SESSION_ZONEN[id] || {}) };
+  if (fs.length && !feldStandard(fs)) st.fs = fs; else delete st.fs;
+  SESSION_ZONEN[id] = st;
+  return st;
+}
+
+/* Ein einzelnes Exemplar tappen/enttappen bzw. seine Marken ändern. */
+function feldTap(cardId, idx) {
+  const fs = feldListe(cardId);
+  if (!fs[idx]) return;
+  fs[idx].t = fs[idx].t ? 0 : 1;
+  feldSetzen(cardId, fs); renderZonen(); zoneSchreiben(cardId);
+}
+function feldMarke(cardId, idx, delta) {
+  const fs = feldListe(cardId);
+  if (!fs[idx]) return;
+  fs[idx].c = Math.max(0, Math.min(999, fs[idx].c + delta));
+  feldSetzen(cardId, fs); renderZonen(); zoneSchreiben(cardId);
+}
+
+/* Enttappen-Schritt: alles auf dem eigenen Feld auf einmal aufrichten. */
+function feldAlleEnttappen() {
+  let geaendert = false;
+  zoneKarten("field").forEach(({ card }) => {
+    const fs = feldListe(card.id);
+    if (!fs.some(x => x.t)) return;
+    fs.forEach(x => x.t = 0);
+    feldSetzen(card.id, fs); zoneSchreiben(card.id); geaendert = true;
+  });
+  if (geaendert) renderZonen();
+}
+
 /* ---- Verschieben ---------------------------------------------------- */
 /* Ein Exemplar von einer Zone in die andere. Die Bibliothek und die
    Kommandozone speichern nichts — sie wachsen und schrumpfen als Rest von
-   selbst, wenn die Gegenseite sich ändert. */
-function zoneMove(cardId, von, nach) {
+   selbst, wenn die Gegenseite sich ändert.
+   `idx` sagt beim Verlassen des Feldes, WELCHES Exemplar geht — sonst nähme
+   eine sterbende Kreatur womöglich die Marken ihrer Zwillingsschwester mit. */
+function zoneMove(cardId, von, nach, idx) {
   if (von === nach || zAnzahl(cardId, von) < 1) return;
   const st = { hand: 0, field: 0, grave: 0, exile: 0, cast: 0, ...(SESSION_ZONEN[cardId] || {}) };
+  const fs = feldListe(cardId);
+  if (von === "field") fs.splice(Number.isInteger(+idx) && fs[idx] ? +idx : 0, 1);
+  if (nach === "field") fs.push({ t: 0, c: 0 });   // frisch ausgespielt: ungetappt, ohne Marken
   if (zoneDef(von)?.gespeichert)  st[von]  -= 1;
   if (zoneDef(nach)?.gespeichert) st[nach] += 1;
   // Jedes Wirken aus der Kommandozone erhöht die Commander-Steuer um zwei Mana.
   if (von === "cmd" && nach === "field") st.cast += 1;
+  if (fs.length && !feldStandard(fs)) st.fs = fs; else delete st.fs;
   if (st.hand || st.field || st.grave || st.exile || st.cast) SESSION_ZONEN[cardId] = st;
   else delete SESSION_ZONEN[cardId];
   renderZonen();
@@ -8067,6 +8146,7 @@ function zoneSchreiben(cardId) {
     if (ZONEN_SPALTEN) Object.assign(zeile, {
       hand: st.hand || 0, field: st.field || 0, graveyard: st.grave || 0,
       exile: st.exile || 0, cast_count: st.cast || 0,
+      field_state: st.fs || [],
     });
     try {
       const { error } = leer
@@ -8135,32 +8215,57 @@ function zoneKorbHtml(zone) {
   if (zone === "lib")  return zoneLibHtml();
   const karten = zoneKarten(zone);
   if (!karten.length) return `<div class="zone-leer">${esc(t("zone.empty"))}</div>`;
+  if (zone === "field") return zoneFeldHtml(karten);
   return `<div class="zone-gitter">${karten.map(x => zoneKarteHtml(x.card, zone, x.n)).join("")}</div>`;
+}
+
+/* Das Schlachtfeld zeigt Stapel gleicher Exemplare: gleiche Karte, gleicher
+   Tapp-Zustand, gleiche Marken. „Alle enttappen" steht nur da, wenn überhaupt
+   etwas getappt ist — der Enttappen-Schritt in einem Klick. */
+function zoneFeldHtml(karten) {
+  const stapel = karten.flatMap(({ card }) => feldStapel(card.id).map(s => ({ card, ...s })));
+  const getappt = stapel.some(s => s.t);
+  return `${getappt ? `<div class="feld-werkzeug"><button class="btn ghost sm" id="feld-enttappen"
+      title="${esc(t("zone.untapAllTitle"))}">&#8635; ${esc(t("zone.untapAll"))}</button></div>` : ""}
+    <div class="zone-gitter">${stapel.map(s => zoneKarteHtml(s.card, "field", s.n, s)).join("")}</div>`;
 }
 
 /* Eine Karte in Feld/Friedhof/Exil/Kommandozone: ein Bild je KARTE mit Anzahl —
    anders als die Hand, wo jedes Exemplar einzeln liegt, weil man sie einzeln
-   hält. Drei Wälder auf dem Feld sind ein Bild mit „×3". */
-function zoneKarteHtml(c, zone, n) {
+   hält. Drei Wälder im Friedhof sind ein Bild mit „×3".
+   Auf dem Feld ist `st` der Stapel (getappt + Marken + Startindex); dort steht
+   das Bild gedreht, wenn getappt, und trägt seine Marken als Abzeichen. */
+function zoneKarteHtml(c, zone, n, st) {
   const nm = trkName(c);
   const steuer = zone === "cmd" ? (zStand(c.id).cast || 0) : 0;
-  return `<div class="zk" tabindex="0" data-id="${esc(c.id)}" data-zone="${esc(zone)}"
-       data-hand-img="${esc(c.img || "")}" data-hand-name="${esc(nm)}" title="${esc(nm)}">
+  const idx = st ? st.idx : 0;
+  return `<div class="zk${st?.t ? " getappt" : ""}" tabindex="0" data-id="${esc(c.id)}" data-zone="${esc(zone)}"
+       data-idx="${idx}" data-hand-img="${esc(c.img || "")}" data-hand-name="${esc(nm)}"
+       title="${esc(nm)}${st?.t ? " · " + t("zone.tapped") : ""}">
     ${c.img ? `<img src="${esc(c.img)}" alt="${esc(nm)}" loading="lazy">`
             : `<div class="zk-ohnebild">${esc(nm)}</div>`}
     ${n > 1 ? `<span class="zk-n">&times;${n}</span>` : ""}
+    ${st?.c ? `<span class="zk-marke" title="${esc(t("zone.counters", { n: st.c }))}">+${st.c}/+${st.c}</span>` : ""}
     ${zone === "cmd" ? `<button class="zk-steuer" data-steuer="${esc(c.id)}" data-d="-1"
          title="${esc(t("sess.cmdTaxTitle", { mana: steuer * 2, n: steuer }))}">+${steuer * 2}</button>` : ""}
-    <div class="zk-akt">${zoneAktHtml(c.id, zone)}</div>
+    <div class="zk-akt">${zone === "field" ? `<div class="zk-akt-reihe">
+        <button class="btn ghost sm" data-tap="${esc(c.id)}" data-idx="${idx}"
+          title="${esc(st?.t ? t("zone.untapTitle") : t("zone.tapTitle"))}">&#8635;</button>
+        <button class="btn ghost sm" data-marke="${esc(c.id)}" data-idx="${idx}" data-d="1"
+          title="${esc(t("zone.counterAdd"))}">&plus;</button>
+        ${st?.c ? `<button class="btn ghost sm" data-marke="${esc(c.id)}" data-idx="${idx}" data-d="-1"
+          title="${esc(t("zone.counterRemove"))}">&minus;</button>` : ""}
+      </div><div class="zk-akt-reihe">${zoneAktHtml(c.id, zone, idx)}</div>`
+      : zoneAktHtml(c.id, zone, idx)}</div>
   </div>`;
 }
 
 /* Die Zielknöpfe einer Karte: für jede erlaubte Zone einer, mit ihrem Zeichen.
    Der Name steht im Tooltip — sechs beschriftete Knöpfe passten unter keine
    Karte, und die Zeichen stehen daneben in jeder Kopfzeile. */
-function zoneAktHtml(id, von) {
+function zoneAktHtml(id, von, idx) {
   return zieleFuer(id, von).map(k => `<button class="btn ghost sm" data-move="${esc(id)}"
-    data-von="${esc(von)}" data-nach="${esc(k)}"
+    data-von="${esc(von)}" data-nach="${esc(k)}" data-idx="${idx || 0}"
     title="${esc(t("zone.moveTo", { zone: t("zone." + k) }))}">${zoneDef(k).icon}</button>`).join("");
 }
 
@@ -8320,7 +8425,12 @@ function wireZonen() {
   // Delegation: die Körbe entstehen bei jedem Zug neu.
   zonen.onclick = e => {
     const mv = e.target.closest("[data-move]");
-    if (mv) return zoneMove(mv.dataset.move, mv.dataset.von, mv.dataset.nach);
+    if (mv) return zoneMove(mv.dataset.move, mv.dataset.von, mv.dataset.nach, mv.dataset.idx);
+    const tap = e.target.closest("[data-tap]");
+    if (tap) return feldTap(tap.dataset.tap, +tap.dataset.idx);
+    const mk = e.target.closest("[data-marke]");
+    if (mk) return feldMarke(mk.dataset.marke, +mk.dataset.idx, parseInt(mk.dataset.d, 10));
+    if (e.target.closest("#feld-enttappen")) return feldAlleEnttappen();
     const st = e.target.closest("[data-steuer]");
     if (st) return cmdSteuer(st.dataset.steuer, parseInt(st.dataset.d, 10));
     const alle = e.target.closest("#lib-alle");
