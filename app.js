@@ -5607,9 +5607,17 @@ async function afterLogin(user) {
   try { await ladeProfile(); } catch (e) { PROFILE = null; }
   await ladeFlags();   // globale Schalter + Admin-Status, bevor gezeichnet wird
   // Anwesenheit und Postfach: beides nebenher, beides ohne Auswirkung auf den
-  // Start. Schlaegt es fehl, fehlt hoechstens die Zahl am Navigationseintrag.
-  sb.rpc("touch_last_seen").catch(() => {});
-  dmBadgeAktualisieren().catch(() => {});
+  // Start. Schlägt es fehl, fehlt höchstens die Zahl am Navigationseintrag.
+  //
+  // WICHTIG: sb.rpc() liefert einen Query-Builder, kein Promise. Er ist zwar
+  // await-bar (er hat then), aber er hat KEIN .catch — ein `.catch()` daran
+  // wirft TypeError. Weil das hier im Startpfad steht, riss es die ganze Seite
+  // mit: kein Zeichnen, keine Anmeldung, weiße Seite. Deshalb await in einem
+  // try, wie überall sonst im Code auch.
+  (async () => {
+    try { await sb.rpc("touch_last_seen"); } catch { /* Anwesenheit ist entbehrlich */ }
+    try { await dmBadgeAktualisieren(); } catch { /* Abzeichen ist entbehrlich */ }
+  })();
   showApp();
   try { await reload(); renderAll(); }
   catch (e) { toast(dbErr(e)); }
