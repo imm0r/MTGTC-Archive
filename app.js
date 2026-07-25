@@ -4106,16 +4106,27 @@ function schnittAusModell(deckId, vorschlag, karte) {
       .filter(e => !tabu.has(e.cardId))
       .map(e => CARDS.find(c => c.id === e.cardId))
       .find(c => c && (c.name || "").toLowerCase() === name);
-    if (treffer) return { karte: treffer, grund: "model" };
+    // Die Begründung des Modells gilt NUR für die Karte, die es selbst genannt
+    // hat. Fällt der Name durch die Prüfung, greift unten die Heuristik — dann
+    // wäre der Satz eine Begründung für eine ganz andere Karte.
+    if (treffer) return { karte: treffer, grund: "model",
+                          warum: String(vorschlag?.replacesWhy || "").trim() };
   }
   return deckSchnittKandidat(d, karte);
 }
 
-/* Die Zeile unter einem Vorschlag, wenn das Deck voll ist. */
+/* Die Zeile unter einem Vorschlag, wenn das Deck voll ist.
+
+   Die vier heuristischen Gründe tragen ihr Argument schon im Namen und werden
+   übersetzt. Beim Modell sagt der feste Satz nur, DASS die KI es so wollte —
+   das ist keine Begründung. Liefert es einen eigenen Satz, steht der hier;
+   fehlt er, bleibt der feste Satz als ehrlicher Rückfall. */
 function schnittHinweisHtml(schnitt) {
   if (!schnitt?.karte) return "";
-  return `<div class="syn-cut" title="${esc(t("deck.cutWhy." + schnitt.grund))}">
-    &#9986; ${esc(t("deck.cutFor", { name: schnitt.karte.disp || schnitt.karte.name }))}</div>`;
+  const warum = schnitt.warum || t("deck.cutWhy." + schnitt.grund);
+  return `<div class="syn-cut" title="${esc(warum)}">
+    &#9986; ${esc(t("deck.cutFor", { name: schnitt.karte.disp || schnitt.karte.name }))}
+    <span class="syn-cut-why">${esc(warum)}</span></div>`;
 }
 
 const DECK_FORMATE = ["Commander", "Standard", "Pioneer", "Modern", "Legacy",

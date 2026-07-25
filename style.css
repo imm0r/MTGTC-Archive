@@ -1024,4 +1024,9 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px}
 .syn-add.voll{ opacity:.45; cursor:not-allowed; }
 .syn-cut{ font-size:11px; color:var(--dim); padding:0 8px 6px;
           overflow-wrap:anywhere; cursor:help; }
+/* Die Begründung darunter: leiser als der Kartenname, damit die Zeile zuerst
+   sagt WAS raus soll und erst danach warum. Auf drei Zeilen begrenzt — der
+   ganze Satz steht weiterhin im title. */
+.syn-cut-why{ display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical;
+              overflow:hidden; margin-top:2px; opacity:.75; font-style:italic; }
 .deck-full-note{ color:var(--err); }
