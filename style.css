@@ -477,26 +477,26 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
    Überlappung als Vielfaches davon aus, also passt sich der ganze Fächer an,
    wenn die Breite auf schmalen Schirmen kleiner wird. 1.395 ist das
    Seitenverhältnis der Scryfall-Bilder (146×204). */
-.zone[data-zone="hand"]{--hk-b:104px}
+[data-zone="hand"]{--hk-b:104px}
 /* Luft ringsum: gedrehte und beim Zeigen angehobene Karten ragen über ihre
    Zeile hinaus. „safe center" hält den Fächer mittig, ohne bei sehr vielen
    Karten den linken Rand unerreichbar abzuschneiden. */
 .hand-fan{display:flex;flex-wrap:nowrap;align-items:flex-end;
   justify-content:center;justify-content:safe center;
-  min-height:calc(var(--hk-b) * 1.395 + 58px);padding:26px 10px 24px;
+  min-height:calc(var(--hk-b,104px) * 1.395 + 58px);padding:26px 10px 24px;
   overflow-x:auto;overflow-y:hidden}
 /* --hk-f dämpft den Fächerwinkel. Gedrehte Karten schwenken seitlich aus und
    machen den Fächer breiter als die Summe der Karten; auf schmalen Schirmen
    liegt die Hand deshalb flacher, statt aus dem Kasten zu laufen. */
-.hand-karte{position:relative;flex:none;width:var(--hk-b);z-index:var(--z);
+.hand-karte{position:relative;flex:none;width:var(--hk-b,104px);z-index:var(--z);
   transform-origin:50% 140%;outline:none;
   transform:rotate(calc(var(--rot) * var(--hk-f,1))) translateY(var(--dy));
   transition:transform .14s ease-out}
-.hand-karte img{display:block;width:var(--hk-b);height:calc(var(--hk-b) * 1.395);
+.hand-karte img{display:block;width:var(--hk-b,104px);height:calc(var(--hk-b,104px) * 1.395);
   object-fit:cover;border-radius:6px;background:#000;border:1px solid var(--line);
   box-shadow:0 6px 16px rgba(0,0,0,.55)}
 .hand-ohnebild{display:flex;align-items:center;justify-content:center;text-align:center;
-  width:var(--hk-b);height:calc(var(--hk-b) * 1.395);padding:8px;border-radius:6px;
+  width:var(--hk-b,104px);height:calc(var(--hk-b,104px) * 1.395);padding:8px;border-radius:6px;
   background:var(--panel);border:1px solid var(--line);font-size:11px;line-height:1.25;color:var(--dim)}
 /* Angehoben wird beim Zeigen UND bei Tastatur-/Tipp-Fokus: auf dem Handy ist
    der erste Tipp das Aufnehmen (Karte kommt nach vorn, Knöpfe erscheinen), der
@@ -552,9 +552,16 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .mat-mitte .zone-gitter,.mat-rechts .zone-gitter{--zk-b:48px;--zk-h:67px;gap:5px}
 .mat-mitte .zone-leer,.mat-rechts .zone-leer{font-size:11px;padding:6px 2px}
 .mat-mitte .lib-liste{max-height:none;margin-top:6px}
-.mat-mitte .lib-zeile{gap:5px}
-.mat-mitte .lib-bild,.mat-mitte .lib-set,.mat-mitte .lib-mana{display:none}
-.mat-mitte .lib-akt .btn{padding:1px 4px;font-size:12px}
+/* In der schmalen Spalte bricht die Zeile um: Name (mit Manakosten und Anzahl)
+   oben, die Zielknöpfe darunter. Nebeneinander fraßen die vier Knöpfe die ganze
+   Breite und der Name schrumpfte auf null — eine Liste ohne Kartennamen ist
+   keine Liste. Bild und Setcode bleiben weg, der Name trägt die Erkennung. */
+.mat-mitte .lib-zeile{flex-wrap:wrap;gap:2px 5px;padding:4px}
+.mat-mitte .lib-bild,.mat-mitte .lib-set{display:none}
+.mat-mitte .lib-nm{flex:1 1 auto;min-width:52px;font-size:12px}
+.mat-mitte .lib-mana{font-size:11px}
+.mat-mitte .lib-akt{flex:1 1 100%;justify-content:flex-start}
+.mat-mitte .lib-akt .btn{padding:1px 5px;font-size:13px}
 /* Commander-Steuer: was das naechste Wirken aus der Kommandozone extra kostet.
    Zugleich der Knopf, um ein zu viel gezaehltes Wirken zurueckzunehmen. */
 .mat-steuer{flex:none}
@@ -604,6 +611,17 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .lib-akt{flex:none;display:flex;gap:3px}
 .lib-akt .btn{padding:2px 6px;font-size:14px;line-height:1.3}
 .lib-alle{margin-top:8px}
+/* Schmale Schirme: dieselbe Umbruch-Behandlung wie in der Mattenspalte. Bild,
+   Name und Manakosten oben, die Zielknöpfe darunter — nebeneinander blieben
+   dem Namen keine 50 px, und eine Bibliothek, in der man die Karte nicht
+   lesen kann, ist keine Hilfe. */
+@media (max-width:640px){
+  .lib-zeile{flex-wrap:wrap;gap:3px 6px}
+  .lib-set{display:none}
+  .lib-nm{flex:1 1 auto;min-width:90px}
+  .lib-akt{flex:1 1 100%;justify-content:flex-start}
+  .lib-akt .btn{padding:2px 8px}
+}
 
 /* ---- Spielerkacheln: flach statt gestapelt ----
    Avatar, Name/Deck und Lebenspunkte nebeneinander; gestapelt füllten vier
@@ -645,13 +663,13 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 /* Schmale Schirme: kleinere Karten überall (der Fächer rechnet in
    Kartenbreiten und folgt von selbst) und ein flacherer Fächerwinkel. */
 @media (max-width:640px){
-  .zone[data-zone="hand"]{--hk-b:74px}
+  [data-zone="hand"]{--hk-b:74px}
   .zone-name{font-size:11px}
   .zone-gitter{--zk-b:62px;--zk-h:86px}
   .lib-set{display:none}
 }
 @media (max-width:430px){
-  .zone[data-zone="hand"]{--hk-b:60px;--hk-f:.7}
+  [data-zone="hand"]{--hk-b:60px;--hk-f:.7}
   .hand-fan{padding:24px 2px 16px}
   .zone-thumbs{display:none}
 }

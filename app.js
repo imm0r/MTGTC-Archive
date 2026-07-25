@@ -8397,7 +8397,7 @@ function zoneHandHtml() {
     const dy = (rel * rel * bogen).toFixed(1);
     const nm = trkName(c);
     return `<div class="hand-karte" tabindex="0" style="--rot:${rot}deg;--dy:${dy}px;--z:${i + 1};${
-      i ? `margin-left:calc(var(--hk-b) * ${(anteil - 1).toFixed(3)})` : ""}"
+      i ? `margin-left:calc(var(--hk-b,104px) * ${(anteil - 1).toFixed(3)})` : ""}"
          data-hand-img="${esc(c.img || "")}" data-hand-name="${esc(nm)}" title="${esc(nm)}">
       ${c.img ? `<img src="${esc(c.img)}" alt="${esc(nm)}" loading="lazy">`
               : `<div class="hand-ohnebild">${esc(nm)}</div>`}
@@ -8511,7 +8511,10 @@ function wireZonenHover() {
 /* Nur die Trefferliste der Bibliothek neu zeichnen: das Suchfeld selbst bleibt
    stehen und behält Fokus und Cursorposition. */
 function renderLibListe() {
-  const korb = $('#zonen .zone[data-zone="lib"] .zone-korb');
+  // Über die Liste selbst suchen, nicht über den Korb: der heißt im Akkordeon
+  // .zone-korb und in der Matte .mat-korb — ein Selektor auf einen der beiden
+  // ließ die Suche in der anderen Anordnung wirkungslos ins Leere greifen.
+  const korb = $('#zonen [data-zone="lib"] .lib-liste')?.parentElement;
   if (!korb) return;
   // Nur Trefferliste und „ganze Bibliothek"-Knopf tauschen — das Suchfeld
   // selbst bleibt dasselbe Element und damit Fokus und Cursor unberührt.
