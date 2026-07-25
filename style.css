@@ -411,13 +411,24 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 
 /* Feld/Friedhof/Exil/Kommandozone: ein Bild je KARTE mit Anzahl. Nur die Hand
    zeigt jedes Exemplar einzeln — dort hält man sie ja auch einzeln. */
-.zone-gitter{display:flex;flex-wrap:wrap;gap:8px}
-.zk{position:relative;flex:none;width:74px;outline:none;transition:transform .12s}
-.zk img{display:block;width:74px;height:103px;object-fit:cover;border-radius:5px;background:#000;
-  border:1px solid var(--line);box-shadow:0 3px 10px rgba(0,0,0,.45)}
-.zk-ohnebild{display:flex;align-items:center;justify-content:center;text-align:center;width:74px;height:103px;
-  padding:6px;border-radius:5px;background:var(--panel);border:1px solid var(--line);
-  font-size:10px;line-height:1.2;color:var(--dim)}
+/* --zk-b ist die Kartenbreite, --zk-h ihre Höhe. Die ZELLE ist quadratisch
+   (--zk-h × --zk-h): eine getappte Karte dreht sich um 90° und braucht dann
+   quer den Platz, den sie sonst hoch braucht. Bekäme die Zelle nur Kartenbreite,
+   ragte jede getappte Karte in ihre Nachbarn — mit dem Quadrat bleibt das Gitter
+   ruhig, egal wie viel gerade getappt ist. */
+.zone-gitter{display:flex;flex-wrap:wrap;gap:8px;--zk-b:74px;--zk-h:103px}
+.zk{position:relative;flex:none;width:var(--zk-h);height:var(--zk-h);outline:none;
+  display:flex;align-items:center;justify-content:center;transition:transform .12s}
+.zk img,.zk-ohnebild{display:block;width:var(--zk-b);height:var(--zk-h);border-radius:5px;
+  border:1px solid var(--line);box-shadow:0 3px 10px rgba(0,0,0,.45);
+  transition:transform .16s cubic-bezier(.34,1.3,.64,1)}
+.zk img{object-fit:cover;background:#000}
+.zk-ohnebild{display:flex;align-items:center;justify-content:center;text-align:center;
+  padding:6px;background:var(--panel);box-shadow:none;font-size:10px;line-height:1.2;color:var(--dim)}
+/* Getappt: gedreht wie am Tisch. Nur das Bild dreht sich, nicht die Abzeichen
+   und Knöpfe — die sollen waagerecht lesbar bleiben. */
+.zk.getappt img,.zk.getappt .zk-ohnebild{transform:rotate(90deg)}
+.zk.getappt img{filter:brightness(.82)}
 .zk:hover,.zk:focus-within{transform:translateY(-4px);z-index:20}
 .zk:focus-visible img{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc)}
 .zk-n{position:absolute;top:-5px;right:-5px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;
@@ -433,8 +444,19 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 /* Zielknöpfe einer Karte: je erlaubter Zone ein Zeichen, Name im Tooltip.
    Erscheinen beim Zeigen bzw. beim ersten Tipp (Fokus) — sechs beschriftete
    Knöpfe passten unter keine Karte. */
-.zk-akt,.hand-akt{position:absolute;left:50%;bottom:-9px;display:flex;gap:3px;opacity:0;pointer-events:none;
+/* +1/+1-Marken: oben links, spiegelbildlich zur Anzahl oben rechts. Unten
+   waeren sie von der Knopfleiste verdeckt, sobald man die Karte anfasst. */
+.zk-marke{position:absolute;left:-5px;top:-5px;height:18px;padding:0 5px;border-radius:9px;
+  display:inline-flex;align-items:center;background:var(--ok,#3cb45a);color:#06210d;
+  font-size:10px;font-weight:800;font-variant-numeric:tabular-nums;box-shadow:0 2px 6px rgba(0,0,0,.5)}
+.feld-werkzeug{margin:0 0 8px}
+/* Feldkarten haben zwei Knopfreihen: erst der Zustand (tappen, Marken), dann
+   die Zielzonen. Nebeneinander wären es bis zu sieben Knöpfe unter einer Karte. */
+.zk-akt-reihe{display:flex;gap:3px;justify-content:center}
+.zk-akt,.hand-akt{position:absolute;left:50%;bottom:-9px;display:flex;flex-direction:column;gap:3px;
+  align-items:center;opacity:0;pointer-events:none;
   transform:translateX(-50%);transition:opacity .12s;z-index:2}
+.zone[data-zone="field"] .zk-akt{bottom:-22px}
 .zk:hover .zk-akt,.zk:focus-within .zk-akt,
 .hand-karte:hover .hand-akt,.hand-karte:focus-within .hand-akt{opacity:1;pointer-events:auto}
 .zk-akt .btn,.hand-akt .btn{padding:2px 6px;font-size:14px;line-height:1.3;background:var(--panel)}
@@ -541,8 +563,7 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 @media (max-width:640px){
   .zone[data-zone="hand"]{--hk-b:74px}
   .zone-name{font-size:11px}
-  .zk,.zk img,.zk-ohnebild{width:62px}
-  .zk img,.zk-ohnebild{height:86px}
+  .zone-gitter{--zk-b:62px;--zk-h:86px}
   .lib-set{display:none}
 }
 @media (max-width:430px){

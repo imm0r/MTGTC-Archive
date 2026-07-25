@@ -966,6 +966,12 @@ revoke execute on function public.session_roster(uuid) from anon;
 -- cast_count ist keine Zone, sondern der Zähler für die Commander-Steuer
 -- (+2 Mana je Wirken aus der Kommandozone). qty ist abgelöst: die Spalte hieß
 -- früher „gespielt" und wird nicht mehr geschrieben.
+--
+-- field_state hält den Zustand der EINZELNEN Exemplare auf dem Schlachtfeld —
+-- [{"t":0|1 getappt,"c":Anzahl +1/+1-Marken}, …], so lang wie field. Nur dort
+-- reicht eine Zahl nicht: von zwei gleichen Kreaturen kann eine getappt sein
+-- und die andere Marken tragen. Solange alles ungetappt und ohne Marken ist,
+-- bleibt die Liste leer, der Regelfall kostet also nichts.
 create table if not exists public.session_played (
   session_id uuid not null references public.game_sessions(id) on delete cascade,
   user_id    uuid not null references auth.users(id) on delete cascade,
@@ -976,6 +982,7 @@ create table if not exists public.session_played (
   graveyard  integer not null default 0 check (graveyard >= 0),
   exile      integer not null default 0 check (exile >= 0),
   cast_count integer not null default 0 check (cast_count >= 0),
+  field_state jsonb not null default '[]'::jsonb,
   primary key (session_id, user_id, card_id)
 );
 -- Für bestehende Datenbanken nachrüsten (create table if not exists ergänzt keine Spalten):
@@ -984,7 +991,13 @@ alter table public.session_played
   add column if not exists field      integer not null default 0 check (field >= 0),
   add column if not exists graveyard  integer not null default 0 check (graveyard >= 0),
   add column if not exists exile      integer not null default 0 check (exile >= 0),
-  add column if not exists cast_count integer not null default 0 check (cast_count >= 0);
+  add column if not exists cast_count integer not null default 0 check (cast_count >= 0),
+  add column if not exists field_state jsonb not null default '[]'::jsonb;
+-- Nur Listen zulassen: ein Objekt oder eine Zahl waere fuer die App unlesbar.
+alter table public.session_played drop constraint if exists session_played_field_state_array;
+alter table public.session_played
+  add constraint session_played_field_state_array
+  check (jsonb_typeof(field_state) = 'array');
 -- Altbestand: „gespielt" war faktisch das Schlachtfeld.
 update public.session_played set field = qty, qty = 0 where qty > 0;
 alter table public.session_played enable row level security;

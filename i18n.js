@@ -3039,6 +3039,11 @@ Object.assign(I18N.de, {
   "lib.hint": "Tippe den Kartennamen, um die gezogene Karte auf die Hand zu nehmen.",
   "lib.noHits": "Keine Karte gefunden.",
   "lib.showAll": "Ganze Bibliothek anzeigen ({n})", "lib.hideAll": "Liste wieder zuklappen",
+  "zone.tapped": "getappt",
+  "zone.tapTitle": "Karte tappen", "zone.untapTitle": "Karte enttappen",
+  "zone.untapAll": "alle enttappen", "zone.untapAllTitle": "Alles auf dem Schlachtfeld aufrichten (Enttappen-Schritt)",
+  "zone.counterAdd": "Eine +1/+1-Marke drauflegen", "zone.counterRemove": "Eine +1/+1-Marke herunternehmen",
+  "zone.counters": "{n} +1/+1-Marken",
   "sess.cmdTaxTitle": "Commander-Steuer: +{mana} Mana ({n}× aus der Kommandozone gewirkt) — klicken, um ein Wirken zurückzunehmen",
 });
 Object.assign(I18N.en, {
@@ -3095,6 +3100,11 @@ Object.assign(I18N.en, {
   "lib.hint": "Type the card name to move the card you drew into your hand.",
   "lib.noHits": "No card found.",
   "lib.showAll": "Show the whole library ({n})", "lib.hideAll": "Collapse the list",
+  "zone.tapped": "tapped",
+  "zone.tapTitle": "Tap this card", "zone.untapTitle": "Untap this card",
+  "zone.untapAll": "untap all", "zone.untapAllTitle": "Untap everything on the battlefield (untap step)",
+  "zone.counterAdd": "Put a +1/+1 counter on it", "zone.counterRemove": "Remove a +1/+1 counter",
+  "zone.counters": "{n} +1/+1 counters",
   "sess.cmdTaxTitle": "Commander tax: +{mana} mana (cast {n}× from the command zone) — click to undo a cast",
 });
 Object.assign(I18N.fr, {
@@ -3151,6 +3161,11 @@ Object.assign(I18N.fr, {
   "lib.hint": "Tape le nom de la carte pour mettre en main celle que tu viens de piocher.",
   "lib.noHits": "Aucune carte trouvée.",
   "lib.showAll": "Afficher toute la bibliothèque ({n})", "lib.hideAll": "Replier la liste",
+  "zone.tapped": "engagée",
+  "zone.tapTitle": "Engager la carte", "zone.untapTitle": "Dégager la carte",
+  "zone.untapAll": "tout dégager", "zone.untapAllTitle": "Dégager tout le champ de bataille (étape de dégagement)",
+  "zone.counterAdd": "Ajouter un marqueur +1/+1", "zone.counterRemove": "Retirer un marqueur +1/+1",
+  "zone.counters": "{n} marqueurs +1/+1",
   "sess.cmdTaxTitle": "Taxe de commandant : +{mana} manas ({n} lancers depuis la zone de commandement) — clique pour en annuler un",
 });
 Object.assign(I18N.es, {
@@ -3207,6 +3222,11 @@ Object.assign(I18N.es, {
   "lib.hint": "Escribe el nombre de la carta para llevar a la mano la que acabas de robar.",
   "lib.noHits": "No se encontró ninguna carta.",
   "lib.showAll": "Mostrar toda la biblioteca ({n})", "lib.hideAll": "Plegar la lista",
+  "zone.tapped": "girada",
+  "zone.tapTitle": "Girar la carta", "zone.untapTitle": "Enderezar la carta",
+  "zone.untapAll": "enderezar todo", "zone.untapAllTitle": "Enderezar todo el campo de batalla (paso de enderezar)",
+  "zone.counterAdd": "Poner un contador +1/+1", "zone.counterRemove": "Quitar un contador +1/+1",
+  "zone.counters": "{n} contadores +1/+1",
   "sess.cmdTaxTitle": "Impuesto de comandante: +{mana} maná (lanzado {n} veces desde la zona de mando) — haz clic para deshacer uno",
 });
 Object.assign(I18N.it, {
@@ -3263,6 +3283,11 @@ Object.assign(I18N.it, {
   "lib.hint": "Digita il nome della carta per portare in mano quella appena pescata.",
   "lib.noHits": "Nessuna carta trovata.",
   "lib.showAll": "Mostra tutta la biblioteca ({n})", "lib.hideAll": "Richiudi la lista",
+  "zone.tapped": "TAPpata",
+  "zone.tapTitle": "TAPpa la carta", "zone.untapTitle": "STAPpa la carta",
+  "zone.untapAll": "STAPpa tutto", "zone.untapAllTitle": "STAPpa tutto il campo di battaglia (fase di STAP)",
+  "zone.counterAdd": "Aggiungi un segnalino +1/+1", "zone.counterRemove": "Togli un segnalino +1/+1",
+  "zone.counters": "{n} segnalini +1/+1",
   "sess.cmdTaxTitle": "Tassa del comandante: +{mana} mana (lanciato {n}× dalla zona di comando) — clicca per annullare un lancio",
 });
 

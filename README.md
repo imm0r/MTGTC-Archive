@@ -290,7 +290,7 @@ Bibliothek zuunterst.
 | | Zone | Inhalt |
 | --- | --- | --- |
 | ★ | Kommandozone | der Commander, solange er nicht im Spiel ist (nur bei Commander-Decks) |
-| ⚔️ | Schlachtfeld | alles, was ausgespielt auf dem Tisch liegt |
+| ⚔️ | Schlachtfeld | alles, was ausgespielt auf dem Tisch liegt — mit getappt/ungetappt und +1/+1-Marken |
 | ⚰️ | Friedhof | Gestorbenes, Abgehandeltes, Abgeworfenes |
 | 🚫 | Exil | ins Exil geschickte Karten |
 | ✋ | Hand | aufgefächert, jedes Exemplar eine eigene Karte |
@@ -307,6 +307,17 @@ oben. Ziehst du im Spiel eine Karte, suchst du sie unten in der Bibliothek und
 schickst sie mit ✋ auf die Hand; von dort geht sie mit ⚔️ ins Spiel, später mit
 ⚰️ in den Friedhof. Jeder Weg lässt sich auch rückwärts gehen.
 
+**Auf dem Schlachtfeld** kann eine Karte mehr als nur daliegen. Der Knopf ↻
+tappt sie — das Bild dreht sich um 90° wie am Tisch —, ＋ und − legen +1/+1-Marken
+drauf und wieder herunter. Oben in der Zone richtet **alle enttappen** in einem
+Klick den ganzen Tisch wieder auf.
+
+Gleiche Exemplare fassen sich zu einem Stapel zusammen: fünf ungetappte Wälder
+sind ein Bild mit `×5`. Tappst du einen, spaltet sich `×4` und `×1 getappt` ab.
+Das ist kein Schönheitsdetail, sondern nötig — von zwei gleichen Kreaturen kann
+eine getappt sein und die andere zwei Marken tragen, und stirbt die markierte,
+darf sie ihre Marken nicht der Zwillingsschwester dalassen.
+
 **Bibliothek: suchen statt scrollen.** Am Tisch ziehst du physisch und musst der
 App nur sagen, *welche* Karte es war — dafür steht dort ein Suchfeld statt einer
 Dauerliste. Die ganze Bibliothek ist einen Klick entfernt, wenn du sehen willst,
@@ -321,16 +332,23 @@ zurück.
 **Gespeichert** werden nur vier Zahlen je Karte (`session_played.hand`, `.field`,
 `.graveyard`, `.exile`). Bibliothek und Kommandozone sind der **Rest** aus der
 Deckmenge und werden bei jeder Anzeige neu gerechnet — so kann kein Exemplar
-doppelt existieren. `cast_count` zählt daneben die Commander-Steuer. Der Stand
-überlebt einen Neuladen der Seite; „Neues Spiel" des Gastgebers räumt ihn bei
-allen ab.
+doppelt existieren. `cast_count` zählt daneben die Commander-Steuer.
+
+Nur das Schlachtfeld braucht mehr als eine Zahl, denn dort unterscheiden sich
+gleiche Karten voneinander. `field_state` hält deshalb eine Liste je Exemplar —
+`[{"t":1,"c":0},{"t":0,"c":2}]` heißt „eine getappt, eine mit +2/+2" — und ist
+genau so lang wie `field`. Solange alles ungetappt und ohne Marken ist, bleibt
+sie leer; der Regelfall kostet also nichts.
+
+Der Stand überlebt einen Neuladen der Seite; „Neues Spiel" des Gastgebers räumt
+ihn bei allen ab.
 
 Würfel und Einladeliste sind Zubehör und stehen eingeklappt am Ende — beim Wurf
 (auch dem eines Mitspielers) fährt der Würfelkasten von selbst auf.
 
 > Meldet die App „Spalte fehlt", ist die Datenbank älter als die App —
 > `supabase-schema.sql` erneut im SQL Editor ausführen (oder
-> `supabase/migrations/20260725140000_session_zones.sql` einzeln). Bis dahin
+> `supabase/migrations/20260725190000_field_state.sql` einzeln). Bis dahin
 > läuft die Partie im Browser weiter, wird aber nicht gespeichert.
 
 ## Preisverlauf: ~90 Tage aus MTGJSON
