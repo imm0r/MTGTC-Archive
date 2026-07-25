@@ -82,6 +82,7 @@ function dialogBackdropSchliesst(dlg) {
 /* ============================== Supabase ============================== */
 let sb = null, USER = null, PROFILE = null;
 let FLAGS = {}, IS_ADMIN = false;   // globale Feature-Schalter + ob der Nutzer Admin ist
+let AI_LIMITS = {};                 // Stundenkontingente je KI-Funktion (0 = unbegrenzt)
 let COMMUNITY_STATS = null, COMMUNITY_FEED = [], communityChannel = null;
 let COMMUNITY_HIGHLIGHTS = null;
 
@@ -2991,7 +2992,23 @@ async function ladeFlags() {
     FLAGS = {}; (data || []).forEach(f => { FLAGS[f.key] = f.enabled; });
   } catch { FLAGS = {}; }
   try { const { data } = await sb.rpc("is_admin"); IS_ADMIN = !!data; } catch { IS_ADMIN = false; }
+  // Stundenkontingente der KI-Funktionen. Jede angemeldete Person darf sie
+  // lesen; ändern darf sie nur der Admin (Policy in der Datenbank).
+  try {
+    const { data } = await sb.from("ai_limits").select("kind,per_hour");
+    AI_LIMITS = {}; (data || []).forEach(l => { AI_LIMITS[l.kind] = l.per_hour; });
+  } catch { AI_LIMITS = {}; }
   document.documentElement.dataset.kiGlobal = FLAGS.ki_synergy ? "on" : "off";
+}
+
+/* Kontingent einer KI-Funktion setzen. 0 = unbegrenzt. Nur der Admin kommt
+   durch — die Datenbank weist andere ab, der Knopf ist bloß die Bequemlichkeit. */
+async function aiLimitSetzen(kind, n) {
+  const wert = Math.max(0, Math.min(1000, Math.floor(Number(n) || 0)));
+  const { error } = await sb.from("ai_limits").update({ per_hour: wert }).eq("kind", kind);
+  if (error) throw error;
+  AI_LIMITS[kind] = wert;
+  return wert;
 }
 
 /* Einen globalen Schalter umlegen — nur der Admin darf; die RLS auf
@@ -3026,7 +3043,11 @@ async function synergieAnzeigen(box, hooks, opts = {}) {
    opts.maxPrice filtert wie bei der heuristischen Suche. */
 async function kiSynergien(card, box, opts = {}) {
   return kiSynergieLauf(box, {
-    body: { card: { name: card.name, type_line: card.type_line, oracle_text: card.oracle_text }, lang: LANG, n: 10 },
+    // Das eingestellte Maximum ans Modell durchreichen, statt die Antwort
+    // hinterher zu kürzen: Wer weniger Vorschläge will, soll auch weniger
+    // Ausgabe-Tokens bezahlen. Die Function klemmt selbst auf 3..15.
+    body: { card: { name: card.name, type_line: card.type_line, oracle_text: card.oracle_text },
+            lang: LANG, n: prefWert("synLimit") || 10 },
     selfName: card.name,
     maxPrice: opts.maxPrice,
   });
@@ -3048,7 +3069,10 @@ async function kiSynergienDeck(deck, cards, box, opts = {}) {
         name: deck.name, format: deck.format || "", commander, colorIdentity: colors,
         cards: [...new Set(cards.map(c => c.name).filter(Boolean))].slice(0, 120),
       },
-      lang: LANG, n: 12,
+      // Wie bei der Einzelkarte: das eingestellte Maximum geht ans Modell,
+      // damit die Einstellung Ausgabe-Tokens spart und nicht nur die Anzeige
+      // kürzt. Ohne Einstellung bleibt es beim bisherigen Wert.
+      lang: LANG, n: prefWert("synLimit") || 12,
     },
     colors,
     exclude: excludeVon(cards),   // nur Karten DIESES Decks raus, Besessenes darf auftauchen
@@ -3111,7 +3135,6 @@ async function kiSynergieLauf(box, cfg) {
 
   const sugg = (data?.suggestions || []).filter(s => s && s.name);
   if (!sugg.length) { box.innerHTML = `<div class="empty">${esc(t("syn.none"))}</div>`; return; }
-  zaehleCommunitySuche("synergies", sugg.length);
 
   // Namen gegen Scryfall prüfen (POST /cards/collection, ein Request bis 75 Namen).
   let karten = [];
@@ -3145,6 +3168,10 @@ async function kiSynergieLauf(box, cfg) {
     treffer.push(vorschlagCardHtml(c, s.reason, cfg.deckId));
     if (lim && treffer.length >= lim) break;
   }
+  // Erst hier zählen: „treffer" ist, was tatsächlich angezeigt wird — nach
+  // Scryfall-Prüfung, Farb- und Preisfilter und dem eingestellten Höchstwert.
+  // Die Rohliste des Modells ist regelmäßig länger und wäre die falsche Zahl.
+  zaehleCommunitySuche("synergies", treffer.length);
   const kosten = kiKostenHtml(data?.usage);   // die Abfrage kostete unabhängig von der Trefferzahl
   box.innerHTML = treffer.length
     ? `<div class="meta">${esc(t("syn.aiNote"))}</div>${kosten}<div class="syn-grid">${treffer.join("")}</div>`
@@ -3570,7 +3597,6 @@ async function deckCombosAnzeigen(box, cards, deckId) {
   // Einstellung „nur komplette Combos": die „Fast komplett"-Kategorie weglassen.
   let almost = suchPrefs().onlyComplete ? [] : (data.almostIncluded || []);
   if (!included.length && !almost.length) { box.innerHTML = `<div class="empty">${esc(t("combo.none"))}</div>`; return; }
-  zaehleCommunitySuche("combos", included.length + almost.length);
 
   // Legalität im Deck-Format: erst zählen (für die Zusammenfassung), dann —
   // je nach Einstellung — die nicht legalen Combos ganz ausblenden.
@@ -3581,6 +3607,8 @@ async function deckCombosAnzeigen(box, cards, deckId) {
     included = included.filter(c => comboIstLegal(c, legKey));
     almost = almost.filter(c => comboIstLegal(c, legKey));
   }
+  // Nach dem Filtern zählen — gezeigt wird, was übrig bleibt.
+  zaehleCommunitySuche("combos", included.length + almost.length);
 
   // Alle Karten aller Combos (fertig + fast fertig) bei Scryfall auflösen —
   // für die Kacheln und die „+ Deck"/„+ Wunsch"-Knöpfe.
@@ -3622,11 +3650,12 @@ async function sammlungCombosAnzeigen(box, cards) {
   if (lauf !== combosLauf) return;
   let included = data.included || [];
   if (!included.length) { box.innerHTML = `<div class="empty">${esc(t("combo.collNone"))}</div>`; return; }
-  zaehleCommunitySuche("combos", included.length);
   // Legalität: ohne Deck-Kontext gegen Commander (siehe comboLegalKey).
   const gesamt = included.length;
   const illegal = included.filter(c => !comboIstLegal(c, "commander")).length;
   if (illegal && suchPrefs().hideBanned) included = included.filter(c => comboIstLegal(c, "commander"));
+  // Nach dem Filtern zählen — gezeigt wird, was übrig bleibt.
+  zaehleCommunitySuche("combos", included.length);
   const cardByName = await comboKartenLaden(included.flatMap(c => (c.uses || []).map(u => u.name)));
   if (lauf !== combosLauf) return;
   const note = illegal ? `<div class="meta legal-note">&#9878; ${esc(t(
@@ -3656,11 +3685,12 @@ async function karteCombosAnzeigen(box, card) {
   if (lauf !== combosLauf) return;
   let combos = data.combos || [];
   if (!combos.length) { box.innerHTML = `<div class="empty">${esc(t("combo.cardNone"))}</div>`; return; }
-  zaehleCommunitySuche("combos", combos.length);
   // Legalität: ohne Deck-Kontext gegen Commander (siehe comboLegalKey).
   const gesamt = combos.length;
   const illegal = combos.filter(c => !comboIstLegal(c, "commander")).length;
   if (illegal && suchPrefs().hideBanned) combos = combos.filter(c => comboIstLegal(c, "commander"));
+  // Nach dem Filtern zählen — gezeigt wird, was übrig bleibt.
+  zaehleCommunitySuche("combos", combos.length);
   const cardByName = await comboKartenLaden(combos.flatMap(c => (c.uses || []).map(u => u.name)));
   if (lauf !== combosLauf) return;
   const note = illegal ? `<div class="meta legal-note">&#9878; ${esc(t(
@@ -5538,6 +5568,14 @@ function renderSettings() {
         <span>${esc(t("admin.kiFlag"))}</span>
       </label>
       <p class="hint">${esc(t("admin.hint"))}</p>
+      <label style="margin-top:12px">${esc(t("admin.limitsTitle"))}</label>
+      <div class="row">
+        ${[["ki_synergy", "admin.limitKiSyn"], ["rules_question", "admin.limitRules"]].map(([k, lbl]) => `
+        <div style="flex:none"><label>${esc(t(lbl))}</label>
+          <input type="number" data-ailimit="${k}" min="0" max="1000" step="1" style="width:150px"
+            value="${AI_LIMITS[k] ?? 5}"></div>`).join("")}
+      </div>
+      <p class="hint">${esc(t("admin.limitHint"))}</p>
     </div>` : ""}
     <p class="hint app-version">${esc(t("settings.version", { v: APP_VERSION || "—" }))}</p>`;
   // Eigenes Sprach-Dropdown mit Flaggen (ein natives <option> kann kein SVG
@@ -5564,6 +5602,16 @@ function renderSettings() {
     const v = inp.value === "" ? null : Math.max(0, parseFloat(inp.value));
     try { await suchPrefSpeichern({ [inp.dataset.prefnum]: Number.isFinite(v) && v > 0 ? v : null }); toast(t("set.saved")); }
     catch (e) { toast(dbErr(e)); }
+  });
+  $$("#v-settings [data-ailimit]").forEach(inp => inp.onchange = async () => {
+    const kind = inp.dataset.ailimit;
+    inp.disabled = true;
+    try {
+      const wert = await aiLimitSetzen(kind, inp.value);
+      inp.value = wert;   // auf den tatsächlich gespeicherten Wert zurückschreiben
+      toast(wert === 0 ? t("admin.limitOff") : t("admin.limitSaved", { n: wert }));
+    } catch (e) { inp.value = AI_LIMITS[kind] ?? 5; toast(dbErr(e)); }
+    finally { inp.disabled = false; }
   });
   const fk = $("#flag-ki");
   if (fk) fk.onchange = async ev => {
