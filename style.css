@@ -315,29 +315,17 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 /* Spielrunde (live) */
 .menu-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;
   margin-left:6px;padding:0 4px;border-radius:8px;background:var(--acc);color:#1a1400;font-size:11px;font-weight:700}
-.sp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:12px;margin-top:12px}
-.sp-card{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 10px;text-align:center;
-  border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
 .sp-card.wartet{opacity:.55}
 .sp-card.besiegt{opacity:.6}
 .sp-card.besiegt .sp-life{color:var(--err)}
 /* „Besiegt"-Abzeichen: immer im DOM, nur bei .besiegt sichtbar. */
-.sp-besiegt{display:none;align-items:center;gap:4px;font-size:12px;font-weight:800;
-  letter-spacing:.4px;text-transform:uppercase;color:var(--err);margin:-2px 0 2px}
+.sp-besiegt{display:none;align-items:center;gap:4px;font-size:11px;font-weight:800;
+  letter-spacing:.4px;text-transform:uppercase;color:var(--err);margin:1px 0 0}
 .sp-card.besiegt .sp-besiegt{display:flex}
-.sp-name{font-size:13px;font-weight:600;line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sp-host{color:var(--acc)}
-.sp-life{font-size:40px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;margin:2px 0}
-.sp-ctrl{display:flex;gap:4px;flex-wrap:wrap;justify-content:center}
-.sp-ctrl .btn{padding:5px 8px}
-.sp-wait{font-size:12px;color:var(--dim);padding:14px 0}
 .dice-result{font-size:24px;font-weight:800}
 .sess-log{margin-top:10px;display:flex;flex-direction:column;gap:3px;max-height:150px;overflow-y:auto}
 .log-zeile{font-size:13px;color:var(--dim)}
-.sp-deck{display:flex;flex-direction:column;align-items:center;gap:3px;max-width:100%;margin-top:2px;cursor:help}
-.sp-cmd{width:46px;height:64px;object-fit:cover;border-radius:4px;border:1px solid var(--line);
-  box-shadow:0 2px 6px rgba(0,0,0,.45);transition:transform .12s}
-.sp-deck:hover .sp-cmd{transform:scale(1.08)}
 .sp-deckname{font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 /* Schwebende Commander-Vorschau beim Hover (eigenes Element, nicht #hovercard) */
 .cmd-hover{position:fixed;z-index:95;display:none;pointer-events:none;background:var(--panel);
@@ -396,30 +384,77 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .ev-inv{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
 .ev-inv span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:560px){.termin-wann{min-width:0}.termin-kopf{flex-wrap:wrap}.kal-tag{min-height:52px}}
-/* ===== Spielrunde: eigene Hand + Deckliste =====
-   Die Hand liegt über der Deckliste und zeigt JEDES Exemplar als eigene Karte,
-   so wie man sie in der Hand hält: überlappend, nach außen gekippt, die Ränder
-   etwas tiefer. Winkel (--rot), Tiefe (--dy) und Überlappung rechnet app.js je
-   Karte aus, zusammengesetzt wird hier — deshalb kann der Hover-Zustand den
-   Grundwinkel behalten und die Karte nur anheben (eine Inline-transform ließe
-   sich davon nicht mehr ergänzen).
+/* ===== Spielrunde: Zonen der eigenen Partie =====
+   Sechs Zonen untereinander, aufgeklappt ist immer genau eine. Die zugeklappten
+   Kopfzeilen bleiben schmal (Zeichen, Name, Anzahl, ein paar Miniaturen), damit
+   die ganze Ansicht kurz bleibt statt sechs Listen zu stapeln. */
+.zonen{margin-top:10px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.zone + .zone{border-top:1px solid var(--line)}
+.zone-kopf{display:flex;align-items:center;gap:9px;padding:7px 10px;cursor:pointer;
+  background:var(--panel2);outline:none;transition:background .12s}
+.zone-kopf:hover,.zone-kopf:focus-visible{background:var(--panel)}
+.zone.offen>.zone-kopf{background:var(--panel);box-shadow:inset 3px 0 0 var(--acc)}
+/* Der Stern erbt die Akzentfarbe, die Emoji bringen ihre eigene mit. */
+.zone-icon{flex:none;width:20px;text-align:center;color:var(--acc);font-size:15px;line-height:1}
+.zone-name{flex:none;font-size:12px;font-weight:600;letter-spacing:.3px;color:var(--txt)}
+.zone-n{flex:none;min-width:20px;height:18px;padding:0 6px;border-radius:9px;display:inline-flex;
+  align-items:center;justify-content:center;background:var(--acc);color:#1a1400;font-size:11px;font-weight:700}
+.zone-n.null{background:var(--line);color:var(--dim)}
+/* Miniaturen der Zone: reiner Ausblick, nicht anklickbar. Bei Überlänge werden
+   sie rechts abgeschnitten statt eine zweite Zeile aufzumachen. */
+.zone-thumbs{flex:1;min-width:0;display:flex;gap:2px;overflow:hidden;justify-content:flex-end;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 24px);mask-image:linear-gradient(90deg,transparent,#000 24px)}
+.zone-thumbs img{width:20px;height:28px;object-fit:cover;border-radius:2px;flex:none;opacity:.8}
+.zone-korb{display:none;padding:8px 10px 12px}
+.zone.offen>.zone-korb{display:block}
+.zone-leer{font-size:13px;color:var(--dim);padding:12px 2px}
+
+/* Feld/Friedhof/Exil/Kommandozone: ein Bild je KARTE mit Anzahl. Nur die Hand
+   zeigt jedes Exemplar einzeln — dort hält man sie ja auch einzeln. */
+.zone-gitter{display:flex;flex-wrap:wrap;gap:8px}
+.zk{position:relative;flex:none;width:74px;outline:none;transition:transform .12s}
+.zk img{display:block;width:74px;height:103px;object-fit:cover;border-radius:5px;background:#000;
+  border:1px solid var(--line);box-shadow:0 3px 10px rgba(0,0,0,.45)}
+.zk-ohnebild{display:flex;align-items:center;justify-content:center;text-align:center;width:74px;height:103px;
+  padding:6px;border-radius:5px;background:var(--panel);border:1px solid var(--line);
+  font-size:10px;line-height:1.2;color:var(--dim)}
+.zk:hover,.zk:focus-within{transform:translateY(-4px);z-index:20}
+.zk:focus-visible img{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc)}
+.zk-n{position:absolute;top:-5px;right:-5px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;
+  display:inline-flex;align-items:center;justify-content:center;background:var(--acc);color:#1a1400;
+  font-size:11px;font-weight:800;box-shadow:0 2px 6px rgba(0,0,0,.5)}
+/* Commander-Steuer: was das nächste Wirken aus der Kommandozone extra kostet.
+   Zugleich der Knopf, um ein zu viel gezähltes Wirken zurückzunehmen. */
+.zk-steuer{position:absolute;top:-6px;left:-6px;height:20px;padding:0 6px;border-radius:10px;border:none;
+  background:var(--panel);color:var(--acc);border:1px solid var(--acc);cursor:pointer;
+  font-size:11px;font-weight:800;font-variant-numeric:tabular-nums}
+.zk-steuer:hover{background:var(--acc);color:#1a1400}
+
+/* Zielknöpfe einer Karte: je erlaubter Zone ein Zeichen, Name im Tooltip.
+   Erscheinen beim Zeigen bzw. beim ersten Tipp (Fokus) — sechs beschriftete
+   Knöpfe passten unter keine Karte. */
+.zk-akt,.hand-akt{position:absolute;left:50%;bottom:-9px;display:flex;gap:3px;opacity:0;pointer-events:none;
+  transform:translateX(-50%);transition:opacity .12s;z-index:2}
+.zk:hover .zk-akt,.zk:focus-within .zk-akt,
+.hand-karte:hover .hand-akt,.hand-karte:focus-within .hand-akt{opacity:1;pointer-events:auto}
+.zk-akt .btn,.hand-akt .btn{padding:2px 6px;font-size:14px;line-height:1.3;background:var(--panel)}
+
+/* ---- Hand: aufgefächert wie in der echten Hand ----
+   Winkel (--rot), Tiefe (--dy) und Überlappung rechnet app.js je Karte aus,
+   zusammengesetzt wird hier — deshalb kann der Hover-Zustand den Grundwinkel
+   behalten und die Karte nur anheben (eine Inline-transform ließe sich davon
+   nicht mehr ergänzen).
    --hk-b ist die Kartenbreite und die Maßeinheit des Fächers: app.js gibt die
    Überlappung als Vielfaches davon aus, also passt sich der ganze Fächer an,
    wenn die Breite auf schmalen Schirmen kleiner wird. 1.395 ist das
    Seitenverhältnis der Scryfall-Bilder (146×204). */
-.hand-sparte{--hk-b:104px;margin-top:12px;padding:10px 10px 4px;border:1px solid var(--line);
-  border-radius:12px;background:var(--panel2)}
-.hand-kopf{display:flex;align-items:center;gap:8px}
-.hand-titel{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--dim)}
-.hand-zahl{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:18px;
-  padding:0 6px;border-radius:9px;background:var(--acc);color:#1a1400;font-size:11px;font-weight:700}
-.hand-leer{font-size:13px;color:var(--dim);padding:14px 2px 12px}
-/* Luft ringsum: gedrehte und beim Hover angehobene Karten ragen über ihre
+.zone[data-zone="hand"]{--hk-b:104px}
+/* Luft ringsum: gedrehte und beim Zeigen angehobene Karten ragen über ihre
    Zeile hinaus. „safe center" hält den Fächer mittig, ohne bei sehr vielen
    Karten den linken Rand unerreichbar abzuschneiden. */
 .hand-fan{display:flex;flex-wrap:nowrap;align-items:flex-end;
   justify-content:center;justify-content:safe center;
-  min-height:calc(var(--hk-b) * 1.395 + 66px);padding:34px 10px 22px;
+  min-height:calc(var(--hk-b) * 1.395 + 58px);padding:26px 10px 24px;
   overflow-x:auto;overflow-y:hidden}
 /* --hk-f dämpft den Fächerwinkel. Gedrehte Karten schwenken seitlich aus und
    machen den Fächer breiter als die Summe der Karten; auf schmalen Schirmen
@@ -434,50 +469,86 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .hand-ohnebild{display:flex;align-items:center;justify-content:center;text-align:center;
   width:var(--hk-b);height:calc(var(--hk-b) * 1.395);padding:8px;border-radius:6px;
   background:var(--panel);border:1px solid var(--line);font-size:11px;line-height:1.25;color:var(--dim)}
-/* Angehoben wird bei Hover UND bei Tastatur-/Tipp-Fokus: auf dem Handy ist der
-   erste Tipp das Aufnehmen (Karte kommt nach vorn, Knöpfe erscheinen), der
-   zweite der Klick auf „spielen". Die Staffelung steht als --z in der Zeile,
-   damit diese Regel sie überhaupt überstimmen kann — eine Inline-z-index
-   schlägt jede Stylesheet-Regel. */
+/* Angehoben wird beim Zeigen UND bei Tastatur-/Tipp-Fokus: auf dem Handy ist
+   der erste Tipp das Aufnehmen (Karte kommt nach vorn, Knöpfe erscheinen), der
+   zweite der Klick aufs Ziel. Die Staffelung steht als --z in der Zeile, damit
+   diese Regel sie überstimmen kann — ein Inline-z-index schlägt jede Regel. */
 .hand-karte:hover,.hand-karte:focus-within{z-index:60;
   transform:rotate(calc(var(--rot) * var(--hk-f,1))) translateY(calc(var(--dy) - 20px)) scale(1.06)}
 .hand-karte:focus-visible img{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc)}
-/* Die Knöpfe drehen mit der Karte zurück, damit sie waagerecht lesbar bleiben. */
-.hand-akt{position:absolute;left:50%;bottom:-8px;display:flex;gap:4px;opacity:0;pointer-events:none;
-  transform:translateX(-50%) rotate(calc(-1 * var(--rot) * var(--hk-f,1)));transition:opacity .12s}
-.hand-karte:hover .hand-akt,.hand-karte:focus-within .hand-akt{opacity:1;pointer-events:auto}
-.hand-akt .btn{padding:3px 8px;font-size:11px;white-space:nowrap;background:var(--panel)}
-/* Deckliste der Partie: gleiche Spalten wie die Sammlung (Bild, Name, Mana,
-   Set, Anzahl, gespielt). Sortiert wird hier nicht — die Kopfzeile ist also
-   kein Knopf. Der Kopf bleibt beim Rollen stehen; sein Hintergrund kommt
-   bereits aus der th-Regel der Sammlung. */
-.trk-sum{font-size:13px;color:var(--dim);margin:10px 0 2px}
-.trk-scroll{max-height:460px;overflow:auto}
-.trk-tbl th{cursor:default;position:sticky;top:0;z-index:2}
-.trk-tbl tbody tr:hover{background:var(--panel2)}
-.trk-tbl tbody tr.leer{opacity:.45}
-.trk-anz,.trk-akt{white-space:nowrap}
-.trk-von{color:var(--dim);font-size:12px}
-.trk-hand-pille{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:999px;
-  background:rgba(210,170,60,.18);color:var(--acc);font-size:11px;font-weight:700}
-.trk-gespielt{font-variant-numeric:tabular-nums}
-.trk-akt .btn{padding:3px 8px;margin-left:4px}
-/* Schmale Schirme: kleinere Handkarten (der Fächer rechnet in Kartenbreiten und
-   folgt von selbst) und die Knöpfe der Deckliste untereinander statt
-   nebeneinander — „ziehen" ist der Griff dieser Ansicht und soll nicht als
-   Erstes aus dem Bild rollen. Bild- und Set-Spalte fallen wie in der Sammlung
-   ohnehin weg (.hide-s); bleibt die Tabelle danach breiter als der Schirm,
-   rollt sie waagerecht wie die Sammlungstabelle auch. */
+
+/* ---- Bibliothek: suchen statt scrollen ----
+   Dieselben Angaben wie in der Sammlung (Bild, Name, Mana, Set, Anzahl), aber
+   als schmale Zeile statt als Tabelle — Kopfzeile und Tabellenpolster brauchte
+   hier niemand. */
+.lib-suchzeile input{margin:0}
+.lib-liste{display:flex;flex-direction:column;gap:1px;max-height:300px;overflow-y:auto;margin-top:8px}
+.lib-zeile{display:flex;align-items:center;gap:8px;padding:3px 4px;border-radius:6px;position:relative}
+.lib-zeile:hover{background:var(--panel2)}
+.lib-bild{width:26px;height:36px;object-fit:cover;border-radius:3px;background:#000;flex:none;cursor:pointer}
+.lib-bild.leer{background:var(--panel2)}
+.lib-nm{flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.lib-mana{flex:none;white-space:nowrap}
+.lib-mana .ms{margin:0 .5px}
+.lib-set{flex:none;font-size:11px;color:var(--dim);white-space:nowrap}
+.lib-n{flex:none;min-width:18px;text-align:right;font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+/* Anders als bei den Kartenbildern stehen die Zielknöpfe hier fest in der
+   Zeile: ein Treffer soll mit einem Klick auf die Hand wandern, ohne dass man
+   ihn erst „aufnehmen" muss. */
+.lib-akt{flex:none;display:flex;gap:3px}
+.lib-akt .btn{padding:2px 6px;font-size:14px;line-height:1.3}
+.lib-alle{margin-top:8px}
+
+/* ---- Spielerkacheln: flach statt gestapelt ----
+   Avatar, Name/Deck und Lebenspunkte nebeneinander; gestapelt füllten vier
+   Mitspieler den halben Schirm, bevor die eigenen Karten anfingen. */
+/* Zwei Zeilen statt fünf: links Avatar und Name/Deck, rechts die Lebenszahl
+   über ihren Knöpfen. Nebeneinander blieben für den Namen keine 50 px übrig —
+   die Knopfreihe allein ist rund 100 px breit. */
+.sp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:8px;margin-top:10px}
+.sp-card{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;
+  gap:2px 10px;padding:7px 10px;text-align:left;
+  border:1px solid var(--line);border-radius:10px;background:var(--panel2)}
+.sp-card>:first-child{grid-row:1/3}                 /* Avatar über beide Zeilen */
+.sp-mitte{grid-column:2;grid-row:1/3;min-width:0}
+.sp-name{font-size:13px;font-weight:600;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp-life{grid-column:3;grid-row:1;justify-self:end;font-size:24px;font-weight:800;line-height:1.1;
+  font-variant-numeric:tabular-nums}
+.sp-ctrl{grid-column:3;grid-row:2;display:flex;gap:3px}
+.sp-ctrl .btn{padding:3px 5px;font-size:11px}
+.sp-wait{grid-column:3;grid-row:1/3;justify-self:end;font-size:12px;color:var(--dim)}
+.sp-deck{display:flex;align-items:center;gap:5px;max-width:100%;margin-top:1px;cursor:help}
+.sp-cmd{width:20px;height:28px;object-fit:cover;border-radius:3px;border:1px solid var(--line);
+  box-shadow:0 2px 6px rgba(0,0,0,.45);transition:transform .12s;flex:none}
+.sp-deck:hover .sp-cmd{transform:scale(1.15)}
+/* Besiegt: das „☠ besiegt" tritt an die Stelle der Deckzeile, statt die
+   Kachel als dritte Zeile höher zu machen als die der Mitspieler. */
+.sp-card.besiegt .sp-deck{display:none}
+@media (max-width:560px){ .sp-grid{grid-template-columns:1fr} }
+
+/* ---- Würfel und Einladeliste: einklappbares Zubehör ---- */
+.sess-klapp>summary{display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;
+  font-size:15px;font-weight:600;color:var(--txt)}
+.sess-klapp>summary::-webkit-details-marker{display:none}
+.sess-klapp>summary::before{content:"\25B8";color:var(--dim);font-size:12px;transition:transform .12s}
+.sess-klapp[open]>summary::before{transform:rotate(90deg)}
+.sess-klapp>summary:hover{color:var(--acc)}
+.klapp-n{min-width:20px;height:18px;padding:0 6px;border-radius:9px;display:inline-flex;align-items:center;
+  justify-content:center;background:var(--line);color:var(--dim);font-size:11px;font-weight:700}
+
+/* Schmale Schirme: kleinere Karten überall (der Fächer rechnet in
+   Kartenbreiten und folgt von selbst) und ein flacherer Fächerwinkel. */
 @media (max-width:640px){
-  .hand-sparte{--hk-b:74px}
-  .trk-tbl th,.trk-tbl td{padding:6px 4px;font-size:13px}
-  .trk-tbl th{font-size:10px;letter-spacing:.2px}
-  .trk-akt .btn{display:block;width:100%;margin:3px 0 0;font-size:11px;padding:3px 6px}
-  .trk-akt .btn:first-child{margin-top:0}
+  .zone[data-zone="hand"]{--hk-b:74px}
+  .zone-name{font-size:11px}
+  .zk,.zk img,.zk-ohnebild{width:62px}
+  .zk img,.zk-ohnebild{height:86px}
+  .lib-set{display:none}
 }
 @media (max-width:430px){
-  .hand-sparte{--hk-b:60px;--hk-f:.7;padding:10px 4px 4px}
-  .hand-fan{padding:30px 2px 20px}
+  .zone[data-zone="hand"]{--hk-b:60px;--hk-f:.7}
+  .hand-fan{padding:24px 2px 16px}
+  .zone-thumbs{display:none}
 }
 /* Würfel-Bühne mit Animation */
 .dice-stage{display:flex;flex-direction:column;align-items:center;gap:8px;min-height:104px;justify-content:center;margin:12px 0 14px;perspective:800px}

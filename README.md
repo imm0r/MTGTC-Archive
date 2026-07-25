@@ -277,43 +277,61 @@ Absender ist das eigene Postfach — dafür gelten dessen Tageslimits (Gmail
 ~500 Mails/Tag), was für eine Spielgruppe reichlich ist. Der `CRON_SECRET`
 gehört wie alle Secrets **nicht** ins Repository.
 
-## Live-Spielrunde: Hand und Deck am Tisch
+## Live-Spielrunde: die eigenen Karten am Tisch
 
 In der Spielrunde wählt jeder sein Deck; darunter steht der **private
 Kartenüberblick** — nur der Spieler selbst sieht ihn, Mitspieler sehen lediglich
 den Decknamen und den Commander.
 
-Die Deckliste ist dieselbe Tabelle wie in der Sammlung: Kartenbild, Name,
-Manakosten, Set, Anzahl, dazu die Spalte **gespielt**. Über ihr liegt die
-**Hand** als aufgefächerte Kartenreihe — jedes Exemplar eine eigene Karte, wie
-man sie am Tisch hält. Zeigen (bzw. antippen) hebt eine Karte an und blendet
-ihre Knöpfe ein.
+Eine Karte liegt immer in genau **einer Zone**, und die Zonen stehen
+untereinander wie am Tisch: das Feld weit vorn, die Hand direkt vor einem, die
+Bibliothek zuunterst.
 
-Jedes Exemplar liegt an genau einem von drei Orten:
+| | Zone | Inhalt |
+| --- | --- | --- |
+| ★ | Kommandozone | der Commander, solange er nicht im Spiel ist (nur bei Commander-Decks) |
+| ⚔️ | Schlachtfeld | alles, was ausgespielt auf dem Tisch liegt |
+| ⚰️ | Friedhof | Gestorbenes, Abgehandeltes, Abgeworfenes |
+| 🚫 | Exil | ins Exil geschickte Karten |
+| ✋ | Hand | aufgefächert, jedes Exemplar eine eigene Karte |
+| 📚 | Bibliothek | was noch im Deck steckt |
 
-```
-Bibliothek  ──ziehen──▶  Hand  ──spielen──▶  gespielt
-     ▲                    │                     │
-     └──── zurück ────────┘                     │
-     └──────────── zurück ────────────────────-─┘
-```
+**Aufgeklappt ist immer genau eine Zone** — die, über der die Maus steht; auf
+dem Handy die zuletzt angetippte. So bleibt die Ansicht kurz, statt sechs Listen
+untereinander zu stapeln. Die zugeklappten Kopfzeilen zeigen Anzahl und ein paar
+Miniaturen, damit man auch ohne Aufklappen sieht, was drinliegt.
 
-Ziehst du im Spiel eine Karte, tippst du in der Deckliste auf **ziehen** — sie
-wandert aus dem Deck auf die Hand. In der Spalte *Anzahl* steht dann, wie viele
-Exemplare noch in der Bibliothek liegen (`6/8`), daneben eine Pille mit dem, was
-davon auf der Hand ist. Karten, die direkt aus der Bibliothek ins Spiel kommen,
-gehen über **gespielt** dorthin. Jeder Schritt lässt sich zurücknehmen.
+**Karten verschieben.** Zeigen (bzw. antippen) hebt eine Karte an und blendet
+ihre Zielknöpfe ein — je erlaubter Zone einer, mit dem Zeichen aus der Tabelle
+oben. Ziehst du im Spiel eine Karte, suchst du sie unten in der Bibliothek und
+schickst sie mit ✋ auf die Hand; von dort geht sie mit ⚔️ ins Spiel, später mit
+⚰️ in den Friedhof. Jeder Weg lässt sich auch rückwärts gehen.
 
-Gespeichert werden nur die beiden „unterwegs"-Zahlen (`session_played.hand` und
-`.qty`); die Bibliothek ist der Rest aus der Deckmenge und wird bei jeder
-Anzeige neu gerechnet — so kann kein Exemplar doppelt existieren. Der Stand
-überlebt einen Neuladen der Seite, „Neues Spiel" des Gastgebers räumt ihn bei
+**Bibliothek: suchen statt scrollen.** Am Tisch ziehst du physisch und musst der
+App nur sagen, *welche* Karte es war — dafür steht dort ein Suchfeld statt einer
+Dauerliste. Die ganze Bibliothek ist einen Klick entfernt, wenn du sehen willst,
+was noch drin ist. Jede Zeile zeigt dieselben Angaben wie die Sammlung: Bild,
+Name, Manakosten, Set, Anzahl.
+
+**Commander-Steuer.** Wanderst du deinen Commander aus der Kommandozone aufs
+Feld, zählt die App das Wirken mit und zeigt am Kartenbild, was das nächste Mal
+extra kostet (`+2`, `+4`, …). Verzählt? Das Abzeichen selbst nimmt ein Wirken
+zurück.
+
+**Gespeichert** werden nur vier Zahlen je Karte (`session_played.hand`, `.field`,
+`.graveyard`, `.exile`). Bibliothek und Kommandozone sind der **Rest** aus der
+Deckmenge und werden bei jeder Anzeige neu gerechnet — so kann kein Exemplar
+doppelt existieren. `cast_count` zählt daneben die Commander-Steuer. Der Stand
+überlebt einen Neuladen der Seite; „Neues Spiel" des Gastgebers räumt ihn bei
 allen ab.
 
-> Kommt die Hand nach einem Update leer zurück und meldet die App „Spalte
-> fehlt", fehlt der Datenbank die Spalte `hand` — `supabase-schema.sql` erneut
-> im SQL Editor ausführen (oder
-> `supabase/migrations/20260725120000_session_hand.sql` einzeln).
+Würfel und Einladeliste sind Zubehör und stehen eingeklappt am Ende — beim Wurf
+(auch dem eines Mitspielers) fährt der Würfelkasten von selbst auf.
+
+> Meldet die App „Spalte fehlt", ist die Datenbank älter als die App —
+> `supabase-schema.sql` erneut im SQL Editor ausführen (oder
+> `supabase/migrations/20260725140000_session_zones.sql` einzeln). Bis dahin
+> läuft die Partie im Browser weiter, wird aber nicht gespeichert.
 
 ## Preisverlauf: ~90 Tage aus MTGJSON
 

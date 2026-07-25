@@ -7360,9 +7360,12 @@ let SESSION_PLAYERS = [];      // [{user_id, life, status, seat, profile}]
 let SESSION_INVITES = [];      // offene Einladungen an mich [{...session, hostProfile}]
 let SESSION_LOG = [];          // jüngste Events (Würfe) für die Anzeige
 let sessionChannel = null, inviteChannel = null;
-let SESSION_PLAYED = {};        // card_id → gespielt-Anzahl (privat, nur mein Deck)
-let SESSION_HAND = {};          // card_id → Exemplare auf der Hand (privat, nur mein Deck)
-let HAND_SPALTE = true;         // false, sobald die DB die Spalte „hand" nicht kennt
+// card_id → {hand, field, grave, exile, cast} (privat, nur mein Deck). Was in
+// keiner dieser Zonen liegt, ist der Rest: Bibliothek bzw. Kommandozone.
+let SESSION_ZONEN = {};
+let ZONEN_SPALTEN = true;       // false, sobald die DB die Zonen-Spalten nicht kennt
+let wuerfelOffen = false;       // Würfelkasten auf-/zugeklappt (überlebt Neuzeichnen)
+let einladenOffen = false;      // Einladeliste auf-/zugeklappt
 const lifeTimers = {}, playedTimers = {};   // entprellt das Schreiben je Spieler/Karte
 const meinSpieler = () => SESSION_PLAYERS.find(p => p.user_id === USER?.id);
 
@@ -7411,25 +7414,30 @@ async function ladeSpieler() {
   }));
 }
 
-/* Eigener Karten-Tracker der Partie laden (privat: nur die eigenen Zeilen).
-   Eine Zeile hält beide Orte außerhalb der Bibliothek: qty = gespielt, hand =
-   auf der Hand. Kennt die Datenbank „hand" noch nicht (Schema älter als die
-   App), lädt der Tracker wenigstens die gespielten Karten statt gar nichts —
-   die Hand bleibt dann bis zum Ausführen der Migration nur lokal. */
-const fehltHandSpalte = e => e?.code === "42703" || /\bhand\b/.test(e?.message || "");
+/* Eigenen Zonenstand der Partie laden (privat: nur die eigenen Zeilen). Eine
+   Zeile hält alle Zonen einer Karte. Kennt die Datenbank die Zonen-Spalten noch
+   nicht (Schema älter als die App), läuft die Partie im Browser trotzdem — die
+   alte Spalte qty zählte „gespielt" und wird als Schlachtfeld gelesen, damit
+   eine laufende Runde nichts verliert. */
+const fehltZonenSpalte = e => e?.code === "42703" || /\b(field|graveyard|exile|cast_count)\b/.test(e?.message || "");
 async function ladePlayed() {
-  SESSION_PLAYED = {}; SESSION_HAND = {};
+  SESSION_ZONEN = {};
   if (!SESSION || !USER) return;
-  let { data, error } = await sb.from("session_played").select("card_id,qty,hand")
+  let { data, error } = await sb.from("session_played")
+    .select("card_id,qty,hand,field,graveyard,exile,cast_count")
     .eq("session_id", SESSION.id).eq("user_id", USER.id);
-  if (error && fehltHandSpalte(error)) {
-    HAND_SPALTE = false;
-    ({ data } = await sb.from("session_played").select("card_id,qty")
+  if (error && fehltZonenSpalte(error)) {
+    ZONEN_SPALTEN = false;
+    ({ data } = await sb.from("session_played").select("card_id,qty,hand")
       .eq("session_id", SESSION.id).eq("user_id", USER.id));
   }
   (data || []).forEach(r => {
-    if (r.qty > 0) SESSION_PLAYED[r.card_id] = r.qty;
-    if (r.hand > 0) SESSION_HAND[r.card_id] = r.hand;
+    const st = {
+      hand:  r.hand || 0,
+      field: r.field != null ? r.field : (r.qty || 0),   // Altbestand: „gespielt" lag auf dem Feld
+      grave: r.graveyard || 0, exile: r.exile || 0, cast: r.cast_count || 0,
+    };
+    if (st.hand || st.field || st.grave || st.exile || st.cast) SESSION_ZONEN[r.card_id] = st;
   });
 }
 
@@ -7845,14 +7853,18 @@ function sessionBoardHtml() {
     const besiegt = joined && p.life <= 0;   // bei 0 Leben ausgeschieden
     const name = p.profile?.display_name
       || (p.user_id === USER.id ? (PROFILE?.display_name || t("sess.you")) : t("friends.unknown"));
+    // Flache Kachel: Avatar, Name/Deck und Lebenspunkte stehen NEBENeinander.
+    // Gestapelt füllten vier Mitspieler den halben Schirm, bevor die eigenen
+    // Karten überhaupt anfingen.
     return `<div class="sp-card${joined ? "" : " wartet"}${besiegt ? " besiegt" : ""}">
-      ${avatarHtml(48, p.profile)}
-      <div class="sp-name">${esc(name)}${p.user_id === SESSION.host ? ` <span class="sp-host" title="${esc(t("sess.host"))}">&#9733;</span>` : ""}</div>
-      ${p.deck_name ? `<div class="sp-deck"${p.commander_img ? ` data-cmd-img="${esc(p.commander_img)}" data-cmd-name="${esc(p.commander || p.deck_name)}"` : ""} title="${esc(p.commander || p.deck_name)}">${p.commander_img ? `<img class="sp-cmd" src="${esc(p.commander_img)}" alt="">` : ""}<span class="sp-deckname">${esc(p.deck_name)}</span></div>` : ""}
+      ${avatarHtml(38, p.profile)}
+      <div class="sp-mitte">
+        <div class="sp-name">${esc(name)}${p.user_id === SESSION.host ? ` <span class="sp-host" title="${esc(t("sess.host"))}">&#9733;</span>` : ""}</div>
+        ${p.deck_name ? `<div class="sp-deck"${p.commander_img ? ` data-cmd-img="${esc(p.commander_img)}" data-cmd-name="${esc(p.commander || p.deck_name)}"` : ""} title="${esc(p.commander || p.deck_name)}">${p.commander_img ? `<img class="sp-cmd" src="${esc(p.commander_img)}" alt="">` : ""}<span class="sp-deckname">${esc(p.deck_name)}</span></div>` : ""}
+        <div class="sp-besiegt">&#9760; ${esc(t("sess.defeated"))}</div>
+      </div>
       ${joined
         ? `<div class="sp-life" data-u="${esc(p.user_id)}">${Math.max(0, p.life)}</div>
-           <div class="sp-besiegt">&#9760; ${esc(t("sess.defeated"))}</div>`
-        + `
            <div class="sp-ctrl">
              <button class="btn ghost sm" data-life="${esc(p.user_id)}" data-d="-5">&minus;5</button>
              <button class="btn ghost sm" data-life="${esc(p.user_id)}" data-d="-1">&minus;1</button>
@@ -7894,21 +7906,27 @@ function sessionBoardHtml() {
 
     ${deckTrackerHtml()}
 
-    <div class="card">
-      <h3 style="margin-top:0">${esc(t("sess.dice"))}</h3>
-      <div class="row" style="align-items:center">
+    <!-- Würfel und Einladeliste sind Zubehör: die Bühne braucht man beim Wurf,
+         die Freundeliste einmal zu Beginn. Zugeklappt bleibt von beiden nur
+         eine Zeile, statt dauerhaft ein paar hundert Pixel zu belegen. Beim
+         Wurf (auch dem eines Mitspielers) klappt der Kasten von selbst auf. -->
+    <details class="card sess-klapp" id="dice-box"${wuerfelOffen ? " open" : ""}>
+      <summary><span>${esc(t("sess.dice"))}</span>${
+        SESSION_LOG.length ? `<span class="klapp-n">${SESSION_LOG.length}</span>` : ""}</summary>
+      <div class="row" style="align-items:center;margin-top:10px">
         <div style="flex:none"><input type="number" id="dice-sides" min="2" max="1000" value="20" style="width:90px"></div>
         <div style="flex:none">${[4, 6, 8, 10, 12, 20].map(s => `<button class="btn ghost sm" data-dice="${s}">W${s}</button>`).join(" ")}</div>
         <div style="flex:none"><button class="btn" id="dice-roll">${esc(t("sess.roll"))}</button></div>
       </div>
       <div class="dice-stage" id="dice-stage">${diceStageHtml()}</div>
       <div class="sess-log" id="sess-log">${SESSION_LOG.slice(0, 30).map(logZeile).join("")}</div>
-    </div>
+    </details>
 
-    ${(FRIENDS?.accepted?.length) ? `<div class="card">
-      <h3 style="margin-top:0">${esc(t("sess.inviteTitle"))}</h3>
-      ${inviteList || `<div class="empty">${esc(t("sess.allInvited"))}</div>`}
-    </div>` : ""}`;
+    ${(FRIENDS?.accepted?.length) ? `<details class="card sess-klapp" id="invite-box"${einladenOffen ? " open" : ""}>
+      <summary><span>${esc(t("sess.inviteTitle"))}</span>${
+        einladbar.length ? `<span class="klapp-n">${einladbar.length}</span>` : ""}</summary>
+      <div style="margin-top:8px">${inviteList || `<div class="empty">${esc(t("sess.allInvited"))}</div>`}</div>
+    </details>` : ""}`;
 }
 
 function logZeile(ev) {
@@ -7919,65 +7937,243 @@ function logZeile(ev) {
   return "";
 }
 
-/* Privater Karten-Tracker: das eigene Deck in der laufenden Partie, aufgebaut
-   wie die Sammlung — Bild, Name, Mana, Set, Anzahl, gespielt. Jedes Exemplar
-   liegt an genau EINEM von drei Orten:
+/* ==================== Zonen der eigenen Partie ======================
+   Der private Kartenüberblick einer Partie. Nur der Spieler selbst sieht ihn;
+   Mitspieler sehen weiterhin bloß Deckname und Commander.
 
-       Bibliothek  ──ziehen──▶  Hand  ──spielen──▶  gespielt
+   Eine Karte liegt immer in genau EINER Zone, und die Zonen stehen
+   untereinander wie am Tisch: das Feld weit vorn, die Hand direkt vor einem,
+   die Bibliothek zuunterst.
 
-   Die Bibliothek wird nicht gespeichert, sie ist der Rest (Deckmenge minus Hand
-   minus gespielt) — so kann keine Karte doppelt existieren. Jeder Schritt lässt
-   sich zurücknehmen. Über der Deckliste steht die Hand als aufgefächerte
-   Kartenreihe, damit man sie sieht wie in der echten Hand. Alles davon ist
-   privat: nur der Spieler selbst sieht seine Karten. */
+       ★  Kommandozone     (nur bei Commander-Decks)
+       ⚔  Schlachtfeld
+       ⚰  Friedhof
+       ✖  Exil
+       ✋  Hand
+       ☰  Bibliothek
+
+   Aufgeklappt ist immer genau eine Zone — die, über der die Maus steht (auf
+   Touch: die zuletzt angetippte). Dadurch bleibt die Ansicht kurz, statt sechs
+   Listen untereinander zu stapeln. Die zugeklappten Kopfzeilen zeigen Anzahl
+   und ein paar Miniaturen, damit man auch ohne Aufklappen sieht, was drinliegt.
+
+   Gespeichert werden nur vier Zahlen je Karte (hand/field/graveyard/exile).
+   Bibliothek und Kommandozone sind der REST aus der Deckmenge: eine normale
+   Karte, die nirgends sonst liegt, ist in der Bibliothek; der Commander eines
+   Decks in der Kommandozone. So kann kein Exemplar doppelt existieren und keine
+   Zeile der Deckmenge widersprechen. cast_count zählt daneben, wie oft der
+   Commander schon aus der Kommandozone gewirkt wurde — daraus ergibt sich die
+   Commander-Steuer (je Mal zwei Mana mehr). */
+
+/* Reihenfolge = Anzeige von oben nach unten. „gespeichert: false" heißt: diese
+   Zone ist der Rest und steht in keiner Spalte. */
+/* Die Zeichen tragen auf den Zielknöpfen die ganze Bedeutung — dort steht kein
+   Text daneben, nur der Tooltip. Deshalb bewusst die farbigen Emoji-Formen:
+   die schmalen Textvarianten (⚔ ⚰ als Strichzeichnung) sind bei 15 px kaum
+   auseinanderzuhalten. Der Stern bleibt einfarbig — er steht in dieser App
+   überall für den Commander. */
+const ZONEN = [
+  { key: "cmd",   icon: "&#9733;",            gespeichert: false, nurCommander: true },
+  { key: "field", icon: "&#9876;&#xFE0F;",    gespeichert: true },
+  { key: "grave", icon: "&#9904;&#xFE0F;",    gespeichert: true },
+  { key: "exile", icon: "&#128683;",          gespeichert: true },
+  { key: "hand",  icon: "&#9995;",            gespeichert: true },
+  { key: "lib",   icon: "&#128218;",          gespeichert: false },
+];
+const zoneDef = k => ZONEN.find(z => z.key === k);
+
+let ZONE_OFFEN = "hand";        // welche Zone gerade aufgeklappt ist
+let zoneHoverT = null;          // entprellt das Aufklappen per Maus
+let zoneSperre = 0;             // bis wann Hover ignoriert wird (Layout beruhigen)
+let libAlle = false;            // „ganze Bibliothek anzeigen" ein/aus
+
+// Lesbarer Kartenname: sonst wie in der App der gedruckte Name, aber für
+// Phyrexianisch (unlesbare Glyphen) der englische Name.
+const trkName = c => ((c.lang === "ph" ? c.name : (c.disp || c.name)) || c.name || "");
+
+const trkDeck  = () => (DECKS || []).find(d => d.id === meinSpieler()?.deck_id);
+const trkTotal = id => trkDeck()?.entries?.find(e => e.cardId === id)?.qty || 0;
+const zStand   = id => SESSION_ZONEN[id] || {};
+const zVon     = (id, k) => zStand(id)[k] || 0;
+/* Rest = Deckmenge minus alles, was in einer gespeicherten Zone liegt. */
+const zRest    = id => Math.max(0, trkTotal(id) - zVon(id, "hand") - zVon(id, "field")
+                                 - zVon(id, "grave") - zVon(id, "exile"));
+/* Commander (erster und Partner): ihr Rest liegt in der Kommandozone, nicht in
+   der Bibliothek — dort starten sie und dorthin kehren sie zurück. */
+const istCmdKarte = id => { const d = trkDeck(); return !!d && (d.main_card_id === id || d.second_card_id === id); };
+const hatCmdZone  = () => { const d = trkDeck(); return !!(d && (d.main_card_id || d.second_card_id)); };
+
+function zAnzahl(id, zone) {
+  if (zone === "lib") return istCmdKarte(id) ? 0 : zRest(id);
+  if (zone === "cmd") return istCmdKarte(id) ? zRest(id) : 0;
+  return zVon(id, zone);
+}
+
+/* Die sichtbaren Zonen: die Kommandozone nur, wenn das Deck einen Commander hat. */
+const sichtbareZonen = () => ZONEN.filter(z => !z.nurCommander || hatCmdZone());
+
+/* Wohin eine Karte aus ihrer Zone wandern darf: alle anderen Zonen, aber die
+   Bibliothek nur für normale Karten und die Kommandozone nur für Commander. */
+const zieleFuer = (id, von) => sichtbareZonen().map(z => z.key).filter(k =>
+  k !== von && (k === "cmd" ? istCmdKarte(id) : k === "lib" ? !istCmdKarte(id) : true));
+
+/* Karten einer Zone, je Karte einmal mit ihrer Anzahl. Alphabetisch, damit die
+   Reihenfolge beim Hin- und Herschieben nicht springt. */
+function zoneKarten(zone) {
+  const deck = trkDeck();
+  if (!deck) return [];
+  return (deck.entries || [])
+    .map(e => ({ card: CARDS.find(c => c.id === e.cardId), n: zAnzahl(e.cardId, zone) }))
+    .filter(x => x.card && x.n > 0)
+    .sort((a, b) => trkName(a.card).localeCompare(trkName(b.card)));
+}
+const zoneSumme = zone => zoneKarten(zone).reduce((s, x) => s + x.n, 0);
+
+/* ---- Verschieben ---------------------------------------------------- */
+/* Ein Exemplar von einer Zone in die andere. Die Bibliothek und die
+   Kommandozone speichern nichts — sie wachsen und schrumpfen als Rest von
+   selbst, wenn die Gegenseite sich ändert. */
+function zoneMove(cardId, von, nach) {
+  if (von === nach || zAnzahl(cardId, von) < 1) return;
+  const st = { hand: 0, field: 0, grave: 0, exile: 0, cast: 0, ...(SESSION_ZONEN[cardId] || {}) };
+  if (zoneDef(von)?.gespeichert)  st[von]  -= 1;
+  if (zoneDef(nach)?.gespeichert) st[nach] += 1;
+  // Jedes Wirken aus der Kommandozone erhöht die Commander-Steuer um zwei Mana.
+  if (von === "cmd" && nach === "field") st.cast += 1;
+  if (st.hand || st.field || st.grave || st.exile || st.cast) SESSION_ZONEN[cardId] = st;
+  else delete SESSION_ZONEN[cardId];
+  renderZonen();
+  zoneSchreiben(cardId);
+}
+
+/* Commander-Steuer von Hand nachstellen (verzählt, Regeländerung am Tisch). */
+function cmdSteuer(cardId, delta) {
+  const st = { hand: 0, field: 0, grave: 0, exile: 0, cast: 0, ...(SESSION_ZONEN[cardId] || {}) };
+  st.cast = Math.max(0, st.cast + delta);
+  if (st.hand || st.field || st.grave || st.exile || st.cast) SESSION_ZONEN[cardId] = st;
+  else delete SESSION_ZONEN[cardId];
+  renderZonen();
+  zoneSchreiben(cardId);
+}
+
+/* Eine Zeile hält alle Zonen einer Karte; ist überall 0, verschwindet sie. */
+function zoneSchreiben(cardId) {
+  clearTimeout(playedTimers[cardId]);
+  playedTimers[cardId] = setTimeout(async () => {
+    delete playedTimers[cardId];
+    const st = zStand(cardId);
+    const leer = !(st.hand || st.field || st.grave || st.exile || st.cast);
+    const zeile = { session_id: SESSION.id, user_id: USER.id, card_id: cardId, qty: 0 };
+    if (ZONEN_SPALTEN) Object.assign(zeile, {
+      hand: st.hand || 0, field: st.field || 0, graveyard: st.grave || 0,
+      exile: st.exile || 0, cast_count: st.cast || 0,
+    });
+    try {
+      const { error } = leer
+        ? await sb.from("session_played").delete()
+            .eq("session_id", SESSION.id).eq("user_id", USER.id).eq("card_id", cardId)
+        : await sb.from("session_played").upsert(zeile, { onConflict: "session_id,user_id,card_id" });
+      if (error) throw error;
+    } catch (e) {
+      // Fehlen die Spalten, ist das Schema älter als die App: die Partie läuft
+      // im Browser weiter, gespeichert wird sie erst nach der Migration.
+      if (ZONEN_SPALTEN && fehltZonenSpalte(e)) { ZONEN_SPALTEN = false; toast(t("toast.columnMissing")); return; }
+      toast(dbErr(e));
+    }
+  }, 350);
+}
+
+async function trackerReset() {
+  SESSION_ZONEN = {};
+  // Noch offene Einzelschreiber verwerfen, sonst tragen sie ihre Karte wieder ein.
+  Object.keys(playedTimers).forEach(k => { clearTimeout(playedTimers[k]); delete playedTimers[k]; });
+  renderZonen();
+  try { await sb.from("session_played").delete().eq("session_id", SESSION.id).eq("user_id", USER.id); }
+  catch (e) { toast(dbErr(e)); }
+}
+
+/* ---- Aufbau --------------------------------------------------------- */
 function deckTrackerHtml() {
-  const deckId = meinSpieler()?.deck_id;
-  const deck = deckId && (DECKS || []).find(d => d.id === deckId);
+  const deck = trkDeck();
   if (!deck) return "";
+  if (!sichtbareZonen().some(z => z.key === ZONE_OFFEN)) ZONE_OFFEN = "hand";
   return `<div class="card" id="trk-card">
     <div class="row" style="align-items:center;justify-content:space-between">
       <h3 style="margin:0">${esc(t("sess.trackerTitle", { deck: deck.name }))}</h3>
       <div style="flex:none"><button class="btn ghost sm" id="trk-reset">${esc(t("sess.trackerReset"))}</button></div>
     </div>
-    <div class="hand-sparte" id="trk-hand">${handInnerHtml()}</div>
-    <div class="row" style="margin-top:8px"><div style="flex:1"><input type="text" id="trk-search"
-      placeholder="${esc(t("sess.trackerSearch"))}"></div></div>
-    <div id="trk-panel">${trackerInnerHtml("")}</div>
+    <div class="zonen" id="zonen">${zonenInnerHtml()}</div>
   </div>`;
 }
 
-// Lesbarer Kartenname für den Tracker: sonst wie in der App der gedruckte Name,
-// aber für Phyrexianisch (unlesbare Glyphen) der englische Name.
-const trkName = c => ((c.lang === "ph" ? c.name : (c.disp || c.name)) || c.name || "");
+function zonenInnerHtml() {
+  return sichtbareZonen().map(z => `
+    <section class="zone${z.key === ZONE_OFFEN ? " offen" : ""}" data-zone="${z.key}">
+      ${zoneKopfHtml(z)}
+      <div class="zone-korb">${zoneKorbHtml(z.key)}</div>
+    </section>`).join("");
+}
 
-/* Die drei Orte einer Deckkarte. trkRest ist berechnet, nicht gespeichert. */
-const trkDeck   = () => (DECKS || []).find(d => d.id === meinSpieler()?.deck_id);
-const trkTotal  = id => trkDeck()?.entries?.find(e => e.cardId === id)?.qty || 0;
-const trkHand   = id => SESSION_HAND[id] || 0;
-const trkPlayed = id => SESSION_PLAYED[id] || 0;
-const trkRest   = id => Math.max(0, trkTotal(id) - trkHand(id) - trkPlayed(id));
+/* Kopfzeile: immer sichtbar, auch zugeklappt. Die Miniaturen verraten auf einen
+   Blick, was in der Zone liegt — bei der Bibliothek wären 90 Bilder sinnlos,
+   dort steht nur die Zahl. */
+function zoneKopfHtml(z) {
+  const n = zoneSumme(z.key);
+  const thumbs = z.key === "lib" ? "" : zoneKarten(z.key).flatMap(x =>
+    Array.from({ length: Math.min(x.n, 3) }, () => x.card)).slice(0, 8)
+    .map(c => c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy">` : "").join("");
+  return `<div class="zone-kopf" tabindex="0" role="button" aria-expanded="${z.key === ZONE_OFFEN}">
+    <span class="zone-icon">${z.icon}</span>
+    <span class="zone-name">${esc(t("zone." + z.key))}</span>
+    <span class="zone-n${n ? "" : " null"}">${n}</span>
+    <span class="zone-thumbs">${thumbs}</span>
+  </div>`;
+}
 
-/* ---- Hand: aufgefächerte Karten über der Deckliste --------------------
-   Je Exemplar eine Karte. Der Fächer entsteht aus zwei Größen, die mit der
+function zoneKorbHtml(zone) {
+  if (zone === "hand") return zoneHandHtml();
+  if (zone === "lib")  return zoneLibHtml();
+  const karten = zoneKarten(zone);
+  if (!karten.length) return `<div class="zone-leer">${esc(t("zone.empty"))}</div>`;
+  return `<div class="zone-gitter">${karten.map(x => zoneKarteHtml(x.card, zone, x.n)).join("")}</div>`;
+}
+
+/* Eine Karte in Feld/Friedhof/Exil/Kommandozone: ein Bild je KARTE mit Anzahl —
+   anders als die Hand, wo jedes Exemplar einzeln liegt, weil man sie einzeln
+   hält. Drei Wälder auf dem Feld sind ein Bild mit „×3". */
+function zoneKarteHtml(c, zone, n) {
+  const nm = trkName(c);
+  const steuer = zone === "cmd" ? (zStand(c.id).cast || 0) : 0;
+  return `<div class="zk" tabindex="0" data-id="${esc(c.id)}" data-zone="${esc(zone)}"
+       data-hand-img="${esc(c.img || "")}" data-hand-name="${esc(nm)}" title="${esc(nm)}">
+    ${c.img ? `<img src="${esc(c.img)}" alt="${esc(nm)}" loading="lazy">`
+            : `<div class="zk-ohnebild">${esc(nm)}</div>`}
+    ${n > 1 ? `<span class="zk-n">&times;${n}</span>` : ""}
+    ${zone === "cmd" ? `<button class="zk-steuer" data-steuer="${esc(c.id)}" data-d="-1"
+         title="${esc(t("sess.cmdTaxTitle", { mana: steuer * 2, n: steuer }))}">+${steuer * 2}</button>` : ""}
+    <div class="zk-akt">${zoneAktHtml(c.id, zone)}</div>
+  </div>`;
+}
+
+/* Die Zielknöpfe einer Karte: für jede erlaubte Zone einer, mit ihrem Zeichen.
+   Der Name steht im Tooltip — sechs beschriftete Knöpfe passten unter keine
+   Karte, und die Zeichen stehen daneben in jeder Kopfzeile. */
+function zoneAktHtml(id, von) {
+  return zieleFuer(id, von).map(k => `<button class="btn ghost sm" data-move="${esc(id)}"
+    data-von="${esc(von)}" data-nach="${esc(k)}"
+    title="${esc(t("zone.moveTo", { zone: t("zone." + k) }))}">${zoneDef(k).icon}</button>`).join("");
+}
+
+/* ---- Hand: aufgefächert wie in der echten Hand ---------------------- */
+/* Je Exemplar eine Karte. Der Fächer entsteht aus zwei Größen, die mit der
    Kartenzahl schrumpfen: dem Winkel je Karte und dem Versatz zur nächsten.
    Beides ist gedeckelt, damit sieben Karten großzügig liegen und zwanzig
    trotzdem in den Kasten passen. Gerechnet wird hier, zusammengesetzt in CSS
    (--rot dreht, --dy senkt die Ränder ab) — so behält der Hover-Zustand den
-   Grundwinkel und hebt die Karte nur an. Mehrere Exemplare derselben Karte
-   liegen als mehrere Karten in der Hand, genau wie am Tisch. */
-function handInnerHtml() {
-  const deck = trkDeck();
-  const kopf = n => `<div class="hand-kopf"><span class="hand-titel">${esc(t("sess.handTitle"))}</span>
-    <span class="hand-zahl">${n}</span></div>`;
-  if (!deck) return kopf(0);
-
-  const karten = [];
-  (deck.entries || []).forEach(e => {
-    const c = CARDS.find(x => x.id === e.cardId);
-    for (let i = 0; c && i < trkHand(e.cardId); i++) karten.push(c);
-  });
-  if (!karten.length) return kopf(0) + `<div class="hand-leer">${esc(t("sess.handEmpty"))}</div>`;
-  karten.sort((a, b) => trkName(a).localeCompare(trkName(b)));
+   Grundwinkel und hebt die Karte nur an. */
+function zoneHandHtml() {
+  const karten = zoneKarten("hand").flatMap(x => Array.from({ length: x.n }, () => x.card));
+  if (!karten.length) return `<div class="zone-leer">${esc(t("zone.emptyHand"))}</div>`;
 
   const n = karten.length;
   const spanne = n > 1 ? Math.min(44, n * 7) : 0;          // Gesamtwinkel des Fächers
@@ -7994,89 +8190,104 @@ function handInnerHtml() {
     const nm = trkName(c);
     return `<div class="hand-karte" tabindex="0" style="--rot:${rot}deg;--dy:${dy}px;--z:${i + 1};${
       i ? `margin-left:calc(var(--hk-b) * ${(anteil - 1).toFixed(3)})` : ""}"
-         data-hand-id="${esc(c.id)}" data-hand-img="${esc(c.img || "")}" data-hand-name="${esc(nm)}" title="${esc(nm)}">
+         data-hand-img="${esc(c.img || "")}" data-hand-name="${esc(nm)}" title="${esc(nm)}">
       ${c.img ? `<img src="${esc(c.img)}" alt="${esc(nm)}" loading="lazy">`
               : `<div class="hand-ohnebild">${esc(nm)}</div>`}
-      <div class="hand-akt">
-        <button class="btn ghost sm" data-hand-play="${esc(c.id)}" title="${esc(t("sess.handPlayTitle"))}">${esc(t("sess.handPlay"))}</button>
-        <button class="btn ghost sm" data-hand-back="${esc(c.id)}" title="${esc(t("sess.handBackTitle"))}">&#8617;</button>
-      </div>
+      <div class="hand-akt">${zoneAktHtml(c.id, "hand")}</div>
     </div>`;
   }).join("");
-  return kopf(n) + `<div class="hand-fan">${fan}</div>`;
+  return `<div class="hand-fan">${fan}</div>`;
 }
 
-/* ---- Deckliste: dieselben Spalten wie in der Sammlung ---------------- */
-function trackerHeadHtml() {
-  return `<tr>
-    <th class="hide-s"></th>
-    <th>${esc(t("th.card"))}</th>
-    <th class="num">${esc(t("th.mana"))}</th>
-    <th class="hide-s">${esc(t("th.set"))}</th>
-    <th class="num">${esc(t("th.qty"))}</th>
-    <th class="num">${esc(t("sess.thPlayed"))}</th>
-    <th></th>
-  </tr>`;
+/* ---- Bibliothek: suchen statt scrollen ------------------------------
+   Am Tisch ziehst du physisch und musst der App nur sagen, WELCHE Karte es
+   war — dafür ist ein Suchfeld der kürzeste Weg. Die ganze Liste steht
+   trotzdem einen Klick entfernt, wenn man sehen will, was noch drin ist. */
+function zoneLibHtml() {
+  const rest = zoneKarten("lib");
+  const gesamt = rest.reduce((s, x) => s + x.n, 0);
+  const f = (libFilter() || "").trim().toLowerCase();
+  const treffer = f ? rest.filter(x => trkName(x.card).toLowerCase().includes(f))
+                    : (libAlle ? rest : []);
+  const liste = treffer.length
+    ? treffer.map(x => libZeileHtml(x.card, x.n)).join("")
+    : `<div class="zone-leer">${esc(f ? t("lib.noHits") : t("lib.hint"))}</div>`;
+  return `<div class="lib-suchzeile">
+      <input type="text" id="lib-suche" value="${esc(libFilter())}" placeholder="${esc(t("sess.trackerSearch"))}">
+    </div>
+    <div class="lib-liste">${liste}</div>
+    ${f ? "" : `<button class="btn ghost sm lib-alle" id="lib-alle">${
+      esc(libAlle ? t("lib.hideAll") : t("lib.showAll", { n: gesamt }))}</button>`}`;
 }
+const libFilter = () => $("#lib-suche")?.value || "";
 
-function trackerRowHtml(c) {
-  const id = c.id, total = trkTotal(id), rest = trkRest(id), hand = trkHand(id), played = trkPlayed(id);
+/* Eine Bibliothekszeile: dieselben Angaben wie in der Sammlung (Bild, Name,
+   Mana, Set, Anzahl), aber als schmale Zeile statt als Tabelle — eine
+   Kopfzeile und Tabellenpolster brauchte hier niemand. */
+function libZeileHtml(c, n) {
   const nm = trkName(c);
-  return `<tr data-id="${esc(id)}"${rest <= 0 ? ' class="leer"' : ""}>
-    <td class="hide-s">${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy" data-view
-           style="cursor:pointer" title="${esc(t("row.viewTitle"))}">` : ""}</td>
-    <td><div data-view style="cursor:pointer" title="${esc(t("row.viewTitle"))}">${esc(nm)}</div>
-        <div style="font-size:12px;color:var(--dim)">${c.foil ? '<span class="pill foil">Foil</span> ' : ""}#${esc(c.cn)}</div></td>
-    <td class="num mana-spalte" title="${c.mana_cost == null ? esc(t("row.manaNone"))
-      : esc(t("row.manaValue", { n: c.cmc ?? "?" }))}">${manaHtml(c.mana_cost)}</td>
-    <td class="hide-s set-spalte" title="${esc(c.set_name || c.set || "")}">${
-      setSymbol(c.set, c.rarity)}${esc((c.set || "").toUpperCase())}</td>
-    <td class="num trk-anz"><b>${rest}</b><span class="trk-von">/${total}</span>${
-      hand ? `<span class="trk-hand-pille" title="${esc(t("sess.inHand", { n: hand }))}">&#9995;${hand}</span>` : ""}</td>
-    <td class="num trk-gespielt">${played ? `<b>${played}</b>` : "&ndash;"}</td>
-    <td class="num trk-akt">
-      <button class="btn ghost sm" data-trk-draw="${esc(id)}" title="${esc(t("sess.drawTitle"))}"${rest <= 0 ? " disabled" : ""}>${esc(t("sess.draw"))}</button>
-      <button class="btn ghost sm" data-trk-play="${esc(id)}" title="${esc(t("sess.markPlayedTitle"))}"${rest <= 0 ? " disabled" : ""}>${esc(t("sess.markPlayed"))}</button>
-      ${played > 0 ? `<button class="btn ghost sm" data-trk-undo="${esc(id)}" title="${esc(t("sess.undoPlayedTitle"))}">&#8617;</button>` : ""}
-    </td>
-  </tr>`;
+  return `<div class="lib-zeile" data-id="${esc(c.id)}">
+    ${c.img ? `<img class="lib-bild" src="${esc(c.img)}" alt="" loading="lazy" data-view
+           title="${esc(t("row.viewTitle"))}">` : `<span class="lib-bild leer"></span>`}
+    <span class="lib-nm" data-view title="${esc(t("row.viewTitle"))}">${esc(nm)}</span>
+    <span class="lib-mana">${manaHtml(c.mana_cost)}</span>
+    <span class="lib-set" title="${esc(c.set_name || c.set || "")}">${
+      setSymbol(c.set, c.rarity)}${esc((c.set || "").toUpperCase())}</span>
+    <span class="lib-n">${n}</span>
+    <span class="lib-akt">${zoneAktHtml(c.id, "lib")}</span>
+  </div>`;
 }
 
-function trackerInnerHtml(filter) {
-  const deck = trkDeck();
-  if (!deck) return "";
-  const f = (filter || "").trim().toLowerCase();
-  const karten = (deck.entries || []).map(e => CARDS.find(c => c.id === e.cardId)).filter(Boolean);
-  let restN = 0, handN = 0, gespieltN = 0;
-  karten.forEach(c => { restN += trkRest(c.id); handN += trkHand(c.id); gespieltN += trkPlayed(c.id); });
-  // Noch in der Bibliothek zuerst, dann alphabetisch.
-  karten.sort((a, b) => ((trkRest(b.id) > 0) - (trkRest(a.id) > 0)) || trkName(a).localeCompare(trkName(b)));
-  const rows = karten.filter(c => !f || trkName(c).toLowerCase().includes(f)).map(trackerRowHtml).join("");
-  return `<div class="trk-sum">${esc(t("sess.trackerSummary", { rest: restN, hand: handN, played: gespieltN }))}</div>
-    <div class="trk-scroll"><table class="trk-tbl">
-      <thead>${trackerHeadHtml()}</thead>
-      <tbody>${rows || `<tr><td colspan="7"><div class="empty">${esc(t("sess.trackerEmpty"))}</div></td></tr>`}</tbody>
-    </table></div>`;
-}
-
-function renderTracker() {
+/* ---- Zeichnen und Verdrahten ---------------------------------------- */
+function renderZonen() {
   // Die Vorschauen hängen an Elementen, die es gleich nicht mehr gibt.
   hideHover(); versteckeCmdHover();
-  const hand = $("#trk-hand");
-  if (hand) hand.innerHTML = handInnerHtml();
-  const panel = $("#trk-panel");
-  if (panel) panel.innerHTML = trackerInnerHtml($("#trk-search")?.value || "");
-  wireTrackerHover();
+  const el = $("#zonen");
+  if (!el) return;
+  const suchtext = libFilter(), fokus = document.activeElement?.id === "lib-suche";
+  el.innerHTML = zonenInnerHtml();
+  const suche = $("#lib-suche");
+  if (suche) { suche.value = suchtext; if (fokus) { suche.focus(); suche.selectionStart = suche.selectionEnd = suchtext.length; } }
+  wireZonenHover();
 }
 
-/* Vorschau wie in der Sammlung: über Bild und Name der Deckliste die große
-   Detailkarte, über einer Handkarte Bild + Name. Nach jedem Neuzeichnen neu
-   gehängt (die Zeilen entstehen bei jedem Zug neu). */
-function wireTrackerHover() {
+/* Aufklappen: immer genau eine Zone. Nach dem Wechsel verschiebt sich das
+   Layout unter dem Zeiger — deshalb eine kurze Sperre, sonst klappt die Zone
+   weiter, über der der Zeiger dann zufällig landet. */
+function zoneOeffnen(key, sofort) {
+  if (!sofort && Date.now() < zoneSperre) return;
+  if (ZONE_OFFEN === key) return;
+  ZONE_OFFEN = key;
+  zoneSperre = Date.now() + 320;
+  $$("#zonen .zone").forEach(s => {
+    const an = s.dataset.zone === key;
+    s.classList.toggle("offen", an);
+    s.querySelector(".zone-kopf")?.setAttribute("aria-expanded", String(an));
+  });
+}
+
+function wireZonenHover() {
+  $$("#zonen .zone-kopf").forEach(k => {
+    const key = k.closest(".zone").dataset.zone;
+    // Klick/Tipp öffnet sofort — der einzige Weg auf Geräten ohne Maus.
+    k.onclick = () => zoneOeffnen(key, true);
+    k.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); zoneOeffnen(key, true); } };
+    if (!HOVER_OK) return;
+    k.onmouseenter = () => { clearTimeout(zoneHoverT); zoneHoverT = setTimeout(() => zoneOeffnen(key), 140); };
+    k.onmouseleave = () => clearTimeout(zoneHoverT);
+  });
   if (!HOVER_OK) return;
-  $$("#trk-panel tbody tr[data-id]").forEach(tr => {
-    const id = tr.dataset.id;
-    tr.querySelectorAll("[data-view]").forEach(el => {
+  // Kartenvorschau wie überall in der Spielrunde: Bild + Name schwebend.
+  $$("#zonen [data-hand-img]").forEach(el => {
+    if (!el.dataset.handImg) return;
+    el.addEventListener("mousemove", e => zeigeCmdHover(el.dataset.handImg, el.dataset.handName, e.clientX, e.clientY));
+    el.addEventListener("mouseleave", versteckeCmdHover);
+  });
+  // Bibliothekszeilen: dieselbe große Detailkarte wie in der Sammlung.
+  $$("#zonen .lib-zeile").forEach(z => {
+    const id = z.dataset.id;
+    z.querySelectorAll("[data-view]").forEach(el => {
+      el.style.cursor = "pointer";
       el.onclick = () => { hideHover(); showCardDetail(id); };
       el.addEventListener("mouseenter", e => {
         clearTimeout(hoverTimer);
@@ -8085,55 +8296,38 @@ function wireTrackerHover() {
       el.addEventListener("mouseleave", hideHover);
     });
   });
-  $$("#trk-hand .hand-karte[data-hand-img]").forEach(el => {
-    if (!el.dataset.handImg) return;
-    el.addEventListener("mousemove", e => zeigeCmdHover(el.dataset.handImg, el.dataset.handName, e.clientX, e.clientY));
-    el.addEventListener("mouseleave", versteckeCmdHover);
-  });
 }
 
-/* Exemplare zwischen den drei Orten verschieben. Die Bibliothek ist der Rest,
-   sie darf also nie ins Minus laufen — deshalb die eine Prüfung über die Summe.
-   Lokal sofort, Schreiben entprellt. */
-function trackerMove(cardId, dHand, dPlayed) {
-  const hand = trkHand(cardId) + dHand, played = trkPlayed(cardId) + dPlayed;
-  if (hand < 0 || played < 0 || hand + played > trkTotal(cardId)) return;
-  if (hand > 0) SESSION_HAND[cardId] = hand; else delete SESSION_HAND[cardId];
-  if (played > 0) SESSION_PLAYED[cardId] = played; else delete SESSION_PLAYED[cardId];
-  renderTracker();
-  trackerSchreiben(cardId);
+/* Nur die Trefferliste der Bibliothek neu zeichnen: das Suchfeld selbst bleibt
+   stehen und behält Fokus und Cursorposition. */
+function renderLibListe() {
+  const korb = $('#zonen .zone[data-zone="lib"] .zone-korb');
+  if (!korb) return;
+  // Nur Trefferliste und „ganze Bibliothek"-Knopf tauschen — das Suchfeld
+  // selbst bleibt dasselbe Element und damit Fokus und Cursor unberührt.
+  const neu = document.createElement("div");
+  neu.innerHTML = zoneLibHtml();
+  korb.querySelector(".lib-liste")?.replaceWith(neu.querySelector(".lib-liste"));
+  korb.querySelector("#lib-alle")?.remove();
+  const knopf = neu.querySelector("#lib-alle");
+  if (knopf) korb.appendChild(knopf);
+  wireZonenHover();
 }
 
-/* Eine Zeile hält beide Orte; sind Hand und gespielt leer, verschwindet sie. */
-function trackerSchreiben(cardId) {
-  clearTimeout(playedTimers[cardId]);
-  playedTimers[cardId] = setTimeout(async () => {
-    delete playedTimers[cardId];
-    const q = trkPlayed(cardId), h = trkHand(cardId);
-    const zeile = { session_id: SESSION.id, user_id: USER.id, card_id: cardId, qty: q };
-    if (HAND_SPALTE) zeile.hand = h;
-    try {
-      const { error } = (q > 0 || h > 0)
-        ? await sb.from("session_played").upsert(zeile, { onConflict: "session_id,user_id,card_id" })
-        : await sb.from("session_played").delete()
-            .eq("session_id", SESSION.id).eq("user_id", USER.id).eq("card_id", cardId);
-      if (error) throw error;
-    } catch (e) {
-      // Fehlt die Spalte, ist das Schema älter als die App: die Hand bleibt für
-      // diese Sitzung lokal, gespielt wird weiter gespeichert.
-      if (HAND_SPALTE && fehltHandSpalte(e)) { HAND_SPALTE = false; toast(t("toast.columnMissing")); trackerSchreiben(cardId); return; }
-      toast(dbErr(e));
-    }
-  }, 350);
-}
-
-async function trackerReset() {
-  SESSION_PLAYED = {}; SESSION_HAND = {};
-  // Noch offene Einzelschreiber verwerfen, sonst tragen sie ihre Karte wieder ein.
-  Object.keys(playedTimers).forEach(k => { clearTimeout(playedTimers[k]); delete playedTimers[k]; });
-  renderTracker();
-  try { await sb.from("session_played").delete().eq("session_id", SESSION.id).eq("user_id", USER.id); }
-  catch (e) { toast(dbErr(e)); }
+function wireZonen() {
+  const zonen = $("#zonen");
+  if (!zonen) return;
+  // Delegation: die Körbe entstehen bei jedem Zug neu.
+  zonen.onclick = e => {
+    const mv = e.target.closest("[data-move]");
+    if (mv) return zoneMove(mv.dataset.move, mv.dataset.von, mv.dataset.nach);
+    const st = e.target.closest("[data-steuer]");
+    if (st) return cmdSteuer(st.dataset.steuer, parseInt(st.dataset.d, 10));
+    const alle = e.target.closest("#lib-alle");
+    if (alle) { libAlle = !libAlle; return renderZonen(); }
+  };
+  zonen.oninput = e => { if (e.target.id === "lib-suche") renderLibListe(); };
+  wireZonenHover();
 }
 
 /* Deck für die Runde wählen: an session_players (Realtime → Mitspieler sehen es),
@@ -8142,7 +8336,7 @@ async function sessDeckWaehlen(deckId) {
   try {
     await sb.from("session_players").update({ deck_id: deckId || null })
       .eq("session_id", SESSION.id).eq("user_id", USER.id);
-    SESSION_PLAYED = {}; SESSION_HAND = {};
+    SESSION_ZONEN = {};
     await sb.from("session_played").delete().eq("session_id", SESSION.id).eq("user_id", USER.id);
     await ladeSpieler(); renderSession();
   } catch (e) { toast(dbErr(e)); }
@@ -8168,20 +8362,10 @@ function wireSession() {
   }
   const deckSel = $("#sess-deck"); if (deckSel) deckSel.onchange = () => sessDeckWaehlen(deckSel.value);
   const trkReset = $("#trk-reset"); if (trkReset) trkReset.onclick = trackerReset;
-  const trkSearch = $("#trk-search"); if (trkSearch) trkSearch.oninput = renderTracker;
-  // Delegation: Deckliste und Hand entstehen bei jedem Zug neu.
-  const trkPanel = $("#trk-panel");
-  if (trkPanel) trkPanel.onclick = e => {
-    const draw = e.target.closest("[data-trk-draw]"); if (draw) return trackerMove(draw.dataset.trkDraw, 1, 0);
-    const play = e.target.closest("[data-trk-play]"); if (play) return trackerMove(play.dataset.trkPlay, 0, 1);
-    const undo = e.target.closest("[data-trk-undo]"); if (undo) return trackerMove(undo.dataset.trkUndo, 0, -1);
-  };
-  const trkHandEl = $("#trk-hand");
-  if (trkHandEl) trkHandEl.onclick = e => {
-    const play = e.target.closest("[data-hand-play]"); if (play) return trackerMove(play.dataset.handPlay, -1, 1);
-    const back = e.target.closest("[data-hand-back]"); if (back) return trackerMove(back.dataset.handBack, -1, 0);
-  };
-  wireTrackerHover();
+  wireZonen();
+  // Auf-/Zugeklappt merken, damit ein Neuzeichnen (Realtime) es nicht aufreißt.
+  const dbox = $("#dice-box"); if (dbox) dbox.ontoggle = () => wuerfelOffen = dbox.open;
+  const ibox = $("#invite-box"); if (ibox) ibox.ontoggle = () => einladenOffen = ibox.open;
   // Commander-Karten: beim Hover große Vorschau + Name.
   if (HOVER_OK) $$("#v-session .sp-deck[data-cmd-img]").forEach(el => {
     el.addEventListener("mousemove", e => zeigeCmdHover(el.dataset.cmdImg, el.dataset.cmdName, e.clientX, e.clientY));
@@ -8230,7 +8414,7 @@ async function sessionBeenden() {
 async function lebenReset() {
   try {
     await sb.rpc("reset_lives", { p_session: SESSION.id });
-    SESSION_PLAYED = {}; SESSION_HAND = {};   // eigener Tracker sofort leer; das reset-Event räumt die DB
+    SESSION_ZONEN = {};   // eigener Zonenstand sofort leer; das reset-Event räumt die DB
     await ladeSpieler(); renderSession();
   } catch (e) { toast(dbErr(e)); }
 }
@@ -8440,6 +8624,10 @@ function landRot(sides, v) { return sides === 6 ? cubeLand(v) : null; }
    sanft auf die ERGEBNIS-Fläche. Sonst: Würfel wackelt, Zahl flackert, rastet mit
    „Plopp" ein. Das Ergebnis steht vorher fest — nur Show. */
 function zeigeWurf(sides, result, name) {
+  // Der Würfelkasten ist normalerweise zugeklappt — ein Wurf (auch der eines
+  // Mitspielers) fährt ihn auf, sonst würfelte man ins Verborgene.
+  const box = $("#dice-box");
+  if (box && !box.open) { box.open = true; wuerfelOffen = true; }
   const stage = $("#dice-stage");
   if (!stage) return;
   const s = Math.max(2, sides | 0);
@@ -8547,10 +8735,10 @@ function onEvent(payload) {
   const ev = payload.new;
   if (!ev || !SESSION || ev.session_id !== SESSION.id) return;
   if (ev.kind === "reset") {   // „Neues Spiel" → eigenen Tracker leeren (lokal + DB)
-    SESSION_PLAYED = {}; SESSION_HAND = {};
+    SESSION_ZONEN = {};
     Object.keys(playedTimers).forEach(k => { clearTimeout(playedTimers[k]); delete playedTimers[k]; });
     sb.from("session_played").delete().eq("session_id", SESSION.id).eq("user_id", USER.id).then(() => {});
-    if ($(".view.on")?.id === "v-session") renderTracker();
+    if ($(".view.on")?.id === "v-session") renderZonen();
     return;
   }
   if (ev.id != null && SESSION_LOG.some(e => e.id === ev.id)) return;   // eigener Wurf schon lokal ergänzt
