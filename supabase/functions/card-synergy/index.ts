@@ -172,11 +172,20 @@ Regeltext: ${oracle || "(kein Regeltext)"}
 
 Nenne ${n} synergistische Karten.`;
 
+  // Die Obergrenze muss mitwachsen, wenn die Antwort mehr Text trägt: im
+  // Deck-Modus schreibt das Modell je Vorschlag ZWEI ganze Sätze (reason und,
+  // bei vollem Deck, replacesWhy). Mit den früheren festen 1500 Tokens brach
+  // die Antwort bei zwölf Vorschlägen mitten im String ab — JSON.parse
+  // scheiterte dann mit „Unterminated string in JSON".
+  // Die Grenze ist eine Decke, keine Vorgabe: bezahlt wird, was wirklich
+  // geschrieben wird, nicht was erlaubt wäre.
+  const maxTokens = mode === "deck" ? Math.min(8000, 1000 + n * 220) : 1500;
+
   try {
     const anthropic = new Anthropic({ apiKey: key });
     const res = await anthropic.messages.create({
       model: MODEL,
-      max_tokens: 1500,
+      max_tokens: maxTokens,
       system: SYSTEM,
       output_config: { format: { type: "json_schema", schema: SCHEMA } },
       messages: [{ role: "user", content: [{ type: "text", text: USER }] }],
@@ -184,12 +193,24 @@ Nenne ${n} synergistische Karten.`;
 
     if (res.stop_reason === "refusal")
       return json({ error: "Anfrage wurde abgelehnt" }, 422);
+    // Abgeschnitten: sagen, was los ist, statt den Parser darüber stolpern zu
+    // lassen. „Unterminated string in JSON at position 4337" ist für niemanden
+    // eine brauchbare Auskunft.
+    if (res.stop_reason === "max_tokens")
+      return json({ error: "Die Antwort wurde abgeschnitten. Stelle unter „max. Vorschläge“ einen kleineren Wert ein und versuche es erneut.", code: "truncated" }, 502);
     const text = res.content.find((b) => b.type === "text");
     if (!text || text.type !== "text")
       return json({ error: "Keine verwertbare Antwort" }, 502);
 
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text.text);
+    } catch {
+      return json({ error: "Die Antwort war unvollständig und konnte nicht gelesen werden.", code: "bad_json" }, 502);
+    }
+
     return json({
-      ...JSON.parse(text.text),
+      ...(parsed as Record<string, unknown>),
       usage: { input: res.usage.input_tokens, output: res.usage.output_tokens, model: res.model },
     });
   } catch (e) {
