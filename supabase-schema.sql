@@ -968,21 +968,39 @@ language sql stable security definer set search_path = public as $$
 $$;
 revoke execute on function public.session_roster(uuid) from anon;
 
--- Privater Tracker: wo eine Deckkarte diese Partie gerade liegt.
--- NUR der Spieler selbst sieht/ändert seine Zeilen. Zwei Orte werden
--- gespeichert — hand (auf der Hand) und qty (gespielt) —, die Bibliothek ist
--- der Rest: Deckmenge minus hand minus qty. Dadurch kann kein Exemplar
+-- Privater Tracker: in welcher Zone eine Deckkarte diese Partie gerade liegt.
+-- NUR der Spieler selbst sieht/ändert seine Zeilen. Gespeichert werden vier
+-- Zonen; Bibliothek und Kommandozone sind der REST aus der Deckmenge:
+--
+--   Bibliothek bzw. Kommandozone = Deckmenge − hand − field − graveyard − exile
+--
+-- Eine normale Karte, die nirgends sonst liegt, ist in der Bibliothek; der
+-- Commander eines Decks in der Kommandozone. Dadurch kann kein Exemplar
 -- doppelt existieren, und die App rechnet den Rest bei jeder Anzeige neu.
+-- cast_count ist keine Zone, sondern der Zähler für die Commander-Steuer
+-- (+2 Mana je Wirken aus der Kommandozone). qty ist abgelöst: die Spalte hieß
+-- früher „gespielt" und wird nicht mehr geschrieben.
 create table if not exists public.session_played (
   session_id uuid not null references public.game_sessions(id) on delete cascade,
   user_id    uuid not null references auth.users(id) on delete cascade,
   card_id    uuid not null references public.cards(id) on delete cascade,
   qty        integer not null default 0 check (qty >= 0),
   hand       integer not null default 0 check (hand >= 0),
+  field      integer not null default 0 check (field >= 0),
+  graveyard  integer not null default 0 check (graveyard >= 0),
+  exile      integer not null default 0 check (exile >= 0),
+  cast_count integer not null default 0 check (cast_count >= 0),
   primary key (session_id, user_id, card_id)
 );
 -- Für bestehende Datenbanken nachrüsten (create table if not exists ergänzt keine Spalten):
-alter table public.session_played add column if not exists hand integer not null default 0 check (hand >= 0);
+alter table public.session_played
+  add column if not exists hand       integer not null default 0 check (hand >= 0),
+  add column if not exists field      integer not null default 0 check (field >= 0),
+  add column if not exists graveyard  integer not null default 0 check (graveyard >= 0),
+  add column if not exists exile      integer not null default 0 check (exile >= 0),
+  add column if not exists cast_count integer not null default 0 check (cast_count >= 0);
+-- Altbestand: „gespielt" war faktisch das Schlachtfeld.
+update public.session_played set field = qty, qty = 0 where qty > 0;
 alter table public.session_played enable row level security;
 alter table public.session_played force row level security;
 revoke all on public.session_played from anon;
