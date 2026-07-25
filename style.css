@@ -450,6 +450,13 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
   display:inline-flex;align-items:center;background:var(--ok,#3cb45a);color:#06210d;
   font-size:10px;font-weight:800;font-variant-numeric:tabular-nums;box-shadow:0 2px 6px rgba(0,0,0,.5)}
 .feld-werkzeug{margin:0 0 8px}
+/* Trennt im Akkordeon die Laender vom uebrigen Schlachtfeld — dieselbe
+   Zweiteilung wie in der Matte, nur untereinander statt nebeneinander. */
+.feld-trenner{display:flex;align-items:center;gap:6px;margin:10px 0 6px;
+  font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--dim)}
+.feld-trenner::after{content:"";flex:1;height:1px;background:var(--line);order:3}
+.feld-trenner-n{order:2;min-width:16px;height:15px;padding:0 5px;border-radius:8px;display:inline-flex;
+  align-items:center;justify-content:center;background:var(--line);color:var(--dim);font-size:10px}
 /* Feldkarten haben zwei Knopfreihen: erst der Zustand (tappen, Marken), dann
    die Zielzonen. Nebeneinander wären es bis zu sieben Knöpfe unter einer Karte. */
 .zk-akt-reihe{display:flex;gap:3px;justify-content:center}
@@ -498,6 +505,83 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .hand-karte:hover,.hand-karte:focus-within{z-index:60;
   transform:rotate(calc(var(--rot) * var(--hk-f,1))) translateY(calc(var(--dy) - 20px)) scale(1.06)}
 .hand-karte:focus-visible img{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc)}
+
+/* ===== Spielmatte (ab 820 px) =====
+   Die Felder liegen wie auf der offiziellen Matte: Schlachtfeld gross links,
+   Laender als Streifen darunter, rechts die schmalen Spalten. Darunter, quer
+   ueber alles, die Hand — da, wo man sie am Tisch haelt.
+   Unter 820 px greift diese Anordnung NICHT: von den schmalen Spalten blieben
+   auf einem hochkant gehaltenen Handy rund 50 px, eine Kartenminiatur ist
+   62 px breit. Dort zeichnet app.js das Akkordeon. */
+/* Feste Hoehe fuer den Mattenteil, die Felder rollen bei Bedarf innen — wie ein
+   echter Spielteppich, der auch nicht waechst. Ohne das bestimmte die hoechste
+   Spalte (vier gestapelte Felder in der Mitte) die Zeilenhoehe, und das
+   Schlachtfeld stand mit fuenf Karten in 400 px Leere. */
+.mat{display:grid;gap:8px;margin-top:10px;
+  grid-template-columns:minmax(0,1fr) 154px 190px;
+  grid-template-rows:clamp(390px,50vh,560px) auto;
+  grid-template-areas:"links mitte rechts" "hand hand hand"}
+.mat-links{grid-area:links;display:flex;flex-direction:column;gap:8px;min-width:0}
+.mat-mitte{grid-area:mitte;display:flex;flex-direction:column;gap:8px}
+.mat-rechts{grid-area:rechts;display:flex;flex-direction:column;gap:8px}
+.mat-hand{grid-area:hand}
+@media (min-width:1100px){ .mat{grid-template-columns:minmax(0,1fr) 172px 208px} }
+
+.mat-feld{display:flex;flex-direction:column;min-width:0;
+  border:1px solid var(--line);border-radius:10px;background:var(--panel2);padding:6px 8px 8px}
+.mat-titel{display:flex;align-items:center;gap:6px;flex:none;margin-bottom:6px;
+  font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--dim)}
+.mat-n{margin-left:auto;min-width:18px;height:16px;padding:0 5px;border-radius:8px;display:inline-flex;
+  align-items:center;justify-content:center;background:var(--acc);color:#1a1400;font-size:10px;font-weight:700}
+.mat-korb{flex:1;min-height:0;overflow-y:auto}
+/* Das Schlachtfeld bekommt den Platz, den es auf der Matte auch hat; die
+   Laender darunter einen festen Streifen. */
+.mat-gross{flex:1;min-height:0}
+.mat-laender{flex:none;height:136px}
+.mat-lib{flex:1;min-height:0}
+/* overflow:hidden an den Spalten, damit nie ein Feld ueber den Mattenrand
+   quillt; erreichbar bleibt alles, weil jeder Korb innen rollt. */
+.mat-links,.mat-mitte,.mat-rechts{min-height:0;overflow:hidden}
+.mat-feld{overflow:hidden}
+.mat-links .zone-gitter,.mat-hand .zone-gitter{gap:10px}
+.mat-hand .mat-korb{overflow:visible}
+/* In den schmalen Spalten sind die Karten kleiner — zwei nebeneinander statt
+   einer mit Rand. */
+/* In den schmalen Spalten kleinere Karten: vier Felder uebereinander muessen
+   in die Mattenhoehe passen, ohne dass eines auf ein paar Pixel zusammenfaellt. */
+.mat-mitte .zone-gitter,.mat-rechts .zone-gitter{--zk-b:48px;--zk-h:67px;gap:5px}
+.mat-mitte .zone-leer,.mat-rechts .zone-leer{font-size:11px;padding:6px 2px}
+.mat-mitte .lib-liste{max-height:none;margin-top:6px}
+.mat-mitte .lib-zeile{gap:5px}
+.mat-mitte .lib-bild,.mat-mitte .lib-set,.mat-mitte .lib-mana{display:none}
+.mat-mitte .lib-akt .btn{padding:1px 4px;font-size:12px}
+/* Commander-Steuer: was das naechste Wirken aus der Kommandozone extra kostet.
+   Zugleich der Knopf, um ein zu viel gezaehltes Wirken zurueckzunehmen. */
+.mat-steuer{flex:none}
+.mat-steuerwert{width:100%;padding:2px 0;border:1px solid var(--acc);border-radius:8px;
+  background:var(--panel);color:var(--acc);cursor:pointer;
+  font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}
+.mat-steuer .mat-titel{margin-bottom:4px}
+.mat-steuerwert:hover{background:var(--acc);color:#1a1400}
+.mat-steuerwert.leer{border-color:var(--line);color:var(--dim);cursor:default}
+/* Lebenspunkte aller Mitspieler: die gewohnten Kacheln, nur schmal gestapelt. */
+/* Bei vier Mitspielern rollt die Lebensliste innen, statt den Friedhof aus der
+   Matte zu schieben — der braucht seinen festen Platz unten rechts. */
+.mat-leben{flex:1;min-height:96px}
+.mat-rechts [data-zone="grave"]{flex:none;min-height:128px}
+.sp-grid.schmal{grid-template-columns:1fr;gap:6px;margin-top:0}
+.sp-grid.schmal .sp-card{gap:1px 7px;padding:6px 7px}
+.sp-grid.schmal .sp-life{font-size:19px}
+.sp-grid.schmal .sp-ctrl{flex-wrap:wrap;justify-content:flex-end;max-width:74px}
+.sp-grid.schmal .sp-ctrl .btn{padding:2px 4px;font-size:10px}
+.sp-grid.schmal .sp-name{font-size:11px}
+/* In der schmalen Spalte bleibt vom Deck nur das Commanderbild — der Name
+   waere auf 190 px ohnehin nach zwei Buchstaben abgeschnitten. Der volle Name
+   steht weiterhin im Tooltip und in der grossen Vorschau. */
+.sp-grid.schmal .sp-deckname{display:none}
+/* Hinweis im Hochformat auf Geraeten, die quer breit genug waeren. */
+.quer-hinweis{margin-top:10px;padding:7px 10px;border:1px dashed var(--line);border-radius:8px;
+  font-size:12px;color:var(--dim)}
 
 /* ---- Bibliothek: suchen statt scrollen ----
    Dieselben Angaben wie in der Sammlung (Bild, Name, Mana, Set, Anzahl), aber
