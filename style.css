@@ -396,15 +396,89 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .ev-inv{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
 .ev-inv span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:560px){.termin-wann{min-width:0}.termin-kopf{flex-wrap:wrap}.kal-tag{min-height:52px}}
-.trk-sum{font-size:13px;color:var(--dim);margin:8px 0}
-.trk-list{display:flex;flex-direction:column;gap:2px;max-height:340px;overflow:auto}
-.trk-row{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;font-size:13px}
-.trk-row:hover{background:var(--panel2)}
-.trk-row.leer{opacity:.5}
-.trk-q{flex:none;min-width:36px;text-align:right;font-variant-numeric:tabular-nums;color:var(--dim)}
-.trk-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.trk-btns{flex:none;display:flex;gap:4px}
-.trk-btns .btn{padding:3px 8px}
+/* ===== Spielrunde: eigene Hand + Deckliste =====
+   Die Hand liegt über der Deckliste und zeigt JEDES Exemplar als eigene Karte,
+   so wie man sie in der Hand hält: überlappend, nach außen gekippt, die Ränder
+   etwas tiefer. Winkel (--rot), Tiefe (--dy) und Überlappung rechnet app.js je
+   Karte aus, zusammengesetzt wird hier — deshalb kann der Hover-Zustand den
+   Grundwinkel behalten und die Karte nur anheben (eine Inline-transform ließe
+   sich davon nicht mehr ergänzen).
+   --hk-b ist die Kartenbreite und die Maßeinheit des Fächers: app.js gibt die
+   Überlappung als Vielfaches davon aus, also passt sich der ganze Fächer an,
+   wenn die Breite auf schmalen Schirmen kleiner wird. 1.395 ist das
+   Seitenverhältnis der Scryfall-Bilder (146×204). */
+.hand-sparte{--hk-b:104px;margin-top:12px;padding:10px 10px 4px;border:1px solid var(--line);
+  border-radius:12px;background:var(--panel2)}
+.hand-kopf{display:flex;align-items:center;gap:8px}
+.hand-titel{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--dim)}
+.hand-zahl{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:18px;
+  padding:0 6px;border-radius:9px;background:var(--acc);color:#1a1400;font-size:11px;font-weight:700}
+.hand-leer{font-size:13px;color:var(--dim);padding:14px 2px 12px}
+/* Luft ringsum: gedrehte und beim Hover angehobene Karten ragen über ihre
+   Zeile hinaus. „safe center" hält den Fächer mittig, ohne bei sehr vielen
+   Karten den linken Rand unerreichbar abzuschneiden. */
+.hand-fan{display:flex;flex-wrap:nowrap;align-items:flex-end;
+  justify-content:center;justify-content:safe center;
+  min-height:calc(var(--hk-b) * 1.395 + 66px);padding:34px 10px 22px;
+  overflow-x:auto;overflow-y:hidden}
+/* --hk-f dämpft den Fächerwinkel. Gedrehte Karten schwenken seitlich aus und
+   machen den Fächer breiter als die Summe der Karten; auf schmalen Schirmen
+   liegt die Hand deshalb flacher, statt aus dem Kasten zu laufen. */
+.hand-karte{position:relative;flex:none;width:var(--hk-b);z-index:var(--z);
+  transform-origin:50% 140%;outline:none;
+  transform:rotate(calc(var(--rot) * var(--hk-f,1))) translateY(var(--dy));
+  transition:transform .14s ease-out}
+.hand-karte img{display:block;width:var(--hk-b);height:calc(var(--hk-b) * 1.395);
+  object-fit:cover;border-radius:6px;background:#000;border:1px solid var(--line);
+  box-shadow:0 6px 16px rgba(0,0,0,.55)}
+.hand-ohnebild{display:flex;align-items:center;justify-content:center;text-align:center;
+  width:var(--hk-b);height:calc(var(--hk-b) * 1.395);padding:8px;border-radius:6px;
+  background:var(--panel);border:1px solid var(--line);font-size:11px;line-height:1.25;color:var(--dim)}
+/* Angehoben wird bei Hover UND bei Tastatur-/Tipp-Fokus: auf dem Handy ist der
+   erste Tipp das Aufnehmen (Karte kommt nach vorn, Knöpfe erscheinen), der
+   zweite der Klick auf „spielen". Die Staffelung steht als --z in der Zeile,
+   damit diese Regel sie überhaupt überstimmen kann — eine Inline-z-index
+   schlägt jede Stylesheet-Regel. */
+.hand-karte:hover,.hand-karte:focus-within{z-index:60;
+  transform:rotate(calc(var(--rot) * var(--hk-f,1))) translateY(calc(var(--dy) - 20px)) scale(1.06)}
+.hand-karte:focus-visible img{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc)}
+/* Die Knöpfe drehen mit der Karte zurück, damit sie waagerecht lesbar bleiben. */
+.hand-akt{position:absolute;left:50%;bottom:-8px;display:flex;gap:4px;opacity:0;pointer-events:none;
+  transform:translateX(-50%) rotate(calc(-1 * var(--rot) * var(--hk-f,1)));transition:opacity .12s}
+.hand-karte:hover .hand-akt,.hand-karte:focus-within .hand-akt{opacity:1;pointer-events:auto}
+.hand-akt .btn{padding:3px 8px;font-size:11px;white-space:nowrap;background:var(--panel)}
+/* Deckliste der Partie: gleiche Spalten wie die Sammlung (Bild, Name, Mana,
+   Set, Anzahl, gespielt). Sortiert wird hier nicht — die Kopfzeile ist also
+   kein Knopf. Der Kopf bleibt beim Rollen stehen; sein Hintergrund kommt
+   bereits aus der th-Regel der Sammlung. */
+.trk-sum{font-size:13px;color:var(--dim);margin:10px 0 2px}
+.trk-scroll{max-height:460px;overflow:auto}
+.trk-tbl th{cursor:default;position:sticky;top:0;z-index:2}
+.trk-tbl tbody tr:hover{background:var(--panel2)}
+.trk-tbl tbody tr.leer{opacity:.45}
+.trk-anz,.trk-akt{white-space:nowrap}
+.trk-von{color:var(--dim);font-size:12px}
+.trk-hand-pille{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:999px;
+  background:rgba(210,170,60,.18);color:var(--acc);font-size:11px;font-weight:700}
+.trk-gespielt{font-variant-numeric:tabular-nums}
+.trk-akt .btn{padding:3px 8px;margin-left:4px}
+/* Schmale Schirme: kleinere Handkarten (der Fächer rechnet in Kartenbreiten und
+   folgt von selbst) und die Knöpfe der Deckliste untereinander statt
+   nebeneinander — „ziehen" ist der Griff dieser Ansicht und soll nicht als
+   Erstes aus dem Bild rollen. Bild- und Set-Spalte fallen wie in der Sammlung
+   ohnehin weg (.hide-s); bleibt die Tabelle danach breiter als der Schirm,
+   rollt sie waagerecht wie die Sammlungstabelle auch. */
+@media (max-width:640px){
+  .hand-sparte{--hk-b:74px}
+  .trk-tbl th,.trk-tbl td{padding:6px 4px;font-size:13px}
+  .trk-tbl th{font-size:10px;letter-spacing:.2px}
+  .trk-akt .btn{display:block;width:100%;margin:3px 0 0;font-size:11px;padding:3px 6px}
+  .trk-akt .btn:first-child{margin-top:0}
+}
+@media (max-width:430px){
+  .hand-sparte{--hk-b:60px;--hk-f:.7;padding:10px 4px 4px}
+  .hand-fan{padding:30px 2px 20px}
+}
 /* Würfel-Bühne mit Animation */
 .dice-stage{display:flex;flex-direction:column;align-items:center;gap:8px;min-height:104px;justify-content:center;margin:12px 0 14px;perspective:800px}
 .dice-die{width:74px;height:74px;border-radius:16px;display:grid;place-items:center;font-size:36px;font-weight:800;

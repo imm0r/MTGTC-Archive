@@ -968,15 +968,21 @@ language sql stable security definer set search_path = public as $$
 $$;
 revoke execute on function public.session_roster(uuid) from anon;
 
--- Privater Tracker: welche Karten habe ich diese Partie schon gespielt.
--- NUR der Spieler selbst sieht/ändert seine Zeilen.
+-- Privater Tracker: wo eine Deckkarte diese Partie gerade liegt.
+-- NUR der Spieler selbst sieht/ändert seine Zeilen. Zwei Orte werden
+-- gespeichert — hand (auf der Hand) und qty (gespielt) —, die Bibliothek ist
+-- der Rest: Deckmenge minus hand minus qty. Dadurch kann kein Exemplar
+-- doppelt existieren, und die App rechnet den Rest bei jeder Anzeige neu.
 create table if not exists public.session_played (
   session_id uuid not null references public.game_sessions(id) on delete cascade,
   user_id    uuid not null references auth.users(id) on delete cascade,
   card_id    uuid not null references public.cards(id) on delete cascade,
   qty        integer not null default 0 check (qty >= 0),
+  hand       integer not null default 0 check (hand >= 0),
   primary key (session_id, user_id, card_id)
 );
+-- Für bestehende Datenbanken nachrüsten (create table if not exists ergänzt keine Spalten):
+alter table public.session_played add column if not exists hand integer not null default 0 check (hand >= 0);
 alter table public.session_played enable row level security;
 alter table public.session_played force row level security;
 revoke all on public.session_played from anon;
