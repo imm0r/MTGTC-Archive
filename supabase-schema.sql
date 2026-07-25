@@ -924,33 +924,19 @@ returns void language plpgsql security invoker set search_path = public as $$
 begin
   update public.game_sessions set status = 'ended' where id = p_session and host = auth.uid();
 end $$;
-create or replace function public.reset_lives(p_session uuid)
-returns void language plpgsql security invoker set search_path = public as $$
-declare sl integer;
-begin
-  select start_life into sl from public.game_sessions where id = p_session and host = auth.uid();
-  if sl is null then raise exception 'Nur der Host darf zuruecksetzen'; end if;
-  update public.session_players set life = sl where session_id = p_session and status = 'joined';
-end $$;
-
--- Spielerliste inkl. Name/Avatar (Mitspieler müssen nicht befreundet sein).
-create or replace function public.session_roster(p_session uuid)
-returns table(user_id uuid, life integer, status text, seat integer,
-              display_name text, avatar_url text)
-language sql stable security definer set search_path = public as $$
-  select sp.user_id, sp.life, sp.status, sp.seat, pr.display_name, pr.avatar_url
-    from public.session_players sp
-    left join public.profiles pr on pr.id = sp.user_id
-   where sp.session_id = p_session and sp.status <> 'left' and public.in_session(p_session)
-   order by sp.seat nulls last, sp.joined_at nulls last;
-$$;
-revoke execute on function public.session_roster(uuid) from anon;
-
--- --- Erweiterung: gespieltes Deck je Spieler + privater Karten-Tracker ---
+-- Gespieltes Deck je Spieler (Mitspieler sehen Deckname und Commander).
 alter table public.session_players
   add column if not exists deck_id uuid references public.decks(id) on delete set null;
 
--- Spielerliste zusätzlich mit Deckname + Commander (nur eigenes Deck).
+-- Spielerliste inkl. Name/Avatar, Deckname und Commander. Mitspieler müssen
+-- nicht befreundet sein, dürfen sich in der Runde aber sehen — daher SECURITY
+-- DEFINER mit in_session()-Prüfung.
+--
+-- Das DROP davor ist Pflicht, nicht Kosmetik: CREATE OR REPLACE kann den
+-- Rückgabetyp einer Funktion nicht ändern. Kommt später eine Spalte in die
+-- Liste, scheiterte ein zweiter Lauf dieses Skripts sonst mit „cannot change
+-- return type of existing function" — und genau das soll hier jederzeit
+-- wiederholbar sein. Gleiches gilt für jede andere RETURNS-TABLE-Funktion.
 drop function if exists public.session_roster(uuid);
 create function public.session_roster(p_session uuid)
 returns table(user_id uuid, life integer, status text, seat integer,
@@ -1047,7 +1033,10 @@ create or replace function public.in_event(e uuid) returns boolean
 language sql stable security definer set search_path=public
 as $$ select public.event_host(e) = auth.uid()
         or exists(select 1 from public.event_rsvp where event_id = e and user_id = auth.uid()) $$;
-create or replace function public.event_roster(p_event uuid)
+-- DROP davor aus demselben Grund wie bei session_roster: der Rückgabetyp einer
+-- RETURNS-TABLE-Funktion lässt sich mit CREATE OR REPLACE nicht ändern.
+drop function if exists public.event_roster(uuid);
+create function public.event_roster(p_event uuid)
 returns table(user_id uuid, status text, display_name text, avatar_url text)
 language sql stable security definer set search_path=public as $$
   select r.user_id, r.status, pr.display_name, pr.avatar_url
