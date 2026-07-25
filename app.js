@@ -40,6 +40,17 @@ function toast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove("on"), 2600);
 }
+/* Meldung für ein erreichtes Stundenkontingent. Die Funktion schickt den
+   Freigabezeitpunkt roh mit; in die lokale Uhrzeit rechnet ihn der Browser —
+   der Server steht auf UTC und kennt die Zeitzone des Aufrufers nicht. */
+function limitMeldung(ctx) {
+  const z = Date.parse(ctx?.reset_at);
+  if (!Number.isFinite(z)) return t("quota.reached");
+  return t("quota.reachedAt", {
+    zeit: new Date(z).toLocaleTimeString(LANG, { hour: "2-digit", minute: "2-digit" }),
+  });
+}
+
 function confirmDlg(html) {
   return new Promise(res => {
     $("#dlg-body").innerHTML = html;
@@ -3088,7 +3099,11 @@ async function kiSynergieLauf(box, cfg) {
     // supabase-js verpackt Non-2xx-Antworten in error; die Klartext-Meldung der
     // Function steckt in error.context (der rohen Response).
     let msg = t("syn.aiError");
-    try { const ctx = await error.context?.json?.(); if (ctx?.error) msg = ctx.error; } catch { /* generisch */ }
+    try {
+      const ctx = await error.context?.json?.();
+      if (ctx?.error) msg = ctx.error;
+      if (ctx?.code === "quota") msg = limitMeldung(ctx);
+    } catch { /* generisch */ }
     box.innerHTML = `<div class="empty">${esc(msg)}</div>`;
     return;
   }
@@ -5747,7 +5762,11 @@ async function regelAbfragen(situation, round = 0) {
   if (error) {
     // Wie bei den Synergien steckt die Klartext-Meldung der Function in error.context.
     let msg = t("rules.error");
-    try { const ctx = await error.context?.json?.(); if (ctx?.error) msg = ctx.error; } catch { /* generisch */ }
+    try {
+      const ctx = await error.context?.json?.();
+      if (ctx?.error) msg = ctx.error;
+      if (ctx?.code === "quota") msg = limitMeldung(ctx);
+    } catch { /* generisch */ }
     if (out) out.innerHTML = `<div class="card"><div class="empty">${esc(msg)}</div></div>`;
     return;
   }

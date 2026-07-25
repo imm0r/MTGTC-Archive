@@ -80,6 +80,26 @@ Deno.serve(async (req) => {
   const { data: flag } = await sb.from("feature_flags").select("enabled").eq("key", "ki_synergy").maybeSingle();
   if (!flag?.enabled) return json({ error: "KI-Synergien sind derzeit deaktiviert.", code: "disabled" }, 403);
 
+  // Stundenkontingent je Person. Wie beim Feature-Schalter sitzt die echte
+  // Sperre HIER: wer angemeldet ist, könnte die Funktions-URL sonst unmittelbar
+  // aufrufen und eine Zählung im Browser wäre in Sekunden umgangen.
+  const { data: quota, error: quotaErr } = await sb.rpc("claim_ai_quota", {
+    p_kind: "ki_synergy",
+    p_limit: 5,
+  });
+  if (quotaErr) {
+    return json({ error: "Kontingent konnte nicht geprüft werden.", code: "quota_error" }, 500);
+  }
+  if (!quota?.ok) {
+    // reset_at bleibt roh — die lokale Uhrzeit rechnet der Browser aus, der
+    // Server steht auf UTC und kennt die Zeitzone des Aufrufers nicht.
+    return json({
+      error: "Stundenlimit für KI-Synergien erreicht.",
+      code: "quota",
+      reset_at: quota?.reset_at ?? null,
+    }, 429);
+  }
+
   const key = Deno.env.get("ANTHROPIC_API_KEY");
   if (!key) return json({ error: "ANTHROPIC_API_KEY ist nicht gesetzt" }, 500);
 

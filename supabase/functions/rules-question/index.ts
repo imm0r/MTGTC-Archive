@@ -425,6 +425,28 @@ ${round >= 1 ? `- Der Nutzer hat bereits ${round === 1 ? "eine" : "mehrere"} Rü
     }
 
     // --- 2. Urteil ---
+    // Stundenkontingent erst HIER buchen, nicht vor der Triage: eine
+    // Rückfrage-Runde kostet nur den kleinen Triage-Aufruf und endet oben
+    // vorzeitig. Wer eine Rückfrage beantwortet, soll dafür kein Kontingent
+    // verlieren — teuer ist das Urteil mit bis zu 90.000 Zeichen Regeltext.
+    // Die echte Sperre gehört hierher und nicht in den Client, der mit gültiger
+    // Anmeldung die Funktions-URL unmittelbar aufrufen könnte.
+    const { data: quota, error: quotaErr } = await sb.rpc("claim_ai_quota", {
+      p_kind: "rules_question",
+      p_limit: 5,
+    });
+    if (quotaErr) {
+      return json({ error: "Kontingent konnte nicht geprüft werden.", code: "quota_error" }, 500);
+    }
+    if (!quota?.ok) {
+      // reset_at bleibt roh — die lokale Uhrzeit rechnet der Browser aus.
+      return json({
+        error: "Stundenlimit für Regelfragen erreicht.",
+        code: "quota",
+        reset_at: quota?.reset_at ?? null,
+      }, 429);
+    }
+
     const grounded = !!CR && ctxText.trim().length > 0;
     const SYSTEM = grounded
       ? `Du bist ein erfahrener, neutraler Magic: The Gathering-Schiedsrichter. Du klärst eine strittige Spielsituation ausschließlich anhand der DIR ÜBERGEBENEN Auszüge aus den offiziellen Comprehensive Rules.
