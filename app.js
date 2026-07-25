@@ -3965,6 +3965,34 @@ function deckVollMelden(d) {
   toast(t("deck.fullToast", { n: deckGroesse(d), max: DECK_MAX }));
 }
 
+/* Dieselbe KARTE, egal welche Auflage — über die oracle_id, die alle Drucke,
+   Sprachen und Foil-Fassungen teilen; Name als Rückfall für Uralt-Zeilen ohne
+   oracle_id. Bewusst NICHT gleicheKarte(): das vergleicht Set + Sammlernummer,
+   also die einzelne Auflage, und beantwortet damit eine andere Frage (welches
+   Exemplar aus dem Regal steckt in welchem Deck). Hier geht es ums Spielen,
+   und dafür ist jede Auflage dieselbe Karte. */
+function selbeKarte(a, b) {
+  if (!a || !b) return false;
+  if (a.oracle_id && b.oracle_id) return a.oracle_id === b.oracle_id;
+  return (a.name || "").toLowerCase() === (b.name || "").toLowerCase();
+}
+
+/* Liegt dieselbe Karte bereits als UNERFÜLLTER Wunsch im Deck — in einer
+   anderen Auflage als der jetzt gewählten? Dann ist der Deckplatz längst
+   vergeben und der Wunsch mit der neu besessenen Auflage schlicht erfüllt.
+   Ohne diesen Fall stünde man vor einer Absage („Deck voll"), obwohl das Deck
+   gar nicht wachsen soll: die Karte war schon eingeplant. */
+function deckWunschEintrag(d, pick) {
+  if (!d || !pick) return null;
+  for (const e of d.entries || []) {
+    if (e.cardId === pick.id) continue;                 // dieselbe Zeile, kein Umhängen
+    const c = CARDS.find(x => x.id === e.cardId);
+    if (!c || !selbeKarte(c, pick)) continue;
+    if (e.qty > bestandVon(c)) return { eintrag: e, karte: c };   // fehlt noch
+  }
+  return null;
+}
+
 /* Welche Karte im Deck würde man für einen Vorschlag am ehesten schneiden?
    Die Reihenfolge der Argumente, vom stärksten zum schwächsten:
 
@@ -4664,6 +4692,39 @@ function renderDecks() {
     if (!d) return;
     const add = Math.max(1, parseInt($(`[data-dqty="${deckId}"]`).value) || 1);
     const ex = d.entries.find(e => e.cardId === cardId);
+    const pick = CARDS.find(x => x.id === cardId);
+
+    // Wunschkarte einlösen: Steht dieselbe Karte schon als fehlender Eintrag im
+    // Deck, nur in einer anderen Auflage, dann will man sie nicht ZUSÄTZLICH
+    // einplanen — man hat sie inzwischen gekauft und der Wunsch ist erfüllt. Der
+    // Eintrag wird umgehängt, das Deck bleibt gleich groß. Muss VOR der
+    // Voll-Prüfung stehen: gerade im vollen Deck ist das der einzige Weg, eine
+    // Wunschkarte noch zu ersetzen.
+    const wunsch = deckWunschEintrag(d, pick);
+    if (wunsch) {
+      const n = Math.min(add, wunsch.eintrag.qty);
+      btn.disabled = true;
+      try {
+        const { error } = await sb.rpc("fulfil_wish_in_deck", {
+          p_deck: deckId, p_from_card: wunsch.karte.id, p_to_card: cardId, p_n: n,
+        });
+        if (error) throw error;
+        await reload(); renderAll();
+        toast(t("deck.wishFilled", { name: pick.disp || pick.name, n }));
+      } catch (e) { toast(dbErr(e)); btn.disabled = false; }
+      return;
+    }
+
+    // Liegt genau diese Zeile schon im Deck und ist kein Platz mehr frei, ist
+    // „Deck voll" die falsche Auskunft: der Platz ist nicht weg, sondern an
+    // genau diese Karte vergeben. Fehlt sie noch, hilft die Sammlung, nicht das
+    // Deck.
+    if (ex && deckFrei(d) === 0) {
+      const fehlt = pick ? ex.qty > bestandVon(pick) : false;
+      toast(t(fehlt ? "deck.alreadyInWish" : "deck.alreadyIn",
+              { name: pick?.disp || pick?.name || "" }));
+      return;
+    }
 
     // Commander-Grenze: lieber hier erklären als den Trigger absagen lassen.
     const frei = deckFrei(d);
