@@ -3500,12 +3500,18 @@ function comboCardMini(card, deckId, alsAktion) {
   const besessen = besessenAnzahl(card);
   const badge = besessen > 0
     ? `<span class="syn-owned" title="${esc(t("syn.ownedTitle", { n: besessen }))}">&#10003;</span>` : "";
-  let addBtn = "";
+  let addBtn = "", cut = "";
   if (alsAktion && card.id) {
     SYN_CACHE.set(card.id, card);
     const owned = besessen > 0;
-    addBtn = `<button class="syn-add${owned ? " owned" : ""}" data-deck="${esc(deckId)}" data-sid="${esc(card.id)}"
+    // Volles Deck: derselbe gesperrte Zustand wie bei den Synergie-Kacheln —
+    // der Knopf soll überall gleich aussehen und gleich erklären.
+    const voll = deckFreiById(deckId) === 0;
+    addBtn = voll
+      ? `<button class="syn-add voll" disabled title="${esc(t("deck.fullBtnTitle"))}">&#43;&#160;${esc(t(owned ? "syn.addDeck" : "syn.addWish"))}</button>`
+      : `<button class="syn-add${owned ? " owned" : ""}" data-deck="${esc(deckId)}" data-sid="${esc(card.id)}"
       title="${esc(owned ? t("syn.addOwnedTitle") : t("syn.addWishTitle"))}">&#43;&#160;${esc(t(owned ? "syn.addDeck" : "syn.addWish"))}</button>`;
+    if (voll) cut = schnittHinweisHtml(deckSchnittKandidat(DECKS.find(d => d.id === deckId), card));
   }
   // Weder besessen noch (mangels Deck-Kontext) wünschbar — z. B. im
   // Kartendetail: direkt zum Kauf verlinken (Scryfalls Cardmarket-Link,
@@ -3519,7 +3525,7 @@ function comboCardMini(card, deckId, alsAktion) {
   return `<div class="combo-mini">
     <div class="combo-mini-card" data-cmd-img="${esc(gross)}" data-cmd-name="${esc(card.name)}">
       ${klein ? `<img src="${esc(klein)}" alt="${esc(card.name)}" loading="lazy">` : `<div class="syn-noimg">&#9670;</div>`}${badge}
-    </div>${addBtn}${buy}
+    </div>${addBtn}${cut}${buy}
   </div>`;
 }
 
@@ -3603,9 +3609,12 @@ async function deckCombosAnzeigen(box, cards, deckId) {
   }
   if (lauf !== combosLauf) return;
 
-  let included = data.included || [];
+  // „max. Anzahl Vorschläge" gilt laut Einstellung auch für Combo-Suchen —
+  // bisher kam sie hier nie an.
+  const cLim = prefWert("synLimit");
+  let included = (data.included || []).slice(0, cLim || undefined);
   // Einstellung „nur komplette Combos": die „Fast komplett"-Kategorie weglassen.
-  let almost = suchPrefs().onlyComplete ? [] : (data.almostIncluded || []);
+  let almost = suchPrefs().onlyComplete ? [] : (data.almostIncluded || []).slice(0, cLim || undefined);
   if (!included.length && !almost.length) { box.innerHTML = `<div class="empty">${esc(t("combo.none"))}</div>`; return; }
 
   // Legalität im Deck-Format: erst zählen (für die Zusammenfassung), dann —
@@ -3658,7 +3667,7 @@ async function sammlungCombosAnzeigen(box, cards) {
     return;
   }
   if (lauf !== combosLauf) return;
-  let included = data.included || [];
+  let included = (data.included || []).slice(0, prefWert("synLimit") || undefined);
   if (!included.length) { box.innerHTML = `<div class="empty">${esc(t("combo.collNone"))}</div>`; return; }
   // Legalität: ohne Deck-Kontext gegen Commander (siehe comboLegalKey).
   const gesamt = included.length;
@@ -3687,7 +3696,7 @@ async function karteCombosAnzeigen(box, card) {
   try {
     // Anführungszeichen im Namen raus, sonst bricht die CSB-Suche card:"…".
     const q = `card:"${(card.name || "").replace(/"/g, "")}"`;
-    data = await combosApi({ mode: "variants", q, limit: 12 });
+    data = await combosApi({ mode: "variants", q, limit: prefWert("synLimit") || 12 });
   } catch (e) {
     if (lauf === combosLauf) box.innerHTML = `<div class="empty">${esc(e.message)}</div>`;
     return;
@@ -4339,7 +4348,7 @@ function renderDecks() {
           }<span class="deck-legal-wrap" data-legalpill="${d.id}">${deckLegalPillInner(DECK_LEGAL.get(d.id))}</span></div>
           <div class="hint" style="margin:2px 0 0">${n} ${esc(t("common.cards"))} &middot; ${eur(v)}${
             istCommanderDeck(d) && deckFrei(d) === 0
-              ? ` &middot; <span class="deck-full-note">${esc(t("deck.fullNote", { n, max: DECK_MAX }))}</span>` : ""}${
+              ? ` &middot; <span class="deck-full-note">${esc(t("deck.fullShort", { n, max: DECK_MAX }))}</span>` : ""}${
             d.shared ? ` &middot; <span style="color:var(--ok)">${esc(t("deck.shared"))}</span>` : ""}${
             fehlt ? ` &middot; <span style="color:var(--err)">${esc(t("deck.incomplete", { n: fehlt }))}</span>` : ""}</div>
         </div>
