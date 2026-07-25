@@ -43,8 +43,9 @@ const SCHEMA = {
         properties: {
           name: { type: "string", description: "Exakter englischer Kartenname einer ECHTEN Magic-Karte." },
           reason: { type: "string", description: "Ein einziger, konkreter Satz: der Synergie-MECHANISMUS (nicht bloß 'starke Karte'). In der gewünschten Sprache." },
+          replaces: { type: "string", description: "Nur wenn das Deck voll ist: der EXAKTE englische Name EINER Karte aus der übergebenen Deckliste, die für diesen Vorschlag weichen sollte. Nicht der Commander. Sonst leerer String." },
         },
-        required: ["name", "reason"],
+        required: ["name", "reason", "replaces"],
         additionalProperties: false,
       },
     },
@@ -106,6 +107,7 @@ Deno.serve(async (req) => {
   let mode = "card", lang = "de", n = 10, colors = "";
   let name = "", typeLine = "", oracle = "";
   let deckName = "", deckFormat = "", commander = "", deckCards: string[] = [];
+  let deckVoll = false;
   try {
     const body = await req.json();
     lang = SPRACHE[body.lang] ? String(body.lang) : "de";
@@ -121,6 +123,7 @@ Deno.serve(async (req) => {
       deckCards = Array.isArray(d.cards)
         ? d.cards.map((x: unknown) => String(x).slice(0, 80)).filter(Boolean).slice(0, 120)
         : [];
+      deckVoll = !!d.full;
       if (!deckCards.length) throw new Error("Leere Deckliste");
     } else {
       const c = body.card ?? {};
@@ -160,7 +163,7 @@ Strikte Regeln:
 Kartenliste (${deckCards.length}):
 ${deckCards.join(", ")}
 
-Nenne ${n} Karten, die die Strategie dieses Decks am besten ergänzen.`
+Nenne ${n} Karten, die die Strategie dieses Decks am besten ergänzen.${deckVoll ? "\n\nDas Deck ist VOLL (100 Karten). Nenne deshalb je Vorschlag im Feld replaces den exakten englischen Namen EINER Karte aus der obigen Liste, die dafür weichen sollte — die schwächste oder am wenigsten zur Strategie passende. Niemals den Commander. Jede Karte höchstens einmal nennen." : ""}`
     : `Ausgangskarte:
 Name: ${name}
 Typzeile: ${typeLine}
