@@ -72,6 +72,7 @@ function dialogBackdropSchliesst(dlg) {
 let sb = null, USER = null, PROFILE = null;
 let FLAGS = {}, IS_ADMIN = false;   // globale Feature-Schalter + ob der Nutzer Admin ist
 let COMMUNITY_STATS = null, COMMUNITY_FEED = [], communityChannel = null;
+let COMMUNITY_HIGHLIGHTS = null;
 
 function cfg() {
   if (CONFIG.url && CONFIG.key) return CONFIG;
@@ -2504,6 +2505,14 @@ function detailHtml(c, hover) {
     <div id="card-combo-box" class="dt-results-full"></div>` : ""}`;
 }
 
+/* Detailansicht einer fremden Karte (Community-Kachel). Dieselbe Ansicht,
+   nur ohne die Knöpfe, die dem Besitzer vorbehalten sind. */
+function zeigeFremdeKarte(c) {
+  if (!c) return;
+  renderDetail(c, null, true);
+  if (!$("#detail-dlg").open) $("#detail-dlg").showModal();
+}
+
 function showCardDetail(id) {
   const c = CARDS.find(x => x.id === id);
   if (!c) return;
@@ -2515,9 +2524,17 @@ function showCardDetail(id) {
 
 /* Inhalt der Detailansicht zeichnen und verdrahten — getrennt vom Öffnen,
    damit dieselbe Ansicht bei offenem Dialog neu gezeichnet werden kann. */
-function renderDetail(c, id) {
+function renderDetail(c, id, fremd) {
   $("#detail-body").innerHTML = detailHtml(c, false);
   wireFlip(c, id);
+
+  // Fremde Karte (Community-Kachel): Bearbeiten und Preis-Aktualisieren
+  // gehören dem Besitzer, nicht dem Betrachter. Synergien und Combos bleiben —
+  // die arbeiten nur mit der Karte selbst und stehen jedem offen.
+  const eb = $("#dt-edit"), pb0 = $("#dt-price");
+  if (eb) eb.hidden = !!fremd;
+  if (pb0) pb0.hidden = !!fremd;
+  if (fremd) return wireDetailSynergien(c);
 
   // Erst schließen, dann bearbeiten: zwei gestapelte Dialoge wären fragil.
   $("#dt-edit").onclick = () => { $("#detail-dlg").close(); editCard(id); };
@@ -2532,6 +2549,13 @@ function renderDetail(c, id) {
       if ($("#detail-dlg").open) showCardDetail(id);
     } catch (e) { pb.disabled = false; toast(e.message); }
   };
+  wireDetailSynergien(c);
+}
+
+/* Alles, was nur die Karte selbst braucht und keinen Besitz voraussetzt:
+   Synergien, KI-Synergien, Combos, Legalität, Deck-Sprünge. Eigener Abschnitt,
+   damit auch die Ansicht einer fremden Karte ihn bekommt. */
+function wireDetailSynergien(c) {
   // Synergien: passende Karten zu dieser Karte (nur die Karte selbst raus).
   const yb = $("#dt-syn");
   if (yb) yb.onclick = () => {
@@ -2630,7 +2654,12 @@ function hideHover() {
 
 function showHover(id, x, y) {
   const c = CARDS.find(k => k.id === id);
-  if (!c) return;
+  if (c) zeigeHoverKarte(c, x, y);
+}
+
+/* Dieselbe Vorschau, aber für ein Kartenobjekt statt einer ID — die
+   Community-Kacheln zeigen fremde Karten, die in CARDS nie zu finden sind. */
+function zeigeHoverKarte(c, x, y) {
   const hc = $("#hovercard");
   hc.innerHTML = detailHtml(c, true);
   hc.style.left = "0px"; hc.style.top = "0px";   // erst einblenden, dann messen
@@ -2647,7 +2676,9 @@ function showHover(id, x, y) {
    Spielrunde eine große Kartenvorschau + Name schweben lassen (eigenes Element,
    nicht #hovercard — das ist 430px breit für die Sammlungs-Detailkarte). */
 let cmdHoverEl = null;
-function zeigeCmdHover(img, name, x, y) {
+/* zusatz ist optional (z. B. der Preis im Community-Feed) — die bisherigen
+   Aufrufer übergeben ihn nicht und bekommen unverändert nur Bild und Name. */
+function zeigeCmdHover(img, name, x, y, zusatz) {
   if (!cmdHoverEl) { cmdHoverEl = document.createElement("div"); cmdHoverEl.className = "cmd-hover"; }
   // Ist ein modaler Dialog offen (Kartendetail via showModal → Top-Layer), muss
   // die Vorschau DARIN hängen — sonst rendert sie hinter dem Dialog, den kein
@@ -2655,7 +2686,8 @@ function zeigeCmdHover(img, name, x, y) {
   const ziel = document.querySelector("dialog[open]") || document.body;
   if (cmdHoverEl.parentElement !== ziel) ziel.appendChild(cmdHoverEl);
   const el = cmdHoverEl;
-  el.innerHTML = `<img src="${esc(img)}" alt=""><div class="cmd-hover-nm">${esc(name)}</div>`;
+  el.innerHTML = `<img src="${esc(img)}" alt=""><div class="cmd-hover-nm">${esc(name)}</div>` +
+    (zusatz ? `<div class="cmd-hover-zus">${esc(zusatz)}</div>` : "");
   el.style.left = "0px"; el.style.top = "0px"; el.style.display = "block";
   const r = el.getBoundingClientRect();
   let l = x + 18, o = y + 14;
@@ -2968,6 +3000,7 @@ async function synergieAnzeigen(box, hooks, opts = {}) {
   const res = await synergieSuchen(hooks, opts);
   if (lauf !== synergyLauf) return;                  // ein neuerer Lauf hat übernommen
   if (!res.length) { box.innerHTML = `<div class="empty">${esc(t("syn.none"))}</div>`; return; }
+  zaehleCommunitySuche("synergies", res.length);
   let kopf = "";
   if (opts.totalBudget) {                            // Summenzeile beim Deck-Budget
     const summe = res.reduce((s, e) => s + (synPreis(e.card) || 0), 0);
@@ -3063,6 +3096,7 @@ async function kiSynergieLauf(box, cfg) {
 
   const sugg = (data?.suggestions || []).filter(s => s && s.name);
   if (!sugg.length) { box.innerHTML = `<div class="empty">${esc(t("syn.none"))}</div>`; return; }
+  zaehleCommunitySuche("synergies", sugg.length);
 
   // Namen gegen Scryfall prüfen (POST /cards/collection, ein Request bis 75 Namen).
   let karten = [];
@@ -3521,6 +3555,7 @@ async function deckCombosAnzeigen(box, cards, deckId) {
   // Einstellung „nur komplette Combos": die „Fast komplett"-Kategorie weglassen.
   let almost = suchPrefs().onlyComplete ? [] : (data.almostIncluded || []);
   if (!included.length && !almost.length) { box.innerHTML = `<div class="empty">${esc(t("combo.none"))}</div>`; return; }
+  zaehleCommunitySuche("combos", included.length + almost.length);
 
   // Legalität im Deck-Format: erst zählen (für die Zusammenfassung), dann —
   // je nach Einstellung — die nicht legalen Combos ganz ausblenden.
@@ -3572,6 +3607,7 @@ async function sammlungCombosAnzeigen(box, cards) {
   if (lauf !== combosLauf) return;
   let included = data.included || [];
   if (!included.length) { box.innerHTML = `<div class="empty">${esc(t("combo.collNone"))}</div>`; return; }
+  zaehleCommunitySuche("combos", included.length);
   // Legalität: ohne Deck-Kontext gegen Commander (siehe comboLegalKey).
   const gesamt = included.length;
   const illegal = included.filter(c => !comboIstLegal(c, "commander")).length;
@@ -3605,6 +3641,7 @@ async function karteCombosAnzeigen(box, card) {
   if (lauf !== combosLauf) return;
   let combos = data.combos || [];
   if (!combos.length) { box.innerHTML = `<div class="empty">${esc(t("combo.cardNone"))}</div>`; return; }
+  zaehleCommunitySuche("combos", combos.length);
   // Legalität: ohne Deck-Kontext gegen Commander (siehe comboLegalKey).
   const gesamt = combos.length;
   const illegal = combos.filter(c => !comboIstLegal(c, "commander")).length;
@@ -6003,6 +6040,25 @@ async function ladeCommunityStats() {
   } catch { COMMUNITY_STATS = null; }
 }
 
+/* Gefundene Combos und Synergien für die Community-Kacheln mitzählen. Beides
+   entsteht außerhalb der Datenbank (Commander Spellbook bzw. Scryfall), also
+   führt kein Weg an einer eigenen Zählung vorbei. Gespeichert wird nur eine
+   Gesamtsumme je Art — keine Zeile je Suche, keine Kennung, nichts, was sich
+   einer Person zuordnen ließe. Schlägt der Aufruf fehl, ist das folgenlos:
+   eine Kachel ist keinen Fehler wert. */
+function zaehleCommunitySuche(art, n) {
+  if (!sb || !USER || !(n > 0)) return;
+  sb.rpc("record_community_search", { p_kind: art, p_n: n }).catch(() => {});
+}
+
+async function ladeCommunityHighlights() {
+  try {
+    const { data, error } = await sb.rpc("community_highlights");
+    if (error) throw error;
+    COMMUNITY_HIGHLIGHTS = data || null;
+  } catch { COMMUNITY_HIGHLIGHTS = null; }
+}
+
 async function ladeCommunityFeed() {
   try {
     const { data, error } = await sb.rpc("community_activity_feed", { p_limit: COMMUNITY_FEED_LIMIT });
@@ -6015,7 +6071,7 @@ async function ladeCommunityFeed() {
    zeichnen, wenn das Dashboard gerade offen ist; sonst holt renderDashboard()
    die Werte beim nächsten Wechsel ohnehin aus den Globals. */
 async function ladeCommunityFoundation() {
-  await Promise.all([ladeCommunityStats(), ladeCommunityFeed()]);
+  await Promise.all([ladeCommunityStats(), ladeCommunityFeed(), ladeCommunityHighlights()]);
   if ($(".view.on")?.id === "v-community") zeigeCommunity();
 }
 
@@ -6179,6 +6235,8 @@ function communityStatsHtml() {
     [t("community.activeSessions"), s.active_session_count],
     [t("community.upcomingEvents"), s.upcoming_event_count],
     [t("community.activity7d"), s.activity_7d_count],
+    [t("community.combos"), s.combo_count],
+    [t("community.synergies"), s.synergy_count],
   ].map(([k, v]) =>
     `<div class="stat"><div class="v">${esc(zahl(v))}</div><div class="k">${esc(k)}</div></div>`).join("")}</div>`;
 }
@@ -6203,9 +6261,86 @@ function aktivitaetHtml(row) {
   const text = t(schluessel, { name: anzeige, karte: KARTEN_PLATZHALTER });
   if (text === schluessel) return esc(aktivitaetText(row));   // Übersetzung fehlt
 
-  const img = row.metadata?.img || "";
-  const el = `<span class="cf-card"${img ? ` data-cmd-img="${esc(img)}" data-cmd-name="${esc(karte)}"` : ""}>${esc(karte)}</span>`;
+  // Gespeichert ist die kleine Scryfall-Fassung (146px). Auf 220px hochgezogen
+  // wäre der Regeltext unlesbar — dieselbe Umschaltung wie bei Combo- und
+  // Deck-Karten. Bewusst hier und nicht beim Schreiben, damit auch die bereits
+  // erfassten Einträge davon profitieren.
+  const img = (row.metadata?.img || "").replace("/small/", "/normal/");
+  const preis = row.metadata?.price;
+  const el = `<span class="cf-card"${img ? ` data-cmd-img="${esc(img)}" data-cmd-name="${esc(karte)}"` : ""}` +
+    `${img && preis != null ? ` data-cmd-preis="${esc(eur(preis))}"` : ""}>${esc(karte)}</span>`;
   return esc(text).split(KARTEN_PLATZHALTER).join(el);
+}
+
+/* Höhepunkte der Community. Die drei Kartenkacheln verhalten sich wie die
+   Sammlung: kleines Bild, Vorschau beim Draufzeigen, Detailansicht beim Klick.
+   Die Karten gehören anderen, deshalb reisen sie als vollständiges Objekt aus
+   der RPC mit — in CARDS wären sie nicht zu finden. */
+function communityHighlightsHtml() {
+  const h = COMMUNITY_HIGHLIGHTS;
+  if (!h) return "";
+
+  const person = (wert, schluessel, zusatz) => {
+    if (!wert) return "";
+    const name = (wert.name || "").trim() || t("community.anonMember");
+    return `<div class="ch-tile"><div class="ch-k">${esc(t(schluessel))}</div>
+      <div class="ch-v">${esc(name)}</div>
+      <div class="ch-z">${esc(zusatz(wert))}</div></div>`;
+  };
+
+  const karte = (k, schluessel, zusatz) => {
+    if (!k) return "";
+    // Der Index zeigt auf die Karte in COMMUNITY_HIGHLIGHTS — das Objekt selbst
+    // gehört nicht ins Markup.
+    return `<div class="ch-tile ch-card" data-ch="${esc(schluessel)}" tabindex="0" role="button">
+      <div class="ch-k">${esc(t("community.hl." + schluessel))}</div>
+      <div class="ch-card-row">
+        ${k.img ? `<img class="ch-img" src="${esc(k.img)}" alt="" loading="lazy">` : ""}
+        <div class="ch-card-txt">
+          <div class="ch-v">${esc(k.name || "")}</div>
+          <div class="ch-z">${esc(zusatz(k))}</div>
+        </div>
+      </div></div>`;
+  };
+
+  const besitzer = k => {
+    const n = (k.owner || "").trim() || t("community.anonMember");
+    return t("community.hl.owner", { name: n });
+  };
+  const datum = d => { const z = Date.parse(d); return Number.isFinite(z) ? new Date(z).toLocaleDateString(LANG) : "–"; };
+
+  const kacheln = [
+    person(h.newest_member, "community.hl.newestMember",
+      w => t("community.hl.since", { d: datum(w.since) })),
+    h.biggest_collection ? `<div class="ch-tile"><div class="ch-k">${esc(t("community.hl.biggestCollection"))}</div>
+      <div class="ch-v">${esc((h.biggest_collection.name || "").trim() || t("community.anonMember"))}</div>
+      <div class="ch-z">${esc(t("community.hl.cardsN", { n: Number(h.biggest_collection.cards || 0).toLocaleString(LANG) }))}</div></div>` : "",
+    karte(h.newest_card, "newestCard", besitzer),
+    karte(h.oldest_card, "oldestCard", k => `${datum(k.released)} · ${besitzer(k)}`),
+    karte(h.priciest_card, "priciestCard", k => `${eur(k.price)} · ${besitzer(k)}`),
+  ].filter(Boolean).join("");
+
+  return kacheln ? `<h4 class="cf-title" style="margin-top:14px">${esc(t("community.hl.title"))}</h4>
+    <div class="ch-grid">${kacheln}</div>` : "";
+}
+
+/* Vorschau und Detailansicht an die Kartenkacheln hängen — wie in der
+   Sammlung, nur mit dem Kartenobjekt statt einer ID. */
+function wireCommunityHighlights(root) {
+  if (!root || !COMMUNITY_HIGHLIGHTS) return;
+  const feld = { newestCard: "newest_card", oldestCard: "oldest_card", priciestCard: "priciest_card" };
+  root.querySelectorAll(".ch-card[data-ch]").forEach(el => {
+    const k = COMMUNITY_HIGHLIGHTS[feld[el.dataset.ch]];
+    if (!k) return;
+    el.onclick = () => { hideHover(); zeigeFremdeKarte(k); };
+    el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); el.click(); } };
+    if (!HOVER_OK) return;
+    el.addEventListener("mouseenter", e => {
+      clearTimeout(hoverTimer);
+      hoverTimer = setTimeout(() => zeigeHoverKarte(k, e.clientX, e.clientY), 300);
+    });
+    el.addEventListener("mouseleave", hideHover);
+  });
 }
 
 function communityFeedHtml() {
@@ -6222,7 +6357,8 @@ function communityFeedHtml() {
 function wireCommunityKartenHover(root) {
   if (!HOVER_OK || !root) return;
   root.querySelectorAll(".cf-card[data-cmd-img]").forEach(el => {
-    el.addEventListener("mousemove", e => zeigeCmdHover(el.dataset.cmdImg, el.dataset.cmdName, e.clientX, e.clientY));
+    el.addEventListener("mousemove", e =>
+      zeigeCmdHover(el.dataset.cmdImg, el.dataset.cmdName, e.clientX, e.clientY, el.dataset.cmdPreis));
     el.addEventListener("mouseleave", versteckeCmdHover);
   });
 }
@@ -6242,6 +6378,7 @@ function communityBodyHtml() {
     return `<p class="hint" style="margin:0">${esc(t("community.unavailable"))}</p>`;
   const offen = feedOffen();
   return `${communityStatsHtml()}
+    ${communityHighlightsHtml()}
     <button type="button" class="cf-toggle" id="cf-toggle" aria-expanded="${offen}" aria-controls="cf-list">
       <span class="cf-caret" aria-hidden="true">${offen ? "&#9662;" : "&#9656;"}</span>
       <span>${esc(t("community.feedTitle"))}</span>
@@ -6263,6 +6400,7 @@ function zeigeCommunity() {
   el.innerHTML = communityBodyHtml();
   wireCommunityFeedToggle();
   wireCommunityKartenHover(el);
+  wireCommunityHighlights(el);
 }
 
 /* Eigene Ansicht statt Anhängsel am Dashboard: das Dashboard beantwortet „was
@@ -6278,6 +6416,7 @@ function renderCommunity() {
     </div>`;
   wireCommunityFeedToggle();
   wireCommunityKartenHover(el);
+  wireCommunityHighlights(el);
   // Beim Login geladen; war das erfolglos oder steht die Ansicht früher, hier
   // nachziehen. Kein Kreislauf: ladeCommunityFoundation() ruft nur zeigeCommunity().
   if (!COMMUNITY_STATS && !COMMUNITY_FEED.length) ladeCommunityFoundation().catch(() => {});

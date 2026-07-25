@@ -996,3 +996,25 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px}
   .cf-card[data-cmd-img]{ cursor:help; text-decoration:underline;
                           text-decoration-style:dotted; text-underline-offset:2px; }
 }
+/* Zusatzzeile der Hover-Vorschau (im Community-Feed der Preis). Ruhiger als
+   der Name darüber — eine Angabe, keine Überschrift. */
+.cmd-hover-zus{ text-align:center; font-size:13px; color:var(--dim);
+                margin-top:2px; font-variant-numeric:tabular-nums; }
+
+/* ---------------- Community-Höhepunkte (Kacheln) ----------------
+   Wie die Kennzahlen darüber, aber mit Platz für Kartenbild und zwei Zeilen
+   Text. Die Kartenkacheln sind anfassbar (Vorschau/Detail), die anderen nicht. */
+.ch-grid{ display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
+.ch-tile{ flex:1; min-width:210px; background:var(--panel2); border:1px solid var(--line);
+          border-radius:var(--radius); padding:12px; }
+.ch-tile .ch-k{ font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.6px; }
+.ch-tile .ch-v{ font-size:16px; font-weight:700; color:var(--acc); margin-top:3px;
+                overflow-wrap:anywhere; }
+.ch-tile .ch-z{ font-size:12px; color:var(--dim); margin-top:2px;
+                font-variant-numeric:tabular-nums; }
+.ch-card{ cursor:pointer; }
+.ch-card:hover, .ch-card:focus-visible{ border-color:var(--acc); outline:none; }
+.ch-card-row{ display:flex; align-items:flex-start; gap:10px; margin-top:6px; }
+.ch-img{ width:48px; flex:none; border-radius:4px; display:block; }
+.ch-card-txt{ min-width:0; }
+.ch-card-txt .ch-v{ margin-top:0; font-size:15px; }
