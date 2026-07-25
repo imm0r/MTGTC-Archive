@@ -107,7 +107,11 @@ Deno.serve(async (req) => {
 
   let mode = "card", lang = "de", n = 10, colors = "";
   let name = "", typeLine = "", oracle = "";
-  let deckName = "", deckFormat = "", commander = "", deckCards: string[] = [];
+  // Deckkarte fürs Modell: Name, Typzeile, Regeltext. Der Regeltext ist der
+  // Punkt — ohne ihn muss das Modell über jede Karte raten, die es nicht aus
+  // dem Training kennt, und rät bei neuen Sets aus dem Namen.
+  type DeckKarte = { n: string; t?: string; o?: string };
+  let deckName = "", deckFormat = "", commander = "", deckCards: DeckKarte[] = [];
   let deckVoll = false;
   try {
     const body = await req.json();
@@ -121,8 +125,18 @@ Deno.serve(async (req) => {
       deckFormat = String(d.format ?? "").slice(0, 60);
       commander = String(d.commander ?? "").slice(0, 120);
       colors = String(d.colorIdentity ?? "").replace(/[^WUBRGC]/gi, "").toUpperCase();
+      // Beide Formen annehmen: der ältere Client schickt blanke Namen, der
+      // neuere Objekte mit Typzeile und Regeltext. Sonst bricht die Funktion
+      // jeden Client, der noch nicht nachgezogen ist.
       deckCards = Array.isArray(d.cards)
-        ? d.cards.map((x: unknown) => String(x).slice(0, 80)).filter(Boolean).slice(0, 120)
+        ? d.cards.map((x: unknown): DeckKarte => typeof x === "string"
+            ? { n: x.slice(0, 80) }
+            : {
+                n: String((x as DeckKarte)?.n ?? "").slice(0, 80),
+                t: String((x as DeckKarte)?.t ?? "").slice(0, 120),
+                o: String((x as DeckKarte)?.o ?? "").slice(0, 300),
+              })
+          .filter((c) => c.n).slice(0, 120)
         : [];
       deckVoll = !!d.full;
       if (!deckCards.length) throw new Error("Leere Deckliste");
@@ -147,6 +161,7 @@ Deno.serve(async (req) => {
 
 Strikte Regeln:
 - Nenne ausschließlich ECHTE, existierende Magic-Karten mit ihrem exakten englischen Namen. Erfinde nichts. Bist du dir bei Existenz oder Schreibweise unsicher, lass die Karte weg.
+- ZUM DECK SELBST: Die Kartenliste enthält Typzeile und Regeltext. Stütze JEDE Aussage über eine Karte aus dem Deck ausschließlich auf diesen Text — niemals auf Erinnerung. Das Deck enthält Karten aus Sets, die nach deinem Trainingsstand erschienen sind; deren Namen legen oft etwas völlig anderes nahe als ihr tatsächlicher Regeltext. Was im gelieferten Text nicht steht, behauptest du nicht.
 - Keine Standardländer (Basic Lands). Schlage keine Karte vor, die bereits im Deck ist.${farbHinweis}
 - Erkenne zuerst die Strategie und die Themen des Decks (Commander/Schlüsselkarten, wiederkehrende Mechaniken) und schlage Karten vor, die genau darauf einzahlen.
 - Je Karte eine EINZIGE, konkrete Begründung, die den Synergie-Mechanismus MIT DEM DECK benennt, nicht bloß "gute Karte". Formuliere die Begründung auf ${SPRACHE[lang]}.
@@ -159,12 +174,22 @@ Strikte Regeln:
 - Je Karte eine EINZIGE, konkrete Begründung, die den Synergie-Mechanismus benennt (WARUM sie zusammen stark sind), nicht bloß "gute Karte". Formuliere die Begründung auf ${SPRACHE[lang]}.
 - Bevorzuge unerwartete, kluge Synergien gegenüber offensichtlichen Kopien desselben Schlüsselworts. Sortiere die überzeugendsten Synergien nach oben.`;
 
+  // Mit Regeltext eine Zeile je Karte, ohne (alter Client, Standardländer) nur
+  // der Name. Zeilenumbrüche im Regeltext werden zu Leerzeichen, damit eine
+  // Karte eine Zeile bleibt und die Liste lesbar ist.
+  const kartenBlock = deckCards
+    .map((c) => c.t || c.o
+      ? `- ${c.n}${c.t ? ` — ${c.t}` : ""}${c.o ? `: ${c.o.replace(/\s*\n\s*/g, " ")}` : ""}`
+      : `- ${c.n}`)
+    .join("\n");
+  const hatText = deckCards.some((c) => c.o);
+
   const USER = mode === "deck"
     ? `Deck: ${deckName || "(ohne Namen)"}${deckFormat ? ` — Format: ${deckFormat}` : ""}${commander ? `\nCommander/Schlüsselkarte: ${commander}` : ""}${colors ? `\nFarbidentität: {${colors}}` : ""}
-Kartenliste (${deckCards.length}):
-${deckCards.join(", ")}
+Kartenliste (${deckCards.length})${hatText ? " mit Typzeile und Regeltext" : ""}:
+${kartenBlock}
 
-Nenne ${n} Karten, die die Strategie dieses Decks am besten ergänzen.${deckVoll ? "\n\nDas Deck ist VOLL (100 Karten). Nenne deshalb je Vorschlag im Feld replaces den exakten englischen Namen EINER Karte aus der obigen Liste, die dafür weichen sollte — die schwächste oder am wenigsten zur Strategie passende. Niemals den Commander. Jede Karte höchstens einmal nennen.\n\nBegründe in replacesWhy in EINEM Satz, warum genau diese Karte weichen sollte: was sie in diesem Deck konkret schlechter leistet als der Vorschlag — zu langsam, redundant zu einer bereits vorhandenen Karte, passt nicht zur Farbidentität, zu hohe Kosten für den Effekt. Kein Allgemeinplatz wie 'sie ist schwächer'." : ""}`
+Nenne ${n} Karten, die die Strategie dieses Decks am besten ergänzen.${deckVoll ? "\n\nDas Deck ist VOLL (100 Karten). Nenne deshalb je Vorschlag im Feld replaces den exakten englischen Namen EINER Karte aus der obigen Liste, die dafür weichen sollte — die schwächste oder am wenigsten zur Strategie passende. Niemals den Commander. Jede Karte höchstens einmal nennen.\n\nBegründe in replacesWhy in EINEM Satz, warum genau diese Karte weichen sollte: was sie in diesem Deck konkret schlechter leistet als der Vorschlag — zu langsam, redundant zu einer bereits vorhandenen Karte, passt nicht zur Farbidentität, zu hohe Kosten für den Effekt. Kein Allgemeinplatz wie 'sie ist schwächer'.\n\nDie Begründung muss sich auf den OBEN GELIEFERTEN Regeltext dieser Karte stützen. Schreibe der Karte nichts zu, was dort nicht steht — kein Effekt, kein Tokentyp, kein Zählmarken-Verhalten. Passt der gelieferte Text nicht zu dem, was du über den Namen zu wissen glaubst, gilt der Text." : ""}`
     : `Ausgangskarte:
 Name: ${name}
 Typzeile: ${typeLine}

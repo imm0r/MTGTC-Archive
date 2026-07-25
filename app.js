@@ -3066,6 +3066,33 @@ async function kiSynergien(card, box, opts = {}) {
 /* Passt die Farbidentität einer Karte in die erlaubten Deckfarben (Teilmenge)? */
 function farbIdentPasst(ci, erlaubt) { return (ci || []).every(f => erlaubt.has(f)); }
 
+/* Die Deckliste, wie sie das Modell braucht: Name, Typzeile, Regeltext.
+
+   Lange gingen nur die NAMEN raus. Das reicht, solange das Modell die Karten
+   kennt — aber jedes neue Set kennt es nicht, und dann rät es aus dem Namen.
+   „Topiary Lecturer" klingt nach Pflanzen, macht aber +1/+1-Zählmarken; die
+   Begründung wurde damit nicht bloß vage, sondern sachlich falsch. Mit dem
+   Regeltext muss nichts geraten werden.
+
+   Standardländer tragen keinen Regeltext, der etwas erklären würde, und der
+   Rest wird bei 300 Zeichen gekappt: das deckt auch lange Karten ab, ohne
+   dass 100 Karten die Anfrage sprengen. */
+function deckKartenFuersModell(cards) {
+  const gesehen = new Set();
+  const raus = [];
+  for (const c of cards) {
+    const nm = c?.name;
+    if (!nm || gesehen.has(nm)) continue;
+    gesehen.add(nm);
+    const typ = c.type_line || "";
+    raus.push(/basic/i.test(typ) && /land/i.test(typ)
+      ? { n: nm }
+      : { n: nm, t: typ, o: (c.oracle_text || "").slice(0, 300) });
+    if (raus.length >= 120) break;
+  }
+  return raus;
+}
+
 /* KI-Synergien fürs GANZE Deck: die Deckliste geht als Kontext an Claude, das
    auch implizite, aufs Deck bezogene Synergien vorschlägt. Zusätzlich filtern
    wir clientseitig auf die Farbidentität des Decks (falls das Modell danebenlangt)
@@ -3077,7 +3104,7 @@ async function kiSynergienDeck(deck, cards, box, opts = {}) {
     body: {
       deck: {
         name: deck.name, format: deck.format || "", commander, colorIdentity: colors,
-        cards: [...new Set(cards.map(c => c.name).filter(Boolean))].slice(0, 120),
+        cards: deckKartenFuersModell(cards),
         // Ist das Deck voll, soll das Modell zu jedem Vorschlag gleich sagen,
         // welche Karte dafür weichen sollte — es kennt die Liste ohnehin.
         full: deckFrei(deck) === 0,
