@@ -3111,7 +3111,6 @@ async function kiSynergieLauf(box, cfg) {
 
   const sugg = (data?.suggestions || []).filter(s => s && s.name);
   if (!sugg.length) { box.innerHTML = `<div class="empty">${esc(t("syn.none"))}</div>`; return; }
-  zaehleCommunitySuche("synergies", sugg.length);
 
   // Namen gegen Scryfall prüfen (POST /cards/collection, ein Request bis 75 Namen).
   let karten = [];
@@ -3145,6 +3144,10 @@ async function kiSynergieLauf(box, cfg) {
     treffer.push(vorschlagCardHtml(c, s.reason, cfg.deckId));
     if (lim && treffer.length >= lim) break;
   }
+  // Erst hier zählen: „treffer" ist, was tatsächlich angezeigt wird — nach
+  // Scryfall-Prüfung, Farb- und Preisfilter und dem eingestellten Höchstwert.
+  // Die Rohliste des Modells ist regelmäßig länger und wäre die falsche Zahl.
+  zaehleCommunitySuche("synergies", treffer.length);
   const kosten = kiKostenHtml(data?.usage);   // die Abfrage kostete unabhängig von der Trefferzahl
   box.innerHTML = treffer.length
     ? `<div class="meta">${esc(t("syn.aiNote"))}</div>${kosten}<div class="syn-grid">${treffer.join("")}</div>`
@@ -3570,7 +3573,6 @@ async function deckCombosAnzeigen(box, cards, deckId) {
   // Einstellung „nur komplette Combos": die „Fast komplett"-Kategorie weglassen.
   let almost = suchPrefs().onlyComplete ? [] : (data.almostIncluded || []);
   if (!included.length && !almost.length) { box.innerHTML = `<div class="empty">${esc(t("combo.none"))}</div>`; return; }
-  zaehleCommunitySuche("combos", included.length + almost.length);
 
   // Legalität im Deck-Format: erst zählen (für die Zusammenfassung), dann —
   // je nach Einstellung — die nicht legalen Combos ganz ausblenden.
@@ -3581,6 +3583,8 @@ async function deckCombosAnzeigen(box, cards, deckId) {
     included = included.filter(c => comboIstLegal(c, legKey));
     almost = almost.filter(c => comboIstLegal(c, legKey));
   }
+  // Nach dem Filtern zählen — gezeigt wird, was übrig bleibt.
+  zaehleCommunitySuche("combos", included.length + almost.length);
 
   // Alle Karten aller Combos (fertig + fast fertig) bei Scryfall auflösen —
   // für die Kacheln und die „+ Deck"/„+ Wunsch"-Knöpfe.
@@ -3622,11 +3626,12 @@ async function sammlungCombosAnzeigen(box, cards) {
   if (lauf !== combosLauf) return;
   let included = data.included || [];
   if (!included.length) { box.innerHTML = `<div class="empty">${esc(t("combo.collNone"))}</div>`; return; }
-  zaehleCommunitySuche("combos", included.length);
   // Legalität: ohne Deck-Kontext gegen Commander (siehe comboLegalKey).
   const gesamt = included.length;
   const illegal = included.filter(c => !comboIstLegal(c, "commander")).length;
   if (illegal && suchPrefs().hideBanned) included = included.filter(c => comboIstLegal(c, "commander"));
+  // Nach dem Filtern zählen — gezeigt wird, was übrig bleibt.
+  zaehleCommunitySuche("combos", included.length);
   const cardByName = await comboKartenLaden(included.flatMap(c => (c.uses || []).map(u => u.name)));
   if (lauf !== combosLauf) return;
   const note = illegal ? `<div class="meta legal-note">&#9878; ${esc(t(
@@ -3656,11 +3661,12 @@ async function karteCombosAnzeigen(box, card) {
   if (lauf !== combosLauf) return;
   let combos = data.combos || [];
   if (!combos.length) { box.innerHTML = `<div class="empty">${esc(t("combo.cardNone"))}</div>`; return; }
-  zaehleCommunitySuche("combos", combos.length);
   // Legalität: ohne Deck-Kontext gegen Commander (siehe comboLegalKey).
   const gesamt = combos.length;
   const illegal = combos.filter(c => !comboIstLegal(c, "commander")).length;
   if (illegal && suchPrefs().hideBanned) combos = combos.filter(c => comboIstLegal(c, "commander"));
+  // Nach dem Filtern zählen — gezeigt wird, was übrig bleibt.
+  zaehleCommunitySuche("combos", combos.length);
   const cardByName = await comboKartenLaden(combos.flatMap(c => (c.uses || []).map(u => u.name)));
   if (lauf !== combosLauf) return;
   const note = illegal ? `<div class="meta legal-note">&#9878; ${esc(t(
