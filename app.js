@@ -2911,15 +2911,18 @@ function synKachel(card, grundText, deckId, schnitt) {
   if (deckId && card.id) {
     SYN_CACHE.set(card.id, card);
     const owned = besessen > 0;
-    // Volles Commander-Deck: Vorschläge bleiben sichtbar, nur das Hinzufügen
-    // ruht — und daneben steht, welche Karte dafür weichen könnte.
-    const voll = deckFreiById(deckId) === 0;
-    addBtn = voll
-      ? `<button class="syn-add voll" disabled title="${esc(t("deck.fullBtnTitle"))}">&#43;&#160;${esc(t(owned ? "syn.addDeck" : "syn.addWish"))}</button>`
+    const deck = DECKS.find(d => d.id === deckId);
+    // Zwei Gründe, den Knopf ruhen zu lassen — der speziellere zuerst: liegt die
+    // Karte schon im Deck, hilft auch kein Schnitt, denn ein zweites Exemplar
+    // wäre im Commander ohnehin nicht erlaubt.
+    const schonDrin = singletonFrei(deck, card) === 0;
+    const voll = !schonDrin && deckFrei(deck) === 0;
+    addBtn = (schonDrin || voll)
+      ? `<button class="syn-add voll" disabled title="${esc(t(schonDrin ? "deck.singletonBtnTitle" : "deck.fullBtnTitle"))}">&#43;&#160;${esc(t(owned ? "syn.addDeck" : "syn.addWish"))}</button>`
       : `<button class="syn-add${owned ? " owned" : ""}" data-deck="${esc(deckId)}" data-sid="${esc(card.id)}"
       title="${esc(t(owned ? "syn.addOwnedTitle" : "syn.addWishTitle"))}">&#43;&#160;${
         esc(t(owned ? "syn.addDeck" : "syn.addWish"))}</button>`;
-    if (voll) cut = schnittHinweisHtml(schnitt || deckSchnittKandidat(DECKS.find(d => d.id === deckId), card));
+    if (voll) cut = schnittHinweisHtml(schnitt || deckSchnittKandidat(deck, card));
   }
   return `<div class="syn-card">
     <a class="syn-card-link" href="${esc(card.scryfall_uri || "#")}" target="_blank" rel="noopener noreferrer">
@@ -3504,14 +3507,17 @@ function comboCardMini(card, deckId, alsAktion) {
   if (alsAktion && card.id) {
     SYN_CACHE.set(card.id, card);
     const owned = besessen > 0;
-    // Volles Deck: derselbe gesperrte Zustand wie bei den Synergie-Kacheln —
-    // der Knopf soll überall gleich aussehen und gleich erklären.
-    const voll = deckFreiById(deckId) === 0;
-    addBtn = voll
-      ? `<button class="syn-add voll" disabled title="${esc(t("deck.fullBtnTitle"))}">&#43;&#160;${esc(t(owned ? "syn.addDeck" : "syn.addWish"))}</button>`
+    // Volles Deck bzw. schon im Deck: derselbe gesperrte Zustand wie bei den
+    // Synergie-Kacheln — der Knopf soll überall gleich aussehen und gleich
+    // erklären.
+    const deck = DECKS.find(d => d.id === deckId);
+    const schonDrin = singletonFrei(deck, card) === 0;
+    const voll = !schonDrin && deckFrei(deck) === 0;
+    addBtn = (schonDrin || voll)
+      ? `<button class="syn-add voll" disabled title="${esc(t(schonDrin ? "deck.singletonBtnTitle" : "deck.fullBtnTitle"))}">&#43;&#160;${esc(t(owned ? "syn.addDeck" : "syn.addWish"))}</button>`
       : `<button class="syn-add${owned ? " owned" : ""}" data-deck="${esc(deckId)}" data-sid="${esc(card.id)}"
       title="${esc(owned ? t("syn.addOwnedTitle") : t("syn.addWishTitle"))}">&#43;&#160;${esc(t(owned ? "syn.addDeck" : "syn.addWish"))}</button>`;
-    if (voll) cut = schnittHinweisHtml(deckSchnittKandidat(DECKS.find(d => d.id === deckId), card));
+    if (voll) cut = schnittHinweisHtml(deckSchnittKandidat(deck, card));
   }
   // Weder besessen noch (mangels Deck-Kontext) wünschbar — z. B. im
   // Kartendetail: direkt zum Kauf verlinken (Scryfalls Cardmarket-Link,
@@ -3959,6 +3965,53 @@ const deckFreiById = id => deckFrei(DECKS.find(d => d.id === id));
    Meldung formuliert die Oberfläche selbst, damit sie übersetzt ist. */
 const istDeckVollFehler = e =>
   e?.hint === "deck_full" || /deck_full/.test(e?.hint || e?.message || "");
+
+const istSingletonFehler = e =>
+  e?.hint === "deck_singleton" || /deck_singleton/.test(e?.hint || e?.message || "");
+
+/* ---- Singleton-Regel ----------------------------------------------------
+   Ein Commander-Deck darf von jeder Karte nur ein Exemplar enthalten.
+   Maßgeblich ist der englische KARTENNAME, nicht die Auflage: zwei Drucke
+   derselben Karte sind zwei Zeilen in der Sammlung, aber trotzdem zweimal
+   dieselbe Karte.
+
+   Ausnahmen sprechen die Karten selbst aus, deshalb steht die Erkennung im
+   Regeltext und nicht in einer gepflegten Liste — eine Liste wäre mit dem
+   nächsten Set veraltet. type_line und oracle_text liefert Scryfall auch bei
+   fremdsprachigen Drucken auf Englisch (die Landessprache steht in printed_*),
+   die Prüfung ist also sprachunabhängig.
+
+   Durchgesetzt wird auch das im Trigger; hier steht die Vorwarnung. */
+const ZAHLWORT = { one: 1, two: 2, three: 3, four: 4, five: 5,
+                   six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+
+function commanderMaxKopien(card) {
+  const typ = card?.type_line || "";
+  if (/basic/i.test(typ) && /land/i.test(typ)) return Infinity;   // Standardländer
+  const txt = card?.oracle_text || card?.card_faces?.[0]?.oracle_text || "";
+  if (/a deck can have any number of cards named/i.test(txt)) return Infinity;
+  const m = txt.match(/a deck can have up to (\w+) cards named/i);
+  if (m) return ZAHLWORT[m[1].toLowerCase()] || 1;
+  return 1;
+}
+
+/* Wie oft liegt diese Karte — über alle Auflagen — schon im Deck? */
+function deckKopien(d, card) {
+  const nm = (card?.name || "").toLowerCase();
+  if (!d || !nm) return 0;
+  let n = 0;
+  for (const e of d.entries || []) {
+    const c = CARDS.find(x => x.id === e.cardId);
+    if (c && (c.name || "").toLowerCase() === nm) n += e.qty;
+  }
+  return n;
+}
+
+/* Passt noch ein Exemplar dieser Karte ins Deck? Nur für Commander relevant. */
+function singletonFrei(d, card) {
+  if (!istCommanderDeck(d)) return Infinity;
+  return Math.max(0, commanderMaxKopien(card) - deckKopien(d, card));
+}
 
 /* Einheitliche Absage, wenn jemand trotz gesperrter Knöpfe durchkommt. */
 function deckVollMelden(d) {
@@ -4715,14 +4768,16 @@ function renderDecks() {
       return;
     }
 
-    // Liegt genau diese Zeile schon im Deck und ist kein Platz mehr frei, ist
-    // „Deck voll" die falsche Auskunft: der Platz ist nicht weg, sondern an
-    // genau diese Karte vergeben. Fehlt sie noch, hilft die Sammlung, nicht das
-    // Deck.
-    if (ex && deckFrei(d) === 0) {
-      const fehlt = pick ? ex.qty > bestandVon(pick) : false;
-      toast(t(fehlt ? "deck.alreadyInWish" : "deck.alreadyIn",
-              { name: pick?.disp || pick?.name || "" }));
+    // Singleton: Im Commander-Deck ist jede Karte nur einmal erlaubt (Ausnahmen
+    // stehen im Regeltext der Karte). Das gilt unabhängig davon, ob noch Platz
+    // ist — und es ist die richtige Auskunft, wo vorher pauschal „Deck voll"
+    // stand: der Platz ist nicht weg, sondern an genau diese Karte vergeben.
+    // Fehlt sie einem noch, führt der Weg über die Sammlung, nicht übers Deck.
+    if (pick && add > singletonFrei(d, pick)) {
+      const name = pick.disp || pick.name;
+      toast(ex && ex.qty > bestandVon(pick)
+        ? t("deck.alreadyInWish", { name })
+        : t("deck.singleton", { name, max: commanderMaxKopien(pick), n: deckKopien(d, pick) }));
       return;
     }
 
@@ -4759,6 +4814,12 @@ function renderDecks() {
       // Der Trigger ist die letzte Instanz — etwa wenn ein zweites Gerät
       // parallel Karten hinzugefügt hat, seit diese Ansicht gezeichnet wurde.
       if (istDeckVollFehler(e)) { await reload(); renderAll(); deckVollMelden(DECKS.find(x => x.id === deckId)); }
+      else if (istSingletonFehler(e)) {
+        await reload(); renderAll();
+        const dd = DECKS.find(x => x.id === deckId);
+        toast(t("deck.singleton", { name: pick?.disp || pick?.name || "",
+          max: pick ? commanderMaxKopien(pick) : 1, n: pick ? deckKopien(dd, pick) : 0 }));
+      }
       else { toast(dbErr(e)); btn.disabled = false; }
     }
   });
@@ -8332,7 +8393,20 @@ function wireApp() {
       btn.innerHTML = "&#10003;";
       const d = DECKS.find(x => x.id === deckId);
       toast(t("syn.addedWish", { name: card.name, deck: d?.name || "" }));
-    } catch (err) { btn.disabled = false; toast(dbErr(err)); }
+    } catch (err) {
+      // Der Trigger kann trotz gesperrter Kachel absagen — etwa wenn die Karte
+      // seit der Suche von einem zweiten Gerät ins Deck gelegt wurde.
+      if (istSingletonFehler(err)) {
+        await reload();
+        const d = DECKS.find(x => x.id === deckId);
+        toast(t("deck.singleton", { name: card.name,
+          max: commanderMaxKopien(card), n: deckKopien(d, card) }));
+        btn.classList.add("voll");
+      } else if (istDeckVollFehler(err)) {
+        await reload(); deckVollMelden(DECKS.find(x => x.id === deckId));
+        btn.classList.add("voll");
+      } else { btn.disabled = false; toast(dbErr(err)); }
+    }
   });
 
   // Treffer direkt übernehmen oder erst bestätigen (gerätelokal gemerkt).

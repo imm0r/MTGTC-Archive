@@ -3349,27 +3349,32 @@ Object.assign(I18N.it, {
 Object.assign(I18N.de, {
   "deck.wishFilled": "„{name}“ war als Wunschkarte eingeplant — jetzt liegt deine eigene Auflage im Deck. Die Deckgröße bleibt gleich.",
   "deck.alreadyInWish": "„{name}“ ist bereits in diesem Deck eingeplant, dir fehlt sie nur noch. Nimm sie in deine Sammlung auf — der Deckplatz ist schon vergeben.",
-  "deck.alreadyIn": "„{name}“ liegt bereits in diesem Deck.",
+  "deck.singleton": "Commander erlaubt „{name}“ nur {max}× im Deck — sie liegt schon {n}× drin.",
+  "deck.singletonBtnTitle": "Liegt schon im Deck — Commander erlaubt nur ein Exemplar",
 });
 Object.assign(I18N.en, {
   "deck.wishFilled": "“{name}” was planned as a wishlist card — your own copy is now in the deck. The deck size stays the same.",
   "deck.alreadyInWish": "“{name}” is already planned in this deck, you just don't own it yet. Add it to your collection — the deck slot is already taken.",
-  "deck.alreadyIn": "“{name}” is already in this deck.",
+  "deck.singleton": "Commander allows “{name}” only {max}× per deck — it is already in there {n}×.",
+  "deck.singletonBtnTitle": "Already in the deck — Commander allows only one copy",
 });
 Object.assign(I18N.fr, {
   "deck.wishFilled": "« {name} » était prévue comme carte souhaitée — ton propre exemplaire est maintenant dans le deck. La taille du deck ne change pas.",
   "deck.alreadyInWish": "« {name} » est déjà prévue dans ce deck, il te manque seulement l'exemplaire. Ajoute-la à ta collection — la place est déjà réservée.",
-  "deck.alreadyIn": "« {name} » est déjà dans ce deck.",
+  "deck.singleton": "Commander n’autorise « {name} » que {max}× par deck — elle y est déjà {n}×.",
+  "deck.singletonBtnTitle": "Déjà dans le deck — Commander n’autorise qu’un exemplaire",
 });
 Object.assign(I18N.es, {
   "deck.wishFilled": "«{name}» estaba prevista como carta deseada; ahora tu propio ejemplar está en el mazo. El tamaño del mazo no cambia.",
   "deck.alreadyInWish": "«{name}» ya está prevista en este mazo, solo te falta el ejemplar. Añádela a tu colección: el hueco ya está reservado.",
-  "deck.alreadyIn": "«{name}» ya está en este mazo.",
+  "deck.singleton": "Commander permite «{name}» solo {max}× por mazo; ya está {n}× dentro.",
+  "deck.singletonBtnTitle": "Ya está en el mazo: Commander solo permite un ejemplar",
 });
 Object.assign(I18N.it, {
   "deck.wishFilled": "«{name}» era prevista come carta desiderata: ora nel mazzo c'è la tua copia. La dimensione del mazzo resta invariata.",
   "deck.alreadyInWish": "«{name}» è già prevista in questo mazzo, ti manca solo la copia. Aggiungila alla tua collezione: il posto è già assegnato.",
-  "deck.alreadyIn": "«{name}» è già in questo mazzo.",
+  "deck.singleton": "Commander consente «{name}» solo {max}× per mazzo: è già presente {n}×.",
+  "deck.singletonBtnTitle": "Già nel mazzo — Commander consente una sola copia",
 });
 
 initLang();
