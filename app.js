@@ -821,17 +821,83 @@ async function scanFile(file) {
 async function scanMultiFile(file) {
   let img;
   try { img = await loadImg(file); } catch { return toast(t("scan.imgUnreadable")); }
+  // Leeren Rand ums Karten-Motiv vorab wegschneiden — dann füllen die Karten
+  // den Rahmen und werden im (fest verkleinerten) detect-Bild groß genug, dass
+  // das Modell alle findet. Findet sich kein klarer Rand, bleibt das ganze Bild.
+  // Detect UND der Zuschnitt je Karte arbeiten auf demselben getrimmten Bild,
+  // damit die zurückgegebenen Rechtecke ohne Umrechnung passen.
+  const base = trimToContent(img) || img;
   toast(t("scan.searching"));
   let boxes;
-  try { boxes = await detectCards(img); }
+  try { boxes = await detectCards(base); }
   catch (e) { return toast(e.message || t("scan.notFound")); }
   if (!boxes.length) return toast(t("scan.noneDetected"));
   toast(t("scan.detected", { n: boxes.length }));
   const lang = $("#d-lang").value;
   for (const box of boxes) {
-    const cv = cropCanvas(img, box, 0.06);
+    const cv = cropCanvas(base, box, 0.06);
     await scanBild(cv, cv.toDataURL("image/jpeg", 0.7), lang);
   }
+}
+
+/* Schneidet den leeren Rand rings ums Karten-Motiv weg, BEVOR das Foto zum
+   detect-Modell geht. Das Bild wird dort auf eine feste Größe heruntergerechnet;
+   je mehr Rand, desto kleiner die Karten darin, desto eher übersieht das Modell
+   welche — ein Nutzer belegte das direkt (dasselbe Motiv mit Rand fand zwei
+   Karten weniger als zugeschnitten). Wir ermitteln nur die EINE äußere Hülle des
+   Inhalts: von jeder Bildkante nach innen, bis eine Zeile/Spalte nicht mehr
+   gleichförmiger Hintergrund ist. Das ist robust — es entfernt nur randständige,
+   gleichförmige Streifen; eine Karte bricht die Gleichförmigkeit und stoppt den
+   Schnitt. Bewusst NICHT die Karten-Segmentierung aus #52: hier fällt genau ein
+   Rechteck, keine Formfilter, kein Zusammenwachsen. Fällt kein klarer Rand an
+   (Karte berührt die Kante) oder wäre der Schnitt unplausibel, kommt null und
+   das ganze Bild geht wie bisher raus. Rückgabe: ein Canvas in Originalauflösung
+   des Ausschnitts, oder null. */
+function trimToContent(img) {
+  const W = 320, H = Math.max(1, Math.round(img.height * (W / img.width)));
+  const cv = document.createElement("canvas");
+  cv.width = W; cv.height = H;
+  const cx = cv.getContext("2d", { willReadFrequently: true });
+  cx.drawImage(img, 0, 0, W, H);
+  const d = cx.getImageData(0, 0, W, H).data;
+  const lum = p => 0.299 * d[p * 4] + 0.587 * d[p * 4 + 1] + 0.114 * d[p * 4 + 2];
+
+  // Hintergrund = Median der Randhelligkeit (Tisch/Papier am Bildrand).
+  const rand = [];
+  for (let x = 0; x < W; x++) { rand.push(lum(x)); rand.push(lum((H - 1) * W + x)); }
+  for (let y = 0; y < H; y++) { rand.push(lum(y * W)); rand.push(lum(y * W + W - 1)); }
+  rand.sort((a, b) => a - b);
+  const bg = rand[rand.length >> 1];
+
+  // Je Zeile/Spalte zählen, wie viele Pixel deutlich vom Rand-Hintergrund
+  // abweichen. Eine Karte (Illustration, Text) liefert reichlich solche Pixel.
+  const zeile = new Array(H).fill(0), spalte = new Array(W).fill(0);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++)
+      if (Math.abs(lum(y * W + x) - bg) > 34) { zeile[y]++; spalte[x]++; }
+
+  // Von außen nach innen bis zur ersten "Inhalts"-Zeile/Spalte (>4 % abweichend).
+  const zMin = W * 0.04, sMin = H * 0.04;
+  let top = 0; while (top < H && zeile[top] < zMin) top++;
+  let bot = H - 1; while (bot > top && zeile[bot] < zMin) bot--;
+  let left = 0; while (left < W && spalte[left] < sMin) left++;
+  let right = W - 1; while (right > left && spalte[right] < sMin) right--;
+  if (top >= bot || left >= right) return null;
+
+  // Etwas Luft lassen, damit keine Kartenkante wegfällt.
+  const pad = 0.02;
+  const x0 = Math.max(0, left / W - pad), y0 = Math.max(0, top / H - pad);
+  const x1 = Math.min(1, (right + 1) / W + pad), y1 = Math.min(1, (bot + 1) / H + pad);
+  const fw = x1 - x0, fh = y1 - y0;
+  if (fw > 0.93 && fh > 0.93) return null;   // kaum Rand da — nichts gewonnen
+  if (fw < 0.25 || fh < 0.25) return null;   // unplausibel klein — lieber ganzes Bild
+
+  const sx = Math.round(x0 * img.width), sy = Math.round(y0 * img.height);
+  const sw = Math.round(fw * img.width), sh = Math.round(fh * img.height);
+  const out = document.createElement("canvas");
+  out.width = sw; out.height = sh;
+  out.getContext("2d").drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+  return out;
 }
 
 /* Kartenrechtecke (Anteile 0..1) für ein Foto mit mehreren Karten, über die
