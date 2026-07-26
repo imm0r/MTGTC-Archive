@@ -64,6 +64,38 @@ Browser.
 Browser und der Cache von GitHub Pages nach dem Push weiter die alten Dateien —
 die Änderung wirkt dann scheinbar gar nicht.
 
+### Versionsnummer
+
+Die angezeigte Version steht in `index.html` und folgt Semantic Versioning:
+
+```html
+<meta name="app-version" content="1.0.0">
+```
+
+| Stelle | Wann sie steigt |
+| --- | --- |
+| **Major** (`X`) | Grundlegende Änderungen, die Schnittstellen verändern können |
+| **Minor** (`X.Y`) | Neue Funktionen oder Erweiterungen, vollständig abwärtskompatibel |
+| **Patch** (`X.Y.Z`) | Fehlerbehebungen und kleinere Optimierungen |
+
+Steigt eine Stelle, werden die rechts davon auf `0` zurückgesetzt: nach `1.4.7`
+kommt bei einer neuen Funktion `1.5.0`, bei einer Schnittstellenänderung `2.0.0`.
+
+Das ist **etwas anderes als `?v=`**, auch wenn beides in derselben Datei steht:
+
+* `?v=` beantwortet „hat sich *diese Datei* geändert" und wandert je Datei
+  einzeln — nur so holen Browser genau das Geänderte neu.
+* Die Version beantwortet „welcher *Stand* ist ausgeliefert" und gilt für die
+  App als Ganzes.
+
+Beide gehören zu jeder Auslieferung hochgezählt: `?v=` bei jeder berührten
+Datei, die Version je nach Art der Änderung. Hinge die Anzeige am `app.js?v=`,
+bliebe sie bei einer reinen Stilkorrektur stehen, obwohl eine Fehlerbehebung
+ausgeliefert wurde.
+
+Fehlt das `<meta>` oder steht dort keine gültige Nummer, zeigt die App gar
+keine Version an, statt eine erfundene zu behaupten.
+
 ### 3. Lokal testen (optional)
 
 `start.cmd` startet einen lokalen Webserver auf Port 8000 und braucht dazu

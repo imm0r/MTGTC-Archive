@@ -22,14 +22,22 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const today = () => { const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 
-/* App-Version = der Cache-Buster ?v= des eigenen <script>-Tags. Eine einzige
-   Quelle der Wahrheit: der Betreiber zählt sie ohnehin bei jeder Änderung in
-   index.html hoch (siehe README), hier wird sie nur angezeigt. */
+/* App-Version aus <meta name="app-version"> in index.html, nach Semantic
+   Versioning (Major.Minor.Patch — siehe README). Hier wird sie nur angezeigt.
+
+   Früher stand hier der Cache-Buster ?v= des eigenen <script>-Tags. Das war
+   bequem, aber falsch: ?v= wandert je Datei einzeln, damit Browser genau die
+   geänderte Datei neu holen. Eine reine CSS-Korrektur hätte app.js also nicht
+   angefasst — und die Anzeige wäre stehengeblieben, obwohl eine Fehlerbehebung
+   ausgeliefert wurde.
+
+   Nur wohlgeformte Angaben werden übernommen. Steht dort Unsinn oder fehlt das
+   Element, bleibt die Version leer, und die Anzeige lässt die Zeile weg
+   (zeigeKopfVersion). Lieber gar keine Version als eine erfundene. */
 const APP_VERSION = (() => {
   try {
-    const s = document.currentScript || document.querySelector('script[src*="app.js"]');
-    const m = s && String(s.src).match(/[?&]v=([0-9]+)/);
-    return m ? m[1] : "";
+    const v = document.querySelector('meta[name="app-version"]')?.content?.trim() || "";
+    return /^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)*$/.test(v) ? v : "";
   } catch { return ""; }
 })();
 
@@ -6048,9 +6056,9 @@ function showApp() {
 }
 
 /* Versionsnummer im Kopf, unter dem Verweis auf die Statusseite. Quelle ist
-   APP_VERSION (der Cache-Buster des eigenen <script>-Tags); fehlt sie — etwa
-   weil app.js ohne ?v= eingebunden ist — bleibt die Zeile weg statt „—“ zu
-   zeigen. Läuft beim Anzeigen der App und nach jedem Sprachwechsel. */
+   APP_VERSION aus dem <meta name="app-version"> in index.html; fehlt sie oder
+   ist sie unbrauchbar, bleibt die Zeile weg statt „—“ zu zeigen. Läuft beim
+   Anzeigen der App und nach jedem Sprachwechsel. */
 function zeigeKopfVersion() {
   const el = $("#header-version");
   if (!el) return;
