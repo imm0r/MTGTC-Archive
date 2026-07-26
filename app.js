@@ -9692,69 +9692,286 @@ function initTooltip() {
   addEventListener("touchstart", verstecke, { passive: true });
 }
 
+/* ========================= Site Status (Upptime) =========================
+   Die vollständige Statusseite, hier im Haus statt als Auswärtslink. Die
+   Zahlen kommen aus dem Upptime-Repo MTGTC-Archive-Status, wo GitHub Actions
+   alle fünf Minuten misst und das Ergebnis festschreibt. Zwei Quellen, weil
+   Upptime sie getrennt führt:
+
+     • history/summary.json über raw.githubusercontent — Momentaufnahme je
+       Dienst: Status, Verfügbarkeit und Antwortzeit je Zeitraum sowie die
+       Ausfallminuten je Tag. Kein Kontingent, das ist die Pflicht.
+     • Störungen (Issues) und Antwortzeit-Verlauf (Commit-Meldungen) über die
+       GitHub-API. Unangemeldet sind das 60 Anfragen je Stunde und IP — daher
+       der Zwischenspeicher unten, und daher ist das die Kür: fällt sie aus,
+       fehlen Graph, Tagesbalken und Störungsliste, alles Übrige steht.
+
+   Vorher stand hier ein HEAD-Fetch mit mode:"no-cors" je Endpunkt. Der kann
+   gar nicht fehlschlagen — eine undurchsichtige Antwort zählt als Erfolg, und
+   selbst ein 500er löst das Promise. Die Ansicht meldete also „UP", solange
+   überhaupt Netz da war. Gemessen wird jetzt dort, wo wirklich gemessen wird. */
+
+const STATUS_ROH  = "https://raw.githubusercontent.com/imm0r/MTGTC-Archive-Status/main";
+const STATUS_API  = "https://api.github.com/repos/imm0r/MTGTC-Archive-Status";
+const STATUS_VOLL = "https://imm0r.github.io/MTGTC-Archive-Status/";
+const STATUS_REPO = "https://github.com/imm0r/MTGTC-Archive-Status";
+const STATUS_FRISCH = 5 * 60 * 1000;   // so lange gilt der Zwischenspeicher
+
+/* tage:null = „gesamt". Die Feldnamen in summary.json heißen uptime/uptimeDay/
+   uptimeWeek/… — „gesamt" ist der Sonderfall ohne Endung. */
+const STATUS_ZEITRAEUME = [
+  { id: "day", tage: 1 }, { id: "week", tage: 7 }, { id: "month", tage: 30 },
+  { id: "year", tage: 365 }, { id: "all", tage: null }
+];
+
+let STATUS_ZEIT  = "week";
+let STATUS_DATEN = null;
+
+const statusFeld = (d, feld, zeit) =>
+  d[zeit === "all" ? feld : feld + zeit[0].toUpperCase() + zeit.slice(1)];
+
+const STATUS_TAG = 86400000;
+const statusMitternacht = ms => { const d = new Date(ms); d.setHours(0, 0, 0, 0); return d.getTime(); };
+const statusIso = ms => { const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+
+/* Upptime schreibt Status und Antwortzeit in die COMMIT-MELDUNG, nicht in die
+   Datei — die trägt immer nur den letzten Stand. Der Verlauf steckt also in der
+   Historie: "🟩 Mana Font is up (200 in 158 ms) [skip ci] [upptime]". Messungen
+   mit 0 ms sind Fehlversuche ohne Antwort und fliegen aus den Punkten raus,
+   genau wie bei Upptime selbst — sonst zöge jeder Ausfall die Durchschnittszeit
+   nach unten, statt sie ehrlich auszulassen.
+
+   „seit" zählt dagegen JEDEN Commit, auch die Ausfälle. Es beantwortet eine
+   andere Frage: ab wann wurde überhaupt gemessen. Beides zu vermischen wäre ein
+   Fehler mit Ansage — ein Dienst, der von Anfang an lag, hätte seinen ersten
+   Messpunkt erst am Tag der Erholung, und der Tagesbalken würde genau die
+   Ausfalltage verschlucken, die er zeigen soll. */
+function statusVerlauf(commits) {
+  const punkte = [];
+  let seit = Infinity;
+  for (const c of commits || []) {
+    const zeit = Date.parse(c?.commit?.author?.date || "");
+    if (!Number.isFinite(zeit)) continue;
+    if (zeit < seit) seit = zeit;
+    const teil = String(c?.commit?.message || "").split(" in ")[1];
+    if (!teil) continue;
+    const ms = parseInt(teil.split("ms")[0].trim(), 10);
+    if (!ms) continue;
+    punkte.push({ zeit, ms });
+  }
+  punkte.sort((a, b) => a.zeit - b.zeit);
+  return { punkte, seit: Number.isFinite(seit) ? seit : null };
+}
+
+async function statusHolen(neu) {
+  if (!neu && STATUS_DATEN && Date.now() - STATUS_DATEN.stand < STATUS_FRISCH) return STATUS_DATEN;
+
+  const json = async url => {
+    const r = await fetch(url, { cache: "no-store" });
+    if (!r.ok) throw new Error(String(r.status));
+    return r.json();
+  };
+
+  const dienste = await json(`${STATUS_ROH}/history/summary.json`);   // Pflicht
+
+  let stoerungen = [], verlauf = {}, apiOk = true;
+  try {
+    const [issues, ...reihen] = await Promise.all([
+      json(`${STATUS_API}/issues?labels=status&state=all&per_page=100`),
+      ...dienste.map(d => json(`${STATUS_API}/commits?path=history/${encodeURIComponent(d.slug)}.yml&per_page=100`))
+    ]);
+    // /issues liefert auch Pull Requests mit; die sind hier keine Störung.
+    stoerungen = (issues || []).filter(i => !i.pull_request);
+    dienste.forEach((d, i) => { verlauf[d.slug] = statusVerlauf(reihen[i]); });
+  } catch { apiOk = false; verlauf = {}; }
+
+  STATUS_DATEN = { stand: Date.now(), dienste, stoerungen, verlauf, apiOk };
+  return STATUS_DATEN;
+}
+
+/* Ein Balken je Tag. dailyMinutesDown verzeichnet NUR Tage mit Ausfall, ein
+   fehlender Eintrag heißt also „lief". Das gilt aber erst ab dem Tag, an dem
+   nachweislich gemessen wurde — davor wäre Grün frei erfunden. Der Balken
+   beginnt darum beim ältesten bekannten Messpunkt, und ohne Verlaufsdaten
+   entfällt er ganz, statt Betriebsbereitschaft zu behaupten. */
+function statusTagesbalken(dienst, verlauf, tage) {
+  if (!verlauf?.seit) return "";
+  const heute = statusMitternacht(Date.now());
+  const start = Math.max(statusMitternacht(verlauf.seit),
+                         tage ? heute - (tage - 1) * STATUS_TAG : -Infinity);
+  const n = Math.round((heute - start) / STATUS_TAG) + 1;
+  if (!Number.isFinite(n) || n < 1) return "";
+
+  const balken = Array.from({ length: n }, (_, i) => {
+    const tagMs = start + i * STATUS_TAG, iso = statusIso(tagMs);
+    const min = Math.round(Number(dienst.dailyMinutesDown?.[iso]) || 0);
+    const art = min === 0 ? "ok" : min >= 1380 ? "aus" : "teil";
+    const datum = new Date(tagMs).toLocaleDateString(LANG, { day: "2-digit", month: "2-digit", year: "numeric" });
+    const titel = min === 0 ? t("status.dayUp", { d: datum }) : t("status.dayDown", { d: datum, min });
+    return `<i class="st-tag ${art}" title="${esc(titel)}"></i>`;
+  }).join("");
+
+  const vonBis = `${new Date(start).toLocaleDateString(LANG, { day: "2-digit", month: "2-digit" })} – ${t("status.today")}`;
+  return `<div class="st-balken" role="img" aria-label="${esc(t("status.daysLabel"))}">${balken}</div>
+    <div class="st-balken-fuss"><span>${esc(vonBis)}</span><span>${esc(t("status.daysLabel"))}</span></div>`;
+}
+
+/* Antwortzeit als Linie. Bewusst schlicht gehalten: keine Achsen, keine
+   Tooltips — die Zahl selbst steht schon als Kachel daneben, hier geht es nur
+   um den Verlauf. Die gestrichelte Linie ist der Durchschnitt, wie im
+   Preisgraph, damit beide Graphen der App dieselbe Sprache sprechen. */
+function statusGraph(punkte, tage) {
+  const grenze = tage ? Date.now() - tage * STATUS_TAG : -Infinity;
+  const P = (punkte || []).filter(p => p.zeit >= grenze);
+  if (P.length < 2) return `<p class="hint st-kein-graph">${esc(t("status.noChart"))}</p>`;
+
+  const w = 620, h = 96, pl = 4, pr = 4, pt = 10, pb = 10;
+  const iw = w - pl - pr, ih = h - pt - pb;
+  const werte = P.map(p => p.ms);
+  const lo = Math.min(...werte), hi = Math.max(...werte), spanne = hi - lo || 1;
+  const t0 = P[0].zeit, dt = (P[P.length - 1].zeit - t0) || 1;
+  const X = p => pl + (p.zeit - t0) / dt * iw;
+  const Y = v => pt + ih - (v - lo) / spanne * ih;
+  const avg = Math.round(werte.reduce((a, b) => a + b, 0) / werte.length);
+  const linie = P.map(p => `${X(p).toFixed(1)},${Y(p.ms).toFixed(1)}`).join(" ");
+
+  return `<svg class="st-graph" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"
+       xmlns="http://www.w3.org/2000/svg" role="img"
+       aria-label="${esc(t("status.chartAria", { min: lo, max: hi, avg }))}">
+      <polyline points="${linie} ${(w - pr).toFixed(1)},${h} ${pl},${h}" fill="var(--acc)" opacity=".10" stroke="none"/>
+      <line x1="${pl}" y1="${Y(avg).toFixed(1)}" x2="${w - pr}" y2="${Y(avg).toFixed(1)}"
+        stroke="var(--dim)" stroke-width="1" stroke-dasharray="2 3" opacity=".5"/>
+      <polyline points="${linie}" fill="none" stroke="var(--acc)" stroke-width="1.5"
+        stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+    </svg>
+    <div class="st-graph-fuss">
+      <span>${esc(t("status.min", { n: lo }))}</span>
+      <span>${esc(t("status.avg", { n: avg }))}</span>
+      <span>${esc(t("status.max", { n: hi }))}</span>
+    </div>`;
+}
+
+const statusDauer = ms => {
+  const min = Math.max(1, Math.round(ms / 60000));
+  if (min < 60) return t("status.durMin", { n: min });
+  if (min < 1440) return t("status.durStd", { n: Math.round(min / 60) });
+  return t("status.durTag", { n: Math.round(min / 1440) });
+};
+
+function statusStoerungen(liste) {
+  if (!liste.length) return `<p class="hint">${esc(t("status.noIncidents"))}</p>`;
+  const datum = s => new Date(s).toLocaleString(LANG, { dateStyle: "short", timeStyle: "short" });
+  return `<div class="st-vorfaelle">${liste.slice(0, 12).map(i => {
+    const offen = i.state === "open";
+    const bis = i.closed_at ? Date.parse(i.closed_at) : Date.now();
+    return `<div class="st-vorfall">
+      <span class="pill ${offen ? "err" : "ok"}">${esc(offen ? t("status.ongoing") : t("status.resolved"))}</span>
+      <div class="st-vorfall-txt">
+        <a href="${esc(i.html_url)}" target="_blank" rel="noopener">${esc(i.title)}</a>
+        <div class="st-vorfall-zeit">${esc(datum(i.created_at))} · ${esc(statusDauer(bis - Date.parse(i.created_at)))}</div>
+      </div>
+    </div>`;
+  }).join("")}</div>`;
+}
+
 function renderStatus() {
   const el = $("#v-status");
   if (!el) return;
-
-  const endpoints = [
-    { id: "app", name: "Arcanum Archive App", url: "https://imm0r.github.io/MTGTC-Archive/" },
-    { id: "keyrune", name: "Keyrune Font", url: "https://imm0r.github.io/MTGTC-Archive/assets/keyrune/keyrune.woff2" },
-    { id: "mana", name: "Mana Font", url: "https://imm0r.github.io/MTGTC-Archive/assets/mana/mana.woff2" }
-  ];
-
-  const statusRows = endpoints.map(ep => `
-    <div data-ep-id="${ep.id}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
-      <div style="flex: 1;">
-        <div style="font-size: 0.95em;">${esc(ep.name)}</div>
-      </div>
-      <div style="flex: none; margin-left: 12px;">
-        <span class="status-badge" style="background: rgba(255,255,255,0.2); color: #aaa; padding: 4px 12px; border-radius: 4px; font-size: 0.85em; white-space: nowrap;">⏳</span>
-      </div>
-    </div>
-  `).join("");
-
-  el.innerHTML = `
-    <div class="card">
-      <h2 style="margin-top: 0; margin-bottom: 8px; font-size: 1.3em;">📊 Site Status</h2>
-      <p style="margin: 0 0 20px 0; font-size: 0.9em; color: #aaa;">Echtzeit-Überwachung der Arcanum Archive Infrastruktur</p>
-
-      <div style="display: flex; flex-direction: column; gap: 0;">
-        ${statusRows}
-      </div>
-
-      <div style="margin-top: 20px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 4px; font-size: 0.85em; color: #aaa;">
-        <p style="margin: 0;">GitHub Actions prüft alle 5 Minuten automatisch die Verfügbarkeit.</p>
-      </div>
-
-      <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.1);">
-        <a href="https://imm0r.github.io/MTGTC-Archive-Status/" target="_blank" rel="noopener" style="display: inline-block; padding: 8px 16px; background: rgba(76, 175, 80, 0.2); color: #4CAF50; text-decoration: none; border-radius: 4px; font-size: 0.9em; border: 1px solid rgba(76, 175, 80, 0.4); transition: all 0.2s;">📈 Vollständige Status-Seite öffnen</a>
-      </div>
-    </div>
-  `;
-
-  checkEndpointStatus(endpoints);
+  el.innerHTML = `<div class="card"><p class="hint">${esc(t("status.loading"))}</p></div>`;
+  statusHolen()
+    .then(d => statusZeichnen(el, d))
+    .catch(() => {
+      el.innerHTML = `<div class="card">
+        <h3 class="st-titel">${esc(t("status.title"))}</h3>
+        <p class="hint">${esc(t("status.error"))}</p>
+        <div class="st-links"><a class="btn ghost sm" href="${STATUS_VOLL}" target="_blank" rel="noopener">${esc(t("status.openFull"))}</a></div>
+      </div>`;
+    });
 }
 
-function checkEndpointStatus(endpoints) {
-  endpoints.forEach(ep => {
-    fetch(ep.url, { method: "HEAD", mode: "no-cors" })
-      .then(() => {
-        const badge = document.querySelector(`div[data-ep-id="${ep.id}"] .status-badge`);
-        if (badge) {
-          badge.innerHTML = "✓ UP";
-          badge.style.background = "rgba(76, 175, 80, 0.8)";
-          badge.style.color = "#fff";
-        }
-      })
-      .catch(() => {
-        const badge = document.querySelector(`div[data-ep-id="${ep.id}"] .status-badge`);
-        if (badge) {
-          badge.innerHTML = "✗ DOWN";
-          badge.style.background = "rgba(244, 67, 54, 0.8)";
-          badge.style.color = "#fff";
-        }
-      });
+function statusZeichnen(el, d) {
+  const zeit = STATUS_ZEIT;
+  const tage = (STATUS_ZEITRAEUME.find(z => z.id === zeit) || {}).tage;
+  const aus  = d.dienste.filter(s => s.status === "down").length;
+  const teil = d.dienste.filter(s => s.status === "degraded").length;
+  const lage = aus ? "err" : teil ? "warn" : "ok";
+  const lageTxt = aus ? t("status.someDown", { n: aus, total: d.dienste.length })
+                : teil ? t("status.degraded") : t("status.allUp");
+
+  const karten = d.dienste.map(s => {
+    const art = s.status === "down" ? "err" : s.status === "degraded" ? "warn" : "ok";
+    const txt = s.status === "down" ? t("status.down")
+              : s.status === "degraded" ? t("status.degradedShort") : t("status.up");
+    return `<div class="card st-dienst">
+      <div class="st-dienst-kopf">
+        <div class="st-dienst-name">
+          <span>${esc(s.name)}</span>
+          <a class="st-dienst-url" href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.url)}</a>
+        </div>
+        <span class="pill ${art}">${esc(txt)}</span>
+      </div>
+      <div class="stats st-kacheln">
+        <div class="stat"><div class="v">${esc(statusFeld(s, "uptime", zeit) ?? "–")}</div>
+          <div class="k">${esc(t("status.uptime"))}</div></div>
+        <div class="stat"><div class="v">${esc(statusFeld(s, "time", zeit) ?? "–")} ms</div>
+          <div class="k">${esc(t("status.responseTime"))}</div></div>
+      </div>
+      ${statusTagesbalken(s, d.verlauf[s.slug], tage)}
+      ${d.apiOk ? statusGraph(d.verlauf[s.slug]?.punkte, tage) : ""}
+    </div>`;
+  }).join("");
+
+  el.innerHTML = `
+    <div class="card st-kopf">
+      <div class="st-kopf-txt">
+        <h3 class="st-titel">${esc(t("status.title"))}</h3>
+        <p class="hint st-lead">${esc(t("status.lead"))}</p>
+      </div>
+      <div class="st-kopf-tat">
+        <button class="btn ghost sm" id="st-neu">${esc(t("status.refresh"))}</button>
+        <span class="st-stand">${esc(t("status.updated", {
+          zeit: new Date(d.stand).toLocaleTimeString(LANG, { hour: "2-digit", minute: "2-digit" }) }))}</span>
+      </div>
+    </div>
+
+    <div class="card st-lage ${lage}">
+      <span class="st-lage-punkt"></span>
+      <span class="st-lage-txt">${esc(lageTxt)}</span>
+    </div>
+
+    <div class="tabs st-zeit">${STATUS_ZEITRAEUME.map(z =>
+      `<button type="button" data-zeit="${z.id}" class="${z.id === zeit ? "on" : ""}">${esc(t("status.period." + z.id))}</button>`
+    ).join("")}</div>
+
+    ${d.apiOk ? "" : `<div class="card"><p class="hint">${esc(t("status.rateLimit"))}</p></div>`}
+
+    ${karten}
+
+    <div class="card">
+      <h3 class="st-titel">${esc(t("status.incidents"))}</h3>
+      ${d.apiOk ? statusStoerungen(d.stoerungen) : `<p class="hint">${esc(t("status.rateLimit"))}</p>`}
+    </div>
+
+    <div class="card">
+      <p class="hint" style="margin-top:0">${esc(t("status.checkNote"))}</p>
+      <div class="st-links">
+        <a class="btn ghost sm" href="${STATUS_VOLL}" target="_blank" rel="noopener">${esc(t("status.openFull"))}</a>
+        <a class="btn ghost sm" href="${STATUS_REPO}" target="_blank" rel="noopener">${esc(t("status.source"))}</a>
+      </div>
+    </div>`;
+
+  // Zeitraumwechsel zeichnet nur neu — die Daten für alle Zeiträume liegen
+  // schon da, ein erneuter Abruf wäre reine Kontingentverschwendung.
+  el.querySelectorAll(".st-zeit button").forEach(b => b.onclick = () => {
+    STATUS_ZEIT = b.dataset.zeit;
+    statusZeichnen(el, d);
   });
+  const neu = el.querySelector("#st-neu");
+  if (neu) neu.onclick = () => {
+    neu.disabled = true;
+    statusHolen(true).then(f => statusZeichnen(el, f)).catch(() => { neu.disabled = false; });
+  };
 }
 
 function wireApp() {
@@ -9974,6 +10191,7 @@ function onLangChange() {
   else if (aktiv === "v-events") renderTermine();
   else if (aktiv === "v-rules") renderRules();
   else if (aktiv === "v-settings") renderSettings();
+  else if (aktiv === "v-status") renderStatus();
   aktualisiereVerkaufZaehler();
   if ($("#sell-dlg")?.open) renderVerkauf();
 }
