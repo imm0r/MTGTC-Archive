@@ -882,11 +882,15 @@ async function orientImage(img) {
   const ganz = { x: 0, y: 0, w: img.width, h: img.height };
   try {
     const { data, error } = await sb.functions.invoke("scan-card", {
-      body: { mode: "orient", images: [{ b64: toJpegBase64(img, ganz, 1000), media_type: "image/jpeg" }] },
+      body: { mode: "orient", images: [{ b64: toJpegBase64(img, ganz, 1400), media_type: "image/jpeg" }] },
     });
     if (error) return img;
-    const deg = data?.orient?.rotate_cw;
-    return (deg === 90 || deg === 180 || deg === 270) ? rotateCanvas(img, deg) : img;
+    // Das Modell nennt die aktuelle Lage des Titelbalkens (top/bottom/left/right);
+    // die Drehung IM UHRZEIGERSINN, die ihn nach oben bringt, folgt daraus
+    // eindeutig: links → 90°, unten → 180°, rechts → 270°, oben → keine. So
+    // muss das Modell die fehleranfällige Uhrzeigersinn-Richtung nicht raten.
+    const grad = { left: 90, bottom: 180, right: 270 }[data?.orient?.title_side] || 0;
+    return grad ? rotateCanvas(img, grad) : img;
   } catch { return img; }
 }
 

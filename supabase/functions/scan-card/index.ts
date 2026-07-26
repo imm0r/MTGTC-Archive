@@ -179,28 +179,35 @@ w und h Breite und Höhe, alle Werte zwischen 0 und 1 (x+w und y+h höchstens 1)
 const ORIENT_SCHEMA = {
   type: "object",
   properties: {
-    rotate_cw: {
-      type: "integer",
-      enum: [0, 90, 180, 270],
-      description: "Grad im Uhrzeigersinn, um die das Bild gedreht werden muss, damit die Karten aufrecht stehen (Titel oben, Text von links nach rechts, kleiner Aufdruck unten links). 0, wenn schon aufrecht.",
+    title_side: {
+      type: "string",
+      enum: ["top", "bottom", "left", "right"],
+      description: "Auf welcher Seite des Bildes liegt aktuell die OBERKANTE der Karten — der Titelbalken mit dem Kartennamen? Bei aufrecht liegenden Karten ist das oben (top).",
     },
   },
-  required: ["rotate_cw"],
+  required: ["title_side"],
   additionalProperties: false,
 } as const;
 
+/* Bewusst nach der POSITION des Titelbalkens gefragt, NICHT nach einer Dreh-
+   richtung: Sehmodelle erkennen sicher, dass ein Bild um eine Vierteldrehung
+   gekippt ist, raten aber die Uhrzeigersinn-Richtung (90 vs. 270) oft falsch.
+   Die Position (oben/unten/links/rechts) ist eine verlässliche Angabe; die
+   nötige Drehung rechnet der Client daraus deterministisch aus. */
 const ORIENT_SYSTEM = `Du siehst ein Foto mit einer oder mehreren Magic-the-Gathering-Karten.
-Bestimme, um wieviel Grad IM UHRZEIGERSINN das GESAMTE Bild gedreht werden muss,
-damit die Karten aufrecht stehen: Titelbalken oben, Regeltext von links nach
-rechts lesbar, der kleine Aufdruck (Setcode/Nummer) unten links.
+Auf einer aufrecht liegenden Karte steht der Titelbalken mit dem Kartennamen ganz
+OBEN und der kleine Aufdruck (Setcode/Nummer) unten links.
 
-Erlaubt sind nur 0, 90, 180 oder 270.
+Bestimme, wo im Bild die OBERKANTE der Karten — also der Titelbalken — aktuell
+liegt, und antworte mit einem Wert:
+  * top    — die Karten stehen aufrecht, der Titel ist oben.
+  * bottom — die Karten stehen auf dem Kopf, der Titel ist unten.
+  * left   — die Karten sind gekippt, der Titel liegt am linken Bildrand.
+  * right  — die Karten sind gekippt, der Titel liegt am rechten Bildrand.
 
-Richte dich allein am KARTENTEXT aus, nicht an der Bildform. Ein hochkantiges
-Foto kann bereits korrekt sein (etwa mehrere Zeilen mit je wenigen Karten) —
-dann ist die Antwort 0. Steht der Text schon aufrecht, gib 0 zurück. Steht er
-auf dem Kopf, gib 180. Ist er um eine Vierteldrehung gekippt, gib 90 oder 270,
-je nachdem welche Drehung im Uhrzeigersinn ihn aufrichtet.`;
+Richte dich am KARTENTEXT aus, nicht an der Bildform: Ein hochkantiges Foto kann
+bereits korrekt sein (etwa mehrere Zeilen mit je wenigen Karten) — dann ist der
+Titel oben und die Antwort top.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
