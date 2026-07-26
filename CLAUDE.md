@@ -1,5 +1,23 @@
 # Hinweise für Claude
 
+## Pull Requests selbst zusammenführen
+
+Nicht nachfragen. Sobald die Voraussetzungen erfüllt sind, mergen — per
+**Squash**, wie seit #91 üblich (linearer Verlauf, `(#NN)` im Titel).
+
+Voraussetzungen, alle vier:
+
+* alle Prüfungen grün (`skipped` zählt als in Ordnung),
+* keine offenen Review-Kommentare,
+* kein Konflikt mit dem Zielzweig,
+* keine eigene Rückfrage offen, auf die noch keine Antwort vorliegt.
+
+Ist eine davon verletzt, nicht mergen, sondern beheben oder sagen, was im Weg
+steht.
+
+**Ausnahme:** Sagt der Eigentümer zu Beginn einer Sitzung ausdrücklich etwas
+anderes, gilt das für diese Sitzung.
+
 ## Pull Requests nicht als Draft anlegen
 
 Direkt als „ready for review" öffnen, **nicht** als Draft. Ein Draft sperrt bei
