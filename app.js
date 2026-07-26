@@ -2399,47 +2399,70 @@ function priceChart(hist, w = 560, h = 200) {
   const punkte = abst >= 5;
   const r      = abst >= 14 ? 3.2 : 2.4;
 
+  // Zwei Bezugslinien: der Median (mittlerer Wert, gegen Ausreißer robust) und
+  // der Durchschnitt. Beide zusammen sagen mehr als jeder allein — liegt der
+  // Durchschnitt deutlich über dem Median, hat die Karte einzelne Ausschläge
+  // nach oben gehabt, die den Mittelwert ziehen, der typische Preis aber lag
+  // tiefer. Nur auf dem breiten Graphen; im schmalen Hover-Format bliebe für
+  // die Beschriftung kein Platz, und zwei unbeschriftete Linien wären dort
+  // nicht deutbar — deshalb zeigt er weiterhin allein den Median.
   const med = H.length >= 3 ? medianOf(vs) : null;
+  const avg = H.length >= 3 && !schmal
+    ? vs.reduce((s, v) => s + v, 0) / vs.length : null;
   const linie = H.map(p => `${X(p).toFixed(1)},${Y(p.v).toFixed(1)}`).join(" ");
   const farbe = H[H.length - 1].v >= H[0].v ? "var(--ok)" : "var(--err)";
 
-  // Platz für das Median-Etikett suchen. Es stand vorher fest am rechten Rand
-  // und wurde dort regelmäßig unlesbar — der Median liegt per Definition mitten
-  // im Wertebereich, also kreuzt die Kurve ihn HÄUFIG, und eine feste Stelle
+  // Platz für ein Etikett an einer waagerechten Bezugslinie suchen. Eine feste
+  // Position ginge nicht: Median und Durchschnitt liegen per Definition mitten
+  // im Wertebereich, also kreuzt die Kurve sie HÄUFIG, und eine feste Stelle
   // trifft früher oder später genau darauf.
   //
   // Deshalb wird das Kästchen über die Breite geschoben und, ober- wie
   // unterhalb der Linie, der Platz mit dem größten Abstand zur Kurve gewählt.
-  // Zusätzlich liegt eine Füllung in Panelfarbe darunter: findet sich nirgends
-  // freier Platz (eine Kurve, die den Median die ganze Breite über umspielt —
-  // genau der Fall aus dem Fehlerbericht), bleibt die Schrift trotzdem lesbar.
-  let etikett = null;
-  if (med != null && !schmal) {
-    const text = `${t("detail.median")} ${eur(med)}`;
-    const efs  = fs - 1;
-    const eb   = text.length * efs * 0.55 + 8;      // Breite samt Innenabstand
-    const eh   = efs + 6;
-    const yMed = Y(med);
-    const von  = pl + 3, bis = w - pr - 3;
-    if (bis - von >= eb) {
-      for (let i = 0; i <= 14; i++) {
-        const ex = von + (bis - von - eb) * i / 14;
-        for (const seite of [-1, 1]) {              // -1 = über, 1 = unter der Linie
-          const ey = seite < 0 ? yMed - 4 - eh : yMed + 4;
-          if (ey < pt || ey + eh > pt + ih) continue;   // muss im Feld bleiben
-          let abstand = Infinity;
-          for (const p of H) {
-            const px = X(p);
-            if (px < ex - 2 || px > ex + eb + 2) continue;
-            const py = Y(p.v);
-            abstand = Math.min(abstand,
-              py < ey ? ey - py : (py > ey + eh ? py - (ey + eh) : 0));
-          }
-          if (!etikett || abstand > etikett.abstand)
-            etikett = { x: ex, y: ey, b: eb, h: eh, text, abstand };
+  // Bereits gesetzte Etiketten (belegt) sind Ausschlusskriterium, nicht bloß
+  // Abzug: eine Überdeckung von Kurve und Kästchen ist verschmerzbar — die
+  // Füllung deckt sie ab —, zwei Kästchen übereinander sind schlicht unlesbar.
+  // Median und Durchschnitt liegen oft dicht beieinander, der Fall tritt also
+  // wirklich ein.
+  const sucheEtikett = (wert, text, belegt) => {
+    if (wert == null) return null;
+    const efs = fs - 1;
+    const eb  = text.length * efs * 0.55 + 8;       // Breite samt Innenabstand
+    const eh  = efs + 6;
+    const yL  = Y(wert);
+    const von = pl + 3, bis = w - pr - 3;
+    if (bis - von < eb) return null;
+
+    let beste = null;
+    for (let i = 0; i <= 14; i++) {
+      const ex = von + (bis - von - eb) * i / 14;
+      for (const seite of [-1, 1]) {                // -1 = über, 1 = unter der Linie
+        const ey = seite < 0 ? yL - 4 - eh : yL + 4;
+        if (ey < pt || ey + eh > pt + ih) continue;  // muss im Feld bleiben
+        if (belegt.some(o => ex < o.x + o.b + 3 && ex + eb + 3 > o.x
+                          && ey < o.y + o.h + 2 && ey + eh + 2 > o.y)) continue;
+        let abstand = Infinity;
+        for (const p of H) {
+          const px = X(p);
+          if (px < ex - 2 || px > ex + eb + 2) continue;
+          const py = Y(p.v);
+          abstand = Math.min(abstand,
+            py < ey ? ey - py : (py > ey + eh ? py - (ey + eh) : 0));
         }
+        if (!beste || abstand > beste.abstand)
+          beste = { x: ex, y: ey, b: eb, h: eh, text, abstand };
       }
     }
+    return beste;
+  };
+
+  // Der Median zuerst — er war zuerst da und behält den besten Platz.
+  const etiketten = [];
+  if (!schmal) {
+    const eMed = sucheEtikett(med, `${t("detail.median")} ${eur(med)}`, etiketten);
+    if (eMed) etiketten.push({ ...eMed, farbe: "var(--acc)" });
+    const eAvg = sucheEtikett(avg, `${t("detail.average")} ${eur(avg)}`, etiketten);
+    if (eAvg) etiketten.push({ ...eAvg, farbe: "var(--dim)" });
   }
 
   const id = ++PCHART_NR;
@@ -2470,6 +2493,11 @@ function priceChart(hist, w = 560, h = 200) {
       }).join("")}
       ${med != null ? `<line x1="${pl}" y1="${Y(med).toFixed(1)}" x2="${w - pr}" y2="${Y(med).toFixed(1)}"
           stroke="var(--acc)" stroke-width="1" stroke-dasharray="4 4" opacity=".38"/>` : ""}
+      ${/* Der Durchschnitt in gedecktem Blaugrau und mit kürzerem Strichmuster:
+            unterscheidbar vom Median auch ohne Farbe (Ausdruck, Farbfehlsicht)
+            und ohne mit dem Grün/Rot der Kurve verwechselbar zu sein. */""}
+      ${avg != null ? `<line x1="${pl}" y1="${Y(avg).toFixed(1)}" x2="${w - pr}" y2="${Y(avg).toFixed(1)}"
+          stroke="var(--dim)" stroke-width="1" stroke-dasharray="2 3" opacity=".42"/>` : ""}
       ${H.length > 1 ? `<polyline points="${linie}" fill="none" stroke="${farbe}"
           stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` : ""}
       ${punkte ? H.map(p => `<circle cx="${X(p).toFixed(1)}" cy="${Y(p.v).toFixed(1)}"
@@ -2480,12 +2508,12 @@ function priceChart(hist, w = 560, h = 200) {
             Dokumentreihenfolge, es gibt kein z-index. Die gestrichelte
             Medianlinie bleibt dagegen bewusst UNTER der Kurve: sie ist
             Hintergrundmaßstab, nicht Beschriftung. */""}
-      ${etikett ? `<rect x="${etikett.x.toFixed(1)}" y="${etikett.y.toFixed(1)}"
-          width="${etikett.b.toFixed(1)}" height="${etikett.h.toFixed(1)}" rx="2"
+      ${etiketten.map(e => `<rect x="${e.x.toFixed(1)}" y="${e.y.toFixed(1)}"
+          width="${e.b.toFixed(1)}" height="${e.h.toFixed(1)}" rx="2"
           fill="var(--panel)" opacity=".94"/>
-        <text x="${(etikett.x + etikett.b / 2).toFixed(1)}"
-          y="${(etikett.y + etikett.h - (fs - 1) * 0.28).toFixed(1)}" text-anchor="middle"
-          font-size="${fs - 1}" fill="var(--acc)" opacity=".9">${esc(etikett.text)}</text>` : ""}
+        <text x="${(e.x + e.b / 2).toFixed(1)}"
+          y="${(e.y + e.h - (fs - 1) * 0.28).toFixed(1)}" text-anchor="middle"
+          font-size="${fs - 1}" fill="${e.farbe}" opacity=".9">${esc(e.text)}</text>`).join("")}
       <circle class="pchart-marke" r="4.5" fill="${farbe}" stroke="var(--panel)"
         stroke-width="2" style="display:none"/>
     </svg>
