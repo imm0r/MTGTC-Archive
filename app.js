@@ -319,7 +319,7 @@ async function findCard(text, lang) {
   if (lang && lang !== "en") {
     let hits = [];
     try { hits = await sfSearch(`name:"${t.replace(/"/g, "")}" lang:${lang}`); } catch { /* weiter */ }
-    const exact = hits.find(c => norm(c.printed_name) === norm(t));
+    const exact = hits.find(c => norm(printedNameOf(c)) === norm(t));
     if (exact) return ok(exact);
     const uniq = byCard(hits);
     if (uniq.length === 1) return ok(uniq[0]);
@@ -335,7 +335,7 @@ async function findCard(text, lang) {
   // 3. Auffangnetz: Volltextsuche inkl. Tokens, egal in welcher Sprache.
   let hits = [];
   try { hits = await sfSearch(`name:"${t.replace(/"/g, "")}"`); } catch { /* nichts gefunden */ }
-  const exact = hits.find(c => norm(c.name) === norm(t) || norm(c.printed_name) === norm(t));
+  const exact = hits.find(c => norm(c.name) === norm(t) || norm(printedNameOf(c)) === norm(t));
   if (exact) return ok(exact);
   const uniq = byCard(hits);
   if (uniq.length === 1) return ok(uniq[0]);
@@ -350,10 +350,13 @@ async function sfSuggest(q, lang) {
     return (r?.data || []).map(n => ({ label: n, value: n }));
   }
   const hits = byCard(await sfSearch(`name:${JSON.stringify(q)} lang:${lang}`, 24)).slice(0, 8);
-  return hits.map(c => ({
-    label: (c.printed_name || c.name) + (c.printed_name ? ` — ${c.name}` : ""),
-    value: c.printed_name || c.name
-  }));
+  return hits.map(c => {
+    const gedruckt = printedNameOf(c);
+    return {
+      label: (gedruckt || c.name) + (gedruckt ? ` — ${c.name}` : ""),
+      value: gedruckt || c.name
+    };
+  });
 }
 
 const priceOf = (c, foil) => {
@@ -727,7 +730,7 @@ const candidates = text => text.split("\n")
 function nameHitMatchesRead(hit, readName) {
   const rn = norm(readName);
   if (!rn) return true;
-  for (const raw of [hit?.printed_name, hit?.name]) {
+  for (const raw of [printedNameOf(hit), hit?.name]) {
     if (!raw) continue;
     for (const teil of String(raw).split("//")) {
       const hn = norm(teil);
@@ -774,7 +777,7 @@ async function identify(img, lang, onStep) {
         // der Nummern-Lücke ~2000–2014, z. B. Rußbold) erreichen findByCode nie,
         // weil parseCorner dort null liefert und der Namensweg allein greift.
         if (hit && nameHitMatchesRead(hit, v.printed_name))
-          return { card: hit, guess: hit.printed_name || hit.name, candidates: [], vision: v, lang: l };
+          return { card: hit, guess: printedNameOf(hit) || hit.name, candidates: [], vision: v, lang: l };
       }
       if (v.printed_name) {
         onStep(t("scan.searchingName", { name: v.printed_name }));
@@ -795,7 +798,7 @@ async function identify(img, lang, onStep) {
     if (c) {
       onStep(t("scan.searchingCode", { set: c.set, num: c.num, token: c.token ? t("scan.tokenSuffix") : "" }));
       const hit = await findByCode(c.set, c.num, lang, c.token);
-      if (hit) return { card: hit, guess: hit.printed_name || hit.name, candidates: [] };
+      if (hit) return { card: hit, guess: printedNameOf(hit) || hit.name, candidates: [] };
     }
   } catch { /* Ecke unlesbar — weiter über den Namen */ }
 
@@ -1142,7 +1145,7 @@ async function addToCollection(card, el, opts) {
 
   const { data, error } = await sb.rpc("add_card", {
     p_scryfall_id: card.id, p_oracle_id: card.oracle_id, p_name: card.name,
-    p_printed_name: card.printed_name || null,
+    p_printed_name: printedNameOf(card),
     p_set_code: (card.set || "").toUpperCase(), p_set_name: card.set_name,
     p_cn: card.collector_number, p_img: imgOf(card),
     p_cm_id: card.cardmarket_id ?? null,
@@ -1160,9 +1163,10 @@ async function addToCollection(card, el, opts) {
   await reload(); renderAll();
   el.classList.remove("pending");   // war es ein bestätigter Treffer, ist er nun geschrieben
   el.querySelector(".thumb").src = imgOf(card) || el.querySelector(".thumb").src;
+  const gedruckt = printedNameOf(card);
   el.querySelector(".body").innerHTML = `
-    <div class="title">${esc(card.printed_name || card.name)}</div>
-    ${card.printed_name ? `<div class="meta">${esc(card.name)}</div>` : ""}
+    <div class="title">${esc(gedruckt || card.name)}</div>
+    ${gedruckt ? `<div class="meta">${esc(card.name)}</div>` : ""}
     <div class="meta">${esc(card.set_name)} &middot; #${esc(card.collector_number)} &middot; ${eur(price)}</div>
     <div class="meta" style="margin-top:6px">
       <span class="pill ok">${before ? esc(t("common.qtyLabel")) + ": " + (row?.qty ?? "+1") : esc(t("detail.added"))}</span>
@@ -1194,8 +1198,8 @@ function renderConfirm(card, el, detected) {
   el.querySelector(".body").innerHTML = `
     <div class="confirm">
       <div class="c-info">
-        <div class="title">${esc(card.printed_name || card.name)}</div>
-        ${card.printed_name ? `<div class="meta">${esc(card.name)}</div>` : ""}
+        <div class="title">${esc(printedNameOf(card) || card.name)}</div>
+        ${printedNameOf(card) ? `<div class="meta">${esc(card.name)}</div>` : ""}
         <div class="meta">${esc(card.set_name)} &middot; #${esc(card.collector_number)} &middot; <span data-price>${eur(priceOf(card, foil0))}</span></div>
         <div class="meta" style="margin-top:6px"><span class="pill warn">${esc(t("scan.pendingBadge"))}</span></div>
       </div>
@@ -1240,8 +1244,8 @@ function renderManual(el, guess, candidates) {
     <div class="picks">${cs.map((c, i) => `
       <button class="pick" data-pick="${i}">
         ${c.image_uris?.small ? `<img src="${esc(c.image_uris.small)}" alt="" loading="lazy">` : ""}
-        <span><b>${esc(c.printed_name || c.name)}</b>
-        ${c.printed_name ? `<i>${esc(c.name)}</i>` : ""}
+        <span><b>${esc(printedNameOf(c) || c.name)}</b>
+        ${printedNameOf(c) ? `<i>${esc(c.name)}</i>` : ""}
         <i>${esc(c.set_name)} · #${esc(c.collector_number)}</i></span>
       </button>`).join("")}</div>` : "";
 
@@ -2190,6 +2194,28 @@ const printedTypeOf = card => {
   return angaben.join(" // ");
 };
 
+/* Der gedruckte NAME. Denselben Rückfall braucht auch er: bei Abenteuer-,
+   geteilten und Umdreh-Karten (adventure, split, flip) führt Scryfall Name,
+   Typzeile und Regeltext AUSSCHLIESSLICH je Seite und bildet oben keine
+   zusammengesetzte Fassung — card.printed_name ist dort undefined, obwohl
+   card_faces[0].printed_name „Knochenmalmer-Riese" sagt. Ohne den Rückfall
+   blieb der Name dieser Karten dauerhaft englisch, während Typzeile und
+   Regeltext längst übersetzt waren.
+
+   Strenger als die beiden Helfer darüber: hier müssen ALLE Seiten einen
+   gedruckten Namen haben, sonst null. Eine halbe Typzeile ist unvollständig,
+   ein halber Name ist falsch — er wird zu `disp` und damit zum Schlüssel für
+   Anzeige, Sortierung und Suche. Lieber ganz englisch als "Knochenmalmer-Riese"
+   für eine Karte, die "Knochenmalmer-Riese // Stampfen" heißt. */
+const printedNameOf = card => {
+  if (typeof card?.printed_name === "string") return card.printed_name;
+  const seiten = card?.card_faces;
+  if (!Array.isArray(seiten) || !seiten.length) return null;
+  const angaben = seiten.map(f => f.printed_name).filter(x => typeof x === "string");
+  if (angaben.length !== seiten.length) return null;
+  return angaben.join(" // ");
+};
+
 /* Trägt nach, was der Karte fehlt. Bestände aus der Zeit vor den Spalten
    type_line/rarity/mana_cost haben sie leer — und ohne Typzeile lehnt der
    Trigger die Karte als Hauptkarte ab und verweist dafür genau hierher
@@ -2233,6 +2259,22 @@ async function nachtragen(c, fresh) {
   // Übersetzung bekommen: "Preis neu ziehen" und der Sammel-Preisabruf laufen
   // beide hier durch, und sfById holt die sprachgenaue Auflage (die deutsche
   // Karte trägt eine eigene scryfall_id).
+  // Der gedruckte Name. Bisher trug ihn nur der Einbuch-Weg ein, nie dieser —
+  // bei Abenteuer-/geteilten Karten stand er deshalb dauerhaft englisch da.
+  // Nicht nur bei NULL nachziehen, sondern auch, wenn dort der englische Name
+  // steht: den setzt der CSV-Import als Notlösung ein (`csvName`, wenn Scryfall
+  // kein printed_name lieferte). Das ist kein gedruckter Name, sondern eine
+  // Platzhalter-Kopie von `name` — die darf der echte ersetzen.
+  // "pn !== c.printed_name" ist nicht bloß Sparsamkeit, sondern nötig: bei
+  // manchen Karten IST der gedruckte Name gleich dem englischen (Eigennamen,
+  // z. B. „Kuja, Genome Sorcerer" auch auf der deutschen Auflage). Ohne diesen
+  // Vergleich bliebe die Bedingung dort für immer wahr und jeder Preisabruf
+  // schriebe denselben Wert erneut — bei Karten ohne sonstige Lücke sogar ein
+  // UPDATE, das es ohne dies gar nicht gäbe.
+  const pn = printedNameOf(fresh);
+  if (pn != null && pn !== c.printed_name
+      && (c.printed_name == null || c.printed_name === c.name))
+    patch.printed_name = pn;
   if (c.printed_text == null) {
     const pt = printedTextOf(fresh);
     if (pt != null) patch.printed_text = pt;
@@ -3534,7 +3576,7 @@ async function wunschkarteZumDeck(deckId, c) {
   const { data, error } = await sb.rpc("add_wish_to_deck", {
     p_deck: deckId,
     p_scryfall_id: c.id, p_oracle_id: c.oracle_id || null, p_name: c.name,
-    p_printed_name: c.printed_name || null,
+    p_printed_name: printedNameOf(c),
     p_set_code: c.set || null, p_set_name: c.set_name || null, p_cn: c.collector_number || null,
     p_img: c.image_uris?.normal || c.image_uris?.small || face.image_uris?.normal || null,
     p_lang: c.lang || "en",
@@ -4458,7 +4500,7 @@ async function applyCardEdit(c, lang, cond, foil, neu) {
     if (!fresh) throw new Error(t("err.printingNotFound", { set: neu.set, cn: neu.cn }));
     patch.scryfall_id = fresh.id;
     patch.name = fresh.name;
-    patch.printed_name = fresh.printed_name || null;
+    patch.printed_name = printedNameOf(fresh);
     patch.set_code = (fresh.set || "").toUpperCase();
     patch.set_name = fresh.set_name;
     patch.cn = fresh.collector_number;
@@ -4492,7 +4534,7 @@ async function applyCardEdit(c, lang, cond, foil, neu) {
     fresh = await withPrice(await sfCode(c.set, c.cn, lang));
     if (fresh) {
       patch.scryfall_id = fresh.id;
-      patch.printed_name = fresh.printed_name || null;
+      patch.printed_name = printedNameOf(fresh);
       // Auch hier ohne Rückfall auf den alten Wert: beim Wechsel DE → EN
       // liefert Scryfall keine printed_*-Felder, und genau dann muss der
       // deutsche Text verschwinden.
@@ -4541,7 +4583,7 @@ async function applyCardEdit(c, lang, cond, foil, neu) {
     const { error } = await sb.from("cards").update(patch).eq("id", c.id);
     if (error) throw new Error(dbErr(error));
     toast(neu
-      ? t("toast.cardNow", { name: fresh.printed_name || fresh.name, set: patch.set_code, cn: patch.cn })
+      ? t("toast.cardNow", { name: printedNameOf(fresh) || fresh.name, set: patch.set_code, cn: patch.cn })
       : t("toast.cardUpdated"));
   }
   await reload(); renderAll();
@@ -6023,7 +6065,7 @@ async function importCsv(file) {
       const row = {
         scryfall_id: card.id, oracle_id: card.oracle_id, name: card.name,
         // Fehlt Scryfall der fremdsprachige Name, nimm den aus der CSV.
-        printed_name: card.printed_name || (lang !== "en" ? csvName : null),
+        printed_name: printedNameOf(card) || (lang !== "en" ? csvName : null),
         set_code: (card.set || "").toUpperCase(), set_name: card.set_name,
         cn: card.collector_number, img: imgOf(card),
         cm_id: card.cardmarket_id ?? null,
@@ -6156,7 +6198,7 @@ async function miImport() {
       const price = priceOf(card, foil);
       const { data, error } = await sb.rpc("add_card", {
         p_scryfall_id: card.id, p_oracle_id: card.oracle_id, p_name: card.name,
-        p_printed_name: card.printed_name || null,
+        p_printed_name: printedNameOf(card),
         p_set_code: (card.set || "").toUpperCase(), p_set_name: card.set_name,
         p_cn: card.collector_number, p_img: imgOf(card),
         p_cm_id: card.cardmarket_id ?? null,
@@ -6176,7 +6218,7 @@ async function miImport() {
       // würde sie sonst erneut einbuchen.
       tr.dataset.done = "1";
       tr.querySelectorAll("input,select,button").forEach(x => x.disabled = true);
-      sag("✓ " + (card.printed_name || card.name) + (price != null ? " · " + eur(price) : ""), "var(--ok)");
+      sag("✓ " + (printedNameOf(card) || card.name) + (price != null ? " · " + eur(price) : ""), "var(--ok)");
       ok++;
     }
     await reload(); renderAll();
