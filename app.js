@@ -706,8 +706,12 @@ async function identify(img, lang, onStep) {
     const v = await readWithVision(img);
     if (v) {
       const c = parseCorner(`${v.corner_line_1 || ""}\n${v.corner_line_2 || ""}`);
-      // Die Sprache von der Karte schlägt die Voreinstellung.
-      const l = c?.lang || lang;
+      // Sprache der Karte in dieser Reihenfolge: der gedruckte Eckcode, sofern
+      // parseCorner ihn sicher gelesen hat; sonst die vom Modell gemeldete
+      // Sprache (aus Name/Regeltext bestimmt, für gemischtsprachige Fotos der
+      // entscheidende Fallback); zuletzt die Dropdown-Voreinstellung. sprachCode
+      // übersetzt den gedruckten Code (DE→de, JP→ja) und filtert Unbekanntes.
+      const l = c?.lang || sprachCode(v.lang) || lang;
       if (c) {
         // Die Typzeile ist ein zweiter, unabhängiger Token-Hinweis: steht dort
         // "Spielsteinkreatur", ist es eines, auch wenn das winzige T entging.

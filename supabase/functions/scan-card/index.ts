@@ -70,6 +70,10 @@ const SCHEMA = {
       type: "string",
       description: "Die Typzeile in der Mitte der Karte, z. B. 'Spielsteinkreatur — Held'. Leer, wenn unlesbar.",
     },
+    lang: {
+      type: "string",
+      description: "Sprache der Karte als zweistelliger Code, wie unten links neben dem Setcode aufgedruckt (DE, EN, FR, IT, ES, PT, RU, KO, JP). Ist der Code unlesbar, an Name und Regeltext erkennen (deutscher Text = DE, englischer = EN). Leer nur, wenn unsicher.",
+    },
     confidence: {
       type: "string",
       enum: ["high", "medium", "low"],
@@ -79,7 +83,7 @@ const SCHEMA = {
   // Kein is_foil: Glanz auf einem Foto beweist kein Foil — jede Lampe über
   // einer normalen Karte erzeugt denselben Eindruck. Ein Fehlurteil legt eine
   // eigene Zeile mit falschem Preis an. Diese Angabe macht der Nutzer.
-  required: ["printed_name", "corner_line_1", "corner_line_2", "type_line", "confidence"],
+  required: ["printed_name", "corner_line_1", "corner_line_2", "type_line", "lang", "confidence"],
   additionalProperties: false,
 } as const;
 
@@ -109,7 +113,13 @@ Welche Zeichenfolge welche Bedeutung hat, entscheidet nicht du — das macht ein
 Programm anhand fester Regeln. Deine einzige Aufgabe ist eine treue Abschrift.
 
 Ganz alte Karten haben diesen Aufdruck nicht. Dann bleiben beide Eckzeilen leer,
-und nur der Kartenname oben zählt.`;
+und nur der Kartenname oben zählt.
+
+Gib zusätzlich die Sprache der Karte an (Feld lang), als zweistelligen Code wie
+unten links neben dem Setcode: DE, EN, FR, IT, ES, PT, RU, KO, JP. Das ist der
+eine Punkt, an dem du auch aufs Bild schauen darfst: Ist der Code nicht lesbar,
+bestimme die Sprache an Name und Regeltext (deutscher Text = DE, englischer =
+EN, usw.). Nur wenn du wirklich unsicher bist, lass das Feld leer.`;
 
 /* Betriebsart "detect": Auf EINEM Foto liegen mehrere Karten. Das Modell soll
    sie nur LOKALISIEREN — je Karte ein achsenparalleles Rechteck in Bild-Anteilen
