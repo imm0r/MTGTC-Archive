@@ -1293,13 +1293,19 @@ async function backfillFarbident() {
   } finally { backfillFarbident._laeuft = false; }
 }
 
-/* ------------------------------------------- Geteilte Preishistorie (MTGJSON)
+/* ------------------------------------------- Geteiltes Preisarchiv (MTGJSON)
    Scryfall kennt nur den Tagespreis — einen Verlauf gibt es dort nicht.
-   MTGJSON liefert ~90 Tage, die ein Backfill-Job (GitHub Action, siehe
+   MTGJSON liefert je Lauf ~90 Tage, die ein Backfill-Job (GitHub Action, siehe
    scripts/price-backfill) in die geteilte Tabelle price_history legt: dieselben
    Werte für alle Nutzer, deshalb je scryfall_id nur einmal. Hier laden wir die
    EUR-Reihen für den eigenen Bestand nach und legen sie beim Anzeigen UNTER die
    persönliche Vorwärts-Historie (cards.hist).
+
+   Wie WEIT die Reihen zurückreichen, hängt daran, wie lange der Job schon
+   läuft: er mischt sein 90-Tage-Fenster in den Bestand, statt ihn zu ersetzen
+   (merge_price_history), also wächst das Archiv mit jedem Lauf über die 90
+   Tage hinaus. Für die App ändert das nichts außer der Länge der Reihe —
+   deshalb rechnet der Graph mit einer echten Zeitachse (siehe priceChart).
 
    Fehlt die Tabelle (Schema noch nicht nachgezogen) oder lief der Job nie,
    bleibt alles beim Alten — die App zeigt dann nur die eigenen Punkte. */
@@ -2275,34 +2281,224 @@ const dtStacked = iso => {
   return `${tag}<br>${uhr}`;
 };
 
-/* Preisverlauf als richtiger Graph: Gitterlinien mit Eurowerten, Datum an
-   den Enden, ein Punkt pro Tag (bis ~90 mit MTGJSON-Fundament, sonst so weit
-   die eigene Historie reicht — siehe mergedHist).
-   Grün bei gestiegenem, rot bei gefallenem Kurs — wie die Mini-Kurve. */
-function priceChart(hist, w = 560, h = 200) {
-  const H = (hist || []).map(p => ({ d: p.d, v: Number(p.v) })).filter(p => !isNaN(p.v));
-  if (!H.length) return `<p class="hint">${esc(t("detail.noHistory"))}</p>`;
-  const pl = w > 400 ? 62 : 54, pr = 14, pt = 12, pb = 26;
-  let min = Math.min(...H.map(p => p.v)), max = Math.max(...H.map(p => p.v));
-  if (min === max) { const d = Math.max(0.05, min * 0.1); min -= d; max += d; }
-  const X = i => H.length === 1 ? pl + (w - pl - pr) / 2 : pl + i * (w - pl - pr) / (H.length - 1);
-  const Y = v => pt + (h - pt - pb) * (1 - (v - min) / (max - min));
-  const fmtD = s => s ? s.slice(8, 10) + "." + s.slice(5, 7) + "." : "";
-  const farbe = H[H.length - 1].v >= H[0].v ? "var(--ok)" : "var(--err)";
-  const ticks = [min, (min + max) / 2, max];
-  return `<svg class="chart-svg" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
-    ${ticks.map(v => `<line x1="${pl}" y1="${Y(v).toFixed(1)}" x2="${w - pr}" y2="${Y(v).toFixed(1)}"
-        stroke="var(--line)" stroke-width="1"/>
-      <text x="${pl - 8}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end" font-size="11"
-        fill="var(--dim)">${eur(v)}</text>`).join("")}
-    ${H.length > 1 ? `<polyline points="${H.map((p, i) => `${X(i).toFixed(1)},${Y(p.v).toFixed(1)}`).join(" ")}"
-        fill="none" stroke="${farbe}" stroke-width="2"/>` : ""}
-    ${H.map((p, i) => `<circle cx="${X(i).toFixed(1)}" cy="${Y(p.v).toFixed(1)}"
-        r="${H.length > 30 ? 2 : 3.5}" fill="${farbe}"><title>${p.d}: ${eur(p.v)}</title></circle>`).join("")}
-    <text x="${pl}" y="${h - 6}" font-size="11" fill="var(--dim)">${fmtD(H[0].d)}</text>
-    <text x="${w - pr}" y="${h - 6}" text-anchor="end" font-size="11" fill="var(--dim)">${fmtD(H[H.length - 1].d)}</text>
-  </svg>`;
+/* ---------------------------------------------------- Preisverlauf --------
+   Der Graph im Zuschnitt von Cardmarket: waagerechte Gitterlinien auf runden
+   Eurobeträgen, senkrechte an den Datumsmarken, schräg gestellte Datums-
+   beschriftung, eine helle Kurve mit einem Punkt je Messwert — und beim
+   Überfahren ein heller Kasten, der auf den nächstgelegenen Punkt einrastet
+   und dessen Datum und Preis zeigt.
+
+   Die Zeitachse ist ZEITgetreu, nicht laufnummerngetreu. Solange die Historie
+   90 lückenlose Tage umfasste, war das dasselbe; seit price_history ein Archiv
+   ist (siehe merge_price_history), kann eine Reihe Jahre umspannen und Lücken
+   haben — Punkte gleichmäßig zu verteilen würde diese Lücken verschweigen und
+   den Verlauf verzerren.
+
+   Der Median liegt als dünne gestrichelte Waagerechte darin: er sagt auf einen
+   Blick, ob der heutige Kurs über oder unter dem üblichen Niveau liegt.
+   Bewusst zurückhaltend gezeichnet und in Gold — er soll die Kurve begleiten,
+   nicht mit ihr wetteifern, und darf mit ihrem Grün/Rot nicht verwechselbar
+   sein.
+
+   Die Kurve bleibt grün bei gestiegenem, rot bei gefallenem Kurs (Endpunkt
+   gegen Anfangspunkt des gezeigten Bereichs) — wie die Mini-Kurve in der
+   Liste. Cardmarket zeichnet neutral weiß; die Richtung auf einen Blick zu
+   sehen ist uns mehr wert als die Farbtreue zur Vorlage. Der Farbtupfer im
+   Zeigerkasten trägt dieselbe Farbe, damit er als Legende zur Kurve lesbar
+   bleibt und nicht als eigene Aussage. */
+
+let PCHART_NR = 0;
+const PCHART_GEO = new Map();   // id → { pts:[{x,y,d,v}], w } in SVG-Einheiten
+
+/* Runder Schrittabstand für die Werteachse: 1 / 2 / 2,5 / 5 / 10 mal eine
+   Zehnerpotenz. Damit steht auf den Linien 0,40 € und nicht 0,4137 €. */
+function niceStep(spanne, ziele) {
+  const roh = spanne / Math.max(1, ziele);
+  if (!(roh > 0)) return 1;
+  const p10 = Math.pow(10, Math.floor(Math.log10(roh)));
+  for (const m of [1, 2, 2.5, 5, 10]) if (roh <= m * p10) return m * p10;
+  return 10 * p10;
 }
+
+function medianOf(vs) {
+  if (!vs.length) return null;
+  const s = [...vs].sort((a, b) => a - b), m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+
+const dmyAusIso = s => (s && s.length >= 10)
+  ? `${s.slice(8, 10)}.${s.slice(5, 7)}.${s.slice(0, 4)}` : (s || "");
+
+function priceChart(hist, w = 560, h = 200) {
+  // Datum mitrechnen (Zeitachse) und ungültige Punkte verwerfen. Sortiert wird
+  // hier noch einmal: mergedHist liefert sortiert, aber der Graph verlässt sich
+  // nicht darauf — eine unsortierte Reihe zeichnete sonst Zickzack.
+  const H = (hist || [])
+    .map(p => ({ d: p.d, v: Number(p.v), t: Date.parse(`${p.d}T00:00:00Z`) }))
+    .filter(p => Number.isFinite(p.v) && Number.isFinite(p.t))
+    .sort((a, b) => a.t - b.t);
+  if (!H.length) return `<p class="hint">${esc(t("detail.noHistory"))}</p>`;
+
+  const schmal = w <= 400;
+  const fs = schmal ? 10 : 11;
+
+  // Die Datumsangaben stehen um 45° gekippt (wie bei Cardmarket). Gekippt
+  // braucht eine Beschriftung der Breite b nach unten UND nach links je
+  // b·cos45° Platz — die Fußhöhe muss also aus der Schriftgröße folgen und
+  // darf nicht geraten sein, sonst schneidet der viewBox die Beschriftung ab.
+  // "01.01.2026" sind 10 Zeichen; 0,58·Schriftgröße je Zeichen trifft die
+  // Breite der hier verwendeten Systemschrift dicht genug.
+  const lblB = fs * 0.58 * 10;
+  const kipp = Math.ceil(lblB * 0.7071);
+  const pl = schmal ? 46 : 56, pr = 12, pt = 12, pb = kipp + 8;
+  const iw = w - pl - pr, ih = h - pt - pb;
+
+  // Wertebereich auf runde Schritte aufziehen. Kein Spread über das Array:
+  // eine Reihe über Jahre kann tausende Punkte haben, und Math.min(...vs)
+  // kippt bei sehr langen Argumentlisten.
+  const vs = H.map(p => p.v);
+  let lo = vs[0], hi = vs[0];
+  for (const v of vs) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  if (lo === hi) { const d = Math.max(0.05, Math.abs(lo) * 0.1); lo -= d; hi += d; }
+  const schritt = niceStep(hi - lo, schmal ? 4 : 6);
+  const yLo = Math.floor(lo / schritt) * schritt;
+  const yHi = Math.ceil(hi / schritt) * schritt;
+  const yN  = Math.max(1, Math.round((yHi - yLo) / schritt));
+
+  const t0 = H[0].t, t1 = H[H.length - 1].t, dt = (t1 - t0) || 1;
+  const X = p => H.length === 1 ? pl + iw / 2 : pl + (p.t - t0) / dt * iw;
+  const Y = v => pt + ih * (1 - (v - yLo) / ((yHi - yLo) || 1));
+
+  // Datumsmarken gleichmäßig über die ZEIT, nicht über die Punkte: bei Lücken
+  // säßen sonst mehrere Beschriftungen dicht beieinander.
+  const xN = Math.max(2, Math.min(7, Math.floor(iw / (schmal ? 78 : 112))));
+  const xMarken = H.length === 1 ? [t0]
+    : Array.from({ length: xN }, (_, i) => t0 + dt * i / (xN - 1));
+  const dmy = ms => {
+    const d = new Date(ms), p = n => String(n).padStart(2, "0");
+    return `${p(d.getUTCDate())}.${p(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}`;
+  };
+
+  // Punkte nur zeichnen, solange sie auseinanderliegen. Bei einem Jahresverlauf
+  // auf 900 Einheiten stünden sie sonst Kante an Kante und würden die Kurve zu
+  // einem Band verschmieren.
+  const abst   = H.length > 1 ? iw / (H.length - 1) : iw;
+  const punkte = abst >= 5;
+  const r      = abst >= 14 ? 3.2 : 2.4;
+
+  const med = H.length >= 3 ? medianOf(vs) : null;
+  const linie = H.map(p => `${X(p).toFixed(1)},${Y(p.v).toFixed(1)}`).join(" ");
+  const farbe = H[H.length - 1].v >= H[0].v ? "var(--ok)" : "var(--err)";
+
+  const id = ++PCHART_NR;
+  PCHART_GEO.set(id, { pts: H.map(p => ({ x: X(p), y: Y(p.v), d: p.d, v: p.v })), w });
+  // Aufräumen: alles wegwerfen, was nicht mehr im Dokument hängt. Ohne das
+  // wüchse die Map mit jedem geöffneten Kartendetail weiter.
+  if (PCHART_GEO.size > 12)
+    for (const k of [...PCHART_GEO.keys()])
+      if (k !== id && !document.querySelector(`.pchart[data-pc="${k}"]`)) PCHART_GEO.delete(k);
+
+  return `<div class="pchart" data-pc="${id}">
+    <svg class="chart-svg" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
+      ${Array.from({ length: yN + 1 }, (_, i) => {
+        const v = yLo + i * schritt, y = Y(v).toFixed(1);
+        return `<line x1="${pl}" y1="${y}" x2="${w - pr}" y2="${y}" stroke="var(--line)" stroke-width="1"/>
+          <text x="${pl - 8}" y="${(Y(v) + fs * 0.36).toFixed(1)}" text-anchor="end"
+            font-size="${fs}" fill="var(--dim)">${esc(eur(v))}</text>`;
+      }).join("")}
+      ${xMarken.map(ms => {
+        const x = (H.length === 1 ? pl + iw / 2 : pl + (ms - t0) / dt * iw).toFixed(1);
+        // Ankerpunkt knapp unter der Achse: von hier läuft die gekippte
+        // Beschriftung nach unten-links und endet bei h-2, also gerade noch
+        // im Bild (pb ist genau darauf berechnet).
+        const yb = h - pb + 6;
+        return `<line x1="${x}" y1="${pt}" x2="${x}" y2="${pt + ih}" stroke="var(--line)" stroke-width="1"/>
+          <text x="${x}" y="${yb}" text-anchor="end" font-size="${fs}" fill="var(--dim)"
+            transform="rotate(-45 ${x} ${yb})">${esc(dmy(ms))}</text>`;
+      }).join("")}
+      ${med != null ? `<line x1="${pl}" y1="${Y(med).toFixed(1)}" x2="${w - pr}" y2="${Y(med).toFixed(1)}"
+          stroke="var(--acc)" stroke-width="1" stroke-dasharray="4 4" opacity=".38"/>
+        ${schmal ? "" : `<text x="${w - pr - 4}" y="${(Y(med) - 5).toFixed(1)}" text-anchor="end"
+          font-size="${fs - 1}" fill="var(--acc)" opacity=".55" stroke="var(--bg)" stroke-width="3"
+          paint-order="stroke">${esc(t("detail.median"))} ${esc(eur(med))}</text>`}` : ""}
+      ${H.length > 1 ? `<polyline points="${linie}" fill="none" stroke="${farbe}"
+          stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` : ""}
+      ${punkte ? H.map(p => `<circle cx="${X(p).toFixed(1)}" cy="${Y(p.v).toFixed(1)}"
+          r="${r}" fill="${farbe}"/>`).join("") : ""}
+      <circle class="pchart-marke" r="4.5" fill="${farbe}" stroke="var(--panel)"
+        stroke-width="2" style="display:none"/>
+    </svg>
+    <div class="pchart-tip" hidden>
+      <div class="pchart-tip-d"></div>
+      <div class="pchart-tip-v"><i style="background:${farbe}"></i><span></span></div>
+    </div>
+  </div>`;
+}
+
+/* Zeigerkasten wie bei Cardmarket: er rastet auf den nächstgelegenen Punkt ein
+   (nicht auf die freie Zeigerposition) und weicht zur anderen Seite aus, wenn
+   er am Rand anstieße. Ein einziger Zuhörer am Dokument bedient alle Graphen —
+   die Detailansicht baut ihr HTML als Zeichenkette, da gibt es beim Erzeugen
+   kein Element, an das man etwas hängen könnte. */
+let PCHART_OFFEN = null;
+
+function pchartAus() {
+  if (!PCHART_OFFEN) return;
+  const tip = PCHART_OFFEN.querySelector(".pchart-tip");
+  const mk  = PCHART_OFFEN.querySelector(".pchart-marke");
+  if (tip) tip.hidden = true;
+  if (mk)  mk.style.display = "none";
+  PCHART_OFFEN = null;
+}
+
+function pchartZeige(e) {
+  const box = e.target.closest && e.target.closest(".pchart");
+  if (!box) { pchartAus(); return; }
+  if (PCHART_OFFEN && PCHART_OFFEN !== box) pchartAus();
+
+  const geo = PCHART_GEO.get(Number(box.dataset.pc));
+  const tip = box.querySelector(".pchart-tip");
+  if (!geo || !geo.pts.length || !tip) return;
+  const rect = box.getBoundingClientRect();
+  if (!rect.width) return;
+
+  const sk = rect.width / geo.w;                   // SVG-Einheiten → Bildschirmpixel
+  const mx = (e.clientX - rect.left) / sk;         // Zeiger in SVG-Einheiten
+
+  // Binäre Suche: die Punkte liegen nach x sortiert, und ein Jahresverlauf
+  // bringt schnell vierstellig viele mit.
+  const pts = geo.pts;
+  let a = 0, b = pts.length - 1;
+  while (a < b) { const m = (a + b) >> 1; if (pts[m].x < mx) a = m + 1; else b = m; }
+  let treffer = pts[a];
+  if (a > 0 && Math.abs(pts[a - 1].x - mx) < Math.abs(treffer.x - mx)) treffer = pts[a - 1];
+
+  tip.querySelector(".pchart-tip-d").textContent = dmyAusIso(treffer.d);
+  tip.querySelector(".pchart-tip-v span").textContent = eur(treffer.v);
+  tip.hidden = false;
+
+  const mk = box.querySelector(".pchart-marke");
+  if (mk) { mk.setAttribute("cx", treffer.x); mk.setAttribute("cy", treffer.y); mk.style.display = ""; }
+
+  const px = treffer.x * sk, py = treffer.y * sk;
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  let l = px + 14;
+  if (l + tw > rect.width) l = px - 14 - tw;                     // rechts kein Platz → links
+  l = Math.max(0, Math.min(rect.width - tw, l));
+  let o = py - th - 12;
+  if (o < 0) o = py + 14;                                        // oben kein Platz → darunter
+  o = Math.max(0, Math.min(rect.height - th, o));
+  tip.style.left = l + "px";
+  tip.style.top  = o + "px";
+  PCHART_OFFEN = box;
+}
+
+document.addEventListener("pointermove", pchartZeige, { passive: true });
+document.addEventListener("pointerdown", pchartZeige, { passive: true });
+// Scrollen/Verlassen räumt auf: der Kasten steht absolut im Graphen und bliebe
+// sonst am letzten Punkt kleben, wenn der Zeiger den Dialog verlässt.
+document.addEventListener("pointercancel", pchartAus, { passive: true });
+window.addEventListener("blur", pchartAus);
 
 /* ---------------------------------------------------- Fähigkeiten ---- */
 /* Scryfall liefert Fähigkeiten NICHT als Name/Typ/Kosten — nur die keywords-

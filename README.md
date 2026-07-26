@@ -413,7 +413,7 @@ Würfel und Einladeliste sind Zubehör und stehen eingeklappt am Ende — beim W
 > `supabase/migrations/20260725190000_field_state.sql` einzeln). Bis dahin
 > läuft die Partie im Browser weiter, wird aber nicht gespeichert.
 
-## Preisverlauf: ~90 Tage aus MTGJSON
+## Preisverlauf: Langzeitarchiv aus MTGJSON
 
 Scryfall liefert nur den **Tagespreis** — einen Verlauf gibt es dort nicht. Die
 App führt deshalb selbst eine Historie: „Preise aktualisieren" schreibt je Karte
@@ -427,6 +427,39 @@ die passenden Reihen in eine geteilte Tabelle; die App legt sie beim Anzeigen
 null anzufangen. Ohne diese Einrichtung bleibt alles beim Alten: nur die eigenen
 Vorwärts-Punkte.
 
+**Über die 90 Tage hinaus.** MTGJSON liefert je Abruf nur das laufende
+90-Tage-Fenster. Würde der Job es einfach in die Tabelle schreiben, wäre der
+gespeicherte Verlauf ebenfalls ein gleitendes Fenster — nach einem Jahr stünde
+dort immer noch nur ein Vierteljahr, egal wie oft der Job lief. Stattdessen
+**mischt** er sein Fenster in den vorhandenen Bestand (`merge_price_history` in
+der Datenbank): je Datum ein Punkt, bei Gleichstand gewinnt der neuere Wert,
+Älteres bleibt für immer stehen. Das Archiv wächst also mit jedem Lauf, und nach
+zwei Jahren zeigt der Graph zwei Jahre.
+
+Gemischt wird bewusst **in der Datenbank** und nicht im Job: sonst müsste der
+Job täglich das gesamte Archiv herunterladen, im Speicher zusammenführen und
+vollständig zurückschreiben — eine Datenmenge, die mit jedem Jahr wächst. So
+überträgt er immer nur das frische Fenster.
+
+Lückenlos bleibt der Verlauf, solange zwischen zwei Läufen keine 90 Tage
+liegen — beim täglichen Zeitplan also mit reichlich Luft. Ein ausgefallener Tag
+schadet nichts: der nächste Lauf bringt die verpassten Tage rückwirkend mit.
+
+Gekürzt wird nirgends mehr, auch nicht in der persönlichen Historie: `set_price`
+hielt früher nur die letzten 60 Punkte je Karte. Für Karten, die MTGJSON kennt,
+trug das geteilte Fundament die alten Tage — für seltene Auflagen ohne
+Cardmarket-Reihe war die eigene Historie aber die einzige, und die endete nach
+zwei Monaten.
+
+**Der Graph** ist im Zuschnitt von [Cardmarket](https://www.cardmarket.com)
+gehalten: Gitterlinien auf runden Eurobeträgen, schräg gestellte Datumsangaben,
+ein Punkt je Messwert und beim Überfahren ein heller Kasten, der auf den
+nächstgelegenen Punkt einrastet und dessen Datum und Preis zeigt. Die Zeitachse
+ist **zeitgetreu** skaliert, nicht nach Laufnummer — bei einer Reihe über Jahre
+würden Lücken sonst verschwiegen. Die Kurve ist grün bei gestiegenem und rot bei
+gefallenem Kurs; dünn und gestrichelt liegt der **Median** darin, der auf einen
+Blick zeigt, ob der heutige Preis über oder unter dem üblichen Niveau liegt.
+
 Warum ein GitHub Action und keine Edge Function: MTGJSONs Preisdatei ist entpackt
 ~1 GB — zu groß für den Speicher einer Edge Function. Der Runner hat den Platz,
 **streamt** die Datei und zieht nur die Karten heraus, die im Bestand stehen. Der
@@ -439,10 +472,15 @@ Warum ein GitHub Action und keine Edge Function: MTGJSONs Preisdatei ist entpack
   schreiben darf allein der Job über den `service_role`-Key, der RLS umgeht. Die
   Tabelle kommt mit `supabase-schema.sql`. Die persönliche Historie (`cards.hist`)
   bleibt davon unberührt.
+* **`merge_price_history(jsonb)`** — die Funktion, die das neue Fenster über den
+  Bestand legt, statt ihn zu ersetzen. Nur für den `service_role` aufrufbar;
+  Angemeldeten ist das Ausführungsrecht entzogen.
 * **`scripts/price-backfill/`** — Node-Skript: liest die vorhandenen
   `scryfall_id` aus der Datenbank, streamt MTGJSONs `AllIdentifiers` (Zuordnung
-  `scryfallId → uuid`) und `AllPrices`, schreibt die EUR/USD-Reihen gebündelt in
-  `price_history`.
+  `scryfallId → uuid`) und `AllPrices`, schickt die EUR/USD-Reihen gebündelt an
+  `merge_price_history`. Fehlt die Funktion (Schema noch nicht nachgezogen),
+  bricht der Lauf ab, **ohne etwas zu schreiben** — lieber kein neuer Punkt als
+  ein stillschweigend auf 90 Tage zurückgestutztes Archiv.
 * **`.github/workflows/prices.yml`** — führt das Skript täglich (15:00 UTC, nach
   MTGJSONs Tages-Build) und auf Knopfdruck aus.
 
@@ -452,12 +490,14 @@ mitgespeichert und lässt sich später ohne erneuten Import sichtbar machen.
 ### Einrichten (optional)
 
 1. **Schema aktualisieren:** `supabase-schema.sql` erneut komplett ausführen
-   (legt `price_history` samt RLS an; wiederholbar, Daten bleiben erhalten).
+   (legt `price_history` samt RLS und `merge_price_history` an; wiederholbar,
+   Daten bleiben erhalten). Wer nur nachziehen will, spielt
+   `supabase/migrations/20260726120000_price_history_langzeit.sql` einzeln ein.
 2. **Secrets im GitHub-Repo** (Settings → Secrets and variables → Actions):
    * `SUPABASE_URL` — z. B. `https://<projekt>.supabase.co`.
    * `SUPABASE_SERVICE_ROLE_KEY` — aus **Project Settings → API**. Er umgeht RLS
      und gehört ausschließlich hierher, nie in die App.
-3. **Auslösen:** im Repo unter **Actions → „Preishistorie (MTGJSON)" → Run
+3. **Auslösen:** im Repo unter **Actions → „Preisarchiv (MTGJSON)" → Run
    workflow** einmal von Hand starten; danach läuft er täglich. Beim nächsten
    Öffnen der Sammlung sind die Graphen gefüllt.
 
@@ -510,6 +550,6 @@ Die Cardmarket-API selbst kommt nicht in Frage:
 Was Cardmarket besser kann, sind die konkreten Angebote. Dorthin führt der
 `CM`-Link je Kartenzeile.
 * „Preise aktualisieren“ ruft jede Karte einzeln ab und schreibt einen
-  Historienpunkt pro Tag (die letzten 60 bleiben erhalten). Rückwirkend füllt
-  der optionale MTGJSON-Job den Verlauf auf ~90 Tage — siehe „Preisverlauf:
-  ~90 Tage aus MTGJSON“.
+  Historienpunkt pro Tag; gekürzt wird dabei nichts. Rückwirkend füllt der
+  optionale MTGJSON-Job den Verlauf und trägt ihn über die Jahre fort — siehe
+  „Preisverlauf: Langzeitarchiv aus MTGJSON“.

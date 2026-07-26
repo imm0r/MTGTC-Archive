@@ -349,8 +349,18 @@ create trigger decks_second_card
   for each row execute function public.check_second_card();
 
 -- ------------------------------------------------- Preis fortschreiben
--- Schreibt den Tagespreis in die Historie: ein Eintrag pro Tag, die
--- letzten 60 Tage. Ersetzt den Wert, falls heute schon einer da ist.
+-- Schreibt den Tagespreis in die Historie: ein Eintrag pro Tag, ohne Ende.
+-- Ersetzt den Wert, falls heute schon einer da ist.
+--
+-- Früher blieben hier nur die letzten 60 Punkte stehen. Für Karten, die
+-- MTGJSON kennt, war das verschmerzbar — das geteilte Fundament
+-- (price_history) trug die alten Tage. Für alles andere (seltene Auflagen,
+-- Karten ohne Cardmarket-Reihe) ist diese Reihe aber die EINZIGE, und die
+-- endete damit nach zwei Monaten. Ein Langzeitverlauf soll nirgends
+-- abgeschnitten werden, also fällt der Schnitt weg.
+--
+-- Das wächst gutmütig: ein Punkt pro Tag und Karte, ein zweiter Aufruf am
+-- selben Tag ersetzt ihn nur — höchstens ~365 kleine Objekte im Jahr.
 create or replace function public.set_price(p_card_id uuid, p_price numeric)
 returns void
 language plpgsql
@@ -371,20 +381,11 @@ begin
     h := h || jsonb_build_array(jsonb_build_object('d', d_txt, 'v', p_price));
   end if;
 
-  -- auf die letzten 60 Einträge kürzen. Das "order by i" muss in der
-  -- Aggregatfunktion stehen: eine sortierte Unterabfrage allein garantiert
-  -- die Reihenfolge im Ergebnis nicht.
-  if jsonb_array_length(h) > 60 then
-    select jsonb_agg(e order by i) into h
-    from (select e, i from jsonb_array_elements(h) with ordinality t(e, i)
-          order by i offset jsonb_array_length(h) - 60) s;
-  end if;
-
   update public.cards set price = p_price, hist = h where id = p_card_id;
 end $$;
 
 -- =====================================================================
---  Geteilte Preishistorie (MTGJSON)
+--  Geteiltes Preisarchiv (MTGJSON)
 --
 --  Scryfall liefert nur den TAGESpreis — einen Verlauf gibt es dort nicht.
 --  MTGJSON bündelt ~90 Tage Preishistorie (Cardmarket-EUR, TCGplayer-USD),
@@ -392,7 +393,15 @@ end $$;
 --  Konto. Deshalb eine einzige geteilte Tabelle je scryfall_id statt einer
 --  Kopie in jeder cards-Zeile. Die persönliche cards.hist (Vorwärtspunkte
 --  aus set_price) bleibt unberührt — die App legt beim Anzeigen beides
---  übereinander: MTGJSON als 90-Tage-Fundament, die eigenen Punkte oben drauf.
+--  übereinander: MTGJSON als Fundament, die eigenen Punkte oben drauf.
+--
+--  Diese Tabelle ist ein ARCHIV, kein Zwischenspeicher. MTGJSON liefert je
+--  Lauf nur die letzten ~90 Tage; würde der Job sie schlicht hineinschreiben,
+--  wäre der gespeicherte Verlauf ein gleitendes 90-Tage-Fenster und ein
+--  Jahresverlauf könnte nie entstehen. Deshalb schreibt er NICHT direkt,
+--  sondern ruft merge_price_history() (weiter unten) auf: dort wird das neue
+--  Fenster über das vorhandene gelegt, je Datum ein Punkt. Nichts wird je
+--  gekürzt — der Verlauf wächst, solange der Job läuft.
 --
 --  Gefüllt wird ausschließlich serverseitig vom Backfill-Job (GitHub Action
 --  mit service_role-Key, siehe scripts/price-backfill/) — nie aus dem
@@ -419,6 +428,140 @@ revoke all on public.price_history from anon;
 drop policy if exists "preishistorie lesbar" on public.price_history;
 create policy "preishistorie lesbar" on public.price_history
   for select to authenticated using (true);
+
+-- ------------------------------------------------- eine Reihe mischen
+-- Zwei Reihen [{d,v}, …] zu einer verschmelzen: je Datum ein Punkt, bei
+-- Gleichstand gewinnt "neu", Ergebnis nach Datum aufsteigend. Der neue Wert
+-- gewinnt bewusst — MTGJSON korrigiert Tageswerte gelegentlich nach, und die
+-- spätere Lieferung ist die bessere.
+--
+-- Punkte ohne Datum oder ohne Zahlwert fallen still heraus: die Reihe soll
+-- auch dann lesbar bleiben, wenn irgendwann Unfug in der Spalte landet.
+-- Das Datum ist 'YYYY-MM-DD', da ist die Textsortierung die zeitliche.
+create or replace function public.merge_price_series(alt jsonb, neu jsonb)
+returns jsonb
+language sql
+immutable
+set search_path = public
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object('d', d, 'v', v) order by d), '[]'::jsonb)
+    from (
+      select p ->> 'd'  as d,
+             (p -> 'v') as v,
+             row_number() over (partition by p ->> 'd' order by rang desc) as platz
+        from (
+          select 0 as rang, e as p from jsonb_array_elements(coalesce(alt, '[]'::jsonb)) e
+          union all
+          select 1 as rang, e as p from jsonb_array_elements(coalesce(neu, '[]'::jsonb)) e
+        ) beide
+       where jsonb_typeof(p) = 'object'
+         and p ->> 'd' is not null
+         and jsonb_typeof(p -> 'v') = 'number'
+    ) s
+   where platz = 1
+$$;
+
+-- ------------------------------------------------- ganzen Preisbaum mischen
+-- { "eur": { "normal": […], "foil": […] }, "usd": { … } } — je Währung und
+-- Ausführung eine Reihe. Gemischt wird über die Schlüssel von "neu"; was nur
+-- in "alt" steht (etwa eine Währung, die MTGJSON heute nicht liefert), bleibt
+-- unangetastet stehen. Genau das macht den Vorgang verlustfrei.
+create or replace function public.merge_price_map(alt jsonb, neu jsonb)
+returns jsonb
+language plpgsql
+immutable
+set search_path = public
+as $$
+declare
+  waehrung text;
+  art      text;
+  ergebnis jsonb := coalesce(alt, '{}'::jsonb);
+  zweig    jsonb;
+begin
+  if jsonb_typeof(ergebnis) is distinct from 'object' then ergebnis := '{}'::jsonb; end if;
+  if jsonb_typeof(neu)      is distinct from 'object' then return ergebnis;        end if;
+
+  for waehrung in select jsonb_object_keys(neu) loop
+    if jsonb_typeof(neu -> waehrung) is distinct from 'object' then continue; end if;
+
+    zweig := coalesce(ergebnis -> waehrung, '{}'::jsonb);
+    if jsonb_typeof(zweig) is distinct from 'object' then zweig := '{}'::jsonb; end if;
+
+    for art in select jsonb_object_keys(neu -> waehrung) loop
+      zweig := jsonb_set(zweig, array[art],
+                 public.merge_price_series(zweig -> art, neu -> waehrung -> art), true);
+    end loop;
+
+    ergebnis := jsonb_set(ergebnis, array[waehrung], zweig, true);
+  end loop;
+
+  return ergebnis;
+end $$;
+
+-- ------------------------------------------------- Eintrittspunkt für den Job
+-- Erwartet [{ "scryfall_id": "…", "prices": { … } }, …] und legt jede Reihe
+-- über die vorhandene, statt sie zu ersetzen. Rückgabe: berührte Zeilen.
+--
+-- Warum das hier steht und nicht im Job: sonst müsste der Job jeden Tag das
+-- gesamte Archiv lesen, im Speicher mischen und vollständig zurückschreiben —
+-- eine Datenmenge, die mit jedem Jahr wächst. So überträgt er immer nur das
+-- frische Fenster, egal wie lang der Verlauf schon ist.
+--
+-- distinct on: käme dieselbe scryfall_id zweimal im selben Aufruf vor, bräche
+-- Postgres den ganzen Stapel ab ("cannot affect row a second time"). Der
+-- letzte Eintrag gewinnt — dieselbe Regel wie in der Map, aus der der Job die
+-- Zeilen baut.
+create or replace function public.merge_price_history(p_rows jsonb)
+returns integer
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  anzahl integer;
+begin
+  if jsonb_typeof(p_rows) is distinct from 'array' then
+    raise exception 'merge_price_history erwartet ein JSON-Array, bekam %',
+      coalesce(jsonb_typeof(p_rows), 'null');
+  end if;
+
+  with eingang as (
+    select distinct on (r ->> 'scryfall_id')
+           r ->> 'scryfall_id'                    as sid,
+           coalesce(r -> 'prices', '{}'::jsonb)   as preise
+      from jsonb_array_elements(p_rows) with ordinality t(r, i)
+     where jsonb_typeof(r) = 'object'
+       and r ->> 'scryfall_id' is not null
+       and jsonb_typeof(coalesce(r -> 'prices', '{}'::jsonb)) = 'object'
+     order by r ->> 'scryfall_id', i desc
+  )
+  -- merge_price_map auch auf dem EINFUEGE-Weg: eine neue Zeile durchliefe
+  -- sonst nie das Mischen und behielte die Reihen genau so, wie MTGJSON sie
+  -- geliefert hat -- unsortiert und samt Punkten ohne Datum oder Zahlwert.
+  -- Gegen '{}' gemischt heisst hier schlicht "normalisiert".
+  insert into public.price_history as ph (scryfall_id, prices, updated_at)
+  select sid, public.merge_price_map('{}'::jsonb, preise), now() from eingang
+  on conflict (scryfall_id) do update
+     set prices     = public.merge_price_map(ph.prices, excluded.prices),
+         updated_at = now();
+
+  get diagnostics anzahl = row_count;
+  return anzahl;
+end $$;
+
+-- Aufrufbar allein für den Job. Angemeldete kämen ohnehin nicht durch (keine
+-- Schreib-Policy, security invoker), aber eine Funktion, die niemand braucht,
+-- soll auch niemand sehen.
+revoke execute on function public.merge_price_series(jsonb, jsonb)  from public, anon, authenticated;
+revoke execute on function public.merge_price_map(jsonb, jsonb)     from public, anon, authenticated;
+revoke execute on function public.merge_price_history(jsonb)        from public, anon, authenticated;
+grant  execute on function public.merge_price_series(jsonb, jsonb)  to service_role;
+grant  execute on function public.merge_price_map(jsonb, jsonb)     to service_role;
+grant  execute on function public.merge_price_history(jsonb)        to service_role;
+
+comment on function public.merge_price_history(jsonb) is
+  'Legt MTGJSON-Preisreihen über die vorhandenen in public.price_history, statt sie zu ersetzen. '
+  'Bei gleichem Datum gewinnt der neue Wert; ältere Punkte bleiben für immer erhalten.';
 
 -- =====================================================================
 --  Profil je Konto: Anzeigename und Avatar. Ein Datensatz pro Nutzer

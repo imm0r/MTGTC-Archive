@@ -1087,10 +1087,32 @@ dialog::backdrop{background:#000a}
 .dt-results-full{margin-top:14px}
 .dt-results-full:empty{display:none}
 /* Preisverlauf über die volle Fensterbreite (mit den Dialog-Einzügen); der
-   Graph füllt die Breite, statt auf 360px begrenzt zu sein. */
+   Graph füllt die Breite, statt auf 360px begrenzt zu sein.
+
+   Die Breitenbegrenzung sitzt am Rahmen .pchart, nicht mehr am SVG: der
+   Zeigerkasten steht absolut darin und muss sich auf dieselbe Box beziehen,
+   sonst säße er neben dem Graphen statt darin. */
 .dt-price-full{margin-top:14px}
-.dt-price-full .chart-svg{max-width:none}
+.dt-price-full .pchart{max-width:none}
+.pchart{position:relative;width:100%;max-width:360px;margin-top:4px}
+.pchart .chart-svg{max-width:none;margin-top:0}
 .chart-svg{width:100%;max-width:360px;height:auto;display:block;margin-top:4px}
+
+/* Der Kasten am Zeiger, im Zuschnitt von Cardmarket: hell auf dem dunklen
+   Graphen, fettes Datum, darunter Farbtupfer und Preis. pointer-events:none —
+   sonst schöbe sich der Kasten unter den Zeiger und der Graph verlöre ihn.
+   white-space:nowrap hält Datum und Preis je auf einer Zeile, damit der
+   Kasten beim Wandern nicht die Höhe wechselt. */
+.pchart-tip{position:absolute;left:0;top:0;z-index:3;pointer-events:none;
+  background:#e7e8ec;color:#1b1d27;border-radius:5px;padding:5px 9px 6px;
+  box-shadow:0 2px 8px rgba(0,0,0,.45);white-space:nowrap;line-height:1.35}
+.pchart-tip[hidden]{display:none}
+.pchart-tip-d{font-size:12px;font-weight:700}
+.pchart-tip-v{display:flex;align-items:center;gap:6px;font-size:12px;font-variant-numeric:tabular-nums}
+/* Der Farbtupfer trägt die Farbe der Kurve (grün/rot je Richtung) — sie kommt
+   inline aus priceChart. Der dunkle Rand hält ihn auf dem hellen Kasten
+   sichtbar, auch wenn die Kurvenfarbe einmal blass ausfällt. */
+.pchart-tip-v i{width:10px;height:10px;flex:none;border:1px solid rgba(0,0,0,.3)}
 
 /* Fähigkeiten. Schlüsselwörter als Tags, darunter der Regeltext in einem
    abgesetzten Kasten (pre-line: die Zeilenumbrüche aus oracle_text bleiben,

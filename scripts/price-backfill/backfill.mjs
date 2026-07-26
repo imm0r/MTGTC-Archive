@@ -9,12 +9,23 @@
 //  Key in die geteilte Tabelle public.price_history. Der Key gehört NIE in
 //  den Browser — hier liegt er als Actions-Secret.
 //
+//  price_history ist ein ARCHIV, kein Zwischenspeicher: MTGJSON liefert je
+//  Lauf nur die letzten ~90 Tage, und die werden über den vorhandenen Verlauf
+//  GELEGT, nicht an seine Stelle gesetzt. Sonst wäre das Gespeicherte ein
+//  gleitendes 90-Tage-Fenster und ein Jahresverlauf könnte nie entstehen.
+//
+//  Gemischt wird in der Datenbank (RPC merge_price_history, siehe
+//  supabase-schema.sql), nicht hier. Andernfalls müsste dieser Job täglich
+//  das gesamte Archiv herunterladen, im Speicher mischen und vollständig
+//  zurückschreiben — eine Datenmenge, die mit jedem Jahr wächst. So überträgt
+//  er immer nur das frische Fenster, egal wie lang der Verlauf schon ist.
+//
 //  Ablauf:
 //    1. vorhandene scryfall_id aus public.cards holen (nur die brauchen wir),
 //    2. AllIdentifiers streamen → scryfallId ↔ MTGJSON-uuid (nur Treffer),
 //    3. AllPrices streamen → je uuid Cardmarket-EUR + TCGplayer-USD (retail,
 //       normal + foil) als [{d,v}] herausziehen,
-//    4. gebündelt in price_history upserten (Konflikt auf scryfall_id).
+//    4. gebündelt an merge_price_history schicken (mischt je scryfall_id).
 //
 //  Beide Dateien werden GESTREAMT (gunzip → JSON-Token → je ein Eintrag),
 //  nie vollständig in den Speicher geladen — nur die gebrauchten Karten
@@ -39,15 +50,17 @@ const MTGJSON_BASE = process.env.MTGJSON_BASE || "https://mtgjson.com/api/v5";
 const SUPABASE_URL = (process.env.SUPABASE_URL || "").replace(/\/+$/, "");
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
-// Wie viele Tage Historie je Reihe höchstens behalten. MTGJSON liefert ~90;
-// der Schnitt ist nur eine Sicherung gegen künftige Formatänderungen.
-const MAX_DAYS = 90;
-
 // ------------------------------------------------------------ Umformung
 // Reine Funktionen ohne Netz/DB — dieselben, die --self-test prüft.
 
 // { "2024-05-01": 0.5, … } → [{ d:"2024-05-01", v:0.5 }, … ], nach Datum
-// aufsteigend, ungültige Werte raus, auf die letzten MAX_DAYS gekürzt.
+// aufsteigend, ungültige Werte raus.
+//
+// Hier wird NICHT gekürzt. Früher schnitt diese Funktion auf 90 Tage — was
+// harmlos aussah, weil MTGJSON ohnehin nur so viel liefert, aber zusammen mit
+// dem überschreibenden Upsert dafür sorgte, dass der gespeicherte Verlauf nie
+// älter als 90 Tage werden konnte. Was hereinkommt, geht auch hinaus; über
+// Alter und Bestand entscheidet allein die Datenbank, und die hebt alles auf.
 export function toSeries(dateMap) {
   if (!dateMap || typeof dateMap !== "object") return [];
   const out = [];
@@ -56,7 +69,7 @@ export function toSeries(dateMap) {
     if (Number.isFinite(v)) out.push({ d, v });
   }
   out.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
-  return out.length > MAX_DAYS ? out.slice(-MAX_DAYS) : out;
+  return out;
 }
 
 // Ein AllPrices-Eintrag (Wert zu einer uuid) → { eur:{normal,foil},
@@ -122,19 +135,41 @@ async function fetchScryfallIds() {
   return ids;
 }
 
-// Zeilen gebündelt in price_history upserten (Konflikt auf scryfall_id →
-// zusammenführen). return=minimal spart die Rückgabe der Zeilen.
-async function upsert(rows) {
-  const jetzt = new Date().toISOString();
+// Zeilen gebündelt an merge_price_history schicken. Die Funktion legt jede
+// Reihe ÜBER die vorhandene (je Datum ein Punkt, der neue gewinnt), statt sie
+// zu ersetzen — deshalb der Umweg über RPC und nicht der direkte Upsert auf
+// die Tabelle, der die Spalte überschreiben würde.
+//
+// Bündelgröße bleibt bei 500: übertragen wird weiterhin nur das ~90-Tage-
+// Fenster je Karte, unabhängig davon, wie lang der Verlauf in der Datenbank
+// schon ist.
+async function mergeInDb(rows) {
+  let beruehrt = 0;
   for (let i = 0; i < rows.length; i += 500) {
-    const batch = rows.slice(i, i + 500).map(r => ({ ...r, updated_at: jetzt }));
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/price_history?on_conflict=scryfall_id`,
+    const batch = rows.slice(i, i + 500);
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/merge_price_history`,
       { method: "POST",
-        headers: { ...restHeaders, Prefer: "resolution=merge-duplicates,return=minimal" },
-        body: JSON.stringify(batch) });
-    if (!res.ok) throw new Error(`price_history schreiben → HTTP ${res.status}: ${await res.text()}`);
+        headers: restHeaders,
+        body: JSON.stringify({ p_rows: batch }) });
+
+    if (!res.ok) {
+      const text = await res.text();
+      // PGRST202 = Funktion nicht gefunden. Hier NICHT auf den alten,
+      // überschreibenden Upsert ausweichen: das würde den Verlauf, den wir
+      // gerade sammeln wollen, still auf 90 Tage zurückstutzen. Lieber
+      // abbrechen, ohne etwas angefasst zu haben.
+      if (res.status === 404 || /PGRST202/.test(text) || /merge_price_history/.test(text))
+        throw new Error(
+          "public.merge_price_history fehlt in der Datenbank — es wurde NICHTS " +
+          "geschrieben, der vorhandene Verlauf bleibt unangetastet.\n" +
+          "Abhilfe: supabase-schema.sql erneut ausführen oder die Migration " +
+          "supabase/migrations/20260726120000_price_history_langzeit.sql einspielen.");
+      throw new Error(`price_history zusammenführen → HTTP ${res.status}: ${text}`);
+    }
+    const n = Number(await res.text());
+    if (Number.isFinite(n)) beruehrt += n;
   }
+  return beruehrt;
 }
 
 // ------------------------------------------------------------ MTGJSON (Stream)
@@ -202,6 +237,19 @@ function selfTest() {
   assert(extractPrices({ paper: { cardmarket: { retail: {} } } }) === null, "keine Reihen → null");
   assert(toSeries(undefined).length === 0, "toSeries(undefined) → []");
 
+  // Kernzusage dieses Jobs: es wird nichts abgeschnitten. Eine Reihe über
+  // zwei Jahre muss vollständig und sortiert herauskommen — hier stand
+  // früher ein 90-Tage-Schnitt, der den Langzeitverlauf unmöglich machte.
+  const lang = {};
+  const t0 = Date.UTC(2023, 0, 1);
+  for (let i = 0; i < 730; i++)
+    lang[new Date(t0 + i * 86400000).toISOString().slice(0, 10)] = i / 100;
+  const reihe = toSeries(lang);
+  assert(reihe.length === 730, `lange Reihe ungekürzt (${reihe.length} statt 730)`);
+  assert(reihe[0].d === "2023-01-01", "lange Reihe beginnt am ältesten Tag");
+  assert(reihe[729].d === "2024-12-30", "lange Reihe endet am jüngsten Tag");
+  assert(reihe.every((p, i) => i === 0 || reihe[i - 1].d < p.d), "lange Reihe streng aufsteigend");
+
   if (process.exitCode) throw new Error("Selbsttest fehlgeschlagen");
   console.log("Selbsttest bestanden.");
 }
@@ -249,9 +297,9 @@ async function main() {
     return;
   }
 
-  console.log(`In price_history schreiben (${rows.length} Zeilen) …`);
-  await upsert(rows);
-  console.log("Fertig.");
+  console.log(`Mit price_history zusammenführen (${rows.length} Zeilen) …`);
+  const beruehrt = await mergeInDb(rows);
+  console.log(`Fertig — ${beruehrt} Zeilen berührt. Ältere Punkte blieben erhalten.`);
 }
 
 // Nur bei direktem Aufruf loslaufen — als Modul (z. B. Tests, die

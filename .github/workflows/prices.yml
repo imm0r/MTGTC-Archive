@@ -1,11 +1,17 @@
-# Füllt die geteilte Tabelle public.price_history täglich aus MTGJSON
-# (~90 Tage Cardmarket-EUR + TCGplayer-USD). Läuft serverseitig; der
-# service_role-Key liegt als Repository-Secret, nie im Browser.
+# Trägt das geteilte Preisarchiv public.price_history täglich aus MTGJSON fort
+# (Cardmarket-EUR + TCGplayer-USD). MTGJSON liefert je Lauf ~90 Tage; die
+# Datenbank MISCHT sie in den Bestand (merge_price_history), statt ihn zu
+# ersetzen — so wächst der Verlauf über die 90 Tage hinaus. Läuft serverseitig;
+# der service_role-Key liegt als Repository-Secret, nie im Browser.
+#
+# Täglich ist reichlich Luft: lückenlos bleibt der Verlauf, solange zwischen
+# zwei Läufen keine 90 Tage liegen. Ein ausgefallener Tag holt sich die
+# verpassten Werte beim nächsten Lauf rückwirkend zurück.
 #
 # Nötige Secrets (Repo → Settings → Secrets and variables → Actions):
 #   SUPABASE_URL                 z. B. https://abcd.supabase.co
 #   SUPABASE_SERVICE_ROLE_KEY    service_role-Key aus Project Settings → API
-name: Preishistorie (MTGJSON)
+name: Preisarchiv (MTGJSON)
 
 on:
   schedule:
@@ -40,7 +46,7 @@ jobs:
         working-directory: scripts/price-backfill
         run: npm ci --no-audit --no-fund
 
-      - name: Backfill ausführen
+      - name: Preisarchiv fortschreiben
         working-directory: scripts/price-backfill
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
