@@ -19,6 +19,16 @@ nav button.on{background:var(--acc);border-color:var(--acc);color:#1a1400;font-w
 .header-status{background:transparent;border:0;padding:0;margin:0;color:var(--dim);
                font-size:13px;cursor:pointer;white-space:nowrap;text-align:left}
 .header-status:hover{color:var(--acc);text-decoration:underline;text-underline-offset:3px}
+/* Traegt der Knopf eine Lage, faerbt sie ihn — und die Farbe bleibt auch beim
+   Ueberfahren stehen, weil sie hier Information ist und nicht Dekoration. Die
+   Unterstreichung aus der Regel darueber zeigt weiterhin an, dass es ein Knopf
+   ist. Ohne Lage bleibt es beim gedaempften Grau. */
+.header-status.ok{color:var(--ok)}
+.header-status.warn{color:var(--acc2)}
+.header-status.err{color:var(--err)}
+.header-status.ok:hover{color:var(--ok)}
+.header-status.warn:hover{color:var(--acc2)}
+.header-status.err:hover{color:var(--err)}
 .header-version{font-size:12px;color:var(--dim);opacity:.7;white-space:nowrap}
 /* Statistiken auf dem Login-Screen, mittig unter dem Logo */
 .gate-stats{text-align:center}

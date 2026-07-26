@@ -6044,6 +6044,7 @@ function showApp() {
   $("#app").style.display = "block";
   renderWho();
   zeigeKopfVersion();                         // Version dauerhaft im Header
+  zeigeKopfLage();                            // Gesamtlage als Beschriftung daneben
 }
 
 /* Versionsnummer im Kopf, unter dem Verweis auf die Statusseite. Quelle ist
@@ -6057,6 +6058,32 @@ function zeigeKopfVersion() {
   if (!APP_VERSION) return;
   el.textContent = t("header.version", { v: APP_VERSION });
   el.title = t("settings.version", { v: APP_VERSION });
+}
+
+/* Der Verweis im Kopf traegt die Gesamtlage als Beschriftung — „Alle Systeme
+   betriebsbereit" statt „Site Status". Die Farbe wiederholt dabei nur, was der
+   Text ohnehin sagt: wer sie nicht unterscheiden kann, verliert nichts.
+
+   Solange keine Daten vorliegen — vor dem ersten Abruf oder wenn er scheitert —
+   bleibt die neutrale Beschriftung stehen. Lieber „Site Status" als eine Lage
+   behaupten, die wir gerade nicht kennen; ein gruenes „Alle Systeme
+   betriebsbereit", weil der Abruf fehlschlug, waere die schlechteste aller
+   Anzeigen. */
+function kopfLageSetzen(lage) {
+  const el = $("#header-status");
+  if (!el) return;
+  el.classList.remove("ok", "warn", "err");
+  el.textContent = lage ? lage.text : t("nav.status");
+  el.title = lage ? t("nav.status") : "";
+  if (lage) el.classList.add(lage.art);
+}
+
+function zeigeKopfLage() {
+  if (!$("#header-status")) return;
+  kopfLageSetzen(STATUS_KURZ ? statusLage(STATUS_KURZ.dienste) : null);
+  statusKurzHolen()
+    .then(dienste => kopfLageSetzen(statusLage(dienste)))
+    .catch(() => kopfLageSetzen(null));
 }
 
 async function afterLogin(user) {
@@ -9782,6 +9809,30 @@ function statusVerlauf(commits) {
   return { punkte, seit: Number.isFinite(seit) ? seit : null };
 }
 
+/* Gesamtlage aus den Einzelzustaenden. Eine Stelle fuer Kopfzeile und Ansicht,
+   damit beide nie Widerspruechliches behaupten. */
+function statusLage(dienste) {
+  const aus  = dienste.filter(s => s.status === "down").length;
+  const teil = dienste.filter(s => s.status === "degraded").length;
+  if (aus)  return { art: "err",  text: t("status.someDown", { n: aus, total: dienste.length }) };
+  if (teil) return { art: "warn", text: t("status.degraded") };
+  return { art: "ok", text: t("status.allUp") };
+}
+
+/* Nur die Zusammenfassung, ohne Stoerungen und Antwortzeit-Verlauf. Die
+   Kopfzeile braucht genau eine Zeile — der volle Abruf kostet zusaetzlich
+   fuenf Anfragen an die GitHub-API, die am Stundenkontingent haengen, und die
+   waeren dafuer verschwendet. raw.githubusercontent hat keins. */
+let STATUS_KURZ = null;
+
+async function statusKurzHolen() {
+  if (STATUS_KURZ && Date.now() - STATUS_KURZ.stand < STATUS_FRISCH) return STATUS_KURZ.dienste;
+  const r = await fetch(`${STATUS_ROH}/history/summary.json`, { cache: "no-store" });
+  if (!r.ok) throw new Error(String(r.status));
+  STATUS_KURZ = { stand: Date.now(), dienste: await r.json() };
+  return STATUS_KURZ.dienste;
+}
+
 async function statusHolen(neu) {
   if (!neu && STATUS_DATEN && Date.now() - STATUS_DATEN.stand < STATUS_FRISCH) return STATUS_DATEN;
 
@@ -9792,6 +9843,7 @@ async function statusHolen(neu) {
   };
 
   const dienste = await json(`${STATUS_ROH}/history/summary.json`);   // Pflicht
+  STATUS_KURZ = { stand: Date.now(), dienste };   // die Kopfzeile lebt davon mit
 
   let stoerungen = [], verlauf = {}, apiOk = true;
   try {
@@ -9910,11 +9962,8 @@ function renderStatus() {
 function statusZeichnen(el, d) {
   const zeit = STATUS_ZEIT;
   const tage = (STATUS_ZEITRAEUME.find(z => z.id === zeit) || {}).tage;
-  const aus  = d.dienste.filter(s => s.status === "down").length;
-  const teil = d.dienste.filter(s => s.status === "degraded").length;
-  const lage = aus ? "err" : teil ? "warn" : "ok";
-  const lageTxt = aus ? t("status.someDown", { n: aus, total: d.dienste.length })
-                : teil ? t("status.degraded") : t("status.allUp");
+  const lage = statusLage(d.dienste);
+  kopfLageSetzen(lage);   // dieselbe Lage im Kopf, ohne erneuten Abruf
 
   const karte = s => {
     const art = s.status === "down" ? "err" : s.status === "degraded" ? "warn" : "ok";
@@ -9967,9 +10016,9 @@ function statusZeichnen(el, d) {
       </div>
     </div>
 
-    <div class="card st-lage ${lage}">
+    <div class="card st-lage ${lage.art}">
       <span class="st-lage-punkt"></span>
-      <span class="st-lage-txt">${esc(lageTxt)}</span>
+      <span class="st-lage-txt">${esc(lage.text)}</span>
     </div>
 
     <div class="tabs st-zeit">${STATUS_ZEITRAEUME.map(z =>
@@ -10215,6 +10264,7 @@ function onLangChange() {
   if (typeof USER === "undefined" || !USER) return;   // vor Login nur statischer Text
   renderWho();
   zeigeKopfVersion();
+  zeigeKopfLage();
   renderAll();
   const aktiv = $(".view.on")?.id;
   if (aktiv === "v-profile") renderProfile();
