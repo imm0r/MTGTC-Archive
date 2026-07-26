@@ -2928,18 +2928,15 @@ function faehigkeitenHtml(c, kompakt) {
     // alles als "statisch" durch und kein Schlüsselwort träfe.
     const ab = parseAbilities(c.oracle_text, c.keywords) || [];
     // Weicht der gedruckte Text ab, ist die Tabelle sichtbar in einer anderen
-    // Sprache als der Kasten darüber. Das sagt die Zusammenfassung, und der
-    // zugrunde liegende englische Text steht mit im Aufklapper — sonst stünde
-    // die Aufschlüsselung ohne erkennbare Quelle da.
+    // Sprache als der Kasten darüber. Das sagt die Zusammenfassung — den
+    // englischen Text dazu NICHT noch einmal als Ganzes zeigen: die Spalte
+    // "Wirkung" enthält ihn bereits vollständig, nur eben zerlegt. Ein Kasten
+    // darüber wäre dieselbe Zeichenkette ein zweites Mal.
     const abweichend = gedruckt != null && gedruckt !== c.oracle_text;
     if (ab.length) teile.push(`
       <details class="faehig">
         <summary>${esc(t("detail.abBreakdown"))} <span class="hint" style="display:inline">${
           esc(t(abweichend ? "detail.abAutoOracle" : "detail.abAuto"))}</span></summary>
-        ${abweichend ? `<div class="oracle-en">
-          <label>${esc(t("detail.oracleEn"))}</label>
-          <div class="regeltext">${mitSymbolen(c.oracle_text)}</div>
-        </div>` : ""}
         <table class="faehig-tbl"><thead><tr>
           <th>${esc(t("common.name"))}</th><th>${esc(t("detail.abType"))}</th><th>${esc(t("detail.abCost"))}</th><th>${esc(t("detail.abEffect"))}</th></tr></thead>
         <tbody>${ab.map(a => `<tr>
