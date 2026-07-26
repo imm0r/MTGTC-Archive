@@ -695,6 +695,27 @@ const candidates = text => text.split("\n")
   .filter(l => l.length >= 3 && /[A-Za-z]{3}/.test(l))
   .slice(0, 6);
 
+/* Passt der über den Eckcode gefundene Treffer zum abgelesenen Kartennamen?
+   Der Treffer trägt den englischen (name) und ggf. den gedruckten Namen
+   (printed_name); der abgelesene Name kann in jeder Sprache sein. Verglichen
+   wird normalisiert und beidseitig teilstring-tolerant (gegen kleine Lese-
+   fehler und Teilnamen); zweiseitige Karten ("A // B") zählen je Seite. Ohne
+   abgelesenen Namen gibt es nichts zu prüfen → true, der Eckcode bleibt
+   maßgeblich. Zweck: einen Eckcode-Falschtreffer (misslesener Set/Nummer trifft
+   eine fremde Karte) verwerfen, damit stattdessen der Namensweg greift. */
+function nameHitMatchesRead(hit, readName) {
+  const rn = norm(readName);
+  if (!rn) return true;
+  for (const raw of [hit?.printed_name, hit?.name]) {
+    if (!raw) continue;
+    for (const teil of String(raw).split("//")) {
+      const hn = norm(teil);
+      if (hn && (hn === rn || hn.includes(rn) || rn.includes(hn))) return true;
+    }
+  }
+  return false;
+}
+
 async function identify(img, lang, onStep) {
   let firstGuess = "", best = [];
 
@@ -718,7 +739,17 @@ async function identify(img, lang, onStep) {
         const token = c.token || /spielstein|\btoken\b|emblem/i.test(v.type_line || "");
         onStep(t("scan.searchingCode", { set: c.set, num: c.num, token: token ? t("scan.tokenSuffix") : "" }));
         const hit = await findByCode(c.set, c.num, l, token);
-        if (hit) return { card: hit, guess: hit.printed_name || hit.name, candidates: [], vision: v, lang: l };
+        // Der Eckcode ist verlässlich — WENN die Ecke stimmt. Ein misslesener
+        // Setcode oder eine misslesene Nummer trifft aber leicht eine ganz
+        // ANDERE existierende Karte (real beobachtet: Rußbolds Ecke landete auf
+        // Sorin, MH3 #245). Ein solcher Falschtreffer würde den korrekt
+        // gelesenen Namen überstimmen. Deshalb gegenprüfen: Passt der Name des
+        // Treffers nicht zum abgelesenen Namen, war die Ecke wohl falsch — dann
+        // NICHT zurückgeben, sondern unten über den Namen weitersuchen (der
+        // findet die Karte, sofern der Name gelesen wurde). Ohne gelesenen Namen
+        // gibt es nichts gegenzuprüfen, dann bleibt der Eckcode maßgeblich.
+        if (hit && nameHitMatchesRead(hit, v.printed_name))
+          return { card: hit, guess: hit.printed_name || hit.name, candidates: [], vision: v, lang: l };
       }
       if (v.printed_name) {
         onStep(t("scan.searchingName", { name: v.printed_name }));
