@@ -351,6 +351,7 @@ async function main() {
   // Dateien. Die anderen Betriebsarten ermitteln sie aus AllIdentifiers und
   // schreiben sie unten mit, damit der Tagesmodus sie künftig vorfindet.
   let uuidToSid;
+  let wantedSids = null;        // im Tagesmodus nicht gebraucht
 
   if (TODAY_ONLY) {
     console.log("Tagesmodus: uuid-Zuordnung aus price_history holen …");
@@ -366,7 +367,6 @@ async function main() {
     // endet der Lauf hier — ohne eine einzige Bulkdatei anzufassen.
     // Voller Modus (wöchentlich, und von Hand): alle Karten, damit auch
     // Korrekturen und verpasste Tage nachgezogen werden.
-    let wantedSids;
     if (ONLY_GAPS) {
       console.log("Lückenmodus: Karten ohne Archivzeile suchen …");
       wantedSids = await fetchLuecken();
@@ -411,6 +411,30 @@ async function main() {
 
   const rows = [...bySid.entries()].map(([scryfall_id, o]) =>
     ({ scryfall_id, prices: o.prices, mtgjson_uuid: o.uuid }));
+
+  // Nachgeschaut und nichts gefunden — das muss FESTGEHALTEN werden, sonst
+  // dreht der Lückenmodus für immer im Kreis.
+  //
+  // MTGJSONs identifiers.scryfallId zeigt auf die ENGLISCHE Auflage. Eine
+  // fremdsprachige Auflage trägt eine eigene Scryfall-ID, die dort nie
+  // vorkommt — sie ist dauerhaft nicht zuordenbar. Ohne Vermerk bliebe sie
+  // ewig eine "Lücke": die stündliche Prüfung fände immer dieselben Karten,
+  // stiege nie früh aus und zöge jede Stunde 358 MB.
+  //
+  // Deshalb bekommt jede angefragte Karte eine Zeile, auch eine leere. Das ist
+  // verlustfrei: merge_price_map läuft über die Schlüssel der NEUEN Seite, und
+  // {} hat keine — eine vorhandene Reihe bleibt also unangetastet, und die uuid
+  // hält das coalesce. Findet MTGJSON die Karte später doch (etwa eine
+  // brandneue Auflage), trägt der wöchentliche Vollauf sie nach; er fragt
+  // ohnehin jedes Mal den ganzen Bestand ab.
+  if (wantedSids) {
+    let ohneDaten = 0;
+    for (const sid of wantedSids)
+      if (!bySid.has(sid)) { rows.push({ scryfall_id: sid, prices: {} }); ohneDaten++; }
+    if (ohneDaten)
+      console.log(`  ${ohneDaten} Karten liefert MTGJSON nicht (meist fremdsprachige ` +
+                  `Auflagen) — als nachgeschaut vermerkt, damit sie nicht ewig neu geladen werden.`);
+  }
 
   if (DRY_RUN) {
     console.log("--dry-run: nicht geschrieben. Stichprobe:");

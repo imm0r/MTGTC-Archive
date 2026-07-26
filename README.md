@@ -530,6 +530,20 @@ Der wöchentliche Vollauf ist kein Beiwerk: `AllPricesToday` kennt immer nur
 der Vollauf holt sie aus dem 90-Tage-Fenster zurück. Ebenso Korrekturen, die
 MTGJSON nachträglich an zurückliegenden Tagen vornimmt.
 
+**Fremdsprachige Auflagen kennt MTGJSON nicht.** `identifiers.scryfallId` zeigt
+dort auf die **englische** Auflage; eine deutsche Karte trägt eine eigene
+Scryfall-ID, die in `AllIdentifiers` nie vorkommt. Solche Karten bekommen daher
+keinen MTGJSON-Verlauf — nur die eigenen Vorwärts-Punkte aus „Preise
+aktualisieren".
+
+Damit die Lückenprüfung daran nicht hängen bleibt, schreibt jeder Lauf für jede
+**angefragte** Karte eine Zeile, auch eine leere. Ohne diesen Vermerk gälte die
+Karte für immer als Lücke, die stündliche Prüfung stiege nie früh aus und zöge
+jede Stunde die 358 MB. Der Vermerk ist verlustfrei: `merge_price_map` läuft über
+die Schlüssel der neuen Seite, und `{}` hat keine — ein vorhandener Verlauf
+bleibt unangetastet. Findet MTGJSON die Karte später doch, trägt der wöchentliche
+Vollauf sie nach.
+
 Vorerst zeigt die App nur den **EUR**-Verlauf; die USD-Reihe wird schon
 mitgespeichert und lässt sich später ohne erneuten Import sichtbar machen.
 
