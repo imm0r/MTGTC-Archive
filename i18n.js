@@ -363,6 +363,7 @@ const I18N = {
     "status.checkNote": "GitHub Actions prüft alle fünf Minuten und schreibt jede Messung fest. Verfügbarkeit und Antwortzeit stammen aus diesem Protokoll.",
     "status.openFull": "Öffentliche Status-Seite",
     "status.source": "Rohdaten auf GitHub",
+    "status.groupOwn": "Eigene Infrastruktur", "status.groupExternal": "Externe Dienste",
     "status.rateLimit": "Verlauf und Störungen konnten nicht geladen werden — das Stundenkontingent der GitHub-API ist erschöpft. Die Kennzahlen oben stimmen trotzdem.",
   },
 
@@ -675,6 +676,7 @@ const I18N = {
     "status.checkNote": "GitHub Actions checks every five minutes and records each measurement. Uptime and response time come from that log.",
     "status.openFull": "Public status page",
     "status.source": "Raw data on GitHub",
+    "status.groupOwn": "Own infrastructure", "status.groupExternal": "External services",
     "status.rateLimit": "History and incidents could not be loaded — the GitHub API hourly quota is exhausted. The figures above are still accurate.",
   },
 
@@ -987,6 +989,7 @@ const I18N = {
     "status.checkNote": "GitHub Actions vérifie toutes les cinq minutes et consigne chaque mesure. La disponibilité et le temps de réponse proviennent de ce journal.",
     "status.openFull": "Page d'état publique",
     "status.source": "Données brutes sur GitHub",
+    "status.groupOwn": "Infrastructure propre", "status.groupExternal": "Services externes",
     "status.rateLimit": "L'historique et les incidents n'ont pas pu être chargés — le quota horaire de l'API GitHub est épuisé. Les chiffres ci-dessus restent exacts.",
   },
 
@@ -1299,6 +1302,7 @@ const I18N = {
     "status.checkNote": "GitHub Actions comprueba cada cinco minutos y registra cada medición. La disponibilidad y el tiempo de respuesta salen de ese registro.",
     "status.openFull": "Página de estado pública",
     "status.source": "Datos en bruto en GitHub",
+    "status.groupOwn": "Infraestructura propia", "status.groupExternal": "Servicios externos",
     "status.rateLimit": "No se pudieron cargar el historial ni las incidencias: la cuota horaria de la API de GitHub está agotada. Las cifras de arriba siguen siendo correctas.",
   },
 
@@ -1611,6 +1615,7 @@ const I18N = {
     "status.checkNote": "GitHub Actions controlla ogni cinque minuti e registra ogni misurazione. Disponibilità e tempo di risposta provengono da quel registro.",
     "status.openFull": "Pagina di stato pubblica",
     "status.source": "Dati grezzi su GitHub",
+    "status.groupOwn": "Infrastruttura propria", "status.groupExternal": "Servizi esterni",
     "status.rateLimit": "Storico e disservizi non sono stati caricati: la quota oraria dell'API GitHub è esaurita. I valori qui sopra restano corretti.",
   },
 };
