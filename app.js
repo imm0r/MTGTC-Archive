@@ -852,6 +852,44 @@ async function scanFile(file) {
   } catch { toast(t("scan.imgUnreadable")); }
 }
 
+/* Bild um 0/90/180/270 Grad im Uhrzeigersinn drehen (in ein neues Canvas). Bei
+   90/270 tauschen Breite und Höhe. Basis der automatischen Ausrichtung. */
+function rotateCanvas(img, deg) {
+  const d = ((deg % 360) + 360) % 360;
+  if (d === 0) return img;
+  const w = img.width, h = img.height, swap = d === 90 || d === 270;
+  const cv = document.createElement("canvas");
+  cv.width = swap ? h : w; cv.height = swap ? w : h;
+  const cx = cv.getContext("2d");
+  cx.imageSmoothingQuality = "high";
+  if (d === 90) { cx.translate(h, 0); cx.rotate(Math.PI / 2); }
+  else if (d === 180) { cx.translate(w, h); cx.rotate(Math.PI); }
+  else { cx.translate(0, w); cx.rotate(-Math.PI / 2); }   // 270
+  cx.drawImage(img, 0, 0);
+  return cv;
+}
+
+/* Handyfotos einer quer liegenden Kartenreihe kommen oft gedreht im Upload an
+   (der Nutzer musste sie bisher von Hand 3× drehen). Ein kleiner Modell-Aufruf
+   sagt, wie weit das Bild gedreht werden muss, damit die Karten aufrecht stehen
+   — festgemacht am KARTENTEXT, nicht an der Bildform, damit hochkant-korrekte
+   Layouts (z. B. 3 Zeilen à 2 Karten) unangetastet bei 0 bleiben. Verkleinertes
+   Bild genügt, es geht nur um die Textrichtung. Fällt der Aufruf aus oder ist
+   das Vision-Modell abgeschaltet, wird nicht gedreht und der Scan läuft wie
+   bisher weiter — die Ausrichtung ist Komfort, kein Muss. */
+async function orientImage(img) {
+  if (visionAus) return img;
+  const ganz = { x: 0, y: 0, w: img.width, h: img.height };
+  try {
+    const { data, error } = await sb.functions.invoke("scan-card", {
+      body: { mode: "orient", images: [{ b64: toJpegBase64(img, ganz, 1000), media_type: "image/jpeg" }] },
+    });
+    if (error) return img;
+    const deg = data?.orient?.rotate_cw;
+    return (deg === 90 || deg === 180 || deg === 270) ? rotateCanvas(img, deg) : img;
+  } catch { return img; }
+}
+
 /* Ein Foto mit MEHREREN Karten: erst die Rechtecke vom Modell holen (detect),
    dann jede Karte ausschneiden und wie einen Einzelscan durch dieselbe Pipeline
    schicken — NACHEINANDER, um die Funktion und ihre Ratenbegrenzung nicht zu
@@ -860,13 +898,15 @@ async function scanFile(file) {
 async function scanMultiFile(file) {
   let img;
   try { img = await loadImg(file); } catch { return toast(t("scan.imgUnreadable")); }
-  // Leeren Rand ums Karten-Motiv vorab wegschneiden — dann füllen die Karten
-  // den Rahmen und werden im (fest verkleinerten) detect-Bild groß genug, dass
-  // das Modell alle findet. Findet sich kein klarer Rand, bleibt das ganze Bild.
-  // Detect UND der Zuschnitt je Karte arbeiten auf demselben getrimmten Bild,
-  // damit die zurückgegebenen Rechtecke ohne Umrechnung passen.
-  const base = trimToContent(img) || img;
   toast(t("scan.searching"));
+  // Zuerst aufrichten: quer fotografierte Reihen kommen oft gedreht im Upload
+  // an. Danach den leeren Rand ums Karten-Motiv wegschneiden — dann füllen die
+  // Karten den Rahmen und werden im (fest verkleinerten) detect-Bild groß genug,
+  // dass das Modell alle findet. Findet sich kein klarer Rand, bleibt das ganze
+  // Bild. Detect UND der Zuschnitt je Karte arbeiten auf demselben aufgerichteten,
+  // getrimmten Bild, damit die zurückgegebenen Rechtecke ohne Umrechnung passen.
+  const aufrecht = await orientImage(img);
+  const base = trimToContent(aufrecht) || aufrecht;
   let boxes;
   try { boxes = await detectCards(base); }
   catch (e) { return toast(e.message || t("scan.notFound")); }

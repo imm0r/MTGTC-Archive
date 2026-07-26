@@ -171,6 +171,37 @@ w und h Breite und Höhe, alle Werte zwischen 0 und 1 (x+w und y+h höchstens 1)
   * Prüfe am Ende: Anzahl Rechtecke = Anzahl gezählter Karten. Liegt keine
     Karte im Bild, gib eine leere Liste. Erfinde nichts.`;
 
+/* Betriebsart "orient": Handyfotos einer quer liegenden Kartenreihe landen oft
+   gedreht im Upload. Das Modell soll NUR sagen, wie weit das Bild gedreht werden
+   muss, damit die Karten aufrecht stehen — die Drehung macht danach der Client.
+   Entscheidend ist der Kartentext, nicht die Bildform (auch ein hochkantiges
+   Foto kann korrekt sein). */
+const ORIENT_SCHEMA = {
+  type: "object",
+  properties: {
+    rotate_cw: {
+      type: "integer",
+      enum: [0, 90, 180, 270],
+      description: "Grad im Uhrzeigersinn, um die das Bild gedreht werden muss, damit die Karten aufrecht stehen (Titel oben, Text von links nach rechts, kleiner Aufdruck unten links). 0, wenn schon aufrecht.",
+    },
+  },
+  required: ["rotate_cw"],
+  additionalProperties: false,
+} as const;
+
+const ORIENT_SYSTEM = `Du siehst ein Foto mit einer oder mehreren Magic-the-Gathering-Karten.
+Bestimme, um wieviel Grad IM UHRZEIGERSINN das GESAMTE Bild gedreht werden muss,
+damit die Karten aufrecht stehen: Titelbalken oben, Regeltext von links nach
+rechts lesbar, der kleine Aufdruck (Setcode/Nummer) unten links.
+
+Erlaubt sind nur 0, 90, 180 oder 270.
+
+Richte dich allein am KARTENTEXT aus, nicht an der Bildform. Ein hochkantiges
+Foto kann bereits korrekt sein (etwa mehrere Zeilen mit je wenigen Karten) —
+dann ist die Antwort 0. Steht der Text schon aufrecht, gib 0 zurück. Steht er
+auf dem Kopf, gib 180. Ist er um eine Vierteldrehung gekippt, gib 90 oder 270,
+je nachdem welche Drehung im Uhrzeigersinn ihn aufrichtet.`;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Nur POST" }, 405);
@@ -199,6 +230,9 @@ Deno.serve(async (req) => {
     // "detect": mehrere Karten auf einem Foto lokalisieren. Sonst wie bisher
     // eine Karte transkribieren.
     if (body.mode === "detect") mode = "detect";
+    // "orient": nur die nötige Drehung bestimmen, damit die Karten aufrecht
+    // stehen. Das eigentliche Drehen macht danach der Client.
+    if (body.mode === "orient") mode = "orient";
     // Neu: images[] (Karte + Eckausschnitt). Alt: image_b64 — bleibt
     // erlaubt, damit eine ältere App-Fassung nicht bricht.
     images = Array.isArray(body.images) && body.images.length
@@ -218,6 +252,33 @@ Deno.serve(async (req) => {
 
   try {
     const anthropic = new Anthropic({ apiKey: key });
+
+    // Betriebsart "orient": nur die nötige Drehung zurückgeben. Läuft vor
+    // detect, verkleinertes Bild reicht — es geht nur um die Textrichtung.
+    // Haiku genügt und ist günstig; temperature 0 für ein stabiles Urteil.
+    if (mode === "orient") {
+      const ori = await anthropic.messages.create({
+        model: MODEL,
+        max_tokens: 256,
+        temperature: 0,
+        system: ORIENT_SYSTEM,
+        output_config: { format: { type: "json_schema", schema: ORIENT_SCHEMA } },
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text" as const, text: "Wie weit muss dieses Bild im Uhrzeigersinn gedreht werden, damit die Karten aufrecht stehen?" },
+            { type: "image" as const, source: { type: "base64" as const, media_type: images[0].media_type, data: images[0].b64 } },
+          ],
+        }],
+      });
+      if (ori.stop_reason === "refusal") return json({ error: "Anfrage wurde abgelehnt" }, 422);
+      const otext = ori.content.find((b) => b.type === "text");
+      if (!otext || otext.type !== "text") return json({ error: "Keine verwertbare Antwort" }, 502);
+      return json({
+        orient: JSON.parse(otext.text),
+        usage: { input: ori.usage.input_tokens, output: ori.usage.output_tokens, model: ori.model },
+      });
+    }
 
     // Betriebsart "detect": nur die Kartenrechtecke zurückgeben. Das genaue
     // Ablesen je Karte macht danach der Einzelscan im Client.
