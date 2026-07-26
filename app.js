@@ -747,7 +747,11 @@ async function identify(img, lang, onStep) {
         // Treffers nicht zum abgelesenen Namen, war die Ecke wohl falsch — dann
         // NICHT zurückgeben, sondern unten über den Namen weitersuchen (der
         // findet die Karte, sofern der Name gelesen wurde). Ohne gelesenen Namen
-        // gibt es nichts gegenzuprüfen, dann bleibt der Eckcode maßgeblich.
+        // gibt es nichts gegenzuprüfen, dann bleibt der Eckcode maßgeblich —
+        // das betrifft eine MODERNE Karte, deren Titel unlesbar war, NICHT alte
+        // Karten: Karten ohne Setcode/Sammlernummer (vor Exodus/Tempest und in
+        // der Nummern-Lücke ~2000–2014, z. B. Rußbold) erreichen findByCode nie,
+        // weil parseCorner dort null liefert und der Namensweg allein greift.
         if (hit && nameHitMatchesRead(hit, v.printed_name))
           return { card: hit, guess: hit.printed_name || hit.name, candidates: [], vision: v, lang: l };
       }
@@ -870,7 +874,12 @@ async function scanMultiFile(file) {
   toast(t("scan.detected", { n: boxes.length }));
   const lang = $("#d-lang").value;
   for (const box of boxes) {
-    const cv = cropCanvas(base, box, 0.06);
+    // Großzügiger Rand (12 %): die detect-Rechtecke sitzen mal etwas zu eng und
+    // schneiden dann die Karte an — gerade die untere linke Ecke mit Setcode und
+    // Sammlernummer, dem wichtigsten Identifier. Lieber etwas Umgebung mitnehmen;
+    // die exakte Kartenlage holt findCardBounds anschließend aus dem Ausschnitt.
+    // Die Karten liegen mit klaren Lücken, daher ragt der Rand kaum in Nachbarn.
+    const cv = cropCanvas(base, box, 0.12);
     await scanBild(cv, cv.toDataURL("image/jpeg", 0.7), lang);
   }
 }
@@ -919,8 +928,10 @@ function trimToContent(img) {
   let right = W - 1; while (right > left && spalte[right] < sMin) right--;
   if (top >= bot || left >= right) return null;
 
-  // Etwas Luft lassen, damit keine Kartenkante wegfällt.
-  const pad = 0.02;
+  // Etwas Luft lassen, damit keine Kartenkante wegfällt — und damit die
+  // Randkarten im getrimmten Bild noch Umgebung haben, in die der Ausschnitt
+  // je Karte hineinpaddet (sonst klemmt sein Rand direkt an der Bildkante).
+  const pad = 0.03;
   const x0 = Math.max(0, left / W - pad), y0 = Math.max(0, top / H - pad);
   const x1 = Math.min(1, (right + 1) / W + pad), y1 = Math.min(1, (bot + 1) / H + pad);
   const fw = x1 - x0, fh = y1 - y0;
