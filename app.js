@@ -142,6 +142,19 @@ async function reload() {
   DECKS = d.data.map(dk => ({ ...dk,
     entries: e.data.filter(en => en.deck_id === dk.id)
                    .map(en => ({ cardId: en.card_id, qty: en.qty })) }));
+
+  // Preisarchiv für neu dazugekommene Karten nachladen. Das lief früher nur
+  // EINMAL beim Start — eine während der Sitzung erfasste Karte fragte das
+  // Archiv also nie ab und zeigte bis zum nächsten Start nur die eigene
+  // Vorwärts-Historie, selbst wenn die 90 Tage längst dort lagen (weil ein
+  // anderer Nutzer die Karte schon hatte). Hier ist die einzige Stelle, an der
+  // CARDS neu befüllt wird, also deckt der Aufruf jeden Weg ab: Scan,
+  // Handeingabe, Import, Deck-Übernahme.
+  //
+  // Billig bei jedem Aufruf: ladePreisHistorie fragt nur scryfall_id ab, die
+  // es noch nicht kennt, und kehrt sofort zurück, wenn nichts übrig bleibt.
+  // Bewusst ohne await — die Sammlung soll nicht auf das Archiv warten.
+  ladePreisHistorie().catch(() => {});
 }
 
 /* ============================== Scryfall ============================== */
@@ -5821,10 +5834,9 @@ async function afterLogin(user) {
   // des Farbidentitäts-Filters). Nicht kritisch, blockiert den Start nicht; ist
   // alles erfasst, kehrt es sofort zurück.
   backfillFarbident().catch(() => {});
-  // Geteilte MTGJSON-Preishistorie im Hintergrund nachladen, damit die
-  // Preisgraphen rückwirkend ~90 Tage zeigen statt erst ab dem Erfassen. Nicht
-  // kritisch; fehlt die Tabelle, bleibt es bei der eigenen Vorwärts-Historie.
-  ladePreisHistorie().catch(() => {});
+  // Die geteilte MTGJSON-Preishistorie lädt reload() selbst nach — dort, wo
+  // CARDS befüllt wird, und damit auch für später erfasste Karten. Hier steht
+  // deshalb kein eigener Aufruf mehr.
   // Spielrunde: Einladungs-Badge + laufende Session live, auch ohne die Ansicht
   // zu öffnen. Nicht kritisch — schlägt es fehl, läuft der Rest weiter.
   try { await ladeSession(); subscribeInvites(); if (SESSION) subscribeSession(); }
