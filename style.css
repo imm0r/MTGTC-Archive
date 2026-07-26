@@ -412,7 +412,9 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .zone-thumbs{flex:1;min-width:0;display:flex;gap:2px;overflow:hidden;justify-content:flex-end;
   -webkit-mask-image:linear-gradient(90deg,transparent,#000 24px);mask-image:linear-gradient(90deg,transparent,#000 24px)}
 .zone-thumbs img{width:20px;height:28px;object-fit:cover;border-radius:2px;flex:none;opacity:.8}
-.zone-korb{display:none;padding:8px 10px 12px}
+/* Seitliches Polster, weil die Leiste mittig unter der Karte sitzt und breiter
+   ist als sie: vier Zielknoepfe brauchen rund 113 px, die Karte misst 62–74. */
+.zone-korb{display:none;padding:10px 26px 34px}
 .zone.offen>.zone-korb{display:block}
 .zone-leer{font-size:13px;color:var(--dim);padding:12px 2px}
 
@@ -424,7 +426,7 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
    ragte jede getappte Karte in ihre Nachbarn — mit dem Quadrat bleibt das Gitter
    ruhig, egal wie viel gerade getappt ist. */
 .zone-gitter{display:flex;flex-wrap:wrap;gap:8px;--zk-b:74px;--zk-h:103px}
-.zk{position:relative;flex:none;width:var(--zk-h);height:var(--zk-h);outline:none;
+.zk{position:relative;flex:none;width:var(--zk-h);height:var(--zk-h);outline:none;cursor:pointer;
   display:flex;align-items:center;justify-content:center;transition:transform .12s}
 .zk img,.zk-ohnebild{display:block;width:var(--zk-b);height:var(--zk-h);border-radius:5px;
   border:1px solid var(--line);box-shadow:0 3px 10px rgba(0,0,0,.45);
@@ -470,7 +472,7 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .zk-akt,.hand-akt{position:absolute;left:50%;bottom:-9px;display:flex;flex-direction:column;gap:3px;
   align-items:center;opacity:0;pointer-events:none;
   transform:translateX(-50%);transition:opacity .12s;z-index:2}
-.zone[data-zone="field"] .zk-akt{bottom:-22px}
+[data-zone="field"] .zk-akt{bottom:-22px}
 .zk:hover .zk-akt,.zk:focus-within .zk-akt,
 .hand-karte:hover .hand-akt,.hand-karte:focus-within .hand-akt{opacity:1;pointer-events:auto}
 .zk-akt .btn,.hand-akt .btn{padding:2px 6px;font-size:14px;line-height:1.3;background:var(--panel)}
@@ -528,11 +530,19 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
   grid-template-columns:minmax(0,1fr) 154px 190px;
   grid-template-rows:clamp(390px,50vh,560px) auto;
   grid-template-areas:"links mitte rechts" "hand hand hand"}
+/* Ab 1200 px eine vierte Spalte ueber die volle Hoehe: die angezeigte Karte
+   erscheint immer DORT, statt als Fenster ueber dem Spielfeld. Darunter fehlt
+   der Platz — dann schwebt sie wie bisher am Zeiger (app.js: SPK_SPALTE). */
+@media (min-width:1200px){
+  .mat{grid-template-columns:minmax(0,1fr) 172px 208px 268px;
+       grid-template-areas:"links mitte rechts vorschau" "hand hand hand vorschau"}
+}
+.mat-vorschau{grid-area:vorschau}
 .mat-links{grid-area:links;display:flex;flex-direction:column;gap:8px;min-width:0}
 .mat-mitte{grid-area:mitte;display:flex;flex-direction:column;gap:8px}
 .mat-rechts{grid-area:rechts;display:flex;flex-direction:column;gap:8px}
 .mat-hand{grid-area:hand}
-@media (min-width:1100px){ .mat{grid-template-columns:minmax(0,1fr) 172px 208px} }
+
 
 .mat-feld{display:flex;flex-direction:column;min-width:0;
   border:1px solid var(--line);border-radius:10px;background:var(--panel2);padding:6px 8px 8px}
@@ -540,18 +550,26 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
   font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--dim)}
 .mat-n{margin-left:auto;min-width:18px;height:16px;padding:0 5px;border-radius:8px;display:inline-flex;
   align-items:center;justify-content:center;background:var(--acc);color:#1a1400;font-size:10px;font-weight:700}
-.mat-korb{flex:1;min-height:0;overflow-y:auto}
+/* Der Korb rollt — und schneidet damit alles ab, was über die Kachel
+   hinausragt: die Abzeichen sitzen 5 px darüber, die Knopfleiste darunter und
+   breiter als die Karte. Deshalb Polster statt blossem overflow. Nur die
+   Schlachtfeld-Spalte braucht seitliches Polster; in den schmalen Spalten gibt
+   es keine Leiste mehr (dort öffnet ein Klick die Kartenansicht). */
+.mat-korb{flex:1;min-height:0;overflow-y:auto;padding:7px 2px 8px}
+.mat-links .mat-korb{padding:8px 22px 30px}
 /* Das Schlachtfeld bekommt den Platz, den es auf der Matte auch hat; die
    Laender darunter einen festen Streifen. */
 .mat-gross{flex:1;min-height:0}
-.mat-laender{flex:none;height:136px}
+/* Hoch genug fuer eine Kartenreihe SAMT der Leiste darunter (103 px Karte,
+   Titel, Polster) — sonst rollt der Streifen und schneidet die Knoepfe ab. */
+.mat-laender{flex:none;height:178px}
 .mat-lib{flex:1;min-height:0}
 /* overflow:hidden an den Spalten, damit nie ein Feld ueber den Mattenrand
    quillt; erreichbar bleibt alles, weil jeder Korb innen rollt. */
 .mat-links,.mat-mitte,.mat-rechts{min-height:0;overflow:hidden}
 .mat-feld{overflow:hidden}
 .mat-links .zone-gitter,.mat-hand .zone-gitter{gap:10px}
-.mat-hand .mat-korb{overflow:visible}
+.mat-hand .mat-korb{overflow:visible;padding:0}
 /* In den schmalen Spalten sind die Karten kleiner — zwei nebeneinander statt
    einer mit Rand. */
 /* In den schmalen Spalten kleinere Karten: vier Felder uebereinander muessen
@@ -612,12 +630,24 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
   background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;
   box-shadow:0 12px 38px #000d}
 .spk.fest{pointer-events:auto;border-color:var(--acc)}
+/* Dieselbe Ansicht in der festen Spalte: kein schwebendes Fenster mehr,
+   sondern der Inhalt der Flaeche — ohne Rahmen, Schatten und Position. */
+#spk-feld{position:static;display:block;pointer-events:auto;width:auto;max-width:none;
+  background:none;border:none;border-radius:0;padding:0;box-shadow:none;
+  flex:1;min-height:0;overflow-y:auto}
+#spk-feld .spk-zu{display:none}
+.spk-leer{font-size:12px;color:var(--dim);padding:10px 2px;text-align:center}
 .spk-bild{display:block;width:100%;border-radius:8px}
 .spk-text{margin-top:8px}
 .spk-text .name-zeile{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 .spk-tipp{margin-top:8px;font-size:11px;color:var(--dim);text-align:center}
-.spk-akt{display:flex;gap:5px;justify-content:center;margin-top:10px;
+/* Die Knopfreihen stehen untereinander, nicht nebeneinander: eine Feldkarte
+   bringt sieben Knöpfe mit (tappen, Marken, vier Zielzonen). Quer belegten die
+   rund 305 px — mehr, als die 268 px schmale Vorschauspalte hergibt; der letzte
+   Knopf wurde rechts abgeschnitten. Untereinander passt jede Reihe. */
+.spk-akt{display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:10px;
   padding-top:9px;border-top:1px solid var(--line)}
+.spk-akt .zk-akt-reihe{flex-wrap:wrap}
 .spk-akt .btn{padding:4px 10px;font-size:16px}
 .spk-zu{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:12px;
   border:1px solid var(--line);background:var(--panel2);color:var(--dim);cursor:pointer;

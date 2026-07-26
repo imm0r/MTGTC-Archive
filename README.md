@@ -308,7 +308,8 @@ Schlachtfeld groß links, Länder als Streifen darunter, rechts die schmalen
 Spalten (Commander-Steuer, Kommandozone, Bibliothek, Exil) und ganz rechts die
 Lebenspunkte aller Mitspieler samt Friedhof. Die Hand liegt als Fächer darunter
 — da, wo man sie am Tisch hält. Ein quer gehaltenes Handy erreicht diese Breite
-und bekommt die Matte automatisch.
+und bekommt die Matte automatisch. Ab **1200 px** kommt rechts eine vierte
+Spalte über die volle Höhe dazu: die Kartenansicht (siehe unten).
 
 Die Spielrunde darf dabei **breiter werden als der Rest der App** (1800 statt
 1100 px): die Mattenspalten sind fest, alles Zusätzliche geht ans Schlachtfeld,
@@ -354,13 +355,36 @@ Dauerliste. Die ganze Bibliothek ist einen Klick entfernt, wenn du sehen willst,
 was noch drin ist.
 
 Eine Zeile trägt dabei **nur Kartenname und Anzahl**. Alles Weitere steht in der
-**Kartenansicht für den Spielmodus**: Zeigen blendet sie neben dem Zeiger ein —
-Bild, Manakosten, Typzeile, Regeltext —, Klicken hält sie fest. Erst dann wird
-sie bedienbar und trägt die Zielknöpfe. Das ist bewusst nicht die Detailkarte aus
-der Sammlung: Preis, Preisverlauf, Zustand und Deckzugehörigkeit sind am Tisch
-ohne Belang und stünden nur im Weg. Und eine Bibliothek hat schnell 90 Zeilen —
-jede mit Bild, Set und vier Knöpfen zu bestücken machte sie in der schmalen
-Mattenspalte unlesbar.
+**Kartenansicht für den Spielmodus**: Zeigen blendet sie ein, Klicken hält sie
+fest. Erst dann wird sie bedienbar und trägt die Zielknöpfe.
+
+Dieselbe Ansicht hat **jede** Karte in jeder Zone, auf Zeigen wie auf Klick.
+Zonenkacheln sind in den schmalen Mattenspalten nur 48 px breit — ohne Vorschau
+erkennt man dort nicht, welche Karte man vor sich hat, und müsste sich
+durchklicken. Zum *Verschieben* ist die Ansicht in diesen Spalten (Kommandozone,
+Bibliothek, Exil, Friedhof) sogar der einzige Weg: eine Knopfleiste ist rund
+113 px breit und wurde vom Spaltenrand abgeschnitten. Auf dem Schlachtfeld und
+bei den Ländern bleibt die schnelle Leiste am Kartenbild, weil Tappen und Marken
+die häufigsten Handgriffe im Spiel sind.
+
+**Wo die Ansicht erscheint**, hängt vom Platz ab. Ab **1200 px** hat die Matte
+ganz rechts eine eigene Spalte dafür („Karte"): Was du anzeigst, erscheint immer
+an **derselben** Stelle, statt als Fenster über dem Spielfeld — der Tisch bleibt
+frei, und der Blick muss die Karte nicht suchen. Beim Mausaustritt bleibt die
+zuletzt gezeigte Karte stehen (nur die Zielknöpfe verschwinden), sonst flackerte
+die Fläche im Spiel dauernd. Darunter — und im Akkordeon — schwebt sie wie bisher
+am Zeiger; auf einem Handy gibt es für eine feste Spalte keinen Platz. Dort
+blendet sie sich außerdem erst nach kurzem Verweilen ein, damit nicht bei jedem
+Überstreichen ein Fenster aufpoppt.
+
+Unter dem Bild steht bewusst **nicht** der Regeltext: der steht bereits auf der
+Karte. Auch nicht das Set — beim Spielen ist egal, aus welcher Auflage die Karte
+kommt. Was bleibt, ist das, was auf dem Bild klein oder gar nicht zu lesen ist:
+Manakosten, fremdsprachiger Name und Typzeile. Das ist bewusst nicht die
+Detailkarte aus der Sammlung: Preis, Preisverlauf, Zustand und
+Deckzugehörigkeit sind am Tisch ohne Belang und stünden nur im Weg. Und eine
+Bibliothek hat schnell 90 Zeilen — jede mit Bild, Set und vier Knöpfen zu
+bestücken machte sie in der schmalen Mattenspalte unlesbar.
 
 **Commander-Steuer.** Wanderst du deinen Commander aus der Kommandozone aufs
 Feld, zählt die App das Wirken mit und zeigt am Kartenbild, was das nächste Mal
