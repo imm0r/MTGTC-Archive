@@ -354,9 +354,19 @@ Dauerliste. Die ganze Bibliothek ist einen Klick entfernt, wenn du sehen willst,
 was noch drin ist.
 
 Eine Zeile trägt dabei **nur Kartenname und Anzahl**. Alles Weitere steht in der
-**Kartenansicht für den Spielmodus**: Zeigen blendet sie neben dem Zeiger ein —
-Bild, Manakosten, Typzeile, Regeltext —, Klicken hält sie fest. Erst dann wird
-sie bedienbar und trägt die Zielknöpfe. Das ist bewusst nicht die Detailkarte aus
+**Kartenansicht für den Spielmodus**: Zeigen blendet sie neben dem Zeiger ein,
+Klicken hält sie fest. Erst dann wird sie bedienbar und trägt die Zielknöpfe.
+
+Dieselbe Ansicht öffnet ein Klick auf **jede** Karte in jeder Zone. In den
+schmalen Mattenspalten (Kommandozone, Bibliothek, Exil, Friedhof) ist sie sogar
+der einzige Weg: eine Knopfleiste ist rund 113 px breit, eine Karte dort 48 px —
+sie wurde vom Spaltenrand abgeschnitten. Auf dem Schlachtfeld und bei den
+Ländern bleibt die schnelle Leiste am Kartenbild, weil Tappen und Marken die
+häufigsten Handgriffe im Spiel sind.
+
+Unter dem Bild steht bewusst **nicht** der Regeltext: der steht bereits auf der
+Karte. Was bleibt, ist das, was auf dem Bild klein oder gar nicht zu lesen ist —
+Manakosten, fremdsprachiger Name, Typzeile und Set. Das ist bewusst nicht die Detailkarte aus
 der Sammlung: Preis, Preisverlauf, Zustand und Deckzugehörigkeit sind am Tisch
 ohne Belang und stünden nur im Weg. Und eine Bibliothek hat schnell 90 Zeilen —
 jede mit Bild, Set und vier Knöpfen zu bestücken machte sie in der schmalen

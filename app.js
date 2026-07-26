@@ -8343,7 +8343,8 @@ function zoneKarteHtml(c, zone, n, st) {
   const steuer = zone === "cmd" ? (zStand(c.id).cast || 0) : 0;
   const idx = st ? st.idx : 0;
   return `<div class="zk${st?.t ? " getappt" : ""}" tabindex="0" data-id="${esc(c.id)}" data-zone="${esc(zone)}"
-       data-idx="${idx}" data-hand-img="${esc(c.img || "")}" data-hand-name="${esc(nm)}"
+       data-idx="${idx}" data-spk="${esc(c.id)}" data-spk-zone="${esc(zone)}"
+       data-hand-img="${esc(c.img || "")}" data-hand-name="${esc(nm)}"
        title="${esc(nm)}${st?.t ? " · " + t("zone.tapped") : ""}">
     ${c.img ? `<img src="${esc(c.img)}" alt="${esc(nm)}" loading="lazy">`
             : `<div class="zk-ohnebild">${esc(nm)}</div>`}
@@ -8351,15 +8352,14 @@ function zoneKarteHtml(c, zone, n, st) {
     ${st?.c ? `<span class="zk-marke" title="${esc(t("zone.counters", { n: st.c }))}">+${st.c}/+${st.c}</span>` : ""}
     ${zone === "cmd" && !MAT_AN ? `<button class="zk-steuer" data-steuer="${esc(c.id)}" data-d="-1"
          title="${esc(t("sess.cmdTaxTitle", { mana: steuer * 2, n: steuer }))}">+${steuer * 2}</button>` : ""}
-    <div class="zk-akt">${zone === "field" ? `<div class="zk-akt-reihe">
+    ${zone === "field" ? `<div class="zk-akt"><div class="zk-akt-reihe">
         <button class="btn ghost sm" data-tap="${esc(c.id)}" data-idx="${idx}"
           title="${esc(st?.t ? t("zone.untapTitle") : t("zone.tapTitle"))}">&#8635;</button>
         <button class="btn ghost sm" data-marke="${esc(c.id)}" data-idx="${idx}" data-d="1"
           title="${esc(t("zone.counterAdd"))}">&plus;</button>
         ${st?.c ? `<button class="btn ghost sm" data-marke="${esc(c.id)}" data-idx="${idx}" data-d="-1"
           title="${esc(t("zone.counterRemove"))}">&minus;</button>` : ""}
-      </div><div class="zk-akt-reihe">${zoneAktHtml(c.id, zone, idx)}</div>`
-      : zoneAktHtml(c.id, zone, idx)}</div>
+      </div><div class="zk-akt-reihe">${zoneAktHtml(c.id, zone, idx)}</div></div>` : ""}
   </div>`;
 }
 
@@ -8466,32 +8466,48 @@ function spkHuelle() {
     spkEl.onclick = e => {
       const mv = e.target.closest("[data-move]");
       if (mv) { versteckeSpielKarte(true); return zoneMove(mv.dataset.move, mv.dataset.von, mv.dataset.nach, mv.dataset.idx); }
+      const tap = e.target.closest("[data-tap]");
+      if (tap) { versteckeSpielKarte(true); return feldTap(tap.dataset.tap, +tap.dataset.idx); }
+      const mk = e.target.closest("[data-marke]");
+      if (mk) { versteckeSpielKarte(true); return feldMarke(mk.dataset.marke, +mk.dataset.idx, parseInt(mk.dataset.d, 10)); }
       if (e.target.closest("[data-spk-zu]")) versteckeSpielKarte(true);
     };
   }
   return spkEl;
 }
 
-function spielKarteHtml(c, zone, fest) {
+function spielKarteHtml(c, zone, fest, idx) {
   // Scryfall-Bild-URLs tragen die Größe im Pfad — aus small wird normal.
   const gross = (c.img || "").replace("/small/", "/normal/");
+  // Der Regeltext steht bereits auf dem Bild — ihn darunter zu wiederholen war
+  // doppelt gemoppelt. Was bleibt, ist das, was auf dem Bild klein oder gar
+  // nicht zu lesen ist: die Manakosten, der fremdsprachige Name und das Set.
+  const marken = zone === "field" ? `<div class="zk-akt-reihe">
+      <button class="btn ghost sm" data-tap="${esc(c.id)}" data-idx="${idx || 0}"
+        title="${esc(t("zone.tapTitle"))}">&#8635;</button>
+      <button class="btn ghost sm" data-marke="${esc(c.id)}" data-idx="${idx || 0}" data-d="1"
+        title="${esc(t("zone.counterAdd"))}">&plus;</button>
+      <button class="btn ghost sm" data-marke="${esc(c.id)}" data-idx="${idx || 0}" data-d="-1"
+        title="${esc(t("zone.counterRemove"))}">&minus;</button>
+    </div>` : "";
   return `${fest ? `<button class="spk-zu" data-spk-zu title="${esc(t("dlg.close"))}">&times;</button>` : ""}
     ${gross ? `<img class="spk-bild" src="${esc(gross)}" alt="">` : ""}
     <div class="spk-text">
       ${faceTopHtml(c)}
-      ${faceBottomHtml(c, true)}
+      ${c.type_line ? `<div class="hint" style="margin-top:2px">${esc(c.type_line)}</div>` : ""}
       <div class="hint" style="margin-top:4px">${setSymbol(c.set, c.rarity)}${
         esc(c.set_name || c.set || "")} &middot; #${esc(c.cn)}</div>
     </div>
-    ${fest ? `<div class="spk-akt">${zoneAktHtml(c.id, zone)}</div>`
+    ${fest ? `<div class="spk-akt">${marken}<div class="zk-akt-reihe">${
+                zoneAktHtml(c.id, zone, idx)}</div></div>`
            : `<div class="spk-tipp">${esc(t("spk.clickHint"))}</div>`}`;
 }
 
-function zeigeSpielKarte(id, x, y, zone, fest) {
+function zeigeSpielKarte(id, x, y, zone, fest, idx) {
   const c = CARDS.find(k => k.id === id);
   if (!c) return;
   const el = spkHuelle();
-  el.innerHTML = spielKarteHtml(c, zone, fest);
+  el.innerHTML = spielKarteHtml(c, zone, fest, idx);
   el.classList.toggle("fest", !!fest);
   el.style.display = "block";
   spkFest = fest ? { id, zone } : null;
@@ -8502,6 +8518,13 @@ function zeigeSpielKarte(id, x, y, zone, fest) {
   if (l + r.width > innerWidth - 8) l = Math.max(8, x - r.width - 18);
   if (o + r.height > innerHeight - 8) o = Math.max(8, innerHeight - r.height - 8);
   el.style.left = l + "px"; el.style.top = o + "px";
+}
+
+/* Kartenansicht aus einem angeklickten Element heraus öffnen — Zone und
+   Exemplar stehen am Element, damit sie die richtigen Knöpfe trägt. */
+function spkAusElement(el) {
+  const r = el.getBoundingClientRect();
+  zeigeSpielKarte(el.dataset.spk, r.right, r.top, el.dataset.spkZone || "lib", true, +el.dataset.idx || 0);
 }
 
 function versteckeSpielKarte(auchFest) {
@@ -8515,6 +8538,10 @@ function versteckeSpielKarte(auchFest) {
 function renderZonen() {
   // Die Vorschauen hängen an Elementen, die es gleich nicht mehr gibt.
   hideHover(); versteckeCmdHover(); versteckeSpielKarte(true);
+  // Und der Fokus auch: eine angehobene Karte bleibt sonst über :focus-within
+  // angehoben, obwohl der Zeiger längst woanders ist — genau das Bild, in dem
+  // mehrere Karten gleichzeitig „aufgenommen" aussehen.
+  if ($("#zonen")?.contains(document.activeElement)) document.activeElement.blur();
   const el = $("#zonen");
   if (!el) return;
   const suchtext = libFilter(), fokus = document.activeElement?.id === "lib-suche";
@@ -8555,7 +8582,11 @@ function wireZonenHover() {
   // Kartenvorschau wie überall in der Spielrunde: Bild + Name schwebend.
   $$("#zonen [data-hand-img]").forEach(el => {
     if (!el.dataset.handImg) return;
-    el.addEventListener("mousemove", e => zeigeCmdHover(el.dataset.handImg, el.dataset.handName, e.clientX, e.clientY));
+    // Ist eine Kartenansicht angeheftet, keine zweite Vorschau darüberlegen.
+    el.addEventListener("mousemove", e => {
+      if (spkFest) return;
+      zeigeCmdHover(el.dataset.handImg, el.dataset.handName, e.clientX, e.clientY);
+    });
     el.addEventListener("mouseleave", versteckeCmdHover);
   });
   // Bibliothekszeilen: Zeigen blendet die Spielmodus-Kartenansicht ein, Klick
@@ -8609,20 +8640,18 @@ function wireZonen() {
     const alle = e.target.closest("#lib-alle");
     if (alle) { libAlle = !libAlle; return renderZonen(); }
     const spk = e.target.closest("[data-spk]");
-    if (spk) {
-      const r = spk.getBoundingClientRect();
-      return zeigeSpielKarte(spk.dataset.spk, r.right, r.top, "lib", true);
-    }
+    if (spk) return spkAusElement(spk);
   };
   zonen.onkeydown = e => {
     const spk = e.target.closest?.("[data-spk]");
-    if (spk && (e.key === "Enter" || e.key === " ")) {
-      e.preventDefault();
-      const r = spk.getBoundingClientRect();
-      zeigeSpielKarte(spk.dataset.spk, r.right, r.top, "lib", true);
-    }
+    if (spk && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); spkAusElement(spk); }
   };
   zonen.oninput = e => { if (e.target.id === "lib-suche") renderLibListe(); };
+  // Verlässt der Zeiger den ganzen Bereich, alle schwebenden Vorschauen weg.
+  // Das mouseleave einer einzelnen Karte bleibt aus, wenn sie unter dem Zeiger
+  // aus dem DOM verschwindet (jeder Zug zeichnet neu) — dann hinge die
+  // Vorschau, bis man sie zufällig wieder auslöst.
+  zonen.onmouseleave = () => { versteckeCmdHover(); clearTimeout(spkTimer); versteckeSpielKarte(); };
   wireZonenHover();
 }
 
