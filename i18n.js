@@ -1985,30 +1985,35 @@ Object.assign(I18N.de, {
   "scan.searchingCode": "Suche {set} #{num}{token}…", "scan.tokenSuffix": " (Token)",
   "scan.searchingName": "Suche „{name}“…", "scan.readingCode": "Lese Setcode und Nummer…",
   "scan.readingName": "Lese Kartennamen…", "scan.secondTry": "Zweiter Versuch am ganzen Bild…",
+  "detail.median": "Median",
   "detail.noHistory": "Noch keine Preishistorie — sie wächst mit jedem Preis-Update um einen Punkt pro Tag.",
 });
 Object.assign(I18N.en, {
   "scan.searchingCode": "Searching {set} #{num}{token}…", "scan.tokenSuffix": " (token)",
   "scan.searchingName": "Searching “{name}”…", "scan.readingCode": "Reading set code and number…",
   "scan.readingName": "Reading card name…", "scan.secondTry": "Second attempt on the whole image…",
+  "detail.median": "Median",
   "detail.noHistory": "No price history yet — it grows with each price update by one point per day.",
 });
 Object.assign(I18N.fr, {
   "scan.searchingCode": "Recherche {set} #{num}{token}…", "scan.tokenSuffix": " (token)",
   "scan.searchingName": "Recherche « {name} »…", "scan.readingCode": "Lecture du code d'extension et du numéro…",
   "scan.readingName": "Lecture du nom de la carte…", "scan.secondTry": "Deuxième essai sur toute l'image…",
+  "detail.median": "Médiane",
   "detail.noHistory": "Pas encore d'historique des prix — il grandit à chaque mise à jour de prix d'un point par jour.",
 });
 Object.assign(I18N.es, {
   "scan.searchingCode": "Buscando {set} #{num}{token}…", "scan.tokenSuffix": " (token)",
   "scan.searchingName": "Buscando «{name}»…", "scan.readingCode": "Leyendo código de edición y número…",
   "scan.readingName": "Leyendo nombre de la carta…", "scan.secondTry": "Segundo intento en toda la imagen…",
+  "detail.median": "Mediana",
   "detail.noHistory": "Aún no hay historial de precios — crece con cada actualización de precio un punto por día.",
 });
 Object.assign(I18N.it, {
   "scan.searchingCode": "Ricerca {set} #{num}{token}…", "scan.tokenSuffix": " (token)",
   "scan.searchingName": "Ricerca «{name}»…", "scan.readingCode": "Lettura codice espansione e numero…",
   "scan.readingName": "Lettura nome della carta…", "scan.secondTry": "Secondo tentativo sull'intera immagine…",
+  "detail.median": "Mediana",
   "detail.noHistory": "Ancora nessuno storico prezzi — cresce a ogni aggiornamento di prezzo di un punto al giorno.",
 });
 
