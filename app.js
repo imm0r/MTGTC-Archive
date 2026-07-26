@@ -3075,6 +3075,162 @@ function zeigeDeck(deckId) {
 /* Gemeinsame Vorlage für Dialog und Hover-Vorschau. Der Preisgraph sitzt in
    der rechten Spalte unter dem Hinzugefügt-Datum — kompakt (320er-viewBox),
    damit die Beschriftung beim Skalieren lesbar bleibt. */
+/* ------------------------------------------------ Eigenes Kartenbild ---
+   Scryfall hat nicht zu jeder Auflage ein Foto: bei fremdsprachigen Drucken
+   steht image_status oft auf "placeholder", angezeigt wird dann ein grauer
+   Ersatz. Hier lässt sich ein eigenes Bild hinterlegen.
+
+   ZWEI WEGE, und der Unterschied ist keine Geschmacksfrage:
+   • Eine Adresse kostet die Datenbank NICHTS.
+   • Eine hochgeladene Datei landet als data:-URI in der Spalte — und die
+     Spalte img wird bei JEDEM reload() für ALLE Karten mitgeladen, also nach
+     jedem Einbuchen und Bearbeiten. Deshalb wird verkleinert (400 px breit,
+     rund 85 KB) und die Größe im Dialog offen ausgewiesen, statt sie zu
+     verschweigen.
+
+   Geschrieben wird über die scryfall_id, nicht über die Zeilen-ID: das Bild
+   gehört zur AUFLAGE, nicht zum einzelnen Exemplar. Wer dieselbe Karte
+   zweimal hat (Foil und normal), will nicht zweimal dasselbe hinterlegen. */
+const SCRYFALL_BILD = /^https:\/\/cards\.scryfall\.io\//;
+const eigenesBild = c => !!c.img && !SCRYFALL_BILD.test(c.img);
+
+/* Datei → verkleinertes JPEG als data:-URI. 400 px Breite deckt die
+   Detailansicht (230 CSS-px, also 460 px auf 2x-Displays) knapp ab und bleibt
+   deutlich unter dem, was ein voller Scan kostet. */
+function bildAlsDataUri(datei, maxBreite = 400, qualitaet = 0.82) {
+  return new Promise((fertig, fehler) => {
+    const leser = new FileReader();
+    leser.onerror = () => fehler(new Error(t("img.readFailed")));
+    leser.onload = () => {
+      const bild = new Image();
+      bild.onerror = () => fehler(new Error(t("img.notAnImage")));
+      bild.onload = () => {
+        const skal = Math.min(1, maxBreite / bild.width);      // nie hochskalieren
+        const cv = document.createElement("canvas");
+        cv.width = Math.round(bild.width * skal);
+        cv.height = Math.round(bild.height * skal);
+        const cx = cv.getContext("2d");
+        cx.imageSmoothingQuality = "high";
+        cx.drawImage(bild, 0, 0, cv.width, cv.height);
+        fertig(cv.toDataURL("image/jpeg", qualitaet));
+      };
+      bild.src = leser.result;
+    };
+    leser.readAsDataURL(datei);
+  });
+}
+
+/* Das Scryfall-Bild zurückholen. Die Adresse wird nicht geraten, sondern beim
+   Abruf der Auflage mitgeliefert — sie trägt einen Zeitstempel, den man aus
+   der scryfall_id allein nicht rekonstruieren kann. */
+async function scryfallBild(c) {
+  const frisch = await sfById(c.scryfall_id);
+  return imgOf(frisch) || null;
+}
+
+async function bildDlg(c) {
+  const kb = s => Math.round((s.length * 3 / 4) / 1024);        // base64 → KB
+  let neu = null;                                              // null = unverändert
+
+  const zeichne = () => {
+    const zeigt = neu ?? c.img ?? "";
+    const eigen = neu ? !SCRYFALL_BILD.test(neu) : eigenesBild(c);
+    $("#bild-vorschau").innerHTML = zeigt
+      ? `<img src="${esc(zeigt.replace("/small/", "/normal/"))}" alt="">`
+      : `<div class="detail-img-leer"></div>`;
+    $("#bild-groesse").textContent = zeigt.startsWith("data:")
+      ? t("img.sizeInline", { kb: kb(zeigt) })
+      : (eigen ? t("img.sizeUrl") : t("img.sizeScryfall"));
+    $("#bild-zuruecksetzen").hidden = !eigen;
+  };
+
+  $("#dlg-body").innerHTML = `
+    <h3 style="margin:0 0 10px">${esc(t("img.dlgTitle"))}</h3>
+    <div class="bild-dlg">
+      <div class="bild-vorschau" id="bild-vorschau"></div>
+      <div class="bild-felder">
+        <div class="field">
+          <label for="bild-url">${esc(t("img.urlLabel"))}</label>
+          <input id="bild-url" type="url" placeholder="https://…" value="${
+            esc(eigenesBild(c) && !String(c.img).startsWith("data:") ? c.img : "")}">
+          <div class="hint" style="margin:4px 0 0">${esc(t("img.urlHint"))}</div>
+        </div>
+        <div class="field" style="margin-top:12px">
+          <label for="bild-datei">${esc(t("img.fileLabel"))}</label>
+          <input id="bild-datei" type="file" accept="image/*">
+          <div class="hint" style="margin:4px 0 0">${esc(t("img.fileHint"))}</div>
+        </div>
+        <div class="hint" id="bild-groesse" style="margin-top:12px"></div>
+        <button class="btn ghost sm" id="bild-zuruecksetzen" style="margin-top:8px" hidden>${
+          esc(t("img.reset"))}</button>
+      </div>
+    </div>`;
+  zeichne();
+
+  $("#bild-url").oninput = e => {
+    const v = e.target.value.trim();
+    neu = v || null;
+    zeichne();
+  };
+  $("#bild-datei").onchange = async e => {
+    const datei = e.target.files && e.target.files[0];
+    if (!datei) return;
+    try {
+      neu = await bildAlsDataUri(datei);
+      $("#bild-url").value = "";
+      zeichne();
+    } catch (err) { toast(err.message); }
+  };
+  $("#bild-zuruecksetzen").onclick = async () => {
+    const knopf = $("#bild-zuruecksetzen");
+    knopf.disabled = true;
+    try { neu = await scryfallBild(c) || ""; $("#bild-url").value = ""; zeichne(); }
+    catch { toast(t("img.resetFailed")); }
+    finally { knopf.disabled = false; }
+  };
+
+  const dlg = $("#dlg");
+  const antwort = await new Promise(res => {
+    const zu = v => { dlg.close(); res(v); };
+    $("#dlg-yes").onclick = () => zu(true);
+    $("#dlg-no").onclick  = () => zu(false);
+    dlg.onclose = () => res(false);
+    dlg.showModal();
+  });
+  if (!antwort || neu === null) return showCardDetail(c.id);
+
+  const { error } = await sb.from("cards")
+    .update({ img: neu || null })
+    .eq("scryfall_id", c.scryfall_id);          // alle Ausführungen dieser Auflage
+  if (error) { toast(dbErr(error)); return showCardDetail(c.id); }
+  await reload(); renderAll();
+  toast(t("img.saved"));
+  showCardDetail(c.id);
+}
+
+/* Kartenbild samt Werkzeugleiste darunter.
+
+   Die Leiste sitzt in DERSELBEN Spalte wie das Bild und rechtsbündig, damit
+   sie mit dessen rechter Kante abschließt. Deshalb die eigene Spalte statt
+   eines Knopfs irgendwo im Textteil: `.detail` ist eine Flex-Zeile aus Bild
+   und Infoteil, ein Kind darunter läge sonst unter beidem.
+
+   In der Hover-Vorschau entfällt sie — dort wird nichts bearbeitet. Fehlt das
+   Bild ganz, bleibt ein leerer Rahmen stehen: genau dann will man ja eines
+   nachtragen können, und ohne Rahmen hinge der Knopf im Nichts. */
+function bildSpalteHtml(c, faced, gross, hover) {
+  const bild = faced ? flipHtml(c)
+             : (gross ? `<img class="detail-img" src="${esc(gross)}" alt="">` : "");
+  if (hover) return bild;
+  return `<div class="detail-bildspalte">
+    ${bild || `<div class="detail-img detail-img-leer" aria-hidden="true"></div>`}
+    <div class="detail-bildtools">
+      <button class="btn ghost sm" id="dt-bild" title="${esc(t("img.replaceTitle"))}">${
+        esc(t("img.replace"))}</button>
+    </div>
+  </div>`;
+}
+
 function detailHtml(c, hover) {
   // Zweiseitige Karte im Dialog: mit Seite 0 (Vorderseite) starten und das
   // Umdrehen ermöglichen. Die Hover-Vorschau bleibt schlicht bei der Vorderseite.
@@ -3120,7 +3276,7 @@ function detailHtml(c, hover) {
   return `
     <div class="detail">
       ${!hover ? `<div class="detail-added">${esc(t("detail.added"))}: ${esc(dtShort(c.added))} ${esc(t("detail.addedSuffix"))}</div>` : ""}
-      ${faced ? flipHtml(c) : (gross ? `<img class="detail-img" src="${esc(gross)}" alt="">` : "")}
+      ${bildSpalteHtml(c, faced, gross, hover)}
       <div class="detail-info">
         ${!hover ? `<div class="detail-face-top" id="dt-face-top">${faceTopHtml(v)}</div>` : faceTopHtml(v)}
         <div class="hint" style="margin-top:2px">${setSymbol(c.set, c.rarity)}${esc(c.set_name || c.set)} · #${esc(c.cn)}${
@@ -3173,10 +3329,18 @@ function renderDetail(c, id, fremd) {
   // Fremde Karte (Community-Kachel): Bearbeiten und Preis-Aktualisieren
   // gehören dem Besitzer, nicht dem Betrachter. Synergien und Combos bleiben —
   // die arbeiten nur mit der Karte selbst und stehen jedem offen.
-  const eb = $("#dt-edit"), pb0 = $("#dt-price");
+  const eb = $("#dt-edit"), pb0 = $("#dt-price"), bb = $("#dt-bild");
   if (eb) eb.hidden = !!fremd;
   if (pb0) pb0.hidden = !!fremd;
+  // Das Bild gehört zur Karte des Besitzers — bei einer fremden Karte
+  // (Community-Kachel) verschwindet der Knopf wie Bearbeiten und Preis.
+  if (bb) bb.hidden = !!fremd;
   if (fremd) return wireDetailSynergien(c);
+
+  // Erst schließen, dann den Bild-Dialog — wie bei „Bearbeiten": zwei
+  // gestapelte Dialoge wären fragil. bildDlg öffnet die Detailansicht danach
+  // wieder, egal ob gespeichert oder abgebrochen.
+  if (bb) bb.onclick = () => { $("#detail-dlg").close(); bildDlg(c); };
 
   // Erst schließen, dann bearbeiten: zwei gestapelte Dialoge wären fragil.
   $("#dt-edit").onclick = () => { $("#detail-dlg").close(); editCard(id); };
