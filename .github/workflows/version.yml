@@ -1,0 +1,123 @@
+# Hält die beiden Nummern in index.html selbsttätig auf Stand:
+#
+#   <meta name="app-version">  — der ausgelieferte Stand nach Semantic Versioning
+#   ?v= an jedem href/src      — Cache-Buster je Datei, aus dem Inhalt berechnet
+#
+# WARUM DAS NÖTIG IST: Die App liegt auf GitHub Pages (impliziter Workflow
+# pages-build-deployment) und auf Vercel. Pages liefert mit
+# „cache-control: max-age=600" OHNE must-revalidate aus — ein Browser darf die
+# alte Datei also zehn Minuten weiterverwenden, ohne nachzufragen. Genau darauf
+# zeigt auch die Überwachung in .upptime.yml. Von Hand ist das dreimal
+# hintereinander vergessen worden (#103, #104, #105 haben app.js, i18n.js und
+# style.css geändert, index.html aber nicht angefasst).
+#
+# WARUM VOR DEM ZUSAMMENFÜHREN, NICHT DANACH: Liefe das erst auf main, wäre
+# der Zielzweig zwischen Merge und Nachtrag-Commit kurz inkonsistent — neue
+# Dateien hinter alten ?v=. Pages baut in dem Fenster schon aus. Als Commit im
+# Pull Request ist die Nummer Teil des Merges, main also nie falsch.
+#
+# WARUM DIE STUFE AUS DEM TITEL: Ob eine Änderung Major, Minor oder Patch ist,
+# kann kein Programm entscheiden. Ein Automatismus, der stur Patch hochzählt,
+# macht die Nummer zum Zähler mit Punkten — genau davon ist #102 weggegangen.
+# Fehlt die Angabe, schlägt der Lauf mit einer Anleitung fehl, statt zu raten:
+# lieber gar keine Version als eine erfundene (dieselbe Regel wie in app.js:35).
+
+name: Version und Cache-Buster
+
+on:
+  pull_request:
+    # „edited" ist wichtig: der Titel trägt die Stufe, und der wird oft erst
+    # nach dem Öffnen gesetzt oder korrigiert.
+    types: [opened, synchronize, reopened, edited]
+
+# Ein Lauf je Pull Request. Zwei gleichzeitige Läufe würden dieselbe Datei
+# schreiben und sich gegenseitig überholen.
+concurrency:
+  group: version-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write        # zum Zurückschreiben in den Zweig des Pull Requests
+
+jobs:
+  nummern:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Stufe aus dem Titel lesen
+        id: stufe
+        env:
+          # Über die Umgebung, NICHT per ${{ }} in den Skriptkörper: ein Titel
+          # ist Nutzereingabe und könnte sonst Shell-Befehle einschleusen.
+          TITEL: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          gefunden=""
+          for s in major minor patch; do
+            if printf '%s' "$TITEL" | grep -qiF "[$s]"; then
+              if [ -n "$gefunden" ]; then
+                echo "::error::Im Titel stehen mehrere Stufen ([$gefunden] und [$s]). Bitte genau eine angeben."
+                exit 1
+              fi
+              gefunden="$s"
+            fi
+          done
+          if [ -z "$gefunden" ]; then
+            echo "::error::Im PR-Titel fehlt die Stufe. Ergänze [major], [minor] oder [patch] — siehe README.md, Abschnitt „Versionsnummer\". Titel war: $TITEL"
+            exit 1
+          fi
+          echo "wert=$gefunden" >> "$GITHUB_OUTPUT"
+          echo "Stufe: $gefunden"
+
+      - name: Zweig des Pull Requests auschecken
+        uses: actions/checkout@v4
+        with:
+          # Nicht den Merge-Ref (Standard bei pull_request): dorthin liesse sich
+          # nicht zurückschreiben. Voller Verlauf, damit der Zielzweig
+          # erreichbar ist.
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          fetch-depth: 0
+
+      - name: Nummern setzen
+        id: setzen
+        env:
+          STUFE: ${{ steps.stufe.outputs.wert }}
+          ZIEL: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$ZIEL"
+          # Die Basis kommt aus dem ZIELZWEIG, nicht aus der Datei im Zweig:
+          # sonst hübe ein zweiter Lauf die schon angehobene Nummer erneut an.
+          basis="$(git show "origin/$ZIEL:index.html" \
+                   | grep -oE 'name="app-version" content="[^"]*"' \
+                   | sed -E 's/.*content="([^"]*)"/\1/')"
+          if [ -z "$basis" ]; then
+            echo "::error::Im Zielzweig $ZIEL steht keine app-version in index.html."
+            exit 1
+          fi
+          echo "Basis aus $ZIEL: $basis"
+          node scripts/version.mjs "$STUFE" "$basis"
+          if git diff --quiet -- index.html; then
+            echo "geaendert=nein" >> "$GITHUB_OUTPUT"
+          else
+            echo "geaendert=ja" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Zurückschreiben
+        if: steps.setzen.outputs.geaendert == 'ja'
+        env:
+          STUFE: ${{ steps.stufe.outputs.wert }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Version und Cache-Buster ($STUFE)" \
+                     -m "Gesetzt von .github/workflows/version.yml aus dem PR-Titel."
+          # Ein Push mit GITHUB_TOKEN löst KEINEN neuen Workflow-Lauf aus —
+          # deshalb kann das hier nicht in eine Schleife geraten.
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
+
+      - name: Nichts zu tun
+        if: steps.setzen.outputs.geaendert == 'nein'
+        run: echo "index.html war schon auf Stand."

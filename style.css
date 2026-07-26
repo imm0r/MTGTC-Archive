@@ -1062,11 +1062,32 @@ dialog::backdrop{background:#000a}
 .detail{display:flex;gap:16px;flex-wrap:wrap;position:relative}
 /* „Hinzugefügt am" oben rechts in der Ecke des Fensters statt unten. */
 .detail-added{position:absolute;top:0;right:0;font-size:12px;color:var(--dim);white-space:nowrap}
-.detail-img{width:230px;max-width:100%;border-radius:10px;background:#000;flex:none;align-self:flex-start}
+/* Bild und Werkzeugleiste stehen in EINER Spalte, damit die Leiste unter dem
+   Bild sitzt und mit dessen rechter Kante abschließt. Ohne diese Spalte wäre
+   die Leiste ein drittes Kind der Flex-Zeile .detail und läge unter Bild UND
+   Infoteil. flex/align-self wandern vom Bild hierher — innen ist es nun das
+   einzige Kind einer Spalte und darf die volle Breite nehmen. */
+.detail-bildspalte{display:flex;flex-direction:column;gap:7px;
+  width:230px;max-width:100%;flex:none;align-self:flex-start}
+.detail-bildtools{display:flex;justify-content:flex-end}
+.detail-img{width:100%;border-radius:10px;background:#000}
+/* Kein Bild hinterlegt: Platz halten, damit der Knopf darunter nicht im Nichts
+   hängt — und sichtbar machen, dass hier etwas fehlt statt lädt. */
+.detail-img-leer{aspect-ratio:488/680;border:1px dashed var(--line);background:var(--panel2);
+  border-radius:10px;width:100%}
+
+/* Dialog „Bild ersetzen": Vorschau links, Eingaben rechts. Bricht auf schmalen
+   Schirmen um, damit die Felder nicht auf Knopfbreite zusammenlaufen. */
+.bild-dlg{display:flex;gap:16px;flex-wrap:wrap}
+.bild-vorschau{width:180px;flex:none}
+.bild-vorschau img{width:100%;border-radius:8px;background:#000;display:block}
+.bild-vorschau .detail-img-leer{width:100%}
+.bild-felder{flex:1 1 260px;min-width:0}
+.bild-felder input[type=file]{font-size:13px;color:var(--dim)}
 /* Zweiseitige Karten (Vorder-/Rückseite): beide Seiten im selben Rahmen, per
    Klick mit 3D-Dreh umgeschlagen — wie auf Scryfall. Der Rahmen hält das
    Kartenmaß (488×680), damit die absolut gesetzten Seiten sich genau decken. */
-.detail-flip{width:230px;max-width:100%;flex:none;align-self:flex-start;position:relative;
+.detail-flip{width:100%;position:relative;
   perspective:1400px;cursor:pointer;outline:none}
 .detail-flip-inner{position:relative;width:100%;aspect-ratio:488/680;transform-style:preserve-3d;
   transition:transform .6s cubic-bezier(.2,.8,.25,1)}
@@ -1148,7 +1169,9 @@ dialog::backdrop{background:#000a}
 #hovercard{position:fixed;z-index:90;display:none;pointer-events:none;
   background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
   padding:12px;width:430px;max-width:calc(100vw - 16px);box-shadow:0 10px 34px #000c}
-#hovercard .detail-img{width:140px;height:196px;object-fit:cover}
+/* flex:none muss hier stehen: in der Hover-Vorschau steht das Bild ohne die
+   .detail-bildspalte direkt in der Flex-Zeile und würde sonst schrumpfen. */
+#hovercard .detail-img{width:140px;height:196px;object-fit:cover;flex:none}
 #hovercard .detail-info b{font-size:15px}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--panel2);
        border:1px solid var(--acc);border-radius:8px;padding:10px 18px;z-index:99;opacity:0;

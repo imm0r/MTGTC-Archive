@@ -93,6 +93,49 @@ Das ist **etwas anderes als `?v=`**, auch wenn beides in derselben Datei steht:
 * Die Version beantwortet „welcher *Stand* ist ausgeliefert" und gilt für die
   App als Ganzes.
 
+#### Beide werden automatisch gesetzt
+
+Von Hand ging das schief: drei Zusammenführungen hintereinander (#103, #104,
+#105) haben `app.js`, `i18n.js` und `style.css` geändert, ohne `index.html`
+anzufassen. Auf GitHub Pages konnte danach bis zu zehn Minuten lang die alte
+Datei ausgeliefert werden.
+
+`.github/workflows/version.yml` übernimmt das jetzt beim Pull Request:
+
+* **`?v=`** wird zum **Inhalts-Hash** der Datei (SHA-256, acht Zeichen) statt zu
+  einem Zähler. Ein Zähler braucht ein Gedächtnis und kann driften, ein Hash
+  nicht: gleiche Datei, gleicher Wert. Erfasst wird jedes `href`/`src` mit
+  `?v=`, ohne gepflegte Dateiliste.
+* **Die Version** wird um genau eine Stelle angehoben. Welche, kann kein
+  Programm entscheiden — deshalb steht die Stufe **im Titel des Pull Requests**:
+
+  ```
+  Eigenes Kartenbild in der Detailansicht hinterlegen [minor]
+  ```
+
+  Erlaubt sind `[major]`, `[minor]` und `[patch]`, Groß- und Kleinschreibung
+  ist egal. Fehlt die Angabe oder stehen zwei darin, schlägt der Lauf mit einer
+  Anleitung fehl — lieber gar keine Version als eine erfundene.
+
+Angehoben wird immer auf die Version im **Zielzweig**, nicht auf die im Zweig
+des Pull Requests. So bleibt es bei mehreren Läufen am selben Pull Request bei
+einer einzigen Anhebung.
+
+Von Hand nachfahren geht auch, `scripts/version.mjs` ist dasselbe Programm:
+
+```bash
+node scripts/version.mjs            # nur die Hashes auffrischen
+node scripts/version.mjs minor      # Version anheben und Hashes auffrischen
+node scripts/version.mjs --pruefen  # nichts schreiben, Exit 1 bei Abweichung
+```
+
+**Warum `?v=` überhaupt nötig ist:** Die App liegt auf GitHub Pages *und* auf
+Vercel. Pages liefert mit `cache-control: max-age=600` **ohne**
+`must-revalidate` aus — ein Browser darf die alte Datei also zehn Minuten
+weiterverwenden, ohne nachzufragen. Vercel schickt `max-age=0,
+must-revalidate` und käme ohne `?v=` aus. Maßgeblich ist Pages: auf diese
+Adresse zeigt auch die Überwachung in `.upptime.yml`.
+
 Beide gehören zu jeder Auslieferung hochgezählt: `?v=` bei jeder berührten
 Datei, die Version je nach Art der Änderung. Hinge die Anzeige am `app.js?v=`,
 bliebe sie bei einer reinen Stilkorrektur stehen, obwohl eine Fehlerbehebung
