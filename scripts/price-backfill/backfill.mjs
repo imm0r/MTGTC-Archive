@@ -21,30 +21,43 @@
 //  er immer nur das frische Fenster, egal wie lang der Verlauf schon ist.
 //
 //  Ablauf:
-//    1. vorhandene scryfall_id aus public.cards holen (nur die brauchen wir),
-//    2. AllIdentifiers streamen → scryfallId ↔ MTGJSON-uuid (nur Treffer),
-//    3. AllPrices streamen → je uuid Cardmarket-EUR + TCGplayer-USD (retail,
-//       normal + foil) als [{d,v}] herausziehen,
-//    4. gebündelt an merge_price_history schicken (mischt je scryfall_id).
+//    1. herausfinden, welche Karten gebraucht werden, und ihre uuid besorgen —
+//       entweder aus AllIdentifiers oder (im Tagesmodus) aus der Datenbank,
+//    2. die passende Preisdatei streamen → je uuid Cardmarket-EUR +
+//       TCGplayer-USD (retail, normal + foil) als [{d,v}] herausziehen,
+//    3. gebündelt an merge_price_history schicken (mischt je scryfall_id).
 //
-//  Beide Dateien werden GESTREAMT (gunzip → JSON-Token → je ein Eintrag),
+//  Die Bulkdateien werden GESTREAMT (gunzip → JSON-Token → je ein Eintrag),
 //  nie vollständig in den Speicher geladen — nur die gebrauchten Karten
 //  bleiben liegen.
 //
-//  Zwei Betriebsarten, weil MTGJSON keinen Abruf für eine einzelne Karte
-//  kennt — den Verlauf einer Karte zu holen heißt, die Bulkdatei zu streamen:
+//  MTGJSON kennt keinen Abruf für eine einzelne Karte — Preise gibt es nur als
+//  Bulkdateien, und die sind unterschiedlich teuer:
 //
-//    voll (täglich)       alle Karten im Bestand; schreibt auch die laufenden
-//                         Preise fort, nicht nur die neu dazugekommenen.
-//    --only-gaps          nur Karten OHNE Archivzeile. Sind keine offen,
-//    (stündlich)          endet der Lauf nach einer Abfrage, ohne die
-//                         Bulkdatei anzufassen. Nur so lässt sich der Job
-//                         stündlich fahren; eine neu erfasste Karte bekommt
-//                         ihre 90 Tage dann binnen einer Stunde statt erst
-//                         beim nächsten Nachtlauf.
+//    AllIdentifiers.json.gz   215 MB   scryfallId → uuid
+//    AllPrices.json.gz        143 MB   90 Tage Verlauf
+//    AllPricesToday.json.gz   5,2 MB   nur der Tagespreis, gleicher Aufbau
+//
+//  Daraus drei Betriebsarten, jede so sparsam wie ihre Aufgabe es zulässt:
+//
+//    --only-gaps      nur Karten OHNE Archivzeile. Sind keine offen, endet der
+//    (stündlich)      Lauf nach EINER Abfrage, ohne eine Bulkdatei anzufassen.
+//                     Nur so lässt sich der Job stündlich fahren; eine neu
+//                     erfasste Karte bekommt ihre 90 Tage binnen einer Stunde.
+//
+//    --today          hängt einen Punkt je Karte an. Lädt allein
+//    (täglich)        AllPricesToday (5,2 MB) — die uuid-Zuordnung kommt aus
+//                     price_history.mtgjson_uuid statt aus AllIdentifiers.
+//
+//    voll             alle Karten, volle 90 Tage. Fängt Korrekturen ein, die
+//    (wöchentlich,    MTGJSON nachträglich an zurückliegenden Tagen vornimmt,
+//     und von Hand)   und heilt Tage, an denen der Tageslauf ausfiel — die
+//                     kleine Datei kennt ja immer nur ihr eigenes Datum.
+//                     Schreibt dabei die uuid mit, von der --today lebt.
 //
 //  Aufruf:
 //    node backfill.mjs              voller Lauf (braucht SUPABASE_*-Env)
+//    node backfill.mjs --today      nur der Tagespreis, kleine Datei
 //    node backfill.mjs --only-gaps  nur fehlende Karten, sonst Frühausstieg
 //    node backfill.mjs --dry-run    alles außer dem Schreiben, mit Stichprobe
 //    node backfill.mjs --self-test  reine Umform-Logik gegen ein Fixture
@@ -62,6 +75,10 @@ const SELF_TEST = ARGS.has("--self-test");
 // Gibt es keine, endet der Lauf, ohne die Bulkdatei anzufassen — nur so lässt
 // sich der Job stündlich fahren, statt stündlich 1 GB zu ziehen.
 const ONLY_GAPS = ARGS.has("--only-gaps");
+// Tagesmodus: nur AllPricesToday (5 MB) statt AllPrices (143 MB) + AllIdentifiers
+// (215 MB). Hängt einen Punkt je Karte an; die uuid-Zuordnung kommt aus der
+// Datenbank, wo ein voller Lauf sie hinterlassen hat.
+const TODAY_ONLY = ARGS.has("--today");
 
 const MTGJSON_BASE = process.env.MTGJSON_BASE || "https://mtgjson.com/api/v5";
 const SUPABASE_URL = (process.env.SUPABASE_URL || "").replace(/\/+$/, "");
@@ -129,27 +146,50 @@ const restHeaders = {
   "Content-Type": "application/json",
 };
 
-// Alle vorhandenen scryfall_id aus public.cards, seitenweise über den
-// Range-Header (PostgREST deckelt die Zeilen pro Antwort). Duplikate und
-// NULL fallen in ein Set.
-async function fetchScryfallIds() {
-  const ids = new Set();
+// Eine Tabelle seitenweise über den Range-Header lesen (PostgREST deckelt die
+// Zeilen pro Antwort) und je Zeile onRow aufrufen.
+async function fetchSeitenweise(pfad, was, onRow) {
   let offset = 0, total = Infinity;
   while (offset < total) {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/cards?select=scryfall_id&order=scryfall_id`,
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${pfad}`,
       { headers: { ...restHeaders, "Range-Unit": "items",
                    Range: `${offset}-${offset + 999}`, Prefer: "count=exact" } });
-    if (!res.ok) throw new Error(`cards lesen → HTTP ${res.status}: ${await res.text()}`);
+    if (!res.ok) throw new Error(`${was} lesen → HTTP ${res.status}: ${await res.text()}`);
     const rows = await res.json();
     const cr = res.headers.get("content-range");   // z. B. "0-999/5234"
     const m = cr && cr.match(/\/(\d+)$/);
     if (m) total = Number(m[1]);
-    for (const r of rows) if (r.scryfall_id) ids.add(r.scryfall_id);
+    for (const r of rows) onRow(r);
     if (rows.length === 0) break;
     offset += rows.length;
   }
+}
+
+// Alle vorhandenen scryfall_id aus public.cards. Duplikate und NULL fallen
+// in ein Set.
+async function fetchScryfallIds() {
+  const ids = new Set();
+  await fetchSeitenweise("cards?select=scryfall_id&order=scryfall_id", "cards",
+    r => { if (r.scryfall_id) ids.add(r.scryfall_id); });
   return ids;
+}
+
+// uuid → scryfall_id aus dem Archiv, für den Tagesmodus. Das erspart ihm
+// AllIdentifiers (215 MB) — die Zuordnung hat ein voller Lauf längst ermittelt
+// und in price_history.mtgjson_uuid hinterlegt.
+//
+// Beschränkt auf Karten, die auch jemand im Bestand hat: das Archiv behält
+// Zeilen zu Karten, die niemand mehr besitzt, und die sollen nicht täglich
+// weiter fortgeschrieben werden.
+async function fetchUuidMap() {
+  const imBestand = await fetchScryfallIds();
+  const map = new Map();
+  if (!imBestand.size) return map;
+  await fetchSeitenweise(
+    "price_history?select=scryfall_id,mtgjson_uuid&mtgjson_uuid=not.is.null&order=scryfall_id",
+    "price_history",
+    r => { if (r.mtgjson_uuid && imBestand.has(r.scryfall_id)) map.set(r.mtgjson_uuid, r.scryfall_id); });
+  return map;
 }
 
 // Karten, zu denen price_history noch KEINE Zeile führt — die Vorfrage des
@@ -305,50 +345,72 @@ async function main() {
   if (!SUPABASE_URL || !SERVICE_KEY)
     throw new Error("SUPABASE_URL und SUPABASE_SERVICE_ROLE_KEY müssen gesetzt sein.");
 
-  // Lückenmodus (stündlich): erst die billige Vorfrage. Ist nichts offen,
-  // endet der Lauf hier — ohne AllIdentifiers und ohne AllPrices anzufassen.
-  // Voller Modus (täglich): alle Karten, damit auch die laufenden Preise
-  // fortgeschrieben werden und nicht nur die neu dazugekommenen.
-  let wantedSids;
-  if (ONLY_GAPS) {
-    console.log("Lückenmodus: Karten ohne Archivzeile suchen …");
-    wantedSids = await fetchLuecken();
-    console.log(`  ${wantedSids.size} Karten ohne Verlauf.`);
-    if (!wantedSids.size) {
-      console.log("Keine Lücken — fertig, ohne die Bulkdatei zu laden.");
+  // ---- 1) Zuordnung uuid → scryfall_id besorgen ------------------------
+  // Tagesmodus holt sie aus der Datenbank (ein voller Lauf hat sie dort
+  // hinterlegt) und spart damit AllIdentifiers — 215 MB, die größte der drei
+  // Dateien. Die anderen Betriebsarten ermitteln sie aus AllIdentifiers und
+  // schreiben sie unten mit, damit der Tagesmodus sie künftig vorfindet.
+  let uuidToSid;
+
+  if (TODAY_ONLY) {
+    console.log("Tagesmodus: uuid-Zuordnung aus price_history holen …");
+    uuidToSid = await fetchUuidMap();
+    console.log(`  ${uuidToSid.size} Karten mit bekannter uuid im Bestand.`);
+    if (!uuidToSid.size) {
+      console.log("Keine bekannte uuid — es muss erst ein voller Lauf durch " +
+                  "(node backfill.mjs ohne --today). Nichts geladen, nichts geschrieben.");
       return;
     }
   } else {
-    console.log("Vorhandene scryfall_id aus public.cards holen …");
-    wantedSids = await fetchScryfallIds();
-    console.log(`  ${wantedSids.size} unterschiedliche Karten im Bestand.`);
-    if (!wantedSids.size) { console.log("Nichts zu tun."); return; }
+    // Lückenmodus (stündlich): erst die billige Vorfrage. Ist nichts offen,
+    // endet der Lauf hier — ohne eine einzige Bulkdatei anzufassen.
+    // Voller Modus (wöchentlich, und von Hand): alle Karten, damit auch
+    // Korrekturen und verpasste Tage nachgezogen werden.
+    let wantedSids;
+    if (ONLY_GAPS) {
+      console.log("Lückenmodus: Karten ohne Archivzeile suchen …");
+      wantedSids = await fetchLuecken();
+      console.log(`  ${wantedSids.size} Karten ohne Verlauf.`);
+      if (!wantedSids.size) {
+        console.log("Keine Lücken — fertig, ohne die Bulkdatei zu laden.");
+        return;
+      }
+    } else {
+      console.log("Vorhandene scryfall_id aus public.cards holen …");
+      wantedSids = await fetchScryfallIds();
+      console.log(`  ${wantedSids.size} unterschiedliche Karten im Bestand.`);
+      if (!wantedSids.size) { console.log("Nichts zu tun."); return; }
+    }
+
+    console.log("AllIdentifiers streamen (scryfallId → uuid, ~215 MB) …");
+    uuidToSid = new Map();
+    await streamKeyed(`${MTGJSON_BASE}/AllIdentifiers.json.gz`, (uuid, value) => {
+      const sid = value && value.identifiers && value.identifiers.scryfallId;
+      if (sid && wantedSids.has(sid)) uuidToSid.set(uuid, sid);
+    });
+    console.log(`  ${uuidToSid.size} Karten in MTGJSON zugeordnet.`);
+    if (!uuidToSid.size) { console.log("Keine Zuordnung — nichts zu schreiben."); return; }
   }
 
-  // 1) AllIdentifiers: nur die gebrauchten scryfallId → uuid merken.
-  console.log("AllIdentifiers streamen (scryfallId → uuid) …");
-  const uuidToSid = new Map();
-  await streamKeyed(`${MTGJSON_BASE}/AllIdentifiers.json.gz`, (uuid, value) => {
-    const sid = value && value.identifiers && value.identifiers.scryfallId;
-    if (sid && wantedSids.has(sid)) uuidToSid.set(uuid, sid);
-  });
-  console.log(`  ${uuidToSid.size} Karten in MTGJSON zugeordnet.`);
-  if (!uuidToSid.size) { console.log("Keine Zuordnung — nichts zu schreiben."); return; }
-
-  // 2) AllPrices: für die zugeordneten uuids die Reihen herausziehen. Wo eine
-  //    Karte unter mehreren Auflagen dieselbe scryfall_id trägt, gewinnt der
-  //    zuletzt gesehene Eintrag — für den EUR/USD-Verlauf ist das gleichwertig.
-  console.log("AllPrices streamen (Cardmarket-EUR + TCGplayer-USD) …");
+  // ---- 2) Preise streamen ----------------------------------------------
+  // Beide Dateien tragen denselben Aufbau ({meta,data:{uuid:{paper:…}}}) und
+  // dieselben Zweige — AllPricesToday führt je Reihe bloß ein Datum statt
+  // neunzig. Deshalb genügt hier ein anderer Dateiname; extractPrices bleibt
+  // unverändert. Wo eine Karte unter mehreren Auflagen dieselbe scryfall_id
+  // trägt, gewinnt der zuletzt gesehene Eintrag — für den Verlauf gleichwertig.
+  const datei = TODAY_ONLY ? "AllPricesToday.json.gz" : "AllPrices.json.gz";
+  console.log(`${datei} streamen (Cardmarket-EUR + TCGplayer-USD) …`);
   const bySid = new Map();
-  await streamKeyed(`${MTGJSON_BASE}/AllPrices.json.gz`, (uuid, value) => {
+  await streamKeyed(`${MTGJSON_BASE}/${datei}`, (uuid, value) => {
     const sid = uuidToSid.get(uuid);
     if (!sid) return;
     const prices = extractPrices(value);
-    if (prices) bySid.set(sid, prices);
+    if (prices) bySid.set(sid, { prices, uuid });
   });
   console.log(`  ${bySid.size} Karten mit Preisreihen gefunden.`);
 
-  const rows = [...bySid.entries()].map(([scryfall_id, prices]) => ({ scryfall_id, prices }));
+  const rows = [...bySid.entries()].map(([scryfall_id, o]) =>
+    ({ scryfall_id, prices: o.prices, mtgjson_uuid: o.uuid }));
 
   if (DRY_RUN) {
     console.log("--dry-run: nicht geschrieben. Stichprobe:");

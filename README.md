@@ -18,7 +18,7 @@ geräteübergreifend.
 | `supabase-schema.sql` | Tabellen, Row Level Security, Funktionen            |
 | `supabase/functions/` | Edge Functions (Scan, Regelfrage, Terminmail …)     |
 | `scripts/price-backfill/` | Node-Job: MTGJSON-Preisverlauf → Supabase       |
-| `.github/workflows/`  | GitHub Action, die den Preis-Job täglich fährt      |
+| `.github/workflows/`  | GitHub Action, die den Preis-Job nach Plan fährt    |
 | `start.cmd`           | Nur für lokales Testen (braucht Python)             |
 
 Kein Build-Schritt: Die Seite lädt Supabase und Tesseract per CDN. Set- und
@@ -495,14 +495,40 @@ Warum ein GitHub Action und keine Edge Function: MTGJSONs Preisdatei ist entpack
   `merge_price_history`. Fehlt die Funktion (Schema noch nicht nachgezogen),
   bricht der Lauf ab, **ohne etwas zu schreiben** — lieber kein neuer Punkt als
   ein stillschweigend auf 90 Tage zurückgestutztes Archiv.
-* **`.github/workflows/prices.yml`** — zwei Zeitpläne. Der **volle Lauf** um
-  15:00 UTC (nach MTGJSONs Tages-Build) schreibt die Preise aller Karten fort.
-  Die **Lückenprüfung** läuft zu jeder anderen vollen Stunde und fasst die
-  Bulkdatei nur an, wenn wirklich eine Karte ohne Verlauf dasteht — sonst endet
-  sie nach einer Abfrage in Sekunden. Ein Start von Hand zieht immer voll durch.
+* **`.github/workflows/prices.yml`** — drei Zeitpläne, siehe „Welche Datei wann"
+  unten. Ein Start von Hand zieht immer voll durch.
 * **`cards_missing_price_history()`** — die Vorfrage der Lückenprüfung: welche
   `scryfall_id` aus `cards` hat noch keine Zeile in `price_history`? Ein
   Anti-Join in der Datenbank statt zweier voller Listen über die Leitung.
+* **`price_history.mtgjson_uuid`** — die MTGJSON-uuid der Karte, die ein voller
+  Lauf ohnehin ermittelt. Nur deshalb kommt der Tageslauf ohne `AllIdentifiers`
+  aus.
+
+### Welche Datei wann
+
+MTGJSON kennt **keinen** Abruf für eine einzelne Karte, und auch die Set- und
+Deck-Dateien enthalten keine Preise (nachgeprüft: dort steht `purchaseUrls`, also
+Shop-Links, aber kein `prices`). Es gibt nur Bulkdateien — und die sind
+unterschiedlich teuer:
+
+| Datei | Größe (gz) | Inhalt |
+|---|---|---|
+| `AllIdentifiers.json.gz` | 215 MB | `scryfallId` → `uuid` |
+| `AllPrices.json.gz` | 143 MB | 90 Tage Verlauf |
+| `AllPricesToday.json.gz` | 5,2 MB | nur der Tagespreis, **gleicher Aufbau** |
+
+Daraus drei Betriebsarten, jede so sparsam wie ihre Aufgabe es zulässt:
+
+| Wann | Modus | Lädt | Wozu |
+|---|---|---|---|
+| stündlich (außer 15:00) | `--only-gaps` | nichts, außer es fehlt etwas | neu erfasste Karten binnen einer Stunde |
+| Mo–Sa 15:00 UTC | `--today` | 5,2 MB | einen Punkt je Karte anhängen |
+| So 15:00 UTC | voll | 358 MB | Korrekturen einsammeln, ausgefallene Tage heilen, `uuid` nachtragen |
+
+Der wöchentliche Vollauf ist kein Beiwerk: `AllPricesToday` kennt immer nur
+*sein* Datum. Fällt ein Tageslauf aus, wären diese Tage sonst dauerhaft weg —
+der Vollauf holt sie aus dem 90-Tage-Fenster zurück. Ebenso Korrekturen, die
+MTGJSON nachträglich an zurückliegenden Tagen vornimmt.
 
 Vorerst zeigt die App nur den **EUR**-Verlauf; die USD-Reihe wird schon
 mitgespeichert und lässt sich später ohne erneuten Import sichtbar machen.
@@ -512,9 +538,10 @@ mitgespeichert und lässt sich später ohne erneuten Import sichtbar machen.
 1. **Schema aktualisieren:** `supabase-schema.sql` erneut komplett ausführen
    (legt `price_history` samt RLS, `merge_price_history` und
    `cards_missing_price_history` an; wiederholbar, Daten bleiben erhalten). Wer
-   nur nachziehen will, spielt
-   `supabase/migrations/20260726120000_price_history_langzeit.sql` und
-   `supabase/migrations/20260726140000_price_history_luecken.sql` einzeln ein.
+   nur nachziehen will, spielt die drei Migrationen einzeln ein:
+   `20260726120000_price_history_langzeit.sql`,
+   `20260726140000_price_history_luecken.sql` und
+   `20260726160000_price_history_uuid.sql` (aus `supabase/migrations/`).
 2. **Secrets im GitHub-Repo** (Settings → Secrets and variables → Actions):
    * `SUPABASE_URL` — z. B. `https://<projekt>.supabase.co`.
    * `SUPABASE_SERVICE_ROLE_KEY` — aus **Project Settings → API**. Er umgeht RLS
@@ -528,7 +555,8 @@ Lokal prüfen: in `scripts/price-backfill/` einmal `npm ci`, dann
 gesetzten `SUPABASE_*`-Variablen — `node backfill.mjs --dry-run` (lädt und
 rechnet, schreibt aber nichts). `node backfill.mjs --only-gaps` fährt den
 stündlichen Modus von Hand: er meldet, wie viele Karten ohne Verlauf dastehen,
-und endet sofort, wenn es keine gibt.
+und endet sofort, wenn es keine gibt. `node backfill.mjs --today` fährt den
+Tagesmodus — praktisch zum Ausprobieren, weil er nur 5 MB lädt.
 
 ## Hinweise
 

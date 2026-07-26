@@ -15,12 +15,17 @@ name: Preisarchiv (MTGJSON)
 
 on:
   schedule:
-    # Voller Lauf, 15:00 UTC — nach MTGJSONs Tages-Build (live ~09:00 EST).
-    # Schreibt die laufenden Preise ALLER Karten fort. Cron ist immer UTC.
-    - cron: "0 15 * * *"
-    # Lückenprüfung, stündlich. Die 15 fehlt bewusst: sonst feuerten beide
-    # Zeitpläne zur selben Minute und der volle Lauf bekäme Gesellschaft, die
-    # er nicht braucht.
+    # Voller Lauf, sonntags 15:00 UTC — nach MTGJSONs Tages-Build (live
+    # ~09:00 EST). Holt die vollen 90 Tage: fängt Korrekturen ein, die MTGJSON
+    # nachträglich an zurückliegenden Tagen vornimmt, heilt Tage, an denen der
+    # Tageslauf ausfiel, und trägt die uuid nach, von der er lebt.
+    # Cron ist immer UTC.
+    - cron: "0 15 * * 0"
+    # Tageslauf, montags bis samstags 15:00 UTC. Lädt allein AllPricesToday
+    # (5,2 MB statt 358 MB) und hängt einen Punkt je Karte an.
+    - cron: "0 15 * * 1-6"
+    # Lückenprüfung, stündlich. Die 15 fehlt bewusst: sonst feuerte sie zur
+    # selben Minute wie die beiden anderen.
     - cron: "0 0-14,16-23 * * *"
   workflow_dispatch: {}
 
@@ -62,8 +67,10 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           # AllPrices ist entpackt ~1 GB; großzügiger Heap für den Stream-Parser.
           NODE_OPTIONS: "--max-old-space-size=4096"
-          # Nur der stündliche Zeitplan läuft im Lückenmodus. Der tägliche und
-          # jeder Start von Hand ziehen bewusst durch: von Hand startet man den
-          # Job, WEIL man alles aufgefrischt haben will.
-          MODUS: ${{ github.event.schedule == '0 0-14,16-23 * * *' && '--only-gaps' || '' }}
+          # Jeder Zeitplan bekommt seine Betriebsart. Ein Start von Hand fällt
+          # bewusst in den vollen Lauf: von Hand startet man den Job, WEIL man
+          # alles aufgefrischt haben will.
+          MODUS: >-
+            ${{ github.event.schedule == '0 0-14,16-23 * * *' && '--only-gaps'
+             || (github.event.schedule == '0 15 * * 1-6' && '--today' || '') }}
         run: node backfill.mjs $MODUS
