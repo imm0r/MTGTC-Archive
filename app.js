@@ -9713,8 +9713,6 @@ function initTooltip() {
 
 const STATUS_ROH  = "https://raw.githubusercontent.com/imm0r/MTGTC-Archive-Status/main";
 const STATUS_API  = "https://api.github.com/repos/imm0r/MTGTC-Archive-Status";
-const STATUS_VOLL = "https://imm0r.github.io/MTGTC-Archive-Status/";
-const STATUS_REPO = "https://github.com/imm0r/MTGTC-Archive-Status";
 const STATUS_FRISCH = 5 * 60 * 1000;   // so lange gilt der Zwischenspeicher
 
 /* tage:null = „gesamt". Die Feldnamen in summary.json heißen uptime/uptimeDay/
@@ -9896,7 +9894,6 @@ function renderStatus() {
       el.innerHTML = `<div class="card">
         <h3 class="st-titel">${esc(t("status.title"))}</h3>
         <p class="hint">${esc(t("status.error"))}</p>
-        <div class="st-links"><a class="btn ghost sm" href="${STATUS_VOLL}" target="_blank" rel="noopener">${esc(t("status.openFull"))}</a></div>
       </div>`;
     });
 }
@@ -9980,11 +9977,7 @@ function statusZeichnen(el, d) {
     </div>
 
     <div class="card">
-      <p class="hint" style="margin-top:0">${esc(t("status.checkNote"))}</p>
-      <div class="st-links">
-        <a class="btn ghost sm" href="${STATUS_VOLL}" target="_blank" rel="noopener">${esc(t("status.openFull"))}</a>
-        <a class="btn ghost sm" href="${STATUS_REPO}" target="_blank" rel="noopener">${esc(t("status.source"))}</a>
-      </div>
+      <p class="hint" style="margin:0">${esc(t("status.checkNote"))}</p>
     </div>`;
 
   // Zeitraumwechsel zeichnet nur neu — die Daten für alle Zeiträume liegen
