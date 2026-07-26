@@ -1,5 +1,18 @@
 # Hinweise für Claude
 
+## Pull Requests nicht als Draft anlegen
+
+Direkt als „ready for review" öffnen, **nicht** als Draft. Ein Draft sperrt bei
+GitHub den Merge-Knopf: die Prüfungen laufen zwar, aber zusammenführen lässt
+sich nichts, bis jemand von Hand „Ready for review" klickt. Genau dieser
+Handgriff blieb bei #103, #104 und #105 jedes Mal am Repository-Eigentümer
+hängen und sah nach langer Wartezeit auf die Prüfungen aus — die tatsächlich
+gemessen rund 75 Sekunden brauchen.
+
+Das überstimmt bewusst die Voreinstellung der Arbeitsumgebung („create as
+draft"). Die Absicherung liegt hier nicht im Draft-Status, sondern davor: vor
+dem Push prüfen, und der Merge-Knopf bleibt ohnehin beim Eigentümer.
+
 ## Jeder Pull Request braucht eine Versionsstufe im Titel
 
 **Zwingend.** In den Titel jedes Pull Requests gehört genau eine der Angaben
