@@ -1384,3 +1384,67 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px}
 .dm-blase-zeit{ font-size:10px; opacity:.7; margin-top:3px; text-align:right; }
 .dm-senden{ display:flex; gap:8px; align-items:flex-end; margin-top:10px; }
 .dm-senden textarea{ flex:1; resize:vertical; }
+
+/* ---- Site Status ----------------------------------------------------
+   Die Statusseite baut auf dem vorhandenen Baukasten auf: .card, .stats/.stat
+   für die Kennzahlen, .pill.ok/.err/.warn für die Zustände, .tabs für den
+   Zeitraum. Eigenes CSS braucht nur, was es sonst nirgends gibt — die
+   Tagesbalken und der Antwortzeitgraph. */
+.st-kopf{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.st-kopf-txt{min-width:220px;flex:1}
+.st-titel{margin:0;font-size:17px;color:var(--acc);letter-spacing:.3px}
+.st-lead{margin-top:4px}
+.st-kopf-tat{display:flex;align-items:center;gap:10px;flex:none}
+.st-stand{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+
+/* Gesamtlage: eine Zeile, die man aus drei Metern Entfernung lesen kann.
+   Der Punkt trägt die Farbe, der Text die Aussage — Farbe allein genügt nicht,
+   wenn jemand sie nicht unterscheiden kann. */
+.st-lage{display:flex;align-items:center;gap:10px}
+.st-lage-punkt{width:11px;height:11px;border-radius:50%;flex:none}
+.st-lage-txt{font-weight:600}
+.st-lage.ok  .st-lage-punkt{background:var(--ok)}   .st-lage.ok  .st-lage-txt{color:var(--ok)}
+.st-lage.warn .st-lage-punkt{background:var(--acc2)} .st-lage.warn .st-lage-txt{color:var(--acc2)}
+.st-lage.err .st-lage-punkt{background:var(--err)}  .st-lage.err .st-lage-txt{color:var(--err)}
+
+.st-zeit{max-width:420px}
+.st-dienst-kopf{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.st-dienst-name{min-width:0;display:flex;flex-direction:column;gap:2px;font-weight:600}
+.st-dienst-url{font-size:12px;font-weight:400;color:var(--dim);text-decoration:none;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.st-dienst-url:hover{color:var(--acc)}
+.st-kacheln{margin-top:12px}
+.st-kacheln .stat{min-width:110px}
+
+/* Ein Balken je Tag. Sie teilen sich die Breite (flex:1), damit 7 Tage genauso
+   passen wie 365 — bei einem Jahr bleibt je Tag rund ein Pixel, was als Muster
+   immer noch trägt. min-width verhindert, dass sie ganz verschwinden. */
+.st-balken{display:flex;gap:1px;margin-top:14px;height:26px;align-items:stretch}
+.st-tag{flex:1;min-width:1px;border-radius:1px;background:var(--ok)}
+.st-tag.teil{background:var(--acc2)}
+.st-tag.aus{background:var(--err)}
+.st-balken-fuss{display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-top:4px}
+
+/* preserveAspectRatio="none" im SVG: die Kurve darf sich in die Breite ziehen,
+   die Form bleibt lesbar. Damit die Linie dabei nicht mitskaliert und ausfranst,
+   hängt am polyline vector-effect="non-scaling-stroke". */
+.st-graph{width:100%;height:90px;display:block;margin-top:14px}
+.st-graph-fuss{display:flex;justify-content:space-between;font-size:11px;color:var(--dim);
+  font-variant-numeric:tabular-nums;margin-top:2px}
+.st-kein-graph{margin-top:12px}
+
+.st-vorfaelle{display:flex;flex-direction:column;gap:10px}
+.st-vorfall{display:flex;gap:10px;align-items:flex-start}
+.st-vorfall .pill{flex:none;margin-top:2px}
+.st-vorfall-txt{min-width:0}
+.st-vorfall-txt a{color:var(--txt);text-decoration:none}
+.st-vorfall-txt a:hover{color:var(--acc)}
+.st-vorfall-zeit{font-size:12px;color:var(--dim);margin-top:2px}
+.st-links{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.st-links a{text-decoration:none}
+
+@media (max-width:560px){
+  .st-kopf-tat{width:100%;justify-content:space-between}
+  .st-zeit{max-width:none}
+  .st-zeit button{padding:8px 4px;font-size:13px}
+}
