@@ -427,6 +427,20 @@ die passenden Reihen in eine geteilte Tabelle; die App legt sie beim Anzeigen
 null anzufangen. Ohne diese Einrichtung bleibt alles beim Alten: nur die eigenen
 Vorwärts-Punkte.
 
+**Neu erfasste Karten.** MTGJSON kennt keinen Abruf für eine einzelne Karte —
+den Verlauf einer Karte zu holen heißt, die ~1 GB große Bulkdatei zu streamen.
+Deshalb greifen zwei Dinge ineinander:
+
+* Hat die Karte **schon jemand anderes**, liegt ihr Verlauf bereits im geteilten
+  Archiv. Die App lädt ihn beim Erfassen sofort nach (`reload()` ruft
+  `ladePreisHistorie()`), es ist also gleich alles da.
+* Ist die Karte **noch nie erfasst worden**, füllt sie die stündliche
+  Lückenprüfung — spätestens eine Stunde später stehen die ~90 Tage da.
+
+Weiter zurück als diese 90 Tage geht es für so eine Karte nicht: MTGJSON
+veröffentlicht nur das laufende Fenster, ältere Tage sind dort nicht mehr
+abrufbar. Ab dann wächst ihr Verlauf mit jedem Lauf.
+
 **Über die 90 Tage hinaus.** MTGJSON liefert je Abruf nur das laufende
 90-Tage-Fenster. Würde der Job es einfach in die Tabelle schreiben, wäre der
 gespeicherte Verlauf ebenfalls ein gleitendes Fenster — nach einem Jahr stünde
@@ -481,8 +495,14 @@ Warum ein GitHub Action und keine Edge Function: MTGJSONs Preisdatei ist entpack
   `merge_price_history`. Fehlt die Funktion (Schema noch nicht nachgezogen),
   bricht der Lauf ab, **ohne etwas zu schreiben** — lieber kein neuer Punkt als
   ein stillschweigend auf 90 Tage zurückgestutztes Archiv.
-* **`.github/workflows/prices.yml`** — führt das Skript täglich (15:00 UTC, nach
-  MTGJSONs Tages-Build) und auf Knopfdruck aus.
+* **`.github/workflows/prices.yml`** — zwei Zeitpläne. Der **volle Lauf** um
+  15:00 UTC (nach MTGJSONs Tages-Build) schreibt die Preise aller Karten fort.
+  Die **Lückenprüfung** läuft zu jeder anderen vollen Stunde und fasst die
+  Bulkdatei nur an, wenn wirklich eine Karte ohne Verlauf dasteht — sonst endet
+  sie nach einer Abfrage in Sekunden. Ein Start von Hand zieht immer voll durch.
+* **`cards_missing_price_history()`** — die Vorfrage der Lückenprüfung: welche
+  `scryfall_id` aus `cards` hat noch keine Zeile in `price_history`? Ein
+  Anti-Join in der Datenbank statt zweier voller Listen über die Leitung.
 
 Vorerst zeigt die App nur den **EUR**-Verlauf; die USD-Reihe wird schon
 mitgespeichert und lässt sich später ohne erneuten Import sichtbar machen.
@@ -490,9 +510,11 @@ mitgespeichert und lässt sich später ohne erneuten Import sichtbar machen.
 ### Einrichten (optional)
 
 1. **Schema aktualisieren:** `supabase-schema.sql` erneut komplett ausführen
-   (legt `price_history` samt RLS und `merge_price_history` an; wiederholbar,
-   Daten bleiben erhalten). Wer nur nachziehen will, spielt
-   `supabase/migrations/20260726120000_price_history_langzeit.sql` einzeln ein.
+   (legt `price_history` samt RLS, `merge_price_history` und
+   `cards_missing_price_history` an; wiederholbar, Daten bleiben erhalten). Wer
+   nur nachziehen will, spielt
+   `supabase/migrations/20260726120000_price_history_langzeit.sql` und
+   `supabase/migrations/20260726140000_price_history_luecken.sql` einzeln ein.
 2. **Secrets im GitHub-Repo** (Settings → Secrets and variables → Actions):
    * `SUPABASE_URL` — z. B. `https://<projekt>.supabase.co`.
    * `SUPABASE_SERVICE_ROLE_KEY` — aus **Project Settings → API**. Er umgeht RLS
@@ -504,7 +526,9 @@ mitgespeichert und lässt sich später ohne erneuten Import sichtbar machen.
 Lokal prüfen: in `scripts/price-backfill/` einmal `npm ci`, dann
 `node backfill.mjs --self-test` (nur die Umform-Logik, ohne Netz) oder — mit
 gesetzten `SUPABASE_*`-Variablen — `node backfill.mjs --dry-run` (lädt und
-rechnet, schreibt aber nichts).
+rechnet, schreibt aber nichts). `node backfill.mjs --only-gaps` fährt den
+stündlichen Modus von Hand: er meldet, wie viele Karten ohne Verlauf dastehen,
+und endet sofort, wenn es keine gibt.
 
 ## Hinweise
 

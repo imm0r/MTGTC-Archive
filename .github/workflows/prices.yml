@@ -15,13 +15,22 @@ name: Preisarchiv (MTGJSON)
 
 on:
   schedule:
-    # 15:00 UTC — nach MTGJSONs Tages-Build (live ~09:00 EST). Cron ist immer UTC.
+    # Voller Lauf, 15:00 UTC — nach MTGJSONs Tages-Build (live ~09:00 EST).
+    # Schreibt die laufenden Preise ALLER Karten fort. Cron ist immer UTC.
     - cron: "0 15 * * *"
+    # Lückenprüfung, stündlich. Die 15 fehlt bewusst: sonst feuerten beide
+    # Zeitpläne zur selben Minute und der volle Lauf bekäme Gesellschaft, die
+    # er nicht braucht.
+    - cron: "0 0-14,16-23 * * *"
   workflow_dispatch: {}
 
+# Warteschlange statt Abbruch: ein angefangener voller Lauf soll nicht von
+# einer Lückenprüfung erschlagen werden. Gefährlich wäre ein Abbruch nicht —
+# das Mischen ist additiv, eine halb geschriebene Runde ergänzt der nächste
+# Lauf —, aber einen fast fertigen 1-GB-Durchlauf wegzuwerfen ist Verschwendung.
 concurrency:
   group: price-backfill
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 # Least Privilege: Der Job liest nur den Code aus (Checkout) und spricht sonst
 # ausschließlich mit Supabase und MTGJSON — die GitHub-API braucht er nie.
@@ -53,4 +62,8 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           # AllPrices ist entpackt ~1 GB; großzügiger Heap für den Stream-Parser.
           NODE_OPTIONS: "--max-old-space-size=4096"
-        run: node backfill.mjs
+          # Nur der stündliche Zeitplan läuft im Lückenmodus. Der tägliche und
+          # jeder Start von Hand ziehen bewusst durch: von Hand startet man den
+          # Job, WEIL man alles aufgefrischt haben will.
+          MODUS: ${{ github.event.schedule == '0 0-14,16-23 * * *' && '--only-gaps' || '' }}
+        run: node backfill.mjs $MODUS

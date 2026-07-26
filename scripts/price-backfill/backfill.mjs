@@ -31,8 +31,21 @@
 //  nie vollständig in den Speicher geladen — nur die gebrauchten Karten
 //  bleiben liegen.
 //
+//  Zwei Betriebsarten, weil MTGJSON keinen Abruf für eine einzelne Karte
+//  kennt — den Verlauf einer Karte zu holen heißt, die Bulkdatei zu streamen:
+//
+//    voll (täglich)       alle Karten im Bestand; schreibt auch die laufenden
+//                         Preise fort, nicht nur die neu dazugekommenen.
+//    --only-gaps          nur Karten OHNE Archivzeile. Sind keine offen,
+//    (stündlich)          endet der Lauf nach einer Abfrage, ohne die
+//                         Bulkdatei anzufassen. Nur so lässt sich der Job
+//                         stündlich fahren; eine neu erfasste Karte bekommt
+//                         ihre 90 Tage dann binnen einer Stunde statt erst
+//                         beim nächsten Nachtlauf.
+//
 //  Aufruf:
-//    node backfill.mjs              echter Lauf (braucht SUPABASE_*-Env)
+//    node backfill.mjs              voller Lauf (braucht SUPABASE_*-Env)
+//    node backfill.mjs --only-gaps  nur fehlende Karten, sonst Frühausstieg
 //    node backfill.mjs --dry-run    alles außer dem Schreiben, mit Stichprobe
 //    node backfill.mjs --self-test  reine Umform-Logik gegen ein Fixture
 // =====================================================================
@@ -45,6 +58,10 @@ import { pathToFileURL } from "node:url";
 const ARGS      = new Set(process.argv.slice(2));
 const DRY_RUN   = ARGS.has("--dry-run");
 const SELF_TEST = ARGS.has("--self-test");
+// Lückenmodus: nur Karten bearbeiten, die noch GAR KEINEN Verlauf haben.
+// Gibt es keine, endet der Lauf, ohne die Bulkdatei anzufassen — nur so lässt
+// sich der Job stündlich fahren, statt stündlich 1 GB zu ziehen.
+const ONLY_GAPS = ARGS.has("--only-gaps");
 
 const MTGJSON_BASE = process.env.MTGJSON_BASE || "https://mtgjson.com/api/v5";
 const SUPABASE_URL = (process.env.SUPABASE_URL || "").replace(/\/+$/, "");
@@ -131,6 +148,33 @@ async function fetchScryfallIds() {
     for (const r of rows) if (r.scryfall_id) ids.add(r.scryfall_id);
     if (rows.length === 0) break;
     offset += rows.length;
+  }
+  return ids;
+}
+
+// Karten, zu denen price_history noch KEINE Zeile führt — die Vorfrage des
+// Lückenmodus, in einer Abfrage statt zweier voller Listen (die Funktion macht
+// den Anti-Join in der Datenbank, siehe supabase-schema.sql).
+async function fetchLuecken() {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/cards_missing_price_history`,
+    { method: "POST", headers: restHeaders, body: "{}" });
+  if (!res.ok) {
+    const text = await res.text();
+    if (res.status === 404 || /PGRST202/.test(text) || /cards_missing_price_history/.test(text))
+      throw new Error(
+        "public.cards_missing_price_history fehlt in der Datenbank — der Lückenmodus " +
+        "kann nicht prüfen, ob etwas fehlt, und bricht ab, statt blind 1 GB zu laden.\n" +
+        "Abhilfe: supabase-schema.sql erneut ausführen oder die Migration " +
+        "supabase/migrations/20260726140000_price_history_luecken.sql einspielen.");
+    throw new Error(`Lücken abfragen → HTTP ${res.status}: ${text}`);
+  }
+  // Die Funktion gibt setof text zurück; PostgREST liefert das als Liste von
+  // Zeichenketten (oder, je nach Fassung, als Objekte mit einer Eigenschaft).
+  const roh = await res.json();
+  const ids = new Set();
+  for (const r of roh || []) {
+    const v = typeof r === "string" ? r : r && Object.values(r)[0];
+    if (v) ids.add(v);
   }
   return ids;
 }
@@ -261,10 +305,25 @@ async function main() {
   if (!SUPABASE_URL || !SERVICE_KEY)
     throw new Error("SUPABASE_URL und SUPABASE_SERVICE_ROLE_KEY müssen gesetzt sein.");
 
-  console.log("Vorhandene scryfall_id aus public.cards holen …");
-  const wantedSids = await fetchScryfallIds();
-  console.log(`  ${wantedSids.size} unterschiedliche Karten im Bestand.`);
-  if (!wantedSids.size) { console.log("Nichts zu tun."); return; }
+  // Lückenmodus (stündlich): erst die billige Vorfrage. Ist nichts offen,
+  // endet der Lauf hier — ohne AllIdentifiers und ohne AllPrices anzufassen.
+  // Voller Modus (täglich): alle Karten, damit auch die laufenden Preise
+  // fortgeschrieben werden und nicht nur die neu dazugekommenen.
+  let wantedSids;
+  if (ONLY_GAPS) {
+    console.log("Lückenmodus: Karten ohne Archivzeile suchen …");
+    wantedSids = await fetchLuecken();
+    console.log(`  ${wantedSids.size} Karten ohne Verlauf.`);
+    if (!wantedSids.size) {
+      console.log("Keine Lücken — fertig, ohne die Bulkdatei zu laden.");
+      return;
+    }
+  } else {
+    console.log("Vorhandene scryfall_id aus public.cards holen …");
+    wantedSids = await fetchScryfallIds();
+    console.log(`  ${wantedSids.size} unterschiedliche Karten im Bestand.`);
+    if (!wantedSids.size) { console.log("Nichts zu tun."); return; }
+  }
 
   // 1) AllIdentifiers: nur die gebrauchten scryfallId → uuid merken.
   console.log("AllIdentifiers streamen (scryfallId → uuid) …");
