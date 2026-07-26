@@ -265,9 +265,14 @@ Deno.serve(async (req) => {
     // Haiku genügt und ist günstig; temperature 0 für ein stabiles Urteil.
     if (mode === "orient") {
       const ori = await anthropic.messages.create({
-        model: MODEL,
+        // Bewusst das stärkere Sehmodell (wie detect): Haiku verwechselte hier
+        // reproduzierbar links/rechts — also die Frage, ob eine Vierteldrehung
+        // im oder gegen den Uhrzeigersinn nötig ist. Genau diese räumliche
+        // Unterscheidung kann das größere Modell verlässlich. temperature
+        // entfällt (Sonnet 5 lehnt sie ab); Denken aus reicht fürs Urteil.
+        model: DETECT_MODEL,
         max_tokens: 256,
-        temperature: 0,
+        thinking: { type: "disabled" },
         system: ORIENT_SYSTEM,
         output_config: { format: { type: "json_schema", schema: ORIENT_SCHEMA } },
         messages: [{
