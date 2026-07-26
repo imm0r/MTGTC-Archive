@@ -530,19 +530,40 @@ Der wöchentliche Vollauf ist kein Beiwerk: `AllPricesToday` kennt immer nur
 der Vollauf holt sie aus dem 90-Tage-Fenster zurück. Ebenso Korrekturen, die
 MTGJSON nachträglich an zurückliegenden Tagen vornimmt.
 
-**Fremdsprachige Auflagen kennt MTGJSON nicht.** `identifiers.scryfallId` zeigt
-dort auf die **englische** Auflage; eine deutsche Karte trägt eine eigene
-Scryfall-ID, die in `AllIdentifiers` nie vorkommt. Solche Karten bekommen daher
-keinen MTGJSON-Verlauf — nur die eigenen Vorwärts-Punkte aus „Preise
-aktualisieren".
+**Fremdsprachige Auflagen laufen über die englische.** MTGJSONs
+`identifiers.scryfallId` zeigt auf die **englische** Auflage; eine deutsche Karte
+trägt eine eigene Scryfall-ID, die in `AllIdentifiers` nie vorkommt. Direkt
+gesucht bekäme sie also niemals einen Verlauf.
 
-Damit die Lückenprüfung daran nicht hängen bleibt, schreibt jeder Lauf für jede
-**angefragte** Karte eine Zeile, auch eine leere. Ohne diesen Vermerk gälte die
-Karte für immer als Lücke, die stündliche Prüfung stiege nie früh aus und zöge
-jede Stunde die 358 MB. Der Vermerk ist verlustfrei: `merge_price_map` läuft über
-die Schlüssel der neuen Seite, und `{}` hat keine — ein vorhandener Verlauf
-bleibt unangetastet. Findet MTGJSON die Karte später doch, trägt der wöchentliche
-Vollauf sie nach.
+Denselben Umweg geht die App beim **Tagespreis** längst (`withPrice` in
+`app.js`): Scryfall führt für fremdsprachige Auflagen gar keine Preise — alle
+Felder sind `null` —, der Preis hängt an der englischen Auflage desselben Sets
+und derselben Sammlernummer. Nachgeprüft an „Jeska's Will" (SOA 44):
+
+| Auflage | `prices.eur` | `cardmarket_id` |
+|---|---|---|
+| deutsch | `null` | `null` |
+| englisch | 30,99 € | 883092 |
+
+Der Job tut daher jetzt dasselbe für den **Verlauf**: für jede fremdsprachige
+Karte schlägt er über `set` + `cn` die englische Auflage bei Scryfall nach und
+sucht **deren** ID in MTGJSON — die Reihe landet aber unter der eigenen,
+fremdsprachigen `scryfall_id`. Liste und Graph haben damit dieselbe Quelle.
+
+Der Wert ist also bewusst der Preis der englischen Auflage; deutsche Karten
+handeln auf Cardmarket oft etwas günstiger. Eine Näherung — aber dieselbe, die
+schon in der Preisspalte steht.
+
+Die Auflösung ist **Einmalarbeit je Karte**: die gefundene `mtgjson_uuid` landet
+in `price_history`, und wer sie hat, braucht danach weder Scryfall noch
+`AllIdentifiers`. Steht für alle Karten eine uuid, lädt selbst der Vollauf die
+215-MB-Datei nicht mehr.
+
+Bleibt eine Karte unauflösbar (Scryfall kennt die Kombination nicht), bekommt sie
+eine **leere Zeile** als Vermerk. Ohne den gälte sie für immer als Lücke, die
+stündliche Prüfung stiege nie früh aus und zöge jede Stunde die 358 MB. Der
+Vermerk ist verlustfrei: `merge_price_map` läuft über die Schlüssel der neuen
+Seite, und `{}` hat keine — ein vorhandener Verlauf bleibt unangetastet.
 
 Vorerst zeigt die App nur den **EUR**-Verlauf; die USD-Reihe wird schon
 mitgespeichert und lässt sich später ohne erneuten Import sichtbar machen.
@@ -563,6 +584,14 @@ mitgespeichert und lässt sich später ohne erneuten Import sichtbar machen.
 3. **Auslösen:** im Repo unter **Actions → „Preisarchiv (MTGJSON)" → Run
    workflow** einmal von Hand starten; danach läuft er täglich. Beim nächsten
    Öffnen der Sammlung sind die Graphen gefüllt.
+
+**Bündelgröße beim Schreiben.** Der Job schickt 50 Zeilen je Aufruf an
+`merge_price_history`, nicht mehr. Das Mischen ist kein einfacher Upsert: je
+Zeile läuft `merge_price_map` durch bis zu vier Reihen à ~90 Punkte, jede mit
+`jsonb_agg` und einer Fensterfunktion. Mit 500 Zeilen lief das in Supabases
+`statement_timeout` (Fehler `57014`) und riss den ganzen Lauf mit. Läuft ein
+Stapel trotzdem in die Zeitüberschreitung, halbiert der Job ihn und versucht es
+erneut — das ist gefahrlos wiederholbar, weil das Mischen additiv ist.
 
 Lokal prüfen: in `scripts/price-backfill/` einmal `npm ci`, dann
 `node backfill.mjs --self-test` (nur die Umform-Logik, ohne Netz) oder — mit

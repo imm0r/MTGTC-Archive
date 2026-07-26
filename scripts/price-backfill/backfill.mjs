@@ -174,9 +174,39 @@ async function fetchScryfallIds() {
   return ids;
 }
 
-// uuid → scryfall_id aus dem Archiv, für den Tagesmodus. Das erspart ihm
+// Wie fetchScryfallIds, aber mit Sprache, Setcode und Sammlernummer — die
+// braucht das Auflösen fremdsprachiger Auflagen (siehe loeseEnglischAuf).
+// Dieselbe Auflage steht je Zustand, Foil und Nutzer mehrfach in cards; je
+// scryfall_id genügt ein Eintrag.
+async function fetchKarten() {
+  const out = [], gesehen = new Set();
+  await fetchSeitenweise("cards?select=scryfall_id,lang,set_code,cn&order=scryfall_id", "cards",
+    r => {
+      if (!r.scryfall_id || gesehen.has(r.scryfall_id)) return;
+      gesehen.add(r.scryfall_id);
+      out.push(r);
+    });
+  return out;
+}
+
+// scryfall_id → mtgjson_uuid aus dem Archiv, soweit schon bekannt.
+async function fetchArchivUuids() {
+  const paare = new Map();
+  await fetchSeitenweise(
+    "price_history?select=scryfall_id,mtgjson_uuid&mtgjson_uuid=not.is.null&order=scryfall_id",
+    "price_history",
+    r => { if (r.mtgjson_uuid) paare.set(r.scryfall_id, r.mtgjson_uuid); });
+  return paare;
+}
+
+// uuid → Menge eigener scryfall_id, für den Tagesmodus. Das erspart ihm
 // AllIdentifiers (215 MB) — die Zuordnung hat ein voller Lauf längst ermittelt
 // und in price_history.mtgjson_uuid hinterlegt.
+//
+// Eine MENGE, kein einzelner Wert: seit fremdsprachige Auflagen über die
+// englische aufgelöst werden, tragen mehrere unserer scryfall_id dieselbe uuid
+// (die deutsche und die englische Auflage derselben Karte). Eine gewöhnliche
+// Zuordnung uuid → sid würde alle bis auf eine verschlucken.
 //
 // Beschränkt auf Karten, die auch jemand im Bestand hat: das Archiv behält
 // Zeilen zu Karten, die niemand mehr besitzt, und die sollen nicht täglich
@@ -185,10 +215,11 @@ async function fetchUuidMap() {
   const imBestand = await fetchScryfallIds();
   const map = new Map();
   if (!imBestand.size) return map;
-  await fetchSeitenweise(
-    "price_history?select=scryfall_id,mtgjson_uuid&mtgjson_uuid=not.is.null&order=scryfall_id",
-    "price_history",
-    r => { if (r.mtgjson_uuid && imBestand.has(r.scryfall_id)) map.set(r.mtgjson_uuid, r.scryfall_id); });
+  for (const [sid, uuid] of await fetchArchivUuids()) {
+    if (!imBestand.has(sid)) continue;
+    if (!map.has(uuid)) map.set(uuid, new Set());
+    map.get(uuid).add(sid);
+  }
   return map;
 }
 
@@ -227,10 +258,21 @@ async function fetchLuecken() {
 // Bündelgröße bleibt bei 500: übertragen wird weiterhin nur das ~90-Tage-
 // Fenster je Karte, unabhängig davon, wie lang der Verlauf in der Datenbank
 // schon ist.
+// Bündelgröße. Bewusst klein: das Mischen ist KEIN einfacher Upsert. Je Zeile
+// läuft merge_price_map durch bis zu vier Reihen à ~90 Punkte, jede mit
+// jsonb_agg und einer Fensterfunktion. Mit 500 Zeilen je Aufruf lief genau das
+// in Supabases statement_timeout (Fehler 57014, "canceling statement due to
+// statement timeout") und riss den ganzen Lauf mit — beobachtet am 26.07. beim
+// ersten vollen Lauf mit 535 Zeilen. Die 500 stammten noch vom alten,
+// überschreibenden Upsert, der pro Zeile fast nichts zu tun hatte.
+const BUENDEL = 50;
+
 async function mergeInDb(rows) {
   let beruehrt = 0;
-  for (let i = 0; i < rows.length; i += 500) {
-    const batch = rows.slice(i, i + 500);
+  // Ein Stapel wird bei Zeitüberschreitung halbiert und erneut versucht, statt
+  // den Lauf zu verlieren. Der Bestand wächst mit der Zeit, und ein fester Wert
+  // wäre irgendwann wieder zu groß; so passt sich der Lauf selbst an.
+  const schicke = async (batch, tiefe = 0) => {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/merge_price_history`,
       { method: "POST",
         headers: restHeaders,
@@ -248,12 +290,75 @@ async function mergeInDb(rows) {
           "geschrieben, der vorhandene Verlauf bleibt unangetastet.\n" +
           "Abhilfe: supabase-schema.sql erneut ausführen oder die Migration " +
           "supabase/migrations/20260726120000_price_history_langzeit.sql einspielen.");
+
+      // 57014 = statement timeout. Halbieren und erneut versuchen. Das ist
+      // gefahrlos wiederholbar: das Mischen ist additiv, ein Stapel, der schon
+      // teilweise durchlief, wird durch dieselben Werte nicht verfälscht.
+      if (/57014/.test(text) && batch.length > 1 && tiefe < 8) {
+        const mitte = Math.ceil(batch.length / 2);
+        console.log(`  Zeitüberschreitung bei ${batch.length} Zeilen — halbiert auf ${mitte}.`);
+        return (await schicke(batch.slice(0, mitte), tiefe + 1))
+             + (await schicke(batch.slice(mitte), tiefe + 1));
+      }
       throw new Error(`price_history zusammenführen → HTTP ${res.status}: ${text}`);
     }
     const n = Number(await res.text());
-    if (Number.isFinite(n)) beruehrt += n;
-  }
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  for (let i = 0; i < rows.length; i += BUENDEL)
+    beruehrt += await schicke(rows.slice(i, i + BUENDEL));
   return beruehrt;
+}
+
+// ------------------------------------------------------- Scryfall (Auflösung)
+// MTGJSONs identifiers.scryfallId zeigt IMMER auf die englische Auflage. Eine
+// deutsche Karte trägt eine eigene Scryfall-ID, die in AllIdentifiers nie
+// vorkommt — ohne Umweg bekäme sie deshalb nie einen Verlauf.
+//
+// Denselben Umweg geht die App beim TAGESpreis längst (withPrice in app.js):
+// Scryfall führt für fremdsprachige Auflagen gar keine Preise, alle Felder sind
+// null; der Preis hängt an der englischen Auflage desselben Sets und derselben
+// Sammlernummer. Hier gilt dasselbe für den VERLAUF, damit Liste und Graph
+// dieselbe Quelle haben.
+//
+// Der Wert ist also bewusst der Preis der ENGLISCHEN Auflage. Deutsche Karten
+// handeln auf Cardmarket oft etwas günstiger — eine Näherung, aber dieselbe,
+// die schon in der Preisspalte steht.
+const SCRYFALL_BASE = process.env.SCRYFALL_BASE || "https://api.scryfall.com";
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function sfGet(pfad) {
+  const res = await fetch(`${SCRYFALL_BASE}${pfad}`, {
+    headers: {
+      Accept: "application/json",
+      // Scryfall bittet ausdrücklich um einen sprechenden User-Agent.
+      "User-Agent": "ArcanumArchive-PriceBackfill/1.0 (+https://github.com/imm0r/MTGTC-Archive)",
+    },
+  });
+  if (res.status === 404) return null;                 // Auflage gibt es nicht
+  if (!res.ok) throw new Error(`Scryfall ${pfad} → HTTP ${res.status}`);
+  return res.json();
+}
+
+// [{scryfall_id, set_code, cn}] → Map(eigene sid → englische sid).
+// Scryfall bittet um höchstens ~10 Anfragen/Sekunde; 110 ms Abstand hält das
+// mit Luft ein. Ein einzelner Fehlschlag darf den Lauf nicht kippen — die Karte
+// bleibt dann unaufgelöst und bekommt einen leeren Vermerk wie bisher.
+async function loeseEnglischAuf(karten) {
+  const map = new Map();
+  let nr = 0, fehlgeschlagen = 0;
+  for (const k of karten) {
+    if (nr++) await sleep(110);
+    const pfad = `/cards/${encodeURIComponent(String(k.set_code).toLowerCase())}`
+               + `/${encodeURIComponent(k.cn)}/en`;
+    let en = null;
+    try { en = await sfGet(pfad); } catch { fehlgeschlagen++; }
+    if (en && en.id) map.set(k.scryfall_id, en.id);
+    if (nr % 100 === 0) console.log(`    … ${nr}/${karten.length} aufgelöst`);
+  }
+  if (fehlgeschlagen) console.log(`    ${fehlgeschlagen} Abrufe fehlgeschlagen (bleiben offen).`);
+  return map;
 }
 
 // ------------------------------------------------------------ MTGJSON (Stream)
@@ -350,14 +455,19 @@ async function main() {
   // hinterlegt) und spart damit AllIdentifiers — 215 MB, die größte der drei
   // Dateien. Die anderen Betriebsarten ermitteln sie aus AllIdentifiers und
   // schreiben sie unten mit, damit der Tagesmodus sie künftig vorfindet.
-  let uuidToSid;
+  // uuidToSids ist eine Zuordnung uuid → MENGE eigener scryfall_id, nicht auf
+  // eine einzelne. Fremdsprachige Auflagen werden über die englische aufgelöst,
+  // also tragen die deutsche und die englische Auflage derselben Karte dieselbe
+  // uuid — eine Zuordnung auf einen Einzelwert würde eine von beiden
+  // verschlucken, und zwar stillschweigend.
+  let uuidToSids;
   let wantedSids = null;        // im Tagesmodus nicht gebraucht
 
   if (TODAY_ONLY) {
     console.log("Tagesmodus: uuid-Zuordnung aus price_history holen …");
-    uuidToSid = await fetchUuidMap();
-    console.log(`  ${uuidToSid.size} Karten mit bekannter uuid im Bestand.`);
-    if (!uuidToSid.size) {
+    uuidToSids = await fetchUuidMap();
+    console.log(`  ${uuidToSids.size} uuids mit bekannter Zuordnung im Bestand.`);
+    if (!uuidToSids.size) {
       console.log("Keine bekannte uuid — es muss erst ein voller Lauf durch " +
                   "(node backfill.mjs ohne --today). Nichts geladen, nichts geschrieben.");
       return;
@@ -367,29 +477,87 @@ async function main() {
     // endet der Lauf hier — ohne eine einzige Bulkdatei anzufassen.
     // Voller Modus (wöchentlich, und von Hand): alle Karten, damit auch
     // Korrekturen und verpasste Tage nachgezogen werden.
+    let gebraucht;
     if (ONLY_GAPS) {
       console.log("Lückenmodus: Karten ohne Archivzeile suchen …");
-      wantedSids = await fetchLuecken();
-      console.log(`  ${wantedSids.size} Karten ohne Verlauf.`);
-      if (!wantedSids.size) {
+      const luecken = await fetchLuecken();
+      console.log(`  ${luecken.size} Karten ohne Verlauf.`);
+      if (!luecken.size) {
         console.log("Keine Lücken — fertig, ohne die Bulkdatei zu laden.");
         return;
       }
+      // Aus cards brauchen wir Sprache, Setcode und Nummer — ohne die lässt
+      // sich eine fremdsprachige Auflage nicht auflösen. Der Umweg kostet eine
+      // kleine Abfrage; die Lückenliste allein trägt nur die scryfall_id.
+      gebraucht = (await fetchKarten()).filter(k => luecken.has(k.scryfall_id));
+      // Beide Quellen leiten sich aus cards ab, sollten also übereinstimmen.
+      // Gehen sie es doch nicht, bekäme die Differenz keinen Vermerk und bliebe
+      // ewig Lücke — genau der Dauerlauf, der hier abgestellt wurde. Also
+      // sichtbar machen statt verschweigen.
+      if (gebraucht.length !== luecken.size)
+        console.log(`  Hinweis: ${luecken.size - gebraucht.length} der gemeldeten Lücken ` +
+                    `stehen nicht mehr in cards (zwischenzeitlich gelöscht?) — übersprungen.`);
     } else {
-      console.log("Vorhandene scryfall_id aus public.cards holen …");
-      wantedSids = await fetchScryfallIds();
-      console.log(`  ${wantedSids.size} unterschiedliche Karten im Bestand.`);
-      if (!wantedSids.size) { console.log("Nichts zu tun."); return; }
+      console.log("Karten aus public.cards holen …");
+      gebraucht = await fetchKarten();
+      console.log(`  ${gebraucht.length} unterschiedliche Karten im Bestand.`);
+    }
+    wantedSids = new Set(gebraucht.map(k => k.scryfall_id));
+    if (!wantedSids.size) { console.log("Nichts zu tun."); return; }
+
+    // Wessen uuid schon im Archiv steht, braucht weder Scryfall noch einen
+    // Treffer in AllIdentifiers — die Auflösung ist damit eine Einmalarbeit
+    // je Karte, nicht eine je Lauf.
+    const bekannt = await fetchArchivUuids();
+
+    // Fremdsprachige Auflagen ohne bekannte uuid über die englische auflösen.
+    const zuLoesen = gebraucht.filter(k =>
+      k.lang && k.lang !== "en" && k.set_code && k.cn && !bekannt.has(k.scryfall_id));
+    let enSid = new Map();
+    if (zuLoesen.length) {
+      console.log(`Fremdsprachige Auflagen über die englische auflösen ` +
+                  `(${zuLoesen.length} Karten, ~110 ms Abstand) …`);
+      enSid = await loeseEnglischAuf(zuLoesen);
+      console.log(`  ${enSid.size} von ${zuLoesen.length} aufgelöst.`);
     }
 
-    console.log("AllIdentifiers streamen (scryfallId → uuid, ~215 MB) …");
-    uuidToSid = new Map();
-    await streamKeyed(`${MTGJSON_BASE}/AllIdentifiers.json.gz`, (uuid, value) => {
-      const sid = value && value.identifiers && value.identifiers.scryfallId;
-      if (sid && wantedSids.has(sid)) uuidToSid.set(uuid, sid);
-    });
-    console.log(`  ${uuidToSid.size} Karten in MTGJSON zugeordnet.`);
-    if (!uuidToSid.size) { console.log("Keine Zuordnung — nichts zu schreiben."); return; }
+    // Suchziel je Karte: die eigene scryfall_id (englisch) oder die der
+    // englischen Auflage (fremdsprachig). Mehrere eigene Karten dürfen auf
+    // dasselbe Ziel zeigen.
+    uuidToSids = new Map();
+    const merke = (uuid, sid) => {
+      if (!uuidToSids.has(uuid)) uuidToSids.set(uuid, new Set());
+      uuidToSids.get(uuid).add(sid);
+    };
+    const zielToSids = new Map();
+    let ausArchiv = 0;
+    for (const k of gebraucht) {
+      const u = bekannt.get(k.scryfall_id);
+      if (u) { merke(u, k.scryfall_id); ausArchiv++; continue; }
+      const ziel = (k.lang && k.lang !== "en") ? enSid.get(k.scryfall_id) : k.scryfall_id;
+      if (!ziel) continue;                          // unauflösbar → leerer Vermerk
+      if (!zielToSids.has(ziel)) zielToSids.set(ziel, new Set());
+      zielToSids.get(ziel).add(k.scryfall_id);
+    }
+    if (ausArchiv) console.log(`  ${ausArchiv} Karten mit uuid direkt aus dem Archiv.`);
+
+    // AllIdentifiers nur streamen, wenn danach überhaupt noch etwas offen ist.
+    if (zielToSids.size) {
+      console.log(`AllIdentifiers streamen (scryfallId → uuid, ~215 MB) für ` +
+                  `${zielToSids.size} offene Zuordnungen …`);
+      await streamKeyed(`${MTGJSON_BASE}/AllIdentifiers.json.gz`, (uuid, value) => {
+        const sid = value && value.identifiers && value.identifiers.scryfallId;
+        const meine = sid && zielToSids.get(sid);
+        if (!meine) return;
+        for (const s of meine) merke(uuid, s);
+      });
+    } else {
+      console.log("Alle Zuordnungen schon bekannt — AllIdentifiers wird nicht geladen.");
+    }
+    let zugeordnet = 0;
+    for (const s of uuidToSids.values()) zugeordnet += s.size;
+    console.log(`  ${zugeordnet} Karten in MTGJSON zugeordnet.`);
+    if (!uuidToSids.size) { console.log("Keine Zuordnung — nichts zu schreiben."); return; }
   }
 
   // ---- 2) Preise streamen ----------------------------------------------
@@ -398,14 +566,19 @@ async function main() {
   // neunzig. Deshalb genügt hier ein anderer Dateiname; extractPrices bleibt
   // unverändert. Wo eine Karte unter mehreren Auflagen dieselbe scryfall_id
   // trägt, gewinnt der zuletzt gesehene Eintrag — für den Verlauf gleichwertig.
+  //
+  // Eine uuid kann jetzt MEHRERE eigene Karten versorgen: die englische Auflage
+  // und jede fremdsprachige, die über sie aufgelöst wurde. Alle bekommen
+  // dieselbe Reihe.
   const datei = TODAY_ONLY ? "AllPricesToday.json.gz" : "AllPrices.json.gz";
   console.log(`${datei} streamen (Cardmarket-EUR + TCGplayer-USD) …`);
   const bySid = new Map();
   await streamKeyed(`${MTGJSON_BASE}/${datei}`, (uuid, value) => {
-    const sid = uuidToSid.get(uuid);
-    if (!sid) return;
+    const meine = uuidToSids.get(uuid);
+    if (!meine) return;
     const prices = extractPrices(value);
-    if (prices) bySid.set(sid, { prices, uuid });
+    if (!prices) return;
+    for (const sid of meine) bySid.set(sid, { prices, uuid });
   });
   console.log(`  ${bySid.size} Karten mit Preisreihen gefunden.`);
 
