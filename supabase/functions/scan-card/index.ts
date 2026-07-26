@@ -70,6 +70,10 @@ const SCHEMA = {
       type: "string",
       description: "Die Typzeile in der Mitte der Karte, z. B. 'Spielsteinkreatur — Held'. Leer, wenn unlesbar.",
     },
+    lang: {
+      type: "string",
+      description: "Sprache der Karte als zweistelliger Code, wie unten links neben dem Setcode aufgedruckt (DE, EN, FR, IT, ES, PT, RU, KO, JP). Ist der Code unlesbar, an Name und Regeltext erkennen (deutscher Text = DE, englischer = EN). Leer nur, wenn unsicher.",
+    },
     confidence: {
       type: "string",
       enum: ["high", "medium", "low"],
@@ -79,7 +83,7 @@ const SCHEMA = {
   // Kein is_foil: Glanz auf einem Foto beweist kein Foil — jede Lampe über
   // einer normalen Karte erzeugt denselben Eindruck. Ein Fehlurteil legt eine
   // eigene Zeile mit falschem Preis an. Diese Angabe macht der Nutzer.
-  required: ["printed_name", "corner_line_1", "corner_line_2", "type_line", "confidence"],
+  required: ["printed_name", "corner_line_1", "corner_line_2", "type_line", "lang", "confidence"],
   additionalProperties: false,
 } as const;
 
@@ -109,7 +113,13 @@ Welche Zeichenfolge welche Bedeutung hat, entscheidet nicht du — das macht ein
 Programm anhand fester Regeln. Deine einzige Aufgabe ist eine treue Abschrift.
 
 Ganz alte Karten haben diesen Aufdruck nicht. Dann bleiben beide Eckzeilen leer,
-und nur der Kartenname oben zählt.`;
+und nur der Kartenname oben zählt.
+
+Gib zusätzlich die Sprache der Karte an (Feld lang), als zweistelligen Code wie
+unten links neben dem Setcode: DE, EN, FR, IT, ES, PT, RU, KO, JP. Das ist der
+eine Punkt, an dem du auch aufs Bild schauen darfst: Ist der Code nicht lesbar,
+bestimme die Sprache an Name und Regeltext (deutscher Text = DE, englischer =
+EN, usw.). Nur wenn du wirklich unsicher bist, lass das Feld leer.`;
 
 /* Betriebsart "detect": Auf EINEM Foto liegen mehrere Karten. Das Modell soll
    sie nur LOKALISIEREN — je Karte ein achsenparalleles Rechteck in Bild-Anteilen
@@ -161,6 +171,44 @@ w und h Breite und Höhe, alle Werte zwischen 0 und 1 (x+w und y+h höchstens 1)
   * Prüfe am Ende: Anzahl Rechtecke = Anzahl gezählter Karten. Liegt keine
     Karte im Bild, gib eine leere Liste. Erfinde nichts.`;
 
+/* Betriebsart "orient": Handyfotos einer quer liegenden Kartenreihe landen oft
+   gedreht im Upload. Das Modell soll NUR sagen, wie weit das Bild gedreht werden
+   muss, damit die Karten aufrecht stehen — die Drehung macht danach der Client.
+   Entscheidend ist der Kartentext, nicht die Bildform (auch ein hochkantiges
+   Foto kann korrekt sein). */
+const ORIENT_SCHEMA = {
+  type: "object",
+  properties: {
+    title_side: {
+      type: "string",
+      enum: ["top", "bottom", "left", "right"],
+      description: "Auf welcher Seite des Bildes liegt aktuell die OBERKANTE der Karten — der Titelbalken mit dem Kartennamen? Bei aufrecht liegenden Karten ist das oben (top).",
+    },
+  },
+  required: ["title_side"],
+  additionalProperties: false,
+} as const;
+
+/* Bewusst nach der POSITION des Titelbalkens gefragt, NICHT nach einer Dreh-
+   richtung: Sehmodelle erkennen sicher, dass ein Bild um eine Vierteldrehung
+   gekippt ist, raten aber die Uhrzeigersinn-Richtung (90 vs. 270) oft falsch.
+   Die Position (oben/unten/links/rechts) ist eine verlässliche Angabe; die
+   nötige Drehung rechnet der Client daraus deterministisch aus. */
+const ORIENT_SYSTEM = `Du siehst ein Foto mit einer oder mehreren Magic-the-Gathering-Karten.
+Auf einer aufrecht liegenden Karte steht der Titelbalken mit dem Kartennamen ganz
+OBEN und der kleine Aufdruck (Setcode/Nummer) unten links.
+
+Bestimme, wo im Bild die OBERKANTE der Karten — also der Titelbalken — aktuell
+liegt, und antworte mit einem Wert:
+  * top    — die Karten stehen aufrecht, der Titel ist oben.
+  * bottom — die Karten stehen auf dem Kopf, der Titel ist unten.
+  * left   — die Karten sind gekippt, der Titel liegt am linken Bildrand.
+  * right  — die Karten sind gekippt, der Titel liegt am rechten Bildrand.
+
+Richte dich am KARTENTEXT aus, nicht an der Bildform: Ein hochkantiges Foto kann
+bereits korrekt sein (etwa mehrere Zeilen mit je wenigen Karten) — dann ist der
+Titel oben und die Antwort top.`;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Nur POST" }, 405);
@@ -189,6 +237,9 @@ Deno.serve(async (req) => {
     // "detect": mehrere Karten auf einem Foto lokalisieren. Sonst wie bisher
     // eine Karte transkribieren.
     if (body.mode === "detect") mode = "detect";
+    // "orient": nur die nötige Drehung bestimmen, damit die Karten aufrecht
+    // stehen. Das eigentliche Drehen macht danach der Client.
+    if (body.mode === "orient") mode = "orient";
     // Neu: images[] (Karte + Eckausschnitt). Alt: image_b64 — bleibt
     // erlaubt, damit eine ältere App-Fassung nicht bricht.
     images = Array.isArray(body.images) && body.images.length
@@ -208,6 +259,38 @@ Deno.serve(async (req) => {
 
   try {
     const anthropic = new Anthropic({ apiKey: key });
+
+    // Betriebsart "orient": nur die nötige Drehung zurückgeben. Läuft vor
+    // detect, verkleinertes Bild reicht — es geht nur um die Textrichtung.
+    // Haiku genügt und ist günstig; temperature 0 für ein stabiles Urteil.
+    if (mode === "orient") {
+      const ori = await anthropic.messages.create({
+        // Bewusst das stärkere Sehmodell (wie detect): Haiku verwechselte hier
+        // reproduzierbar links/rechts — also die Frage, ob eine Vierteldrehung
+        // im oder gegen den Uhrzeigersinn nötig ist. Genau diese räumliche
+        // Unterscheidung kann das größere Modell verlässlich. temperature
+        // entfällt (Sonnet 5 lehnt sie ab); Denken aus reicht fürs Urteil.
+        model: DETECT_MODEL,
+        max_tokens: 256,
+        thinking: { type: "disabled" },
+        system: ORIENT_SYSTEM,
+        output_config: { format: { type: "json_schema", schema: ORIENT_SCHEMA } },
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text" as const, text: "Wie weit muss dieses Bild im Uhrzeigersinn gedreht werden, damit die Karten aufrecht stehen?" },
+            { type: "image" as const, source: { type: "base64" as const, media_type: images[0].media_type, data: images[0].b64 } },
+          ],
+        }],
+      });
+      if (ori.stop_reason === "refusal") return json({ error: "Anfrage wurde abgelehnt" }, 422);
+      const otext = ori.content.find((b) => b.type === "text");
+      if (!otext || otext.type !== "text") return json({ error: "Keine verwertbare Antwort" }, 502);
+      return json({
+        orient: JSON.parse(otext.text),
+        usage: { input: ori.usage.input_tokens, output: ori.usage.output_tokens, model: ori.model },
+      });
+    }
 
     // Betriebsart "detect": nur die Kartenrechtecke zurückgeben. Das genaue
     // Ablesen je Karte macht danach der Einzelscan im Client.

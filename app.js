@@ -695,6 +695,27 @@ const candidates = text => text.split("\n")
   .filter(l => l.length >= 3 && /[A-Za-z]{3}/.test(l))
   .slice(0, 6);
 
+/* Passt der über den Eckcode gefundene Treffer zum abgelesenen Kartennamen?
+   Der Treffer trägt den englischen (name) und ggf. den gedruckten Namen
+   (printed_name); der abgelesene Name kann in jeder Sprache sein. Verglichen
+   wird normalisiert und beidseitig teilstring-tolerant (gegen kleine Lese-
+   fehler und Teilnamen); zweiseitige Karten ("A // B") zählen je Seite. Ohne
+   abgelesenen Namen gibt es nichts zu prüfen → true, der Eckcode bleibt
+   maßgeblich. Zweck: einen Eckcode-Falschtreffer (misslesener Set/Nummer trifft
+   eine fremde Karte) verwerfen, damit stattdessen der Namensweg greift. */
+function nameHitMatchesRead(hit, readName) {
+  const rn = norm(readName);
+  if (!rn) return true;
+  for (const raw of [hit?.printed_name, hit?.name]) {
+    if (!raw) continue;
+    for (const teil of String(raw).split("//")) {
+      const hn = norm(teil);
+      if (hn && (hn === rn || hn.includes(rn) || rn.includes(hn))) return true;
+    }
+  }
+  return false;
+}
+
 async function identify(img, lang, onStep) {
   let firstGuess = "", best = [];
 
@@ -706,15 +727,33 @@ async function identify(img, lang, onStep) {
     const v = await readWithVision(img);
     if (v) {
       const c = parseCorner(`${v.corner_line_1 || ""}\n${v.corner_line_2 || ""}`);
-      // Die Sprache von der Karte schlägt die Voreinstellung.
-      const l = c?.lang || lang;
+      // Sprache der Karte in dieser Reihenfolge: der gedruckte Eckcode, sofern
+      // parseCorner ihn sicher gelesen hat; sonst die vom Modell gemeldete
+      // Sprache (aus Name/Regeltext bestimmt, für gemischtsprachige Fotos der
+      // entscheidende Fallback); zuletzt die Dropdown-Voreinstellung. sprachCode
+      // übersetzt den gedruckten Code (DE→de, JP→ja) und filtert Unbekanntes.
+      const l = c?.lang || sprachCode(v.lang) || lang;
       if (c) {
         // Die Typzeile ist ein zweiter, unabhängiger Token-Hinweis: steht dort
         // "Spielsteinkreatur", ist es eines, auch wenn das winzige T entging.
         const token = c.token || /spielstein|\btoken\b|emblem/i.test(v.type_line || "");
         onStep(t("scan.searchingCode", { set: c.set, num: c.num, token: token ? t("scan.tokenSuffix") : "" }));
         const hit = await findByCode(c.set, c.num, l, token);
-        if (hit) return { card: hit, guess: hit.printed_name || hit.name, candidates: [], vision: v, lang: l };
+        // Der Eckcode ist verlässlich — WENN die Ecke stimmt. Ein misslesener
+        // Setcode oder eine misslesene Nummer trifft aber leicht eine ganz
+        // ANDERE existierende Karte (real beobachtet: Rußbolds Ecke landete auf
+        // Sorin, MH3 #245). Ein solcher Falschtreffer würde den korrekt
+        // gelesenen Namen überstimmen. Deshalb gegenprüfen: Passt der Name des
+        // Treffers nicht zum abgelesenen Namen, war die Ecke wohl falsch — dann
+        // NICHT zurückgeben, sondern unten über den Namen weitersuchen (der
+        // findet die Karte, sofern der Name gelesen wurde). Ohne gelesenen Namen
+        // gibt es nichts gegenzuprüfen, dann bleibt der Eckcode maßgeblich —
+        // das betrifft eine MODERNE Karte, deren Titel unlesbar war, NICHT alte
+        // Karten: Karten ohne Setcode/Sammlernummer (vor Exodus/Tempest und in
+        // der Nummern-Lücke ~2000–2014, z. B. Rußbold) erreichen findByCode nie,
+        // weil parseCorner dort null liefert und der Namensweg allein greift.
+        if (hit && nameHitMatchesRead(hit, v.printed_name))
+          return { card: hit, guess: hit.printed_name || hit.name, candidates: [], vision: v, lang: l };
       }
       if (v.printed_name) {
         onStep(t("scan.searchingName", { name: v.printed_name }));
@@ -813,6 +852,48 @@ async function scanFile(file) {
   } catch { toast(t("scan.imgUnreadable")); }
 }
 
+/* Bild um 0/90/180/270 Grad im Uhrzeigersinn drehen (in ein neues Canvas). Bei
+   90/270 tauschen Breite und Höhe. Basis der automatischen Ausrichtung. */
+function rotateCanvas(img, deg) {
+  const d = ((deg % 360) + 360) % 360;
+  if (d === 0) return img;
+  const w = img.width, h = img.height, swap = d === 90 || d === 270;
+  const cv = document.createElement("canvas");
+  cv.width = swap ? h : w; cv.height = swap ? w : h;
+  const cx = cv.getContext("2d");
+  cx.imageSmoothingQuality = "high";
+  if (d === 90) { cx.translate(h, 0); cx.rotate(Math.PI / 2); }
+  else if (d === 180) { cx.translate(w, h); cx.rotate(Math.PI); }
+  else { cx.translate(0, w); cx.rotate(-Math.PI / 2); }   // 270
+  cx.drawImage(img, 0, 0);
+  return cv;
+}
+
+/* Handyfotos einer quer liegenden Kartenreihe kommen oft gedreht im Upload an
+   (der Nutzer musste sie bisher von Hand 3× drehen). Ein kleiner Modell-Aufruf
+   sagt, wie weit das Bild gedreht werden muss, damit die Karten aufrecht stehen
+   — festgemacht am KARTENTEXT, nicht an der Bildform, damit hochkant-korrekte
+   Layouts (z. B. 3 Zeilen à 2 Karten) unangetastet bei 0 bleiben. Verkleinertes
+   Bild genügt, es geht nur um die Textrichtung. Fällt der Aufruf aus oder ist
+   das Vision-Modell abgeschaltet, wird nicht gedreht und der Scan läuft wie
+   bisher weiter — die Ausrichtung ist Komfort, kein Muss. */
+async function orientImage(img) {
+  if (visionAus) return img;
+  const ganz = { x: 0, y: 0, w: img.width, h: img.height };
+  try {
+    const { data, error } = await sb.functions.invoke("scan-card", {
+      body: { mode: "orient", images: [{ b64: toJpegBase64(img, ganz, 1400), media_type: "image/jpeg" }] },
+    });
+    if (error) return img;
+    // Das Modell nennt die aktuelle Lage des Titelbalkens (top/bottom/left/right);
+    // die Drehung IM UHRZEIGERSINN, die ihn nach oben bringt, folgt daraus
+    // eindeutig: links → 90°, unten → 180°, rechts → 270°, oben → keine. So
+    // muss das Modell die fehleranfällige Uhrzeigersinn-Richtung nicht raten.
+    const grad = { left: 90, bottom: 180, right: 270 }[data?.orient?.title_side] || 0;
+    return grad ? rotateCanvas(img, grad) : img;
+  } catch { return img; }
+}
+
 /* Ein Foto mit MEHREREN Karten: erst die Rechtecke vom Modell holen (detect),
    dann jede Karte ausschneiden und wie einen Einzelscan durch dieselbe Pipeline
    schicken — NACHEINANDER, um die Funktion und ihre Ratenbegrenzung nicht zu
@@ -822,16 +903,91 @@ async function scanMultiFile(file) {
   let img;
   try { img = await loadImg(file); } catch { return toast(t("scan.imgUnreadable")); }
   toast(t("scan.searching"));
+  // Zuerst aufrichten: quer fotografierte Reihen kommen oft gedreht im Upload
+  // an. Danach den leeren Rand ums Karten-Motiv wegschneiden — dann füllen die
+  // Karten den Rahmen und werden im (fest verkleinerten) detect-Bild groß genug,
+  // dass das Modell alle findet. Findet sich kein klarer Rand, bleibt das ganze
+  // Bild. Detect UND der Zuschnitt je Karte arbeiten auf demselben aufgerichteten,
+  // getrimmten Bild, damit die zurückgegebenen Rechtecke ohne Umrechnung passen.
+  const aufrecht = await orientImage(img);
+  const base = trimToContent(aufrecht) || aufrecht;
   let boxes;
-  try { boxes = await detectCards(img); }
+  try { boxes = await detectCards(base); }
   catch (e) { return toast(e.message || t("scan.notFound")); }
   if (!boxes.length) return toast(t("scan.noneDetected"));
   toast(t("scan.detected", { n: boxes.length }));
   const lang = $("#d-lang").value;
   for (const box of boxes) {
-    const cv = cropCanvas(img, box, 0.06);
+    // Großzügiger Rand (12 %): die detect-Rechtecke sitzen mal etwas zu eng und
+    // schneiden dann die Karte an — gerade die untere linke Ecke mit Setcode und
+    // Sammlernummer, dem wichtigsten Identifier. Lieber etwas Umgebung mitnehmen;
+    // die exakte Kartenlage holt findCardBounds anschließend aus dem Ausschnitt.
+    // Die Karten liegen mit klaren Lücken, daher ragt der Rand kaum in Nachbarn.
+    const cv = cropCanvas(base, box, 0.12);
     await scanBild(cv, cv.toDataURL("image/jpeg", 0.7), lang);
   }
+}
+
+/* Schneidet den leeren Rand rings ums Karten-Motiv weg, BEVOR das Foto zum
+   detect-Modell geht. Das Bild wird dort auf eine feste Größe heruntergerechnet;
+   je mehr Rand, desto kleiner die Karten darin, desto eher übersieht das Modell
+   welche — ein Nutzer belegte das direkt (dasselbe Motiv mit Rand fand zwei
+   Karten weniger als zugeschnitten). Wir ermitteln nur die EINE äußere Hülle des
+   Inhalts: von jeder Bildkante nach innen, bis eine Zeile/Spalte nicht mehr
+   gleichförmiger Hintergrund ist. Das ist robust — es entfernt nur randständige,
+   gleichförmige Streifen; eine Karte bricht die Gleichförmigkeit und stoppt den
+   Schnitt. Bewusst NICHT die Karten-Segmentierung aus #52: hier fällt genau ein
+   Rechteck, keine Formfilter, kein Zusammenwachsen. Fällt kein klarer Rand an
+   (Karte berührt die Kante) oder wäre der Schnitt unplausibel, kommt null und
+   das ganze Bild geht wie bisher raus. Rückgabe: ein Canvas in Originalauflösung
+   des Ausschnitts, oder null. */
+function trimToContent(img) {
+  const W = 320, H = Math.max(1, Math.round(img.height * (W / img.width)));
+  const cv = document.createElement("canvas");
+  cv.width = W; cv.height = H;
+  const cx = cv.getContext("2d", { willReadFrequently: true });
+  cx.drawImage(img, 0, 0, W, H);
+  const d = cx.getImageData(0, 0, W, H).data;
+  const lum = p => 0.299 * d[p * 4] + 0.587 * d[p * 4 + 1] + 0.114 * d[p * 4 + 2];
+
+  // Hintergrund = Median der Randhelligkeit (Tisch/Papier am Bildrand).
+  const rand = [];
+  for (let x = 0; x < W; x++) { rand.push(lum(x)); rand.push(lum((H - 1) * W + x)); }
+  for (let y = 0; y < H; y++) { rand.push(lum(y * W)); rand.push(lum(y * W + W - 1)); }
+  rand.sort((a, b) => a - b);
+  const bg = rand[rand.length >> 1];
+
+  // Je Zeile/Spalte zählen, wie viele Pixel deutlich vom Rand-Hintergrund
+  // abweichen. Eine Karte (Illustration, Text) liefert reichlich solche Pixel.
+  const zeile = new Array(H).fill(0), spalte = new Array(W).fill(0);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++)
+      if (Math.abs(lum(y * W + x) - bg) > 34) { zeile[y]++; spalte[x]++; }
+
+  // Von außen nach innen bis zur ersten "Inhalts"-Zeile/Spalte (>4 % abweichend).
+  const zMin = W * 0.04, sMin = H * 0.04;
+  let top = 0; while (top < H && zeile[top] < zMin) top++;
+  let bot = H - 1; while (bot > top && zeile[bot] < zMin) bot--;
+  let left = 0; while (left < W && spalte[left] < sMin) left++;
+  let right = W - 1; while (right > left && spalte[right] < sMin) right--;
+  if (top >= bot || left >= right) return null;
+
+  // Etwas Luft lassen, damit keine Kartenkante wegfällt — und damit die
+  // Randkarten im getrimmten Bild noch Umgebung haben, in die der Ausschnitt
+  // je Karte hineinpaddet (sonst klemmt sein Rand direkt an der Bildkante).
+  const pad = 0.03;
+  const x0 = Math.max(0, left / W - pad), y0 = Math.max(0, top / H - pad);
+  const x1 = Math.min(1, (right + 1) / W + pad), y1 = Math.min(1, (bot + 1) / H + pad);
+  const fw = x1 - x0, fh = y1 - y0;
+  if (fw > 0.93 && fh > 0.93) return null;   // kaum Rand da — nichts gewonnen
+  if (fw < 0.25 || fh < 0.25) return null;   // unplausibel klein — lieber ganzes Bild
+
+  const sx = Math.round(x0 * img.width), sy = Math.round(y0 * img.height);
+  const sw = Math.round(fw * img.width), sh = Math.round(fh * img.height);
+  const out = document.createElement("canvas");
+  out.width = sw; out.height = sh;
+  out.getContext("2d").drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+  return out;
 }
 
 /* Kartenrechtecke (Anteile 0..1) für ein Foto mit mehreren Karten, über die
@@ -843,13 +999,19 @@ async function scanMultiFile(file) {
    der Modell-Weg nie zum Zug. Gelernt: der Bildweg kennt seine eigenen
    Grenzfälle nicht — also wieder ausschließlich das Sehmodell, dessen
    Rechtecke dedupeBoxes und je Ausschnitt findCardBounds nachschärfen.
-   1600 → 2400 px Kantenlänge: Sonnet 5 verarbeitet bis 2576 px nativ, und
-   mehr Auflösung heißt präzisere Rechtecke bei acht kleinen Karten. */
+   2400 px Kantenlänge (statt 1600): Das Foto wird für den detect-Schritt auf
+   diese feste Größe heruntergerechnet — je mehr leerer Rand ums Karten-Raster,
+   desto kleiner landen die Karten darin und desto eher übersieht das Modell
+   welche. Ein Nutzer belegte das direkt: dasselbe Motiv einmal mit Rand (zwei
+   Karten fehlten) und einmal zugeschnitten (alle acht gefunden). Höher auflösen
+   macht die Karten auch im ungeschnittenen Bild groß genug; Sonnet 5
+   verarbeitet bis 2576 px nativ (keine Kachelung). Die Denkschritte bleiben
+   AUS — die verschlechterten die Rechtecke (#53), nicht die Auflösung. */
 async function detectCards(img) {
   if (visionAus) throw new Error(t("scan.visionDisabled"));
   const ganz = { x: 0, y: 0, w: img.width, h: img.height };
   const { data, error } = await sb.functions.invoke("scan-card", {
-    body: { mode: "detect", images: [{ b64: toJpegBase64(img, ganz, 1600), media_type: "image/jpeg" }] },
+    body: { mode: "detect", images: [{ b64: toJpegBase64(img, ganz, 2400), media_type: "image/jpeg" }] },
   });
   if (error) {
     let msg = "";
