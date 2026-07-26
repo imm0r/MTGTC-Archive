@@ -1411,6 +1411,18 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px}
 .st-lage.err .st-lage-punkt{background:var(--err)}  .st-lage.err .st-lage-txt{color:var(--err)}
 
 .st-zeit{max-width:420px}
+
+/* Zwei Spalten: links die eigene Infrastruktur, rechts die fremden Dienste.
+   align-items:start, damit die kuerzere Spalte oben bleibt und sich nicht auf
+   die Hoehe der laengeren streckt. Unter 900 px untereinander — bei halber
+   Breite wuerden die Kennzahlkacheln sonst umbrechen und der Graph zur
+   Briefmarke. Die Reihenfolge bleibt dabei erhalten: erst das Eigene. */
+.st-raster{display:grid;grid-template-columns:1fr 1fr;gap:0 14px;align-items:start}
+@media (max-width:900px){ .st-raster{grid-template-columns:1fr} }
+.st-spalte{min-width:0}
+.st-spalte-titel{margin:0 0 8px;font-size:12px;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+
 .st-dienst-kopf{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
 .st-dienst-name{min-width:0;display:flex;flex-direction:column;gap:2px;font-weight:600}
 .st-dienst-url{font-size:12px;font-weight:400;color:var(--dim);text-decoration:none;
@@ -1443,8 +1455,6 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px}
 .st-vorfall-txt a{color:var(--txt);text-decoration:none}
 .st-vorfall-txt a:hover{color:var(--acc)}
 .st-vorfall-zeit{font-size:12px;color:var(--dim);margin-top:2px}
-.st-links{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-.st-links a{text-decoration:none}
 
 @media (max-width:560px){
   .st-kopf-tat{width:100%;justify-content:space-between}

@@ -9722,8 +9722,6 @@ function initTooltip() {
 
 const STATUS_ROH  = "https://raw.githubusercontent.com/imm0r/MTGTC-Archive-Status/main";
 const STATUS_API  = "https://api.github.com/repos/imm0r/MTGTC-Archive-Status";
-const STATUS_VOLL = "https://imm0r.github.io/MTGTC-Archive-Status/";
-const STATUS_REPO = "https://github.com/imm0r/MTGTC-Archive-Status";
 const STATUS_FRISCH = 5 * 60 * 1000;   // so lange gilt der Zwischenspeicher
 
 /* tage:null = „gesamt". Die Feldnamen in summary.json heißen uptime/uptimeDay/
@@ -9735,6 +9733,17 @@ const STATUS_ZEITRAEUME = [
 
 let STATUS_ZEIT  = "week";
 let STATUS_DATEN = null;
+
+/* Was uns gehoert: die eigene Auslieferung auf GitHub Pages und die eigene
+   Datenbank. Alles andere sind fremde Datenquellen. Die Unterscheidung ist
+   nicht kosmetisch — bei einem Ausfall links kann man selbst eingreifen,
+   rechts bleibt nur abwarten. Gepruft wird der Host und nicht der Name: Namen
+   aendern sich beim Umbenennen in der .upptimerc.yml, Hosts nicht. */
+const STATUS_EIGENE_HOSTS = ["imm0r.github.io", "api.supabase.com"];
+const statusIstEigen = s => {
+  try { return STATUS_EIGENE_HOSTS.includes(new URL(s.url).hostname); }
+  catch { return false; }   // unbrauchbare URL gilt als fremd, nicht als eigen
+};
 
 const statusFeld = (d, feld, zeit) =>
   d[zeit === "all" ? feld : feld + zeit[0].toUpperCase() + zeit.slice(1)];
@@ -9894,7 +9903,6 @@ function renderStatus() {
       el.innerHTML = `<div class="card">
         <h3 class="st-titel">${esc(t("status.title"))}</h3>
         <p class="hint">${esc(t("status.error"))}</p>
-        <div class="st-links"><a class="btn ghost sm" href="${STATUS_VOLL}" target="_blank" rel="noopener">${esc(t("status.openFull"))}</a></div>
       </div>`;
     });
 }
@@ -9908,7 +9916,7 @@ function statusZeichnen(el, d) {
   const lageTxt = aus ? t("status.someDown", { n: aus, total: d.dienste.length })
                 : teil ? t("status.degraded") : t("status.allUp");
 
-  const karten = d.dienste.map(s => {
+  const karte = s => {
     const art = s.status === "down" ? "err" : s.status === "degraded" ? "warn" : "ok";
     const txt = s.status === "down" ? t("status.down")
               : s.status === "degraded" ? t("status.degradedShort") : t("status.up");
@@ -9929,7 +9937,22 @@ function statusZeichnen(el, d) {
       ${statusTagesbalken(s, d.verlauf[s.slug], tage)}
       ${d.apiOk ? statusGraph(d.verlauf[s.slug]?.punkte, tage) : ""}
     </div>`;
-  }).join("");
+  };
+
+  // Links das Eigene, rechts das Fremde — die Trennung, die im Ernstfall zählt:
+  // links kann man selbst etwas tun, rechts nur abwarten. Die Zuordnung haengt
+  // am Host und nicht an der Reihenfolge in summary.json, damit ein neu
+  // eingetragener Dienst von selbst in der richtigen Spalte landet, statt die
+  // Aufteilung stillschweigend zu verschieben.
+  const eigene = d.dienste.filter(statusIstEigen);
+  const fremde = d.dienste.filter(s => !statusIstEigen(s));
+  const spalte = (titel, liste) => liste.length
+    ? `<div class="st-spalte"><h4 class="st-spalte-titel">${esc(titel)}</h4>${liste.map(karte).join("")}</div>`
+    : "";
+  const raster = `<div class="st-raster">
+      ${spalte(t("status.groupOwn"), eigene)}
+      ${spalte(t("status.groupExternal"), fremde)}
+    </div>`;
 
   el.innerHTML = `
     <div class="card st-kopf">
@@ -9955,7 +9978,7 @@ function statusZeichnen(el, d) {
 
     ${d.apiOk ? "" : `<div class="card"><p class="hint">${esc(t("status.rateLimit"))}</p></div>`}
 
-    ${karten}
+    ${raster}
 
     <div class="card">
       <h3 class="st-titel">${esc(t("status.incidents"))}</h3>
@@ -9963,11 +9986,7 @@ function statusZeichnen(el, d) {
     </div>
 
     <div class="card">
-      <p class="hint" style="margin-top:0">${esc(t("status.checkNote"))}</p>
-      <div class="st-links">
-        <a class="btn ghost sm" href="${STATUS_VOLL}" target="_blank" rel="noopener">${esc(t("status.openFull"))}</a>
-        <a class="btn ghost sm" href="${STATUS_REPO}" target="_blank" rel="noopener">${esc(t("status.source"))}</a>
-      </div>
+      <p class="hint" style="margin:0">${esc(t("status.checkNote"))}</p>
     </div>`;
 
   // Zeitraumwechsel zeichnet nur neu — die Daten für alle Zeiträume liegen
