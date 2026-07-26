@@ -258,10 +258,21 @@ async function fetchLuecken() {
 // Bündelgröße bleibt bei 500: übertragen wird weiterhin nur das ~90-Tage-
 // Fenster je Karte, unabhängig davon, wie lang der Verlauf in der Datenbank
 // schon ist.
+// Bündelgröße. Bewusst klein: das Mischen ist KEIN einfacher Upsert. Je Zeile
+// läuft merge_price_map durch bis zu vier Reihen à ~90 Punkte, jede mit
+// jsonb_agg und einer Fensterfunktion. Mit 500 Zeilen je Aufruf lief genau das
+// in Supabases statement_timeout (Fehler 57014, "canceling statement due to
+// statement timeout") und riss den ganzen Lauf mit — beobachtet am 26.07. beim
+// ersten vollen Lauf mit 535 Zeilen. Die 500 stammten noch vom alten,
+// überschreibenden Upsert, der pro Zeile fast nichts zu tun hatte.
+const BUENDEL = 50;
+
 async function mergeInDb(rows) {
   let beruehrt = 0;
-  for (let i = 0; i < rows.length; i += 500) {
-    const batch = rows.slice(i, i + 500);
+  // Ein Stapel wird bei Zeitüberschreitung halbiert und erneut versucht, statt
+  // den Lauf zu verlieren. Der Bestand wächst mit der Zeit, und ein fester Wert
+  // wäre irgendwann wieder zu groß; so passt sich der Lauf selbst an.
+  const schicke = async (batch, tiefe = 0) => {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/merge_price_history`,
       { method: "POST",
         headers: restHeaders,
@@ -279,11 +290,24 @@ async function mergeInDb(rows) {
           "geschrieben, der vorhandene Verlauf bleibt unangetastet.\n" +
           "Abhilfe: supabase-schema.sql erneut ausführen oder die Migration " +
           "supabase/migrations/20260726120000_price_history_langzeit.sql einspielen.");
+
+      // 57014 = statement timeout. Halbieren und erneut versuchen. Das ist
+      // gefahrlos wiederholbar: das Mischen ist additiv, ein Stapel, der schon
+      // teilweise durchlief, wird durch dieselben Werte nicht verfälscht.
+      if (/57014/.test(text) && batch.length > 1 && tiefe < 8) {
+        const mitte = Math.ceil(batch.length / 2);
+        console.log(`  Zeitüberschreitung bei ${batch.length} Zeilen — halbiert auf ${mitte}.`);
+        return (await schicke(batch.slice(0, mitte), tiefe + 1))
+             + (await schicke(batch.slice(mitte), tiefe + 1));
+      }
       throw new Error(`price_history zusammenführen → HTTP ${res.status}: ${text}`);
     }
     const n = Number(await res.text());
-    if (Number.isFinite(n)) beruehrt += n;
-  }
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  for (let i = 0; i < rows.length; i += BUENDEL)
+    beruehrt += await schicke(rows.slice(i, i + BUENDEL));
   return beruehrt;
 }
 

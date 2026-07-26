@@ -585,6 +585,14 @@ mitgespeichert und lässt sich später ohne erneuten Import sichtbar machen.
    workflow** einmal von Hand starten; danach läuft er täglich. Beim nächsten
    Öffnen der Sammlung sind die Graphen gefüllt.
 
+**Bündelgröße beim Schreiben.** Der Job schickt 50 Zeilen je Aufruf an
+`merge_price_history`, nicht mehr. Das Mischen ist kein einfacher Upsert: je
+Zeile läuft `merge_price_map` durch bis zu vier Reihen à ~90 Punkte, jede mit
+`jsonb_agg` und einer Fensterfunktion. Mit 500 Zeilen lief das in Supabases
+`statement_timeout` (Fehler `57014`) und riss den ganzen Lauf mit. Läuft ein
+Stapel trotzdem in die Zeitüberschreitung, halbiert der Job ihn und versucht es
+erneut — das ist gefahrlos wiederholbar, weil das Mischen additiv ist.
+
 Lokal prüfen: in `scripts/price-backfill/` einmal `npm ci`, dann
 `node backfill.mjs --self-test` (nur die Umform-Logik, ohne Netz) oder — mit
 gesetzten `SUPABASE_*`-Variablen — `node backfill.mjs --dry-run` (lädt und
