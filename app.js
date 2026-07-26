@@ -9995,13 +9995,9 @@ function statusZeichnen(el, d) {
   // Aufteilung stillschweigend zu verschieben.
   const eigene = d.dienste.filter(statusIstEigen);
   const fremde = d.dienste.filter(s => !statusIstEigen(s));
-  const spalte = (titel, liste) => liste.length
-    ? `<div class="st-spalte"><h4 class="st-spalte-titel">${esc(titel)}</h4>${liste.map(karte).join("")}</div>`
-    : "";
-  const raster = `<div class="st-raster">
-      ${spalte(t("status.groupOwn"), eigene)}
-      ${spalte(t("status.groupExternal"), fremde)}
-    </div>`;
+  const spalte = liste => liste.length
+    ? `<div class="st-spalte">${liste.map(karte).join("")}</div>` : "";
+  const raster = `<div class="st-raster">${spalte(eigene)}${spalte(fremde)}</div>`;
 
   el.innerHTML = `
     <div class="card st-kopf">
