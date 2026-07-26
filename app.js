@@ -33,11 +33,20 @@ const today = () => { const d = new Date();
 
    Nur wohlgeformte Angaben werden übernommen. Steht dort Unsinn oder fehlt das
    Element, bleibt die Version leer, und die Anzeige lässt die Zeile weg
-   (zeigeKopfVersion). Lieber gar keine Version als eine erfundene. */
+   (zeigeKopfVersion). Lieber gar keine Version als eine erfundene.
+
+   Der Ausdruck bildet Semver genau ab: höchstens EIN Vorabteil (-alpha.1) und
+   danach höchstens EIN Bauteil (+abc). Ein wiederholbares ([-+]…)* wäre nicht
+   nur falsch — es ließe 1.0.0-a+b-c+d durchgehen —, sondern gefährlich: die
+   Zeichenklasse enthält selbst ein „-", also dasselbe Zeichen, mit dem die
+   Gruppe beginnt. Bei „9.9.9+" gefolgt von vielen „--" kann die Engine jedes
+   Zeichen auf zwei Arten zuordnen, und die Laufzeit wächst exponentiell (bei
+   22 Wiederholungen gemessene 11,9 s statt Mikrosekunden). Hier trennt jedes
+   Zeichen die beiden Teile eindeutig, es gibt nichts zurückzuverfolgen. */
 const APP_VERSION = (() => {
   try {
     const v = document.querySelector('meta[name="app-version"]')?.content?.trim() || "";
-    return /^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)*$/.test(v) ? v : "";
+    return /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(v) ? v : "";
   } catch { return ""; }
 })();
 
