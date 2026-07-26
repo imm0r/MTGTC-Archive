@@ -8277,7 +8277,11 @@ function matInnerHtml() {
       </section>
       ${feld("grave", t("zone.grave"), { n: zoneSumme("grave"), html: zoneKorbHtml("grave") })}
     </div>
-    ${feld("hand", t("zone.hand"), { n: zoneSumme("hand"), html: zoneKorbHtml("hand") }, " mat-hand")}`;
+    ${feld("hand", t("zone.hand"), { n: zoneSumme("hand"), html: zoneKorbHtml("hand") }, " mat-hand")}
+    ${SPK_SPALTE ? `<section class="mat-feld mat-vorschau">
+      <div class="mat-titel">${esc(t("spk.slot"))}</div>
+      <div class="spk" id="spk-feld"><div class="spk-leer">${esc(t("spk.slotEmpty"))}</div></div>
+    </section>` : ""}`;
 }
 
 function zonenInnerHtml() {
@@ -8344,7 +8348,6 @@ function zoneKarteHtml(c, zone, n, st) {
   const idx = st ? st.idx : 0;
   return `<div class="zk${st?.t ? " getappt" : ""}" tabindex="0" data-id="${esc(c.id)}" data-zone="${esc(zone)}"
        data-idx="${idx}" data-spk="${esc(c.id)}" data-spk-zone="${esc(zone)}"
-       data-hand-img="${esc(c.img || "")}" data-hand-name="${esc(nm)}"
        title="${esc(nm)}${st?.t ? " · " + t("zone.tapped") : ""}">
     ${c.img ? `<img src="${esc(c.img)}" alt="${esc(nm)}" loading="lazy">`
             : `<div class="zk-ohnebild">${esc(nm)}</div>`}
@@ -8398,7 +8401,7 @@ function zoneHandHtml() {
     const nm = trkName(c);
     return `<div class="hand-karte" tabindex="0" style="--rot:${rot}deg;--dy:${dy}px;--z:${i + 1};${
       i ? `margin-left:calc(var(--hk-b,104px) * ${(anteil - 1).toFixed(3)})` : ""}"
-         data-hand-img="${esc(c.img || "")}" data-hand-name="${esc(nm)}" title="${esc(nm)}">
+         data-spk="${esc(c.id)}" data-spk-zone="hand" title="${esc(nm)}">
       ${c.img ? `<img src="${esc(c.img)}" alt="${esc(nm)}" loading="lazy">`
               : `<div class="hand-ohnebild">${esc(nm)}</div>`}
       <div class="hand-akt">${zoneAktHtml(c.id, "hand")}</div>
@@ -8454,7 +8457,21 @@ function libZeileHtml(c, n) {
    trägt dann die Zielknöpfe. So kostet Nachschlagen nichts und Verschieben
    einen zweiten Klick — an einer Stelle, an der man die Karte gerade ohnehin
    ansieht. */
+/* Ab dieser Breite hat die Matte eine eigene Spalte für die Kartenansicht: Was
+   man anzeigt, erscheint immer an DERSELBEN Stelle rechts, statt als Fenster
+   über dem Spielfeld. Darunter (und im Akkordeon) schwebt sie wie bisher am
+   Zeiger — auf einem Handy gibt es für eine feste Spalte keinen Platz. */
+const SPK_SPALTE_AB = 1200;
+let SPK_SPALTE = matchMedia(`(min-width:${SPK_SPALTE_AB}px)`).matches;
+matchMedia(`(min-width:${SPK_SPALTE_AB}px)`).addEventListener("change", e => {
+  SPK_SPALTE = e.matches;
+  if (SESSION && $(".view.on")?.id === "v-session") renderSession();
+});
+
 let spkEl = null, spkFest = null, spkTimer = null;
+/* Die feste Spalte, falls die Matte sie gerade hat — sonst das schwebende
+   Fenster. Beide zeigen dasselbe, nur an anderem Ort. */
+const spkFeldEl = () => (MAT_AN && SPK_SPALTE) ? $("#spk-feld") : null;
 
 function spkHuelle() {
   if (!spkEl) {
@@ -8481,7 +8498,7 @@ function spielKarteHtml(c, zone, fest, idx) {
   const gross = (c.img || "").replace("/small/", "/normal/");
   // Der Regeltext steht bereits auf dem Bild — ihn darunter zu wiederholen war
   // doppelt gemoppelt. Was bleibt, ist das, was auf dem Bild klein oder gar
-  // nicht zu lesen ist: die Manakosten, der fremdsprachige Name und das Set.
+  // nicht zu lesen ist: die Manakosten, der fremdsprachige Name und der Typ.
   const marken = zone === "field" ? `<div class="zk-akt-reihe">
       <button class="btn ghost sm" data-tap="${esc(c.id)}" data-idx="${idx || 0}"
         title="${esc(t("zone.tapTitle"))}">&#8635;</button>
@@ -8495,8 +8512,6 @@ function spielKarteHtml(c, zone, fest, idx) {
     <div class="spk-text">
       ${faceTopHtml(c)}
       ${c.type_line ? `<div class="hint" style="margin-top:2px">${esc(c.type_line)}</div>` : ""}
-      <div class="hint" style="margin-top:4px">${setSymbol(c.set, c.rarity)}${
-        esc(c.set_name || c.set || "")} &middot; #${esc(c.cn)}</div>
     </div>
     ${fest ? `<div class="spk-akt">${marken}<div class="zk-akt-reihe">${
                 zoneAktHtml(c.id, zone, idx)}</div></div>`
@@ -8506,6 +8521,14 @@ function spielKarteHtml(c, zone, fest, idx) {
 function zeigeSpielKarte(id, x, y, zone, fest, idx) {
   const c = CARDS.find(k => k.id === id);
   if (!c) return;
+  // Gibt es die feste Spalte, geht alles dorthin — kein Fenster über dem Feld.
+  const feld = spkFeldEl();
+  if (feld) {
+    feld.innerHTML = spielKarteHtml(c, zone, fest, idx);
+    feld.classList.toggle("fest", !!fest);
+    spkFest = fest ? { id, zone } : null;
+    return;
+  }
   const el = spkHuelle();
   el.innerHTML = spielKarteHtml(c, zone, fest, idx);
   el.classList.toggle("fest", !!fest);
@@ -8531,6 +8554,12 @@ function versteckeSpielKarte(auchFest) {
   clearTimeout(spkTimer);
   if (spkFest && !auchFest) return;   // Angeheftetes bleibt stehen
   spkFest = null;
+  // Die feste Spalte behält die zuletzt gezeigte Karte: sie bei jedem
+  // Mausaustritt zu leeren, ließe die Fläche im Spiel dauernd flackern. Nur
+  // die Knöpfe verschwinden, denn die gehören zum Festhalten.
+  const feld = spkFeldEl();
+  if (feld) { feld.classList.remove("fest"); feld.querySelector(".spk-akt")?.remove();
+              feld.querySelector(".spk-zu")?.remove(); return; }
   if (spkEl) { spkEl.style.display = "none"; spkEl.classList.remove("fest"); }
 }
 
@@ -8580,27 +8609,23 @@ function wireZonenHover() {
   });
   if (!HOVER_OK) return;
   // Kartenvorschau wie überall in der Spielrunde: Bild + Name schwebend.
-  $$("#zonen [data-hand-img]").forEach(el => {
-    if (!el.dataset.handImg) return;
-    // Ist eine Kartenansicht angeheftet, keine zweite Vorschau darüberlegen.
-    el.addEventListener("mousemove", e => {
-      if (spkFest) return;
-      zeigeCmdHover(el.dataset.handImg, el.dataset.handName, e.clientX, e.clientY);
-    });
-    el.addEventListener("mouseleave", versteckeCmdHover);
-  });
-  // Bibliothekszeilen: Zeigen blendet die Spielmodus-Kartenansicht ein, Klick
-  // heftet sie fest. Der Klick wird unten am ganzen Behälter delegiert, damit
-  // er auch ohne Maus (Touch, Tastatur) funktioniert.
-  $$("#zonen .lib-zeile[data-spk]").forEach(z => {
-    const id = z.dataset.spk;
-    z.addEventListener("mouseenter", e => {
+  // JEDE Karte behält ihren Hover — Zonenkacheln sind teils nur 48 px breit,
+  // da erkennt man ohne Vorschau nicht, welche Karte man vor sich hat, und
+  // müsste sich durchklicken. Überall dieselbe volle Kartenansicht statt des
+  // früheren kleinen Bild-plus-Name; in der Matte landet sie in der festen
+  // Spalte, sonst schwebt sie am Zeiger.
+  $$("#zonen [data-spk]").forEach(el => {
+    const id = el.dataset.spk, zone = el.dataset.spkZone || "lib", idx = +el.dataset.idx || 0;
+    // Ohne feste Spalte erst nach kurzem Verweilen einblenden, damit nicht bei
+    // jedem Überstreichen ein Fenster aufpoppt. In der Spalte stört nichts.
+    const zoegern = spkFeldEl() ? 0 : 250;
+    el.addEventListener("mouseenter", e => {
       if (spkFest) return;
       clearTimeout(spkTimer);
       const x = e.clientX, y = e.clientY;
-      spkTimer = setTimeout(() => zeigeSpielKarte(id, x, y, "lib", false), 250);
+      spkTimer = setTimeout(() => zeigeSpielKarte(id, x, y, zone, false, idx), zoegern);
     });
-    z.addEventListener("mouseleave", () => versteckeSpielKarte());
+    el.addEventListener("mouseleave", () => versteckeSpielKarte());
   });
 }
 

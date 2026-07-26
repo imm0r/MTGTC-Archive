@@ -530,11 +530,19 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
   grid-template-columns:minmax(0,1fr) 154px 190px;
   grid-template-rows:clamp(390px,50vh,560px) auto;
   grid-template-areas:"links mitte rechts" "hand hand hand"}
+/* Ab 1200 px eine vierte Spalte ueber die volle Hoehe: die angezeigte Karte
+   erscheint immer DORT, statt als Fenster ueber dem Spielfeld. Darunter fehlt
+   der Platz — dann schwebt sie wie bisher am Zeiger (app.js: SPK_SPALTE). */
+@media (min-width:1200px){
+  .mat{grid-template-columns:minmax(0,1fr) 172px 208px 268px;
+       grid-template-areas:"links mitte rechts vorschau" "hand hand hand vorschau"}
+}
+.mat-vorschau{grid-area:vorschau}
 .mat-links{grid-area:links;display:flex;flex-direction:column;gap:8px;min-width:0}
 .mat-mitte{grid-area:mitte;display:flex;flex-direction:column;gap:8px}
 .mat-rechts{grid-area:rechts;display:flex;flex-direction:column;gap:8px}
 .mat-hand{grid-area:hand}
-@media (min-width:1100px){ .mat{grid-template-columns:minmax(0,1fr) 172px 208px} }
+
 
 .mat-feld{display:flex;flex-direction:column;min-width:0;
   border:1px solid var(--line);border-radius:10px;background:var(--panel2);padding:6px 8px 8px}
@@ -622,12 +630,24 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
   background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;
   box-shadow:0 12px 38px #000d}
 .spk.fest{pointer-events:auto;border-color:var(--acc)}
+/* Dieselbe Ansicht in der festen Spalte: kein schwebendes Fenster mehr,
+   sondern der Inhalt der Flaeche — ohne Rahmen, Schatten und Position. */
+#spk-feld{position:static;display:block;pointer-events:auto;width:auto;max-width:none;
+  background:none;border:none;border-radius:0;padding:0;box-shadow:none;
+  flex:1;min-height:0;overflow-y:auto}
+#spk-feld .spk-zu{display:none}
+.spk-leer{font-size:12px;color:var(--dim);padding:10px 2px;text-align:center}
 .spk-bild{display:block;width:100%;border-radius:8px}
 .spk-text{margin-top:8px}
 .spk-text .name-zeile{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 .spk-tipp{margin-top:8px;font-size:11px;color:var(--dim);text-align:center}
-.spk-akt{display:flex;gap:5px;justify-content:center;margin-top:10px;
+/* Die Knopfreihen stehen untereinander, nicht nebeneinander: eine Feldkarte
+   bringt sieben Knöpfe mit (tappen, Marken, vier Zielzonen). Quer belegten die
+   rund 305 px — mehr, als die 268 px schmale Vorschauspalte hergibt; der letzte
+   Knopf wurde rechts abgeschnitten. Untereinander passt jede Reihe. */
+.spk-akt{display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:10px;
   padding-top:9px;border-top:1px solid var(--line)}
+.spk-akt .zk-akt-reihe{flex-wrap:wrap}
 .spk-akt .btn{padding:4px 10px;font-size:16px}
 .spk-zu{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:12px;
   border:1px solid var(--line);background:var(--panel2);color:var(--dim);cursor:pointer;
