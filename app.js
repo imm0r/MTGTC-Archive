@@ -2265,8 +2265,15 @@ async function nachtragen(c, fresh) {
   // steht: den setzt der CSV-Import als Notlösung ein (`csvName`, wenn Scryfall
   // kein printed_name lieferte). Das ist kein gedruckter Name, sondern eine
   // Platzhalter-Kopie von `name` — die darf der echte ersetzen.
+  // "pn !== c.printed_name" ist nicht bloß Sparsamkeit, sondern nötig: bei
+  // manchen Karten IST der gedruckte Name gleich dem englischen (Eigennamen,
+  // z. B. „Kuja, Genome Sorcerer" auch auf der deutschen Auflage). Ohne diesen
+  // Vergleich bliebe die Bedingung dort für immer wahr und jeder Preisabruf
+  // schriebe denselben Wert erneut — bei Karten ohne sonstige Lücke sogar ein
+  // UPDATE, das es ohne dies gar nicht gäbe.
   const pn = printedNameOf(fresh);
-  if (pn != null && (c.printed_name == null || c.printed_name === c.name))
+  if (pn != null && pn !== c.printed_name
+      && (c.printed_name == null || c.printed_name === c.name))
     patch.printed_name = pn;
   if (c.printed_text == null) {
     const pt = printedTextOf(fresh);
