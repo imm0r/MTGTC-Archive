@@ -21,6 +21,11 @@ create table if not exists public.cards (
   -- auch bei fremdsprachigen Auflagen. Deshalb ist die Prüfung auf
   -- "legendary" sprachunabhängig; die gedruckte Fassung wäre es nicht.
   type_line   text,
+  -- Die gedruckte Typzeile ("Hexerei") — nur für die ANZEIGE. Scryfall
+  -- liefert sie ausschließlich bei fremdsprachigen Drucken, bei lang='en'
+  -- bleibt sie NULL und die App zeigt type_line. Nie filtern oder prüfen:
+  -- dafür ist type_line da (siehe oben).
+  printed_type_line text,
   -- common, uncommon, rare, mythic, special, bonus. Bewusst ohne CHECK:
   -- käme eine siebte Stufe dazu, soll das Einbuchen nicht scheitern.
   rarity      text,
@@ -57,6 +62,17 @@ create table if not exists public.cards (
   -- (gültig), NULL = unerfasst. oracle_text: '' gültig (Vanilla), NULL Lücke.
   keywords    text[],
   oracle_text text,
+  -- Der GEDRUCKTE Regeltext, also die landessprachige Fassung von der Karte
+  -- selbst (Scryfalls printed_text). oracle_text ist bei JEDEM Druck englisch
+  -- — ohne diese Spalte zeigte eine deutsche Karte einen deutschen Namen
+  -- (printed_name) neben englischen Fähigkeiten.
+  -- NULL heißt "gibt es nicht": bei einer englischen Auflage liefert Scryfall
+  -- das Feld gar nicht, dort IST der Oracle-Text das Gedruckte. Die App fällt
+  -- dann auf oracle_text zurück. '' bleibt gültig (Vanilla-Kreatur).
+  -- Wie printed_type_line ausdrücklich nur ANZEIGE: die Aufschlüsselung der
+  -- Fähigkeiten, alle Filter und die Commander-Regeln lesen weiter
+  -- oracle_text, weil deren Muster englisch sind.
+  printed_text text,
   lang        text not null default 'en',
   condition   text not null default 'NM',
   foil        boolean not null default false,
@@ -120,10 +136,18 @@ alter table public.cards add column if not exists released date;
 alter table public.cards add column if not exists colors text[];
 alter table public.cards add column if not exists keywords text[];
 alter table public.cards add column if not exists oracle_text text;
+-- Gedruckte (landessprachige) Fassung von Regeltext und Typzeile. Reine
+-- Anzeige; NULL bei englischen Auflagen. Bestandskarten füllen sich beim
+-- nächsten Preisabruf (nachtragen() in der App).
+alter table public.cards add column if not exists printed_text text;
+alter table public.cards add column if not exists printed_type_line text;
 -- Seiten zweiseitiger Karten (Vorder-/Rückseite zum Umdrehen), als JSON je
--- Seite: Name, Typzeile, Regeltext, Manakosten, Stärke/Widerstand, Bild. NULL
--- bei einseitigen Karten. Nur für die Detailansicht — Suche/Sortierung laufen
--- weiter über die flachen Spalten (name, type_line …).
+-- Seite: Name, Typzeile, Regeltext, Manakosten, Stärke/Widerstand, Bild —
+-- Typzeile und Regeltext zusätzlich in der gedruckten Fassung
+-- (printed_type_line, printed_text), damit auch die RÜCKSEITE einer
+-- fremdsprachigen Karte in ihrer Sprache steht. NULL bei einseitigen Karten.
+-- Nur für die Detailansicht — Suche/Sortierung laufen weiter über die flachen
+-- Spalten (name, type_line …).
 alter table public.cards add column if not exists faces jsonb;
 -- Farbidentität (Scryfalls color_identity): Farben aus Kosten, Farbindikator
 -- UND Regeltext-Mana-Symbolen — für Länder u. a. aussagekräftig, wo colors leer
@@ -866,10 +890,12 @@ begin
     if mycard is null then
       insert into public.cards (user_id, scryfall_id, oracle_id, name, printed_name, set_code,
         set_name, cn, img, cm_id, type_line, rarity, mana_cost, cmc, released, colors,
-        keywords, oracle_text, lang, condition, foil, qty, price)
+        keywords, oracle_text, printed_text, printed_type_line,
+        lang, condition, foil, qty, price)
       values (me, e.scryfall_id, e.oracle_id, e.name, e.printed_name, e.set_code,
         e.set_name, e.cn, e.img, e.cm_id, e.type_line, e.rarity, e.mana_cost, e.cmc, e.released, e.colors,
-        e.keywords, e.oracle_text, e.lang, e.condition, e.foil, 0, e.price)
+        e.keywords, e.oracle_text, e.printed_text, e.printed_type_line,
+        e.lang, e.condition, e.foil, 0, e.price)
       returning id into mycard;
     end if;
     if e.id = src.main_card_id then mymain := mycard; end if;

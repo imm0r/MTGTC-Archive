@@ -388,6 +388,10 @@ const facesOf = card => {
       name: x.name ?? null,
       printed: x.printed_name ?? null,
       type_line: x.type_line ?? null,
+      // Landessprachige Fassung je Seite. Führt Scryfall nur bei
+      // fremdsprachigen Drucken; bei englischen bleiben beide null.
+      printed_type_line: x.printed_type_line ?? null,
+      printed_text: typeof x.printed_text === "string" ? x.printed_text : null,
       mana_cost: typeof x.mana_cost === "string" ? x.mana_cost : null,
       oracle_text: oracle,
       power: x.power ?? null,
@@ -1091,6 +1095,35 @@ function cropCanvas(img, box, padFrac) {
   return cv;
 }
 
+/* Was add_card nicht kennt, in einem zweiten Schreibvorgang hinterher:
+   • faces          — Seiten zweiseitiger Karten (fürs Umdrehen in den Details)
+   • color_identity — Grundlage des Farbidentitäts-Filters in der Sammlung
+   • printed_text / printed_type_line — die gedruckte, landessprachige Fassung
+   Bewusst getrennt statt als weitere RPC-Parameter: jede Erweiterung der
+   add_card-Signatur zieht in Postgres ein weiteres "drop function" nach sich
+   (siehe die Liste im Schema), und diese Felder sind reine Anzeige.
+   Ein Fehlschlag ist gutartig — die Detailansicht fällt auf die englischen
+   Felder zurück, und der nächste Preisabruf trägt es über nachtragen() nach.
+   `row` ist die von add_card zurückgegebene Zeile (die RPC gibt public.cards
+   zurück), `card` die Scryfall-Karte, aus der geschrieben wurde. */
+async function addCardNachtrag(row, card) {
+  if (!row?.id) return;
+  const patch = {};
+  const fc = facesOf(card);
+  if (fc) patch.faces = fc;
+  const ci = farbIdentOf(card);
+  if (ci) patch.color_identity = ci;
+  // "!= null" und nicht "truthy": '' ist ein gültiger gedruckter Text
+  // (Vanilla-Kreatur), null heißt "gibt es nicht" (englische Auflage).
+  const pt = printedTextOf(card);
+  if (pt != null) patch.printed_text = pt;
+  const pty = printedTypeOf(card);
+  if (pty != null) patch.printed_type_line = pty;
+  if (!Object.keys(patch).length) return;
+  try { await sb.from("cards").update(patch).eq("id", row.id); }
+  catch { /* Anzeige klappt auch ohne die Nachträge */ }
+}
+
 /* Die pro Karte gewählten Werte (opts) schlagen die globalen Scan-Dropdowns.
    Die Sprache steht auf der Karte; Foil und Zustand wählt man im Bestätigungs-
    schritt bewusst je Karte. Fehlt ein Wert — beim direkten Übernehmen oder aus
@@ -1121,21 +1154,8 @@ async function addToCollection(card, el, opts) {
   });
   if (error) throw new Error(dbErr(error));
 
-  // Nachtrag getrennt vom add_card-Aufruf (spart eine Signatur-Erweiterung):
-  //  • faces = die Seiten zweiseitiger Karten (fürs Umdrehen in den Details),
-  //  • color_identity = Grundlage des Farbidentitäts-Filters in der Sammlung.
   const row = Array.isArray(data) ? data[0] : data;
-  if (row?.id) {
-    const patch = {};
-    const fc = facesOf(card);
-    if (fc) patch.faces = fc;
-    const ci = farbIdentOf(card);
-    if (ci) patch.color_identity = ci;
-    if (Object.keys(patch).length) {
-      try { await sb.from("cards").update(patch).eq("id", row.id); }
-      catch { /* Anzeige klappt auch ohne die Nachträge */ }
-    }
-  }
+  await addCardNachtrag(row, card);
 
   await reload(); renderAll();
   el.classList.remove("pending");   // war es ein bestätigter Treffer, ist er nun geschrieben
@@ -2133,6 +2153,43 @@ const oracleOf = card => {
   return angaben.join("\n//\n");
 };
 
+/* Der GEDRUCKTE Regeltext und die GEDRUCKTE Typzeile — die Fassung, die
+   wirklich auf der Karte steht. Scryfall führt sie in printed_text /
+   printed_type_line und liefert sie NUR bei fremdsprachigen Drucken; bei
+   lang="en" fehlen die Felder ganz, denn dort IST der Oracle-Text das
+   Gedruckte. Deshalb ist null hier kein Fehler, sondern der Normalfall — die
+   Anzeige fällt dann auf oracle_text/type_line zurück.
+
+   Warum das überhaupt eigene Spalten braucht: oracle_text und type_line sind
+   bei JEDEM Druck englisch. Eine deutsche Karte lieferte darüber bisher einen
+   deutschen Namen (printed_name nutzen wir seit je) und englische Fähigkeiten
+   — genau die Mischung, die in der Detailansicht auffiel.
+
+   WICHTIG: Diese beiden Felder sind reine ANZEIGE. Jede Regel-, Filter- und
+   Typprüfung (Land, legendär, Deck-Kategorie, Commander-Singleton) läuft
+   weiter über type_line/oracle_text — die sind sprachunabhängig vergleichbar,
+   die gedruckte Fassung wäre es nicht. Aufbau wie oracleOf: einseitig oben,
+   doppelseitig je Seite zusammengefügt. */
+const printedTextOf = card => {
+  if (typeof card?.printed_text === "string") return card.printed_text;
+  const seiten = card?.card_faces;
+  if (!Array.isArray(seiten) || !seiten.length) return null;
+  const angaben = seiten.map(f => f.printed_text).filter(x => typeof x === "string");
+  if (!angaben.length) return null;
+  return angaben.join("\n//\n");
+};
+
+// Die Typzeile trennt Scryfall bei geteilten Karten mit " // " in EINER Zeile
+// (nicht mit Zeilenumbruch wie den Regeltext) — hier genauso.
+const printedTypeOf = card => {
+  if (typeof card?.printed_type_line === "string") return card.printed_type_line;
+  const seiten = card?.card_faces;
+  if (!Array.isArray(seiten) || !seiten.length) return null;
+  const angaben = seiten.map(f => f.printed_type_line).filter(x => typeof x === "string");
+  if (!angaben.length) return null;
+  return angaben.join(" // ");
+};
+
 /* Trägt nach, was der Karte fehlt. Bestände aus der Zeit vor den Spalten
    type_line/rarity/mana_cost haben sie leer — und ohne Typzeile lehnt der
    Trigger die Karte als Hauptkarte ab und verweist dafür genau hierher
@@ -2169,10 +2226,32 @@ async function nachtragen(c, fresh) {
     const o = oracleOf(fresh);
     if (o != null) patch.oracle_text = o;
   }
+  // Gedruckte (landessprachige) Fassung von Regeltext und Typzeile. Wieder
+  // "== null": '' wäre gültig. Bei englischen Auflagen liefert Scryfall die
+  // Felder gar nicht — dann bleibt die Spalte leer und die Anzeige nimmt
+  // oracle_text/type_line. Das ist der Weg, über den BESTANDSKARTEN die
+  // Übersetzung bekommen: "Preis neu ziehen" und der Sammel-Preisabruf laufen
+  // beide hier durch, und sfById holt die sprachgenaue Auflage (die deutsche
+  // Karte trägt eine eigene scryfall_id).
+  if (c.printed_text == null) {
+    const pt = printedTextOf(fresh);
+    if (pt != null) patch.printed_text = pt;
+  }
+  if (c.printed_type_line == null) {
+    const pty = printedTypeOf(fresh);
+    if (pty != null) patch.printed_type_line = pty;
+  }
   // Seiten einer zweiseitigen Karte nachtragen (fürs Umdrehen in der
   // Detailansicht). facesOf liefert nur bei echten Vorder-/Rückseiten-Karten
   // etwas — einseitige bleiben null und werden nicht angefasst.
-  if (c.faces == null) {
+  // Auch dann neu schreiben, wenn die gespeicherten Seiten noch aus der Zeit
+  // VOR printed_text stammen (der Schlüssel fehlt in keiner Seite): sonst
+  // bliebe die Rückseite einer fremdsprachigen Karte für immer englisch,
+  // während die Vorderseite übersetzt ist. Der Schlüssel wird auch bei
+  // englischen Karten gesetzt (auf null), das greift also genau einmal.
+  const seitenOhneDruck = Array.isArray(c.faces)
+                       && !c.faces.some(f => f && "printed_text" in f);
+  if (c.faces == null || seitenOhneDruck) {
     const fc = facesOf(fresh);
     if (fc != null) patch.faces = fc;
   }
@@ -2822,15 +2901,45 @@ function parseAbilities(text, keywords) {
    sagt, steht offen; was wir raten, liegt unter einem Klick. */
 function faehigkeitenHtml(c, kompakt) {
   const teile = [];
+  // Die Schlüsselwort-Tags bleiben englisch: Scryfalls keywords-Liste ist die
+  // kanonische Fassung und hat KEIN landessprachiges Gegenstück (auch auf der
+  // deutschen Karte steht dort "Storm", nicht "Sturm"). Erfunden wird hier
+  // nichts — lieber ein englisches verbürgtes Wort als eine geratene
+  // Übersetzung.
   if (Array.isArray(c.keywords) && c.keywords.length)
     teile.push(`<div class="kw-tags">${c.keywords.map(k => `<span class="pill">${esc(k)}</span>`).join("")}</div>`);
-  if (c.oracle_text)
-    teile.push(`<div class="regeltext">${mitSymbolen(c.oracle_text)}</div>`);
+  // Gedruckt vor Oracle: bei einer fremdsprachigen Auflage steht hier der
+  // Text, der wirklich auf der Karte steht. Fehlt er — englische Auflage, oder
+  // eine, die Scryfall nur englisch führt —, bleibt es beim Oracle-Text.
+  // "|| null" und NICHT "!= null": für die Anzeige sind '' und null dasselbe —
+  // beides heißt "kein gedruckter Text zu zeigen". Beim SPEICHERN ist der
+  // Unterschied wichtig ('' = geprüft, es gibt keinen), beim Anzeigen nicht:
+  // stünde hier ein leeres '' vor einem gefüllten oracle_text, bliebe der
+  // Kasten leer statt auf Englisch zu zeigen.
+  const gedruckt = c.printed_text || null;
+  const anzeige = gedruckt ?? c.oracle_text;
+  if (anzeige)
+    teile.push(`<div class="regeltext">${mitSymbolen(anzeige)}</div>`);
   if (!kompakt && c.oracle_text) {
+    // Aufgeschlüsselt wird WEITER der englische Oracle-Text, nicht der
+    // gedruckte: er ist regeltechnisch verbindlich, und die Muster in
+    // parseAbilities (When/Whenever/Sacrifice …) sowie der Abgleich gegen die
+    // englische keywords-Liste sind es ebenfalls. Auf deutschem Text fiele
+    // alles als "statisch" durch und kein Schlüsselwort träfe.
     const ab = parseAbilities(c.oracle_text, c.keywords) || [];
+    // Weicht der gedruckte Text ab, ist die Tabelle sichtbar in einer anderen
+    // Sprache als der Kasten darüber. Das sagt die Zusammenfassung, und der
+    // zugrunde liegende englische Text steht mit im Aufklapper — sonst stünde
+    // die Aufschlüsselung ohne erkennbare Quelle da.
+    const abweichend = gedruckt != null && gedruckt !== c.oracle_text;
     if (ab.length) teile.push(`
       <details class="faehig">
-        <summary>${esc(t("detail.abBreakdown"))} <span class="hint" style="display:inline">${esc(t("detail.abAuto"))}</span></summary>
+        <summary>${esc(t("detail.abBreakdown"))} <span class="hint" style="display:inline">${
+          esc(t(abweichend ? "detail.abAutoOracle" : "detail.abAuto"))}</span></summary>
+        ${abweichend ? `<div class="oracle-en">
+          <label>${esc(t("detail.oracleEn"))}</label>
+          <div class="regeltext">${mitSymbolen(c.oracle_text)}</div>
+        </div>` : ""}
         <table class="faehig-tbl"><thead><tr>
           <th>${esc(t("common.name"))}</th><th>${esc(t("detail.abType"))}</th><th>${esc(t("detail.abCost"))}</th><th>${esc(t("detail.abEffect"))}</th></tr></thead>
         <tbody>${ab.map(a => `<tr>
@@ -2858,6 +2967,11 @@ function faceView(c, i) {
     mana_cost: f.mana_cost,
     type_line: f.type_line,
     oracle_text: f.oracle_text,
+    // Immer setzen, auch auf null: der Spread oben trägt die Werte der GANZEN
+    // Karte herein, und die gehören der Vorderseite. Ohne das zeigte die
+    // Rückseite den gedruckten Text der Vorderseite.
+    printed_text: f.printed_text ?? null,
+    printed_type_line: f.printed_type_line ?? null,
     keywords: f.keywords,
     img: f.img || c.img };
 }
@@ -2872,7 +2986,10 @@ function faceTopHtml(v) {
     ${v.printed_name && v.printed_name !== v.name ? `<div class="hint" style="margin:0">${esc(v.name)}</div>` : ""}`;
 }
 function faceBottomHtml(v, hover) {
-  return `${v.type_line ? `<div class="hint" style="margin-top:2px">${esc(v.type_line)}</div>` : ""}
+  // Gedruckte Typzeile vor der englischen — dieselbe Regel wie beim Regeltext.
+  // Nur hier in der Anzeige: gefiltert und geprüft wird weiter über type_line.
+  const typ = v.printed_type_line || v.type_line;
+  return `${typ ? `<div class="hint" style="margin-top:2px">${esc(typ)}</div>` : ""}
     ${faehigkeitenHtml(v, hover)}`;
 }
 
@@ -4360,6 +4477,16 @@ async function applyCardEdit(c, lang, cond, foil, neu) {
     patch.colors = farbenOf(fresh);
     patch.keywords = keywordsOf(fresh);
     patch.oracle_text = oracleOf(fresh);
+    // Gedruckte Fassung der NEUEN Auflage — ohne "|| c.…": ist die neue
+    // Auflage englisch, muss der alte deutsche Text weg, sonst stünde er unter
+    // einer englischen Karte. Gleiche Logik wie bei printed_name darüber.
+    patch.printed_text = printedTextOf(fresh);
+    patch.printed_type_line = printedTypeOf(fresh);
+    // Seiten gehören zur Auflage (eigene Bilder, eigener gedruckter Text) und
+    // müssen mitwandern. facesOf ist bei einseitigen Karten null — dann bleibt
+    // die Spalte, wie sie war (auch sie null).
+    const fcNeu = facesOf(fresh);
+    if (fcNeu) patch.faces = fcNeu;
   } else if (lang !== c.lang) {
     // Sprachwechsel: die sprachgenaue Auflage hat eine eigene Scryfall-ID,
     // eigenen gedruckten Namen und eigenes Bild. Gibt es sie nicht (viele
@@ -4369,6 +4496,13 @@ async function applyCardEdit(c, lang, cond, foil, neu) {
     if (fresh) {
       patch.scryfall_id = fresh.id;
       patch.printed_name = fresh.printed_name || null;
+      // Auch hier ohne Rückfall auf den alten Wert: beim Wechsel DE → EN
+      // liefert Scryfall keine printed_*-Felder, und genau dann muss der
+      // deutsche Text verschwinden.
+      patch.printed_text = printedTextOf(fresh);
+      patch.printed_type_line = printedTypeOf(fresh);
+      const fcNeu = facesOf(fresh);
+      if (fcNeu) patch.faces = fcNeu;
       patch.img = imgOf(fresh) || c.img;
       patch.cm_id = fresh.cardmarket_id ?? c.cm_id;
     }
@@ -5900,6 +6034,10 @@ async function importCsv(file) {
         mana_cost: manaOf(card), cmc: card.cmc ?? null,
         released: card.released_at ?? null, colors: farbenOf(card),
         keywords: keywordsOf(card), oracle_text: oracleOf(card),
+        // Gedruckte Fassung gleich mit: hier wird direkt in die Tabelle
+        // geschrieben (kein add_card), also ohne Umweg über addCardNachtrag.
+        printed_text: printedTextOf(card), printed_type_line: printedTypeOf(card),
+        faces: facesOf(card), color_identity: farbIdentOf(card),
         lang, condition: cond, foil, qty, price,
         hist: price == null ? [] : [{ d: today(), v: price }],
       };
@@ -6019,7 +6157,7 @@ async function miImport() {
       if (!card) { sag("✗ " + t("mi.notFound", { set: set.toUpperCase(), num }), "var(--err)"); fail++; continue; }
 
       const price = priceOf(card, foil);
-      const { error } = await sb.rpc("add_card", {
+      const { data, error } = await sb.rpc("add_card", {
         p_scryfall_id: card.id, p_oracle_id: card.oracle_id, p_name: card.name,
         p_printed_name: card.printed_name || null,
         p_set_code: (card.set || "").toUpperCase(), p_set_name: card.set_name,
@@ -6032,6 +6170,9 @@ async function miImport() {
         p_keywords: keywordsOf(card), p_oracle_text: oracleOf(card),
       });
       if (error) { sag("✗ " + dbErr(error), "var(--err)"); fail++; continue; }   // dbErr ist bereits übersetzt
+      // Derselbe Nachtrag wie beim Scan — sonst käme eine hier eingetippte
+      // deutsche Karte ohne gedruckten Regeltext in die Sammlung.
+      await addCardNachtrag(Array.isArray(data) ? data[0] : data, card);
 
       // Erfolgreiche Zeilen bleiben sichtbar stehen (man sieht, was aus der
       // Eingabe wurde), sind aber gesperrt — ein zweites "Importieren"
@@ -9010,7 +9151,8 @@ function spielKarteHtml(c, zone, fest, idx) {
     ${gross ? `<img class="spk-bild" src="${esc(gross)}" alt="">` : ""}
     <div class="spk-text">
       ${faceTopHtml(c)}
-      ${c.type_line ? `<div class="hint" style="margin-top:2px">${esc(c.type_line)}</div>` : ""}
+      ${(c.printed_type_line || c.type_line)
+        ? `<div class="hint" style="margin-top:2px">${esc(c.printed_type_line || c.type_line)}</div>` : ""}
     </div>
     ${fest ? `<div class="spk-akt">${marken}<div class="zk-akt-reihe">${
                 zoneAktHtml(c.id, zone, idx)}</div></div>`

@@ -1138,6 +1138,12 @@ dialog::backdrop{background:#000a}
 .faehig{margin-top:8px}
 .faehig summary{cursor:pointer;color:var(--dim);font-size:13px;user-select:none}
 .faehig summary:hover{color:var(--txt)}
+/* Der englische Oracle-Text im Aufklapper — nur da, wenn oben die gedruckte
+   Fassung steht und die Tabelle darunter erkennbar aus einer anderen Sprache
+   stammt. Bewusst zurückgenommen (kleiner, blasser): er ist die QUELLE der
+   Aufschlüsselung, nicht der Text der Karte. Den zeigt der Kasten darüber. */
+.faehig .oracle-en{margin-top:8px}
+.faehig .oracle-en .regeltext{font-size:12px;color:var(--dim)}
 .faehig-tbl{width:100%;margin-top:8px;font-size:12px}
 .faehig-tbl th{font-size:10px}
 .faehig-tbl td{vertical-align:top;padding:6px 6px}
