@@ -76,6 +76,7 @@ const I18N = {
     "nav.community": "Community",
     "nav.logout": "Abmelden",
     "who.menu": "Menü",
+    "header.version": "Version {v}",
 
     "coll.search": "Suche",
     "coll.searchPh": "Name oder Set…",
@@ -387,6 +388,7 @@ const I18N = {
     "nav.community": "Community",
     "nav.logout": "Sign out",
     "who.menu": "Menu",
+    "header.version": "Version {v}",
 
     "coll.search": "Search",
     "coll.searchPh": "Name or set…",
@@ -698,6 +700,7 @@ const I18N = {
     "nav.community": "Community",
     "nav.logout": "Se déconnecter",
     "who.menu": "Menu",
+    "header.version": "Version {v}",
 
     "coll.search": "Recherche",
     "coll.searchPh": "Nom ou set…",
@@ -1009,6 +1012,7 @@ const I18N = {
     "nav.community": "Community",
     "nav.logout": "Cerrar sesión",
     "who.menu": "Menú",
+    "header.version": "Versión {v}",
 
     "coll.search": "Buscar",
     "coll.searchPh": "Nombre o set…",
@@ -1320,6 +1324,7 @@ const I18N = {
     "nav.community": "Community",
     "nav.logout": "Esci",
     "who.menu": "Menu",
+    "header.version": "Versione {v}",
 
     "coll.search": "Cerca",
     "coll.searchPh": "Nome o set…",

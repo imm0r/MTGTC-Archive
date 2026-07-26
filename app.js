@@ -6043,8 +6043,20 @@ function showApp() {
   $("#gate").style.display = "none";
   $("#app").style.display = "block";
   renderWho();
-  ladeBenutzerzahl();                         // Nutzerzahl dauerhaft im Header
-  ladeDeckzahl();                             // Decks-Zahl dauerhaft im Header
+  zeigeKopfVersion();                         // Version dauerhaft im Header
+}
+
+/* Versionsnummer im Kopf, unter dem Verweis auf die Statusseite. Quelle ist
+   APP_VERSION (der Cache-Buster des eigenen <script>-Tags); fehlt sie — etwa
+   weil app.js ohne ?v= eingebunden ist — bleibt die Zeile weg statt „—“ zu
+   zeigen. Läuft beim Anzeigen der App und nach jedem Sprachwechsel. */
+function zeigeKopfVersion() {
+  const el = $("#header-version");
+  if (!el) return;
+  el.hidden = !APP_VERSION;
+  if (!APP_VERSION) return;
+  el.textContent = t("header.version", { v: APP_VERSION });
+  el.title = t("settings.version", { v: APP_VERSION });
 }
 
 async function afterLogin(user) {
@@ -6930,8 +6942,8 @@ async function passwortAendern() {
    Zustimmung). Freunde sehen GETEILTE Decks nur lesend; die RLS erlaubt das,
    geladen wird fremdes Material aber ausschließlich hier gezielt. */
 let FRIENDS = { accepted: [], incoming: [], outgoing: [] };
-let USER_COUNT = null;   // Gesamtzahl registrierter Nutzer (Anzeige unter „Freunde")
-let DECK_COUNT = null;   // Gesamtzahl erstellter Decks (Anzeige im Header)
+let USER_COUNT = null;   // Gesamtzahl registrierter Nutzer (Anzeige auf dem Login-Screen)
+let DECK_COUNT = null;   // Gesamtzahl erstellter Decks (Anzeige auf dem Login-Screen)
 
 async function ladeFreunde() {
   const { data: fr, error } = await sb.from("friendships").select("*");
@@ -6953,9 +6965,10 @@ async function ladeFreunde() {
 }
 
 /* Gesamtzahl registrierter Nutzer laden (SECURITY-DEFINER-RPC, da RLS nur
-   eigene + befreundete Profile sichtbar macht) und anschließend im Header
-   und auf dem Login-Screen anzeigen. Anzeige ist optional — schlägt der
-   Aufruf fehl, bleibt sie einfach leer. */
+   eigene + befreundete Profile sichtbar macht) und auf dem Login-Screen
+   anzeigen. In der angemeldeten Ansicht steht die Zahl unter „Community“;
+   der Login-Screen kennt diesen Weg nicht und zeigt sie deshalb hier.
+   Anzeige ist optional — schlägt der Aufruf fehl, bleibt sie einfach leer. */
 async function ladeBenutzerzahl() {
   try { const { data, error } = await sb.rpc("registered_user_count"); if (!error && data != null) USER_COUNT = Number(data); }
   catch { /* still ignorieren — Zahl ist nur informativ */ }
@@ -6963,16 +6976,14 @@ async function ladeBenutzerzahl() {
 }
 function zeigeBenutzerzahl() {
   const n = USER_COUNT != null ? String(USER_COUNT) : null, lbl = t("stats.registeredUsers");
-  const h = $("#user-count");
-  if (h) { h.hidden = n == null; if (n != null) { h.innerHTML = `&#128101;&nbsp;<b>${esc(n)}</b>`; h.title = lbl; } }
   const g = $("#gate-user-count");
   if (g) { g.hidden = n == null; if (n != null) g.innerHTML = `&#128101; <b>${esc(n)}</b> ${esc(lbl)}`; }
 }
 
 /* Gesamtzahl erstellter Decks laden (SECURITY-DEFINER-RPC, da RLS nur
-   eigene Decks sichtbar macht) und anschließend im Header und auf dem
-   Login-Screen anzeigen. Anzeige ist optional — schlägt der Aufruf fehl,
-   bleibt sie einfach leer. */
+   eigene Decks sichtbar macht) und auf dem Login-Screen anzeigen — wie bei
+   der Nutzerzahl liegt die Zahl in der App selbst unter „Community“.
+   Anzeige ist optional — schlägt der Aufruf fehl, bleibt sie einfach leer. */
 async function ladeDeckzahl() {
   try { const { data, error } = await sb.rpc("total_deck_count"); if (!error && data != null) DECK_COUNT = Number(data); }
   catch { /* still ignorieren — Zahl ist nur informativ */ }
@@ -6980,8 +6991,6 @@ async function ladeDeckzahl() {
 }
 function zeigeDeckzahl() {
   const n = DECK_COUNT != null ? String(DECK_COUNT) : null, lbl = t("stats.totalDecks");
-  const h = $("#deck-count");
-  if (h) { h.hidden = n == null; if (n != null) { h.innerHTML = `&#127136;&nbsp;<b>${esc(n)}</b>`; h.title = lbl; } }
   const g = $("#gate-deck-count");
   if (g) { g.hidden = n == null; if (n != null) g.innerHTML = `&#127136; <b>${esc(n)}</b> ${esc(lbl)}`; }
 }
@@ -10014,6 +10023,10 @@ function wireApp() {
     if (b.dataset.v === "status") renderStatus();
     if (b.dataset.v === "settings") renderSettings();
   });
+  // Der Verweis neben dem Logo drückt den gleichnamigen Knopf im Benutzermenü:
+  // Umschalten, Markierung und Nachladen bleiben so an einer einzigen Stelle.
+  const kopfStatus = $("#header-status");
+  if (kopfStatus) kopfStatus.onclick = () => $('nav button[data-v="status"]')?.click();
   // Angeheftete Spielmodus-Karte: Escape und ein Klick daneben schließen sie.
   document.addEventListener("keydown", e => { if (e.key === "Escape") versteckeSpielKarte(true); });
   document.addEventListener("click", e => {
@@ -10201,6 +10214,7 @@ function wireApp() {
 function onLangChange() {
   if (typeof USER === "undefined" || !USER) return;   // vor Login nur statischer Text
   renderWho();
+  zeigeKopfVersion();
   renderAll();
   const aktiv = $(".view.on")?.id;
   if (aktiv === "v-profile") renderProfile();
