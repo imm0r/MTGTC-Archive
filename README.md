@@ -69,7 +69,7 @@ die Änderung wirkt dann scheinbar gar nicht.
 Die angezeigte Version steht in `index.html` und folgt Semantic Versioning:
 
 ```html
-<meta name="app-version" content="1.0.0">
+<meta name="app-version" content="0.12.0">
 ```
 
 | Stelle | Wann sie steigt |
@@ -80,6 +80,11 @@ Die angezeigte Version steht in `index.html` und folgt Semantic Versioning:
 
 Steigt eine Stelle, werden die rechts davon auf `0` zurückgesetzt: nach `1.4.7`
 kommt bei einer neuen Funktion `1.5.0`, bei einer Schnittstellenänderung `2.0.0`.
+
+Die führende `0` ist Absicht: solange als registrierte Nutzer nur Tester
+unterwegs sind, gilt nichts als festgeschrieben. Die `1.0.0` markiert den
+Punkt, ab dem Schnittstellen verlässlich sind — bis dahin darf sich alles
+ändern, ohne dass dafür die Major-Stelle steigen müsste.
 
 Das ist **etwas anderes als `?v=`**, auch wenn beides in derselben Datei steht:
 
