@@ -843,13 +843,19 @@ async function scanMultiFile(file) {
    der Modell-Weg nie zum Zug. Gelernt: der Bildweg kennt seine eigenen
    Grenzfälle nicht — also wieder ausschließlich das Sehmodell, dessen
    Rechtecke dedupeBoxes und je Ausschnitt findCardBounds nachschärfen.
-   1600 → 2400 px Kantenlänge: Sonnet 5 verarbeitet bis 2576 px nativ, und
-   mehr Auflösung heißt präzisere Rechtecke bei acht kleinen Karten. */
+   2400 px Kantenlänge (statt 1600): Das Foto wird für den detect-Schritt auf
+   diese feste Größe heruntergerechnet — je mehr leerer Rand ums Karten-Raster,
+   desto kleiner landen die Karten darin und desto eher übersieht das Modell
+   welche. Ein Nutzer belegte das direkt: dasselbe Motiv einmal mit Rand (zwei
+   Karten fehlten) und einmal zugeschnitten (alle acht gefunden). Höher auflösen
+   macht die Karten auch im ungeschnittenen Bild groß genug; Sonnet 5
+   verarbeitet bis 2576 px nativ (keine Kachelung). Die Denkschritte bleiben
+   AUS — die verschlechterten die Rechtecke (#53), nicht die Auflösung. */
 async function detectCards(img) {
   if (visionAus) throw new Error(t("scan.visionDisabled"));
   const ganz = { x: 0, y: 0, w: img.width, h: img.height };
   const { data, error } = await sb.functions.invoke("scan-card", {
-    body: { mode: "detect", images: [{ b64: toJpegBase64(img, ganz, 1600), media_type: "image/jpeg" }] },
+    body: { mode: "detect", images: [{ b64: toJpegBase64(img, ganz, 2400), media_type: "image/jpeg" }] },
   });
   if (error) {
     let msg = "";
