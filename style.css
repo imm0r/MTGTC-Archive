@@ -981,6 +981,66 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
 .deck-cat-count{color:var(--dim);font-weight:400;margin-left:8px}
 .deck-cat-body.zu tr:not(.deck-cat-head){display:none}
 
+/* ===== Kartenansicht: das Deck als Stapel =====
+   Jede Gruppe eine Spalte, darin die Karten als Stapel. Sichtbar ist von jeder
+   nur ihr NAMENSBALKEN — der obere Streifen des echten Kartenbildes, mit Name,
+   Manakosten und Rahmenfarbe in der Gestaltung der Karte selbst.
+
+   DIE GEOMETRIE IST DER GANZE TRICK. Eine Magic-Karte misst 63 × 88 mm, ihr
+   Seitenverhältnis ist also 1 : 1,397. Der Namensbalken sitzt zwischen rund
+   4 % und 10 % der Kartenhöhe. Beides sind Anteile, keine Pixel — deshalb
+   stimmt der Ausschnitt bei jeder Spaltenbreite und auf jedem Bildschirm.
+
+   * Das Fenster bekommt aspect-ratio 8/1: Bei Breite B ist es B/8 hoch, also
+     8,9 % der Kartenhöhe (B × 1,397). Das deckt den Balken samt Oberkante ab.
+   * Das Bild wird auf volle Breite gezogen und um 3,5 % SEINER EIGENEN HÖHE
+     nach oben geschoben. Prozentwerte in translateY beziehen sich auf das
+     Element selbst — genau deshalb geht das ohne eine einzige Pixelangabe. */
+.deck-stapel{display:grid;gap:12px;margin-top:12px;align-items:start;
+  grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+.stapel-spalte{background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+  padding:8px;min-width:0}
+.stapel-kopf{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;
+  padding:2px 2px 8px}
+.stapel-kopf:hover .stapel-name{color:var(--acc)}
+.stapel-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:13px;font-weight:600;color:var(--acc2)}
+.stapel-zahl{flex:none;font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+.stapel-preis{flex:none;font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums}
+.stapel-spalte.zu .stapel-karten{display:none}
+
+.stapel-karten{display:flex;flex-direction:column;gap:3px}
+.stapel-karte{display:flex;align-items:flex-start;gap:5px;cursor:pointer;min-width:0}
+/* Die Menge steht NEBEN der Karte, nicht darauf: Auf dem Balken verdeckte sie
+   den Namen, und der ist das, wonach man sucht. */
+.stapel-menge{flex:none;width:20px;text-align:right;font-size:11px;line-height:18px;
+  color:var(--dim);font-variant-numeric:tabular-nums;cursor:grab;touch-action:none;
+  user-select:none}
+.stapel-karte:hover .stapel-menge{color:var(--acc2)}
+.stapel-fenster{flex:1;min-width:0;position:relative;overflow:hidden;border-radius:4px;
+  aspect-ratio:8/1;background:#0c0d12;transition:aspect-ratio .16s ease-out}
+.stapel-fenster img{display:block;width:100%;transform:translateY(-3.5%)}
+/* Ohne Bild: schlichter Balken mit dem Namen. */
+.stapel-ersatz{position:absolute;inset:0;display:flex;align-items:center;padding:0 8px;
+  font-size:12px;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Aufklappen beim Überfahren: aus dem Balken wird die ganze Karte, der Stapel
+   darunter rückt nach. Nur auf Geräten mit Zeiger — mit dem Finger führt der
+   Tipp zur Detailansicht, die mehr zeigt als das Bild. */
+@media(hover:hover){
+  .stapel-karte:hover .stapel-fenster{aspect-ratio:63/88}
+  .stapel-karte:hover .stapel-fenster img{transform:none}
+}
+@media(prefers-reduced-motion:reduce){ .stapel-fenster{transition:none} }
+
+/* Fehlbestand: dieselbe Aussage wie die rote Pille der Tabelle, nur als Kante —
+   in einem Stapel ist der Rand die einzige Fläche, die frei bleibt. */
+.stapel-karte.fehlt .stapel-fenster{box-shadow:0 0 0 2px var(--err)}
+.stapel-karte.fehlt .stapel-menge{color:var(--err)}
+/* Der Commander bekommt die Farbe, mit der die App überall "besonders" sagt. */
+.stapel-karte.cmd .stapel-fenster{box-shadow:0 0 0 2px var(--acc)}
+.stapel-karte.zieht{opacity:.45}
+
 /* ===== Eigene Kategorien je Deck =====
    Die Leiste sitzt zwischen Werkzeugkasten und Tabelle, weil sie genau das
    steuert, was direkt darunter steht. Sie darf umbrechen: auf dem Handy
