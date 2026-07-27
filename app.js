@@ -2851,6 +2851,47 @@ function renderSetFilter(karten, bereich = "coll") {
 /* Sammlung und Wunschliste in einem: Filter zeichnen, Treffer zählen, Tabelle
    und Blätterleiste bauen. Was die beiden unterscheidet, steckt in LISTE
    (welche Zeilen) und im Tabellenmodus (welche Spalten und Knöpfe). */
+/* ------------------------------------------- Eben hinzugefügte Zeile zeigen
+   Gemerkt wird die ID, NICHT das <tr>. Der Grund ist handfest: reload() stößt
+   im Hintergrund Preisarchiv und Farbidentität an, und deren Nachträge zeichnen
+   die Liste neu (zeichneOffeneKartenliste). Eine Klasse, die direkt am Element
+   hing, war damit nach wenigen hundert Millisekunden fort — mitten in der
+   Animation und regelmäßig, bevor der Blick nach dem Scrollen überhaupt ankam.
+   Über die ID findet jedes Neuzeichnen die Markierung wieder.
+
+   Damit das Neuzeichnen die Animation nicht von vorn beginnen lässt (was als
+   Stottern zu sehen wäre), bekommt sie eine negative Verzögerung in Höhe der
+   schon verstrichenen Zeit — sie läuft dann dort weiter, wo sie war. */
+const TREFFER_MS = 2800;
+let trefferZeile = null, trefferStart = 0, trefferUhr = 0;
+
+function trefferMarkieren(id) {
+  clearTimeout(trefferUhr);
+  trefferZeile = id || null;
+  trefferStart = Date.now();
+  if (!trefferZeile) return;
+  trefferUhr = setTimeout(() => {
+    trefferZeile = null;
+    $$("tr.treffer").forEach(tr => {
+      tr.classList.remove("treffer");
+      tr.style.removeProperty("--treffer-ab");
+    });
+  }, TREFFER_MS);
+}
+
+/* Nach jedem Zeichnen der Liste die Markierung wieder anlegen. Die verstrichene
+   Zeit geht als NEGATIVE Verzögerung mit: die Animation setzt dort fort, wo sie
+   beim Verwerfen der alten Zeile stand, statt neu aufzuleuchten. Als CSS-
+   Variable, weil animation-delay nicht vererbt, die Animation aber an den
+   Zellen hängt und die Markierung an der Zeile. */
+function trefferAnwenden(tbl) {
+  if (!trefferZeile || !tbl) return;
+  const tr = tbl.querySelector(`tr[data-id="${CSS.escape(String(trefferZeile))}"]`);
+  if (!tr) return;
+  tr.style.setProperty("--treffer-ab", `-${Math.max(0, Date.now() - trefferStart)}ms`);
+  tr.classList.add("treffer");
+}
+
 function renderKartenliste(bereich) {
   const wunsch = bereich === "wish";
   const rows = filtered(bereich);
@@ -2896,6 +2937,7 @@ function renderKartenliste(bereich) {
   tbl.querySelector("tbody").innerHTML =
     seite.map(c => cardRow(c, wunsch ? { wunsch: true } : {})).join("");
   wireCardRows(tbl);
+  trefferAnwenden(tbl);
   renderPager(rows.length, seiten, bereich);
   // Jeder Bereich führt seinen eigenen Zähler: die Sammlung den der
   // Verkaufsliste in der Filterzeile, die Wunschliste den am Navigationspunkt.
@@ -2942,15 +2984,13 @@ async function zeigeKarteInSammlung(id) {
   if (idx < 0) return;                       // z. B. sofort wieder entfernt
   const gr = seitenGroesse();
   listPage.coll = gr ? Math.floor(idx / gr) : 0;
+  // Erst merken, dann zeichnen: renderKartenliste legt die Markierung selbst
+  // an — und tut das bei jedem weiteren Zeichnen wieder, auch wenn ein
+  // Nachtrag aus dem Hintergrund die Tabelle zwischendurch ersetzt.
+  trefferMarkieren(id);
   renderKartenliste("coll");
-  const tr = $(`#tbl tr[data-id="${CSS.escape(String(id))}"]`);
-  if (!tr) return;
-  tr.scrollIntoView({ behavior: "smooth", block: "center" });
-  // Die Hervorhebung läuft als CSS-Animation ab und nimmt sich selbst zurück;
-  // die Klasse muss trotzdem weg, sonst bliebe die Zeile beim nächsten
-  // Zeichnen unmarkiert, aber der Merker stünde noch.
-  tr.classList.add("treffer");
-  setTimeout(() => tr.classList.remove("treffer"), 2600);
+  $(`#tbl tr[data-id="${CSS.escape(String(id))}"]`)
+    ?.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 /* Die gerade offene der beiden Kartenlisten neu zeichnen — für Nachträge, die
