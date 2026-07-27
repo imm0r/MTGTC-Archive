@@ -2175,7 +2175,22 @@ function wireZiehImport() {
     [...(e.dataTransfer?.types || [])].some(x => ZIEH_TYPEN.includes(x));
   // In ein Textfeld gezogener Text soll dort landen — das ist die Erwartung und
   // obendrein nützlich (Kartenname ins Suchfeld). Dort halten wir uns heraus.
-  const imFeld = e => !!e.target?.closest?.("input,textarea,select,[contenteditable]");
+  //
+  // NUR dort. Ein <select> stand hier ebenfalls in der Liste, und das war ein
+  // Fehler mit Folgen: Aufnehmen kann es einen Text nicht, also griff die
+  // Browser-Vorgabe für eine abgelegte Adresse — HINNAVIGIEREN. Wer eine Karte
+  // knapp neben das Set- oder Ausführungs-Dropdown der Sammlung fallen ließ,
+  // verlor die App und landete auf der Fehlerseite des fremden Bildwirts
+  // (Cardmarkets CDN antwortet auf Fremdzugriffe mit 403). Dasselbe gälte für
+  // jedes andere Element, das keinen Text annimmt. Deshalb: ausschließlich
+  // echte Eingabefelder — und bei denen auch nur die textannehmenden Arten.
+  const TEXTARTEN = ["text", "search", "url", "email", "tel", "password", "number"];
+  const imFeld = e => {
+    const el = e.target?.closest?.("input,textarea,[contenteditable]");
+    if (!el) return false;
+    if (el.tagName !== "INPUT") return true;          // textarea, contenteditable
+    return TEXTARTEN.includes((el.type || "text").toLowerCase());
+  };
   const aus = () => { tiefe = 0; clearTimeout(wache); if (schleier) schleier.hidden = true; };
   const wachauf = () => { clearTimeout(wache); wache = setTimeout(aus, 900); };
 
