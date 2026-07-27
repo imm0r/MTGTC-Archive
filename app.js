@@ -1482,6 +1482,17 @@ function gathererLang(gebiet) {
 const cmSlugName = s => String(s || "").replace(/-V\d+$/i, "").replace(/[-_]+/g, " ")
   .replace(/\s+/g, " ").trim();
 
+/* Die Fassungsnummer aus einem Cardmarket-Slug („Anzrag-the-Quake-Mole-V2").
+   Cardmarket führt je ABWEICHENDEM ARTWORK ein eigenes Produkt und hängt ab
+   dem zweiten ein -V2, -V3 … an. Welche Sammlernummer damit gemeint ist, sagt
+   die Adresse aber nicht — und raten verbietet sich hier: Showcase- und
+   Sonderrahmen sind im Handel oft ein Vielfaches der regulären Auflage wert.
+   null = ohne Kürzel, also der Normaldruck. */
+const cmVariante = s => {
+  const m = String(s || "").match(/-V(\d+)$/i);
+  return m ? parseInt(m[1], 10) : null;
+};
+
 /* Cardmarkets Sprachnummern (der „?language=N"-Filter auf Produktseiten) auf
    Scryfalls Kürzel. Die Nummer ist die verlässlichste Sprachangabe, die
    Cardmarket überhaupt macht: Sie benennt die gesuchte KARTE, während der
@@ -1562,7 +1573,8 @@ function ziehKennung(adresse) {
     const i = teile.findIndex(x => x.toLowerCase() === "singles");
     if (i >= 0 && teile[i + 2])
       return { art: "cmname", quelle: "Cardmarket", lang,
-               name: cmSlugName(teile[i + 2]), setName: cmSlugName(teile[i + 1]) };
+               name: cmSlugName(teile[i + 2]), setName: cmSlugName(teile[i + 1]),
+               variante: cmVariante(teile[i + 2]) };
     // Produktbild: …/<Produktnummer>.jpg. Dass diese Zahl die Produktnummer
     // ist, ist GERATEN — deshalb „unsicher": der Treffer gilt erst, wenn der
     // mitgezogene Name dazu passt (siehe karteAusKennung).
@@ -1678,7 +1690,7 @@ async function karteAusKennung(k, nameHinweis, standardLang) {
     const genau = await sfCode(k.set, k.cn, k.lang);
     return genau ? withPrice(genau) : findByCode(k.set, k.cn, k.lang);
   }
-  if (k.art === "cmname") return cmKarteAusNamen(k.name, k.setName, k.lang || standardLang);
+  if (k.art === "cmname") return cmKarteAusNamen(k.name, k.setName, k.lang || standardLang, k.variante);
   return null;
 }
 
@@ -1690,7 +1702,7 @@ async function karteAusKennung(k, nameHinweis, standardLang) {
    keine — Cardmarket schneidet Sets teils anders zu und benennt sie anders —,
    bleibt es beim Treffer der Namenssuche: dieselbe Karte, nur womöglich eine
    andere Auflage. */
-async function cmKarteAusNamen(name, setName, lang) {
+async function cmKarteAusNamen(name, setName, lang, variante) {
   if (!name) return null;
   let hit = null;
   try { hit = (await findCard(name, lang)).card; } catch { /* unten null */ }
@@ -1712,8 +1724,15 @@ async function cmKarteAusNamen(name, setName, lang) {
   // und Sonderrahmen ein "-V2"/"-V3" an — die nackte Adresse meint den
   // Normaldruck, und der trägt die niedrigste Sammlernummer.
   const nr = c => parseInt(String(c.collector_number).replace(/\D/g, ""), 10) || 1e9;
-  const regulaer = drucke.filter(c => setWorte(c.set_name) === gesucht)
-    .sort((a, b) => nr(a) - nr(b))[0];
+  const imSet = drucke.filter(c => setWorte(c.set_name) === gesucht);
+  // Trägt die Adresse ein Fassungskürzel, ist der Normaldruck NICHT gemeint —
+  // welche der übrigen Auflagen aber schon, sagt sie nicht. Dann wird nicht
+  // geraten, sondern gefragt: Die Auflagen des Sets gehen als Auswahlliste
+  // zurück, und der Nutzer erkennt am Bild, welche er in der Hand hält. Ein
+  // still eingetragenes Standard-Artwork wäre hier der teuerste Fehler — im
+  // Handel trennen Showcase und Normaldruck oft ein Vielfaches des Preises.
+  if (variante && imSet.length > 1) return { kandidaten: imSet };
+  const regulaer = imSet.sort((a, b) => nr(a) - nr(b))[0];
   if (!regulaer) return withPrice(await inSprache(hit, lang));
   // Sprache der Cardmarket-Seite bzw. des Scan-Dropdowns, sofern Scryfall die
   // Auflage in ihr führt (ein Cardmarket-Produkt führt alle Sprachen).
@@ -1870,6 +1889,13 @@ async function ziehErkennen(nutzlast, lang, schritt, diag) {
     let card = null, fehler = null;
     try { card = await karteAusKennung(k, nameHinweis, lang); }
     catch (e) { fehler = e.message; }   /* Abruf fehlgeschlagen — nächster Weg */
+    // Mehrere Auflagen kommen in Frage (Cardmarket-Fassungskürzel): nicht
+    // raten, sondern die Auswahlliste zeigen — am Bild erkennt der Nutzer
+    // seine Auflage sofort.
+    if (card?.kandidaten) {
+      notiz(`${k.art} · ${k.quelle}`, `${card.kandidaten.length} Auflagen zur Auswahl`, fehler);
+      return { card: null, guess: k.name || nameHinweis, candidates: card.kandidaten };
+    }
     notiz(`${k.art} · ${k.quelle}`, card ? `${card.name} [${card.set}/${card.collector_number}/${card.lang}]` : "—", fehler);
     if (card) return { card, quelle: k.quelle, sicher: true };
   }
