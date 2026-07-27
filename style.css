@@ -2,6 +2,25 @@
   --bg:#12131a; --panel:#1b1d27; --panel2:#232633; --line:#31364a;
   --txt:#e8e9f0; --dim:#9aa0b8; --acc:#c9a227; --acc2:#e3bf4a;
   --ok:#4caf7d; --err:#e0605e; --radius:12px;
+
+  /* ----------------------------------------------------------- „Aktiv"
+     Ein Zustand, eine Sprache — hier an EINER Stelle festgelegt.
+     Vorher markierte jede Komponente „ausgewählt" anders: die Kopfzeile mit
+     voller Goldfläche, die Blätterleiste nur mit Goldrand, die Verkaufsliste
+     mit getönter Fläche. Am meisten fiel die Kopfzeile auf — eine
+     vollflächige Pille zwischen lauter Umriss-Pillen liest sich nicht als
+     „ausgewählt", sondern als anderes Bauteil. Und Gold auf Gold zwang den
+     Zähler darin zu einer eigenen Umkehrregel; die ist damit hinfällig.
+
+     Markiert wird jetzt über die FARBE statt über die Masse: getönte Fläche,
+     goldener Rand, goldene Schrift. Der Umriss bleibt, nur sein Ton wechselt.
+
+     Zwei Stufen, und der Unterschied ist keine Laune: Knöpfe bekommen den
+     Schein dazu, Listenzeilen und kleine Schalter nicht — auf einem
+     30-px-Kästchen ist ein Leuchten kein Hinweis mehr, sondern Lärm. */
+  --akt-flaeche:rgba(201,162,39,.13);
+  --akt-rand:rgba(201,162,39,.75);
+  --akt-schein:0 0 0 1px rgba(201,162,39,.18),0 3px 14px -6px rgba(201,162,39,.85);
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--txt);
@@ -12,7 +31,8 @@ h1{font-size:17px;margin:0;letter-spacing:.5px;color:var(--acc)}
 nav{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;align-items:center}
 nav button{background:transparent;border:1px solid var(--line);color:var(--dim);
            padding:7px 14px;border-radius:999px;cursor:pointer;font-size:14px}
-nav button.on{background:var(--acc);border-color:var(--acc);color:#1a1400;font-weight:600}
+nav button.on{background:var(--akt-flaeche);border-color:var(--akt-rand);color:var(--acc2);
+               font-weight:600;box-shadow:var(--akt-schein)}
 /* Neben dem Logo: Statusseite und Version, zweizeilig untereinander. */
 .header-meta{display:inline-flex;flex-direction:column;align-items:flex-start;
              gap:1px;line-height:1.25;min-width:0}
@@ -50,7 +70,7 @@ nav button.on{background:var(--acc);border-color:var(--acc);color:#1a1400;font-w
 .who-menu .menu button{background:transparent;border:0;border-radius:7px;color:var(--txt);
   padding:8px 11px;text-align:left;font-size:14px;cursor:pointer;width:100%;font-weight:400}
 .who-menu .menu button:hover{background:var(--panel)}
-.who-menu .menu button.on{color:var(--acc);font-weight:600}
+.who-menu .menu button.on{background:var(--akt-flaeche);color:var(--acc2);font-weight:600}
 main{padding:14px;max-width:1100px;margin:0 auto}
 /* Die Spielrunde bekommt mehr Breite als der Rest der App. Die Matte hat feste
    schmale Spalten (Steuer, Kommandozone, Bibliothek, Exil, Lebenspunkte,
@@ -144,7 +164,8 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
    für den klebenden Seitenkopf. */
 .pager{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:12px}
 .pager:empty{display:none}
-.pager .pager-on{border-color:var(--acc);color:var(--acc);font-weight:600}
+.pager .pager-on{background:var(--akt-flaeche);border-color:var(--akt-rand);color:var(--acc2);
+                 font-weight:600;box-shadow:var(--akt-schein)}
 .pager button:disabled{opacity:.4;cursor:default}
 .pager-dots{color:var(--dim);padding:0 2px}
 /* Trefferzähler über der Tabelle: dezent, rechtsbündig; die eigentliche Zahl
@@ -166,14 +187,11 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
   display:inline-flex;align-items:baseline;gap:4px;vertical-align:top}
 .wunsch-decks .dc-nm{overflow:hidden;text-overflow:ellipsis;min-width:0}
 .wunsch-decks .dc-n{flex:0 0 auto}
-/* Zähler am Navigationspunkt: auf dem AKTIVEN Knopf liegt Gold auf Gold —
-   dort die Farben tauschen, sonst wäre die Zahl unsichtbar. Gilt auch für die
-   Zähler im Benutzermenü (Nachrichten, Spielrunde). */
-nav button.on .menu-badge{background:#1a1400;color:var(--acc)}
 .tabs{display:flex;gap:6px;margin-bottom:12px}
 .tabs button{flex:1;background:transparent;border:1px solid var(--line);color:var(--dim);
              padding:8px;border-radius:8px;cursor:pointer}
-.tabs button.on{background:var(--panel2);border-color:var(--acc);color:var(--txt)}
+.tabs button.on{background:var(--akt-flaeche);border-color:var(--akt-rand);color:var(--acc2);
+                font-weight:600;box-shadow:var(--akt-schein)}
 .msg{font-size:13px;margin-top:10px;min-height:19px}
 .msg.err{color:var(--err)} .msg.ok{color:var(--ok)}
 
@@ -416,7 +434,8 @@ nav button.on .menu-badge{background:#1a1400;color:var(--acc)}
 .ev-att-st.st-yes{background:rgba(60,180,90,.2);color:var(--ok)}
 .ev-att-st.st-no{background:rgba(210,80,80,.18);color:var(--err)}
 .ev-att-st.st-maybe{background:rgba(210,170,60,.18);color:var(--acc)}
-.ev-rsvp.on{background:var(--acc);color:#1a1400}
+.ev-rsvp.on{background:var(--akt-flaeche);border-color:var(--akt-rand);color:var(--acc2);
+            box-shadow:var(--akt-schein)}
 .ev-invite-list{display:flex;flex-direction:column;gap:4px;max-height:200px;overflow:auto}
 .ev-inv{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
 .ev-inv span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -895,7 +914,8 @@ td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000
    in den 30-px-Kästchen besser. */
 .ci-sym .ms:not(.ms-cost){font-size:18px}
 .ci-box:hover .ci-sym{opacity:.85}
-.ci-box input:checked ~ .ci-sym{opacity:1;border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
+.ci-box input:checked ~ .ci-sym{opacity:1;border-color:var(--akt-rand);background:var(--akt-flaeche);
+  box-shadow:0 0 0 1px var(--akt-rand) inset}
 .ci-box input:focus-visible ~ .ci-sym{box-shadow:0 0 0 2px var(--acc)}
 /* In der Detailansicht stehen die Kosten hinter dem Namen (kein flex: so bleibt
    der Name normaler Textfluss und darf umbrechen). In den Tabellen haben sie
@@ -933,8 +953,8 @@ td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000
 .set-select.open .set-menu{display:block}
 .set-item{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:6px;cursor:pointer;
   font-size:14px;white-space:nowrap}
-.set-item.on{font-weight:600;color:var(--acc)}
-.set-item:hover{background:var(--acc);color:#1a1400}
+.set-item.on{font-weight:600;color:var(--acc2);background:var(--akt-flaeche)}
+.set-item:hover{background:var(--akt-flaeche);color:var(--acc2)}
 /* Set-Icon in Trigger und Liste neutral (nicht nach Seltenheit gefärbt) — ein
    Set enthält alle Raritäten. gap trennt schon, deshalb keine eigene Marge. */
 .set-item .ss,.set-trigger-inner .ss{margin-right:0}
@@ -960,8 +980,8 @@ td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000
   max-height:280px;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.35)}
 .lang-select.open .lang-menu{display:block}
 .lang-item{display:flex;align-items:center;gap:9px;padding:8px 8px;border-radius:6px;cursor:pointer;font-size:14px}
-.lang-item.on{font-weight:600;color:var(--acc)}
-.lang-item:hover{background:var(--acc);color:#1a1400}
+.lang-item.on{font-weight:600;color:var(--acc2);background:var(--akt-flaeche)}
+.lang-item:hover{background:var(--akt-flaeche);color:var(--acc2)}
 
 .stats{display:flex;gap:10px;flex-wrap:wrap}
 .stat{flex:1;min-width:130px;background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);padding:12px}
@@ -1059,10 +1079,15 @@ html{scrollbar-width:thin;scrollbar-color:var(--line) transparent}
   background:#000;flex:none;box-shadow:0 2px 8px #0008}
 /* Erster + (bei Partnern) zweiter Commander nebeneinander im Deck-Kopf. */
 .deck-cmds{display:flex;gap:4px;flex:none}
-.star-on{border-color:var(--acc);color:var(--acc)}
+/* Mit .btn.ghost davor, nicht als blosses .star-on: die Sterne sind
+   `btn ghost sm`, und .btn.ghost setzt Rand UND Farbe mit zwei Klassen. Ein
+   einklassiges .star-on verlor dagegen — der aktive Commander-Stern war
+   deshalb nie golden, sondern seit jeher ein Knopf wie jeder andere. Aufgefallen
+   ist es nur, weil das Glyph (☆ → ★) trotzdem umsprang. */
+.btn.ghost.star-on{border-color:var(--akt-rand);color:var(--acc2);background:var(--akt-flaeche)}
 /* Aktiver Partner-Stern (zweiter Commander) — eigener Farbton zur Unterscheidung
    vom ersten Commander-Stern. */
-.star2-on{border-color:var(--acc2);color:var(--acc2)}
+.btn.ghost.star2-on{border-color:var(--acc2);color:var(--acc2);background:var(--akt-flaeche)}
 
 /* ------------------------------------------------------------ Diverses */
 dialog{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:var(--radius);
@@ -1206,7 +1231,7 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px}
 }
 
 /* --------- Cardmarket-Verkaufsliste --------- */
-.sell-toggle.on{border-color:var(--acc);color:var(--acc);background:rgba(201,162,39,.14);font-weight:700}
+.sell-toggle.on{border-color:var(--akt-rand);color:var(--acc2);background:var(--akt-flaeche);font-weight:700}
 #sell-open.has{border-color:var(--acc);color:var(--acc2)}
 #sell-dlg,#buy-dlg{max-width:560px;width:calc(100% - 32px)}
 .sell-liste{display:flex;flex-direction:column;max-height:46vh;overflow:auto;
