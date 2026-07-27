@@ -977,6 +977,10 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
 .deck-cat-head>td{background:var(--panel2);border-top:1px solid var(--line);
   padding:6px 10px;font-size:12.5px;font-weight:600;color:var(--acc2)}
 .deck-cat-head:hover>td{color:var(--acc)}
+/* Im Blick auf ein fremdes Deck klappt nichts auf oder zu — dann darf die
+   Kopfzeile auch nicht wie ein Knopf aussehen. */
+.deck-cat-head.stumm{cursor:default}
+.deck-cat-head.stumm:hover>td{color:var(--acc2)}
 .deck-cat-arrow{display:inline-block;width:12px;color:var(--dim);font-size:10px;margin-right:6px}
 .deck-cat-count{color:var(--dim);font-weight:400;margin-left:8px}
 .deck-cat-body.zu tr:not(.deck-cat-head){display:none}

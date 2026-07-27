@@ -10458,8 +10458,28 @@ async function zeigeFreundDecks(friendId) {
       const { data: cards } = await sb.from("cards").select("*").in("id", cardIds);
       (cards || []).forEach(c => cardsById[c.id] = { ...c, set: c.set_code, disp: c.printed_name || c.name });
     }
+    // Die Einteilung des FREUNDES mitladen. Sie ist Teil dessen, was er geteilt
+    // hat: Ein Deck ohne sie ist eine Liste, mit ihr ein Bauplan. Die RLS gibt
+    // beides für geteilte Decks frei (deck_categories_select_shared).
+    //
+    // Fehlt die Tabelle in dieser Datenbank, bleibt es bei der schlichten
+    // Liste — dafür werden die Fehler hier abgefangen und nicht geworfen.
+    const kats = {}, zuord = new Map();
+    try {
+      const [k, z] = await Promise.all([
+        sb.from("deck_categories").select("*").in("deck_id", deckIds).order("pos").order("created"),
+        sb.from("deck_entry_categories").select("*").in("deck_id", deckIds),
+      ]);
+      for (const x of (k.data || [])) (kats[x.deck_id] ||= []).push(x);
+      for (const x of (z.data || [])) {
+        const s = x.deck_id + "|" + x.card_id;
+        if (!zuord.has(s)) zuord.set(s, []);
+        zuord.get(s).push({ id: x.category_id, primaer: !!x.is_primary });
+      }
+    } catch { /* ältere Datenbank — dann eben ohne Einteilung */ }
     ziel.innerHTML = `<h3 style="margin:14px 2px 4px">${esc(t("deck.sharedFrom", { name }))}</h3>` +
-      decks.map(d => friendDeckHtml(d, (entries || []).filter(e => e.deck_id === d.id), cardsById)).join("");
+      decks.map(d => friendDeckHtml(d, (entries || []).filter(e => e.deck_id === d.id),
+                                    cardsById, kats[d.id] || [], zuord)).join("");
     // Auf-/Zuklappen (der Import-Knopf im Kopf darf nicht mit-toggeln) + Import.
     ziel.querySelectorAll(".deck-kopf[data-ftoggle]").forEach(k => k.onclick = ev => {
       if (ev.target.closest("button")) return;
@@ -10483,21 +10503,51 @@ const freundDeckOffen = new Set();
 /* Read-only Deck eines Freundes: auf-/zuklappbarer Kopf mit Kennzahlen (wie in
    der eigenen Deckliste) und eine einfache Kartenliste (Bild, Name, Set·#,
    Deckmenge, Preis). Keine Bearbeitung; ein Knopf übernimmt das Deck. */
-function friendDeckHtml(d, entries, cardsById) {
+function friendDeckHtml(d, entries, cardsById, kategorien = [], zuord = new Map()) {
   const rows = entries.map(e => ({ e, c: cardsById[e.card_id] })).filter(x => x.c)
     .sort((a, b) => a.c.disp.localeCompare(b.c.disp));
   const n = rows.reduce((s, x) => s + x.e.qty, 0);
   const v = rows.reduce((s, x) => s + (x.c.price || 0) * x.e.qty, 0);
   const haupt = d.main_card_id ? cardsById[d.main_card_id] : null;
   const offen = freundDeckOffen.has(d.id);
-  const list = rows.map(({ e, c }) => `
+  const zeile = ({ e, c }) => `
     <tr>
       <td style="width:40px">${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy" style="width:34px;border-radius:3px;display:block">` : ""}</td>
       <td>${esc(c.disp)}</td>
       <td class="hide-s">${esc(c.set_name || c.set || "")} &middot; #${esc(c.cn)}</td>
       <td class="num">${e.qty}&times;</td>
       <td class="num">${eur(c.price)}</td>
-    </tr>`).join("");
+    </tr>`;
+
+  // Hat der Freund sein Deck eingeteilt, zeigen wir SEINE Einteilung. Hat er
+  // keine, bleibt es bei der schlichten alphabetischen Liste — hier wird nichts
+  // umgruppiert, was er nicht selbst so angelegt hat.
+  //
+  // Bewusst ohne deckGruppen(): Dessen Umschalter zwischen Typ und Kategorien
+  // gehört dem Eigentümer der Ansicht und liegt in seinem Browser. Für einen
+  // fremden Blick gibt es nur eine richtige Ordnung — die des Erbauers.
+  let list;
+  if (kategorien.length) {
+    const gruppen = new Map(kategorien.map(k => [k.id, []]));
+    const rest = [];
+    for (const x of rows) {
+      const meine = (zuord.get(d.id + "|" + x.c.id) || []).filter(z => gruppen.has(z.id));
+      if (!meine.length) rest.push(x);
+      else for (const z of meine) gruppen.get(z.id).push(x);
+    }
+    // "stumm": Hier klappt nichts auf oder zu — die Kopfzeile darf also auch
+    // nicht so aussehen. Leere Kategorien bleiben trotzdem stehen, wie in der
+    // eigenen Ansicht: Sie sind eine Aussage dessen, der das Deck gebaut hat.
+    const block = (label, items) => `
+      <tr class="deck-cat-head stumm"><td colspan="99">
+        <span class="deck-cat-name">${esc(label)}</span>
+        <span class="deck-cat-count">${items.reduce((s, x) => s + x.e.qty, 0)}</span></td></tr>
+      ${items.map(zeile).join("")}`;
+    list = kategorien.map(k => block(k.name, gruppen.get(k.id))).join("")
+         + (rest.length ? block(t("kat.none"), rest) : "");
+  } else {
+    list = rows.map(zeile).join("");
+  }
   return `<div class="card">
     <div class="deck-kopf" data-ftoggle="${esc(d.id)}" title="${offen ? t("common.collapse") : t("common.expand")}">
       <span class="deck-pfeil">${offen ? "&#9660;" : "&#9654;"}</span>

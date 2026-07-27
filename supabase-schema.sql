@@ -943,9 +943,8 @@ drop policy if exists deck_entries_select_shared on public.deck_entries;
 create policy deck_entries_select_shared on public.deck_entries for select to authenticated
   using (public.deck_shared(deck_id) and public.are_friends(auth.uid(), user_id));
 -- Ohne diese Zeile wäre ein geteiltes Deck halb sichtbar — die Karten schon,
--- ihre Einteilung nicht. Die Freundesansicht zeigt die Kategorien noch nicht
--- an; das Recht gehört trotzdem hierher, damit die Zugriffsregeln vollständig
--- sind und nicht später nachgereicht werden müssen.
+-- ihre Einteilung nicht. Und die ist Teil dessen, was geteilt wird: Ein Deck
+-- ohne sie ist eine Liste, mit ihr ein Bauplan.
 drop policy if exists deck_categories_select_shared on public.deck_categories;
 create policy deck_categories_select_shared on public.deck_categories for select to authenticated
   using (public.deck_shared(deck_id) and public.are_friends(auth.uid(), user_id));
