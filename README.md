@@ -121,12 +121,37 @@ Angehoben wird immer auf die Version im **Zielzweig**, nicht auf die im Zweig
 des Pull Requests. So bleibt es bei mehreren Läufen am selben Pull Request bei
 einer einzigen Anhebung.
 
+### Zwei Pull Requests gleichzeitig
+
+Genau daraus folgt eine Lücke, denn gerechnet wird gegen den Zielzweig **zum
+Zeitpunkt des Laufs**: Sind A und B gleichzeitig offen, rechnet B gegen das
+`main` *vor* A. Wird A zusammengeführt, trägt B eine längst vergebene Nummer —
+B zu mergen ließe die Version stehen oder, bei kleinerer Stufe, sogar fallen.
+Ein Ereignis dafür gibt es nicht: GitHub meldet keinem Pull Request, dass sich
+sein Zielzweig bewegt hat.
+
+Deshalb läuft `version.yml` **auch bei jedem Push auf `main`** und tut dort
+zweierlei:
+
+1. **Offene Pull Requests nachziehen** — jeder bekommt seine Nummer gegen das
+   neue `main` neu berechnet und in seinen Zweig geschrieben. Damit stimmt sie
+   wieder, ohne dass jemand etwas anfassen muss. (Pull Requests aus fremden
+   Gabelungen werden übersprungen — dorthin lässt sich nicht schreiben.)
+2. **Nachsehen, ob die Nummer wirklich gestiegen ist** — das Netz darunter,
+   falls doch etwas durchrutscht. Steht sie still, obwohl sich `app.js`,
+   `i18n.js`, `style.css` oder `index.html` geändert haben, oder ist sie
+   gefallen, schlägt der Lauf fehl. Reine Doku- oder Workflow-Commits stören
+   dabei nicht.
+
 Von Hand nachfahren geht auch, `scripts/version.mjs` ist dasselbe Programm:
 
 ```bash
 node scripts/version.mjs            # nur die Hashes auffrischen
 node scripts/version.mjs minor      # Version anheben und Hashes auffrischen
 node scripts/version.mjs --pruefen  # nichts schreiben, Exit 1 bei Abweichung
+node scripts/version.mjs --stufe "Titel [minor]"   # Stufe aus einem Titel lesen
+node scripts/version.mjs --hoeher 0.18.0 0.17.1    # Exit 0, wenn wirklich höher
+scripts/version-wache.sh            # HEAD gegen HEAD~1 prüfen (wie nach dem Merge)
 ```
 
 **Warum `?v=` überhaupt nötig ist:** Die App liegt auf GitHub Pages *und* auf

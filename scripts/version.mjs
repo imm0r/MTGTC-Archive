@@ -62,6 +62,31 @@ export function versionAus(html) {
   return /<meta\s+name="app-version"\s+content="([^"]*)"/.exec(html)?.[1] ?? null;
 }
 
+/* Vergleicht zwei Versionen als Zahlentripel, nicht als Text: "0.10.0" ist
+   höher als "0.9.0", als Zeichenkette wäre es kleiner. Grundlage der Wache,
+   die nach dem Zusammenführen prüft, ob die Nummer wirklich gestiegen ist. */
+export function istHoeher(neu, alt) {
+  const z = v => { const m = VERSION_RX.exec(v); return m ? m.slice(1).map(Number) : null; };
+  const a = z(neu), b = z(alt);
+  if (!a || !b) throw new Error(`Version nicht lesbar: "${!a ? neu : alt}" (erwartet X.Y.Z)`);
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i];
+  return false;                                    // gleich ist nicht höher
+}
+
+/* Die Stufe aus einem Pull-Request-Titel lesen. Steht hier und nicht im
+   Workflow, weil sie inzwischen an ZWEI Stellen gebraucht wird (beim Pull
+   Request und beim Nachziehen offener Pull Requests nach einem Merge) — und
+   eine Regel, die zweimal geschrieben ist, driftet. Wirft mit der Anleitung
+   aus der README, wenn sie fehlt oder mehrdeutig ist. */
+export function stufeAusTitel(titel) {
+  const gefunden = STUFEN.filter(s => String(titel ?? "").toLowerCase().includes(`[${s}]`));
+  if (gefunden.length > 1)
+    throw new Error(`Im Titel stehen mehrere Stufen (${gefunden.map(s => `[${s}]`).join(" und ")}). Bitte genau eine angeben.`);
+  if (!gefunden.length)
+    throw new Error(`Im Titel fehlt die Stufe. Ergänze [major], [minor] oder [patch] — siehe README.md, Abschnitt „Versionsnummer". Titel war: ${titel}`);
+  return gefunden[0];
+}
+
 const hashVon = pfad =>
   createHash("sha256").update(readFileSync(resolve(WURZEL, pfad))).digest("hex").slice(0, 8);
 
@@ -77,6 +102,25 @@ export function hashesSetzen(html, warnen = () => {}) {
 }
 
 function main(argv) {
+  // --stufe "<Titel>": nur die Stufe ausgeben (für die Workflows). Kein
+  // Schreiben, keine index.html — deshalb ganz vorn und mit eigenem Ausstieg.
+  const iS = argv.indexOf("--stufe");
+  if (iS >= 0) {
+    try { console.log(stufeAusTitel(argv[iS + 1])); }
+    catch (e) { console.error(e.message); process.exit(1); }
+    return;
+  }
+  // --hoeher A B: Exit 0, wenn A höher als B ist — sonst 1 mit Meldung.
+  const iH = argv.indexOf("--hoeher");
+  if (iH >= 0) {
+    const [neu, alt] = [argv[iH + 1], argv[iH + 2]];
+    try {
+      if (istHoeher(neu, alt)) { console.log(`${neu} ist höher als ${alt}.`); return; }
+      console.error(`Version ist nicht gestiegen: ${alt} → ${neu}.`);
+    } catch (e) { console.error(e.message); }
+    process.exit(1);
+  }
+
   const pruefen = argv.includes("--pruefen");
   const rest = argv.filter(a => a !== "--pruefen");
   const stufe = rest[0] || null;
