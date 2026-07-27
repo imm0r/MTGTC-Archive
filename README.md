@@ -644,10 +644,45 @@ der Gruppen ist **nicht mehr** die Deckgröße. Sie kann sie übersteigen, sobal
 eine Karte in zwei Fächern liegt. Die Zahl über der Tabelle zählt weiter jede
 Karte genau einmal — nur die Zahlen an den Gruppen zählen Zuordnungen.
 
-Zugeordnet wird über die Kategorie-Spalte der Kartenzeile: Sie zeigt die Fächer
-als Marken (die primäre hervorgehoben) und öffnet auf Klick die Auswahl. Dort
-lässt sich auch gleich eine neue Kategorie anlegen, damit die erste Einordnung
-nicht über die Verwaltung führen muss.
+### Einordnen durch Ziehen
+
+Der schnelle Weg: **eine Kartenzeile anfassen und ziehen**. Sobald der Zug
+beginnt, legen sich die Fächer als **Ablageflächen über die Oberfläche** —
+darunter bleibt das Deck sichtbar, nur zurückgenommen. Fallen lassen, fertig.
+
+Das ist nicht bloß Schauwert. Flächen, die schweben, brauchen im Layout **keinen
+Platz**: Sie verhalten sich bei jeder Auflösung gleich, funktionieren in der
+Tabelle ebenso wie später in der Spaltenansicht, und ersparen das Einordnen
+Karte für Karte über einen Dialog.
+
+Die Regel dahinter, in drei Zeilen:
+
+* **Loslassen** ordnet in das Fach ein und nimmt die Karte aus dem Fach heraus,
+  aus dem sie *gezogen* wurde. Kam sie aus keinem — Typ-Ansicht oder „Ohne
+  Kategorie" —, kommt das Ziel schlicht hinzu.
+* **Mit Strg** (bzw. Cmd) kommt das Ziel immer nur *hinzu*; es fällt nichts weg.
+  Der Hinweis unter den Flächen wechselt mit der Taste, damit man vor dem
+  Loslassen sieht, was passieren wird.
+* Auf **„Ohne Kategorie"** abgelegt, fallen alle Zuordnungen weg.
+
+Das Kennzeichen *primär* wandert mit: Es geht ans Ziel, wenn die Karte noch
+keines hatte oder wenn ausgerechnet das ersetzte Fach es trug — sonst bleibt es,
+wo es war. Fächer, in denen die Karte schon liegt, sind beim Ziehen als solche
+gekennzeichnet. Eine Fläche **„+ Neue Kategorie"** legt eines an und ordnet
+gleich ein.
+
+Der **Zieh-Import** (Karten aus einem zweiten Fenster hereinziehen) kommt sich
+damit nicht in die Quere: Der merkt sich, ob ein Zug *innerhalb* der App begann,
+und hält sich dann heraus — dafür war die Unterscheidung von Anfang an da.
+
+### … und der Weg ohne Ziehen
+
+Auf Touch-Geräten gibt es kein HTML5-Ziehen. Deshalb bleibt die
+**Kategorie-Spalte** der Kartenzeile, was sie war: Sie zeigt die Fächer als
+Marken (die primäre hervorgehoben) und öffnet auf Klick eine Auswahl mit Häkchen
+und Stern. Dort lässt sich ebenfalls gleich eine neue Kategorie anlegen. Beide
+Wege schreiben durch dieselbe Funktion — zwei Wege zu derselben Datenbank, die
+auseinanderliefen, wären zwei Fehlerquellen.
 
 **Beide Ordnungen bleiben.** Umgeschaltet wird je Deck und je Gerät, gemerkt im
 Browser. Das ist keine Unentschlossenheit: Ein halb eingeordnetes Deck ist der
