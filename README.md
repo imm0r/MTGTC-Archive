@@ -673,6 +673,38 @@ wo es war. Fächer, in denen die Karte schon liegt, sind beim Ziehen als solche
 gekennzeichnet. Eine Fläche **„+ Neue Kategorie"** legt eines an und ordnet
 gleich ein.
 
+### Automatisch einordnen
+
+Hundert Karten von Hand einzuordnen ist auch mit Ziehen ein Abend Arbeit. Der
+Knopf **⚡ Automatisch** schlägt für jede Karte **ohne Kategorie** eine vor —
+anhand ihres Regeltexts.
+
+Die Regeln sind bewusst **dieselben**, mit denen die Deck-Analyse zählt
+(`AN_KATEGORIEN`): Ramp, Kartenvorteil, Entfernung, Boardwipes. Ein zweiter Satz
+Muster daneben hieße, dass die Analyse eine Karte als Ramp zählt, die die
+Einordnung nicht als Ramp ansieht — zwei Wahrheiten über dieselbe Karte. Dazu
+kommen nur die **Länder**, die die Analyse nicht führt, weil sie dort keine
+Funktionslücke sein können.
+
+Drei Zusagen:
+
+* **Angefasst wird nur, was noch nirgends liegt.** Was du selbst eingeordnet
+  hast, ist eine Entscheidung; die überschreibt kein Automat.
+* **Nichts geschieht ungefragt.** Der Vorschlag steht erst als Liste da —
+  welche Kategorie wie viele Karten bekäme und wie viele ohne bleiben —, und
+  wird erst auf OK geschrieben.
+* **Fehlende Kategorien entstehen mit**, vorhandene gleichen Namens werden
+  wiederverwendet.
+
+Greift mehr als eine Regel, bekommt die Karte mehrere Fächer; die erste
+greifende wird die primäre. Mit den engen Mustern der Analyse ist das der
+Ausnahmefall — die Möglichkeit kostet aber nichts und verhindert, dass eine
+Karte willkürlich einem Fach zugeschlagen wird, in das sie nur zur Hälfte
+gehört.
+
+Was keine Regel trifft (eine Vanilla-Kreatur etwa), bleibt unter „Ohne
+Kategorie" liegen. Das ist Absicht: Geraten wird nicht.
+
 ### Kartenansicht: das Deck als Stapel
 
 Über der Liste steht neben der Gruppierung ein zweiter Umschalter: **Tabelle**

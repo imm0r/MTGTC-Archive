@@ -6769,7 +6769,111 @@ function deckGruppeLeisteHtml(d) {
     </div>
     <button class="btn ghost sm" data-katverw="${d.id}"
       title="${esc(t("kat.manageTitle"))}">&#127991; ${esc(t("kat.manage"))}</button>
+    <button class="btn ghost sm" data-katauto="${d.id}"
+      title="${esc(t("kat.autoTitleBtn"))}">&#9889; ${esc(t("kat.auto"))}</button>
   </div>`;
+}
+
+/* ---------------------------------------------- Automatisch einordnen
+   Hundert Karten von Hand einzuordnen ist auch mit Ziehen ein Abend Arbeit.
+   Dieser Weg schlägt für jede Karte OHNE Kategorie eine vor — anhand des
+   Regeltexts.
+
+   Die Regeln sind bewusst DIESELBEN, mit denen die Deck-Analyse schon zählt
+   (AN_KATEGORIEN). Ein zweiter Satz Muster daneben hieße, dass die Analyse eine
+   Karte als Ramp zählt, die die Einordnung nicht als Ramp ansieht — zwei
+   Wahrheiten über dieselbe Karte. Dazu kommen nur die Länder, die die Analyse
+   nicht führt, weil sie dort keine Funktionslücke sein können.
+
+   MEHRERE TREFFER SIND ERLAUBT: Greift mehr als eine Regel, bekommt die Karte
+   mehrere Fächer — dafür darf eine Karte seit 0.24.0 in mehreren stehen. Die
+   erste greifende Regel wird die primäre. Mit den Mustern der Analyse ist das
+   der Ausnahmefall, weil sie eng gefasst sind; die Möglichkeit kostet aber
+   nichts und verhindert, dass eine Karte willkürlich einem Fach zugeschlagen
+   wird, in das sie nur zur Hälfte gehört. Länder stehen vorn und für sich —
+   die Ramp-Regel der Analyse schließt sie ohnehin aus.
+
+   ANGEFASST WIRD NUR, WAS NOCH NIRGENDS LIEGT. Was der Nutzer selbst
+   eingeordnet hat, ist eine Entscheidung; die überschreibt kein Automat. */
+function autoRegeln() {
+  return [
+    { name: t("kat.autoLands"), test: c => /\bland\b/i.test(c.type_line || "") },
+    ...AN_KATEGORIEN.map(k => ({ name: t("an.cat." + k.key), test: k.test })),
+  ];
+}
+
+/* Was der Automat vorschlagen würde: [{ eintrag, karte, namen[] }] — ohne zu
+   schreiben. Eigene Funktion, damit der Vorschlag gezeigt werden kann, bevor
+   irgendetwas geschieht. */
+function autoVorschlag(d) {
+  const regeln = autoRegeln();
+  const offen = (d.entries || []).filter(e => !(e.kats || []).length);
+  const treffer = [];
+  for (const e of offen) {
+    const c = CARDS.find(x => x.id === e.cardId);
+    if (!c) continue;
+    const namen = regeln.filter(r => { try { return r.test(c); } catch { return false; } })
+                        .map(r => r.name);
+    if (namen.length) treffer.push({ e, c, namen });
+  }
+  return { treffer, offen: offen.length };
+}
+
+async function autoEinordnen(deckId) {
+  const d = DECKS.find(x => x.id === deckId);
+  if (!d) return;
+  if (DECK_KAT_TABELLE_FEHLT) return toast(t("kat.needSchema"));
+
+  const { treffer, offen } = autoVorschlag(d);
+  if (!treffer.length) return toast(t("kat.autoNone"));
+
+  // Nach Zielkategorie zählen — das ist die Auskunft, an der man erkennt, ob
+  // der Vorschlag taugt. Die Reihenfolge folgt den Regeln, nicht der Menge:
+  // So steht die Liste in derselben Ordnung wie später die Spalten.
+  const zaehler = new Map();
+  for (const x of treffer) for (const n of x.namen) zaehler.set(n, (zaehler.get(n) || 0) + x.e.qty);
+  const reihenfolge = autoRegeln().map(r => r.name).filter(n => zaehler.has(n));
+  const rest = offen - treffer.length;
+
+  const ok = await confirmDlg(`
+    <b>${esc(t("kat.autoTitle"))}</b>
+    <p class="hint" style="margin:8px 0 10px">${esc(t("kat.autoIntro"))}</p>
+    <div class="kat-liste">${reihenfolge.map(n => `
+      <div class="kat-zeile"><span class="katz-name">${esc(n)}</span>
+        <span class="kat-zahl">${zaehler.get(n)}</span></div>`).join("")}</div>
+    <p class="hint" style="margin-top:10px">${esc(t("kat.autoCards", { n: treffer.length }))}${
+      rest ? " " + esc(t("kat.autoRest", { n: rest })) : ""}</p>
+    <p class="hint">${esc(t("kat.autoEstimate"))}</p>`);
+  if (!ok) return;
+
+  try {
+    // Fehlende Kategorien anlegen — in der Reihenfolge der Regeln, damit die
+    // Spalten hinterher so stehen wie die Liste im Dialog.
+    const nachId = new Map((d.kategorien || []).map(k => [k.name, k.id]));
+    const fehlend = reihenfolge.filter(n => !nachId.has(n));
+    if (fehlend.length) {
+      const start = (d.kategorien || []).length;
+      const { data, error } = await sb.from("deck_categories")
+        .insert(fehlend.map((n, i) => ({ deck_id: d.id, name: n, pos: start + i })))
+        .select("id, name");
+      if (error) throw error;
+      data.forEach(k => nachId.set(k.name, k.id));
+    }
+
+    const zeilen = [];
+    for (const x of treffer) x.namen.forEach((n, i) => {
+      const id = nachId.get(n);
+      if (id) zeilen.push({ deck_id: d.id, card_id: x.c.id, category_id: id, is_primary: i === 0 });
+    });
+    // In Häppchen: Bei hundert Karten mit zwei Fächern sind das zweihundert
+    // Zeilen, und eine einzelne Anfrage dieser Größe ist unnötig sperrig.
+    for (let i = 0; i < zeilen.length; i += 100) {
+      const { error } = await sb.from("deck_entry_categories").insert(zeilen.slice(i, i + 100));
+      if (error) throw error;
+    }
+    await reload(); renderDecks();
+    toast(t("kat.autoDone", { n: treffer.length }));
+  } catch (e) { toast(dbErr(e)); }
 }
 
 /* ------------------------------------------------ Kartenansicht (Stapel)
@@ -7682,6 +7786,7 @@ function renderDecks() {
     renderDecks();
   });
   $$("#deck-list [data-katverw]").forEach(b => b.onclick = () => kategorienVerwalten(b.dataset.katverw));
+  $$("#deck-list [data-katauto]").forEach(b => b.onclick = () => autoEinordnen(b.dataset.katauto));
 
   // Gruppen im Deck auf-/zuklappen: nur die Kartenzeilen dieses <tbody>
   // ausblenden, Zustand in deckCatZu merken (übersteht das nächste renderDecks).
