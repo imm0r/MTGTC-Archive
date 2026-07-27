@@ -966,11 +966,33 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
 .gruppe-zahl{color:var(--dim);font-weight:400}
 .gruppe-schalter>.btn.on .gruppe-zahl{color:var(--acc2)}
 
-/* Auswahlfeld in der Kartenzeile. Schmal gehalten: die Spalte steht neben
-   Anzahl und Bestand, und lange Kategorienamen dürfen die Tabelle nicht
-   auseinanderziehen — das Feld kürzt selbst. */
-.kat-zelle{white-space:nowrap}
-.kat-zelle select{width:100%;min-width:104px;max-width:150px;padding:4px 6px;font-size:12.5px}
+/* Zuordnung in der Kartenzeile: die Fächer als Marken, der ganze Block ist der
+   Knopf zum Ändern. Schmal gehalten — die Spalte steht neben Anzahl und
+   Bestand, und lange Namen dürfen die Tabelle nicht auseinanderziehen. */
+.kat-zelle{max-width:170px}
+.kat-knopf{display:flex;flex-wrap:wrap;gap:3px;width:100%;padding:3px;background:none;
+  border:1px solid transparent;border-radius:6px;cursor:pointer;text-align:left}
+.kat-knopf:hover{border-color:var(--line);background:var(--panel2)}
+.kat-chip{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;font-size:11px;line-height:1.5;padding:1px 6px;border-radius:999px;
+  border:1px solid var(--line);color:var(--dim)}
+/* Die primäre trägt die Farbe — sie ist die Antwort, wenn nur eine gilt. */
+.kat-chip.prim{border-color:var(--akt-rand);background:var(--akt-flaeche);color:var(--acc2);font-weight:600}
+.kat-leer{color:var(--dim);font-size:13px;padding:0 4px;opacity:.6}
+.kat-knopf:hover .kat-leer{opacity:1;color:var(--acc)}
+
+/* Zuordnungsdialog: Häkchen, Name, Stern für die primäre. */
+.katz-liste{display:flex;flex-direction:column;gap:2px;max-height:46vh;overflow:auto}
+.katz-zeile{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;
+  border:1px solid transparent;cursor:pointer}
+.katz-zeile:hover{background:var(--panel2)}
+.katz-zeile.an{border-color:var(--akt-rand);background:var(--akt-flaeche)}
+.katz-zeile>input[type=checkbox]{flex:none;margin:0}
+.katz-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.katz-stern{flex:none;background:none;border:none;cursor:pointer;font-size:15px;
+  line-height:1;color:var(--dim);padding:2px 4px}
+.katz-stern:disabled{opacity:.25;cursor:default}
+.katz-stern.on{color:var(--acc)}
 
 /* Verwaltungsdialog: je Zeile Reihenfolge, Name, Kartenzahl, Löschen. */
 .kat-liste{display:flex;flex-direction:column;gap:6px;max-height:46vh;overflow:auto}

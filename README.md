@@ -632,11 +632,22 @@ braucht, und ein Umbenennen hätte überall gewirkt. Wer eine Liste
 wiederverwenden will, übernimmt sie im Verwaltungsdialog aus einem anderen Deck
 — **kopiert**, nicht geteilt.
 
-**Eine Karte, eine Kategorie.** Damit bleibt wahr, was schon für die Typ-Gruppen
-gilt: Die Summe der Gruppen ist die Deckgröße. Und man findet die Karte, weil es
-nur einen Ort gibt, an dem sie stehen kann. Zugeordnet wird im Auswahlfeld der
-Kartenzeile; `＋ Neu…` legt dort gleich eine Kategorie an, damit die erste
-Einordnung nicht über die Verwaltung führen muss.
+**Eine Karte darf in mehreren Kategorien stehen.** Ein Sol Ring ist Ramp *und*
+Teil des Artefakt-Pakets, ein Solemn Simulacrum ist Ramp *und* Kartenziehen —
+beim Deckbau will man ihn in beiden Rechnungen sehen, nicht sich für eine
+entscheiden müssen. Genau **eine davon ist die primäre** (der Stern im Dialog):
+Sie beantwortet die Frage, die eine Mehrfachzuordnung offen lässt — wo die Karte
+steht, wenn jede nur einmal vorkommen darf.
+
+Der Preis dafür ist eine Aussage, die für die Typ-Gruppen noch galt: Die Summe
+der Gruppen ist **nicht mehr** die Deckgröße. Sie kann sie übersteigen, sobald
+eine Karte in zwei Fächern liegt. Die Zahl über der Tabelle zählt weiter jede
+Karte genau einmal — nur die Zahlen an den Gruppen zählen Zuordnungen.
+
+Zugeordnet wird über die Kategorie-Spalte der Kartenzeile: Sie zeigt die Fächer
+als Marken (die primäre hervorgehoben) und öffnet auf Klick die Auswahl. Dort
+lässt sich auch gleich eine neue Kategorie anlegen, damit die erste Einordnung
+nicht über die Verwaltung führen muss.
 
 **Beide Ordnungen bleiben.** Umgeschaltet wird je Deck und je Gerät, gemerkt im
 Browser. Das ist keine Unentschlossenheit: Ein halb eingeordnetes Deck ist der
@@ -654,33 +665,50 @@ abgeleitet — „0 Planeswalker" hat niemand behauptet.
 
 ### Was beim Umbauen mit der Kategorie geschieht
 
-Sie hängt am **Deckplatz** (`deck_entries.category_id`), nicht an der Karte —
-dieselbe Karte darf in einem anderen Deck etwas anderes sein. Daraus folgt, was
-bei jedem Umhängen zu tun ist, und beides tut die App:
+Die Zuordnungen stehen in `deck_entry_categories` und hängen am **Deckplatz**
+(`deck_id, card_id`), nicht an der Karte — dieselbe Karte darf in einem anderen
+Deck etwas anderes sein. Der Fremdschlüssel zeigt deshalb auf `deck_entries`:
+Fliegt die Karte aus dem Deck, fliegen ihre Zuordnungen mit, und eine verwaiste
+Einordnung für eine Karte, die gar nicht mehr drinliegt, kann es nicht geben.
+
+Daraus folgt, was bei jedem Umhängen zu tun ist, und beides tut die App:
 
 * **Wunsch eingelöst.** `fulfil_wish_in_deck` hängt den Deckplatz von der
-  Wunschzeile auf das gekaufte Exemplar um und **nimmt die Kategorie mit**. Wer
-  eine Wunschkarte unter „Removal" eingeplant hat, hat den *Platz* eingeordnet,
-  nicht den Platzhalter; ginge sie verloren, zerfiele die Einteilung genau in
-  dem Moment, in dem das Deck echt wird.
+  Wunschzeile auf das gekaufte Exemplar um und **nimmt die Kategorien mit** —
+  gemerkt *vor* dem Abziehen, denn mit der Wunschzeile verschwänden sie.
+  Wer eine Wunschkarte unter „Removal" eingeplant hat, hat den *Platz*
+  eingeordnet, nicht den Platzhalter; gingen sie verloren, zerfiele die
+  Einteilung genau in dem Moment, in dem das Deck echt wird.
 * **Zwei Zeilen fallen zusammen** (Bearbeiten auf eine schon vorhandene
   Ausprägung): dasselbe. In beiden Fällen behält die **Zielzeile** ihre eigene
-  Einordnung, falls sie eine hat — die der verschwindenden springt nur ein, wo
+  Einteilung, falls sie eine hat — die der verschwindenden springt nur ein, wo
   noch nichts steht.
 
-Eine gelöschte Kategorie nimmt **keine Karten** mit: `on delete set null` lässt
-sie im Deck und stellt sie zurück unter „Ohne Kategorie". Wer ein Fach
-loswerden will, will nicht den Inhalt loswerden.
+Eine gelöschte Kategorie nimmt **keine Karten** mit: Das `on delete cascade`
+räumt nur die *Zuordnung* weg, die Karte bleibt im Deck und steht wieder unter
+„Ohne Kategorie". Wer ein Fach loswerden will, will nicht den Inhalt loswerden.
 
-Die Datenbank erzwingt außerdem, dass eine Zuordnung nur auf eine Kategorie
-**desselben Decks** zeigt (Trigger `deck_entries_kategorie_passt`). Eine fremde
-wäre eine Gruppe, die dieses Deck gar nicht anzeigt — die Karte verschwände aus
-der Liste.
+Zwei Dinge erzwingt die Datenbank, nicht die Anwendung:
+
+* Eine Zuordnung zeigt nur auf eine Kategorie **desselben Decks** (Trigger
+  `deck_entry_kategorie_passt`). Eine fremde wäre eine Gruppe, die dieses Deck
+  gar nicht anzeigt — die Karte verschwände aus der Liste.
+* **Höchstens eine primäre** je Karte und Deck (Teilindex
+  `deck_entry_categories_primaer_idx`). Ein `check` genügte dafür nicht: Der
+  sieht nur die eigene Zeile, „genau eine unter allen Zeilen dieser Karte" ist
+  aber eine Aussage über die Menge.
 
 > Meldet die App „Dafür fehlt der Datenbank die Tabelle `deck_categories`", ist
 > das Schema älter als die App — `supabase-schema.sql` erneut im SQL Editor
-> ausführen (oder `supabase/migrations/20260727190000_deck_kategorien.sql`
-> einzeln). Bis dahin läuft alles wie zuvor, nur eben nach Typ gruppiert.
+> ausführen (oder die beiden Migrationen
+> `20260727190000_deck_kategorien.sql` und
+> `20260727200000_deck_kategorien_mehrfach.sql` einzeln, in dieser Reihenfolge).
+> Bis dahin läuft alles wie zuvor, nur eben nach Typ gruppiert.
+
+> Wer schon 0.23.0 im Einsatz hatte: Dort saß die Zuordnung als
+> `deck_entries.category_id`, also genau eine je Karte. Der Umzug ist
+> verlustfrei — jede vorhandene Zuordnung wird zur **primären** der neuen
+> Tabelle, denn eine einzige ist immer auch die erste.
 
 ## Live-Spielrunde: die eigenen Karten am Tisch
 

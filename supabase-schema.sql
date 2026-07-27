@@ -146,16 +146,45 @@ create table if not exists public.deck_categories (
   constraint deck_categories_name_unique unique (deck_id, name)
 );
 
--- Die Zuordnung sitzt am Deckeintrag, nicht in einer eigenen Tabelle: eine
--- Karte steht in GENAU EINER Kategorie ihres Decks. Damit bleibt die Aussage
--- "die Summe der Gruppen ist die Deckgröße" wahr, die schon für die Typ-Gruppen
--- gilt — und die Karte ist auffindbar, weil es nur einen Ort gibt, an dem sie
--- stehen kann.
+-- Zuordnung Karte → Kategorie, als eigene Tabelle: eine Karte darf in MEHREREN
+-- Kategorien ihres Decks stehen. Ein Sol Ring ist Ramp und Teil des
+-- Artefakt-Pakets, ein Solemn Simulacrum ist Ramp und Kartenziehen — beim
+-- Deckbau will man ihn in beiden Rechnungen sehen, nicht sich für eine
+-- entscheiden müssen.
 --
--- "on delete set null": Wer eine Kategorie löscht, will das Fach loswerden,
--- nicht die Karten darin. Sie fallen zurück in "Ohne Kategorie".
-alter table public.deck_entries add column if not exists category_id uuid
-  references public.deck_categories(id) on delete set null;
+-- Genau EINE davon ist die primäre (is_primary). Sie beantwortet die Frage, die
+-- eine Mehrfachzuordnung offen lässt: Wo steht die Karte, wenn jede nur einmal
+-- vorkommen darf — etwa in einer Ausgabe der Deckliste. Erzwungen wird die
+-- Einzigkeit vom Teilindex weiter unten, nicht von der Anwendung.
+--
+-- Der Fremdschlüssel geht auf (deck_id, card_id), also auf den Deckplatz selbst:
+-- Fliegt die Karte aus dem Deck, fliegen ihre Zuordnungen mit. Eine verwaiste
+-- Einordnung für eine Karte, die gar nicht mehr drinliegt, kann es so nicht
+-- geben.
+create table if not exists public.deck_entry_categories (
+  deck_id     uuid not null,
+  card_id     uuid not null,
+  category_id uuid not null references public.deck_categories(id) on delete cascade,
+  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  is_primary  boolean not null default false,
+  primary key (deck_id, card_id, category_id),
+  foreign key (deck_id, card_id)
+    references public.deck_entries(deck_id, card_id) on delete cascade
+);
+
+-- Höchstens eine primäre Kategorie je Karte und Deck. Teilindex statt
+-- Bedingung, weil eine Bedingung nur die eigene Zeile sieht — "genau eine unter
+-- allen Zeilen dieser Karte" ist eine Aussage über die Menge.
+create unique index if not exists deck_entry_categories_primaer_idx
+  on public.deck_entry_categories(deck_id, card_id) where is_primary;
+
+create index if not exists deck_entry_categories_kat_idx
+  on public.deck_entry_categories(category_id);
+
+-- "on delete cascade" auf deck_categories: Wer eine Kategorie löscht, will das
+-- Fach loswerden, NICHT die Karten darin. Weggeräumt wird deshalb nur die
+-- Zuordnung — die Karte bleibt im Deck und steht wieder unter "Ohne Kategorie".
+-- Das Kaskadieren endet hier; deck_entries wird nicht angefasst.
 
 -- Eine Kategorie aus einem FREMDEN Deck wäre eine Gruppe, die in diesem Deck
 -- niemand sieht — die Karte verschwände aus der Anzeige. Ein zusammengesetzter
@@ -179,10 +208,30 @@ begin
   return new;
 end $$;
 
-drop trigger if exists deck_entries_kategorie_passt on public.deck_entries;
-create trigger deck_entries_kategorie_passt
-  before insert or update of category_id, deck_id on public.deck_entries
+drop trigger if exists deck_entry_categories_kategorie_passt on public.deck_entry_categories;
+create trigger deck_entry_categories_kategorie_passt
+  before insert or update of category_id, deck_id on public.deck_entry_categories
   for each row execute function public.deck_entry_kategorie_passt();
+
+-- ---- Umzug von der einspaltigen Zuordnung (0.23.0) ----------------------
+-- Dort saß die Kategorie als deck_entries.category_id, also genau eine je
+-- Karte. Die vorhandenen Zuordnungen werden zur PRIMÄREN der neuen Tabelle —
+-- verlustfrei, denn eine einzige ist immer auch die erste. Der Block läuft nur,
+-- solange die alte Spalte da ist, und ist wiederholbar.
+do $$
+begin
+  if exists (select 1 from information_schema.columns
+              where table_schema = 'public' and table_name = 'deck_entries'
+                and column_name = 'category_id') then
+    insert into public.deck_entry_categories (deck_id, card_id, category_id, user_id, is_primary)
+      select deck_id, card_id, category_id, user_id, true
+        from public.deck_entries where category_id is not null
+      on conflict do nothing;
+  end if;
+end $$;
+
+drop trigger if exists deck_entries_kategorie_passt on public.deck_entries;
+alter table public.deck_entries drop column if exists category_id;
 
 -- Für Bestände, die vor diesen Spalten angelegt wurden:
 alter table public.cards add column if not exists printed_name text;
@@ -227,26 +276,30 @@ create index if not exists cards_user_idx           on public.cards(user_id);
 create index if not exists decks_user_idx           on public.decks(user_id);
 create index if not exists deck_entries_deck_idx    on public.deck_entries(deck_id);
 create index if not exists deck_categories_deck_idx on public.deck_categories(deck_id);
+create index if not exists deck_entry_categories_deck_idx on public.deck_entry_categories(deck_id);
 
 -- ------------------------------------------------- Row Level Security
 -- Ohne diesen Block könnte jeder mit dem öffentlichen Schlüssel alle Daten
 -- lesen. Jede Zeile ist ausschließlich für ihren Eigentümer sichtbar.
-alter table public.cards           enable row level security;
-alter table public.decks           enable row level security;
-alter table public.deck_entries    enable row level security;
-alter table public.deck_categories enable row level security;
+alter table public.cards                 enable row level security;
+alter table public.decks                 enable row level security;
+alter table public.deck_entries          enable row level security;
+alter table public.deck_categories       enable row level security;
+alter table public.deck_entry_categories enable row level security;
 
 -- "force" gilt zusätzlich für den Tabelleneigentümer, "revoke" nimmt anon
 -- alle direkt vergebenen Rechte. Ohne Anmeldung ist auf diesen Tabellen
 -- nichts zu suchen — der öffentliche Schlüssel steht im Repository.
-alter table public.cards           force row level security;
-alter table public.decks           force row level security;
-alter table public.deck_entries    force row level security;
-alter table public.deck_categories force row level security;
-revoke all on public.cards           from anon;
-revoke all on public.decks           from anon;
-revoke all on public.deck_entries    from anon;
-revoke all on public.deck_categories from anon;
+alter table public.cards                 force row level security;
+alter table public.decks                 force row level security;
+alter table public.deck_entries          force row level security;
+alter table public.deck_categories       force row level security;
+alter table public.deck_entry_categories force row level security;
+revoke all on public.cards                 from anon;
+revoke all on public.decks                 from anon;
+revoke all on public.deck_entries          from anon;
+revoke all on public.deck_categories       from anon;
+revoke all on public.deck_entry_categories from anon;
 
 drop policy if exists "eigene karten" on public.cards;
 create policy "eigene karten" on public.cards
@@ -265,6 +318,11 @@ create policy "eigene deck-eintraege" on public.deck_entries
 
 drop policy if exists "eigene deck-kategorien" on public.deck_categories;
 create policy "eigene deck-kategorien" on public.deck_categories
+  for all to authenticated
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "eigene deck-zuordnungen" on public.deck_entry_categories;
+create policy "eigene deck-zuordnungen" on public.deck_entry_categories
   for all to authenticated
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
@@ -891,6 +949,9 @@ create policy deck_entries_select_shared on public.deck_entries for select to au
 drop policy if exists deck_categories_select_shared on public.deck_categories;
 create policy deck_categories_select_shared on public.deck_categories for select to authenticated
   using (public.deck_shared(deck_id) and public.are_friends(auth.uid(), user_id));
+drop policy if exists deck_entry_categories_select_shared on public.deck_entry_categories;
+create policy deck_entry_categories_select_shared on public.deck_entry_categories for select to authenticated
+  using (public.deck_shared(deck_id) and public.are_friends(auth.uid(), user_id));
 drop policy if exists cards_select_shared on public.cards;
 create policy cards_select_shared on public.cards for select to authenticated
   using (public.card_in_shared_deck(id, auth.uid()));
@@ -1078,7 +1139,8 @@ declare
   v_to   public.cards%rowtype;
   v_have integer;
   v_n    integer;
-  v_kat  uuid;
+  v_kats uuid[];
+  v_prim uuid;
 begin
   if v_uid is null then
     raise exception 'Nicht angemeldet' using hint = 'auth';
@@ -1126,16 +1188,25 @@ begin
       using hint = 'not_same_card';
   end if;
 
-  -- Die eigene Kategorie wandert mit: Wer eine Wunschkarte unter "Removal"
-  -- eingeplant hat, hat DEN PLATZ eingeordnet, nicht den Platzhalter. Ginge sie
-  -- beim Kauf verloren, zerfiele die Einteilung genau in dem Moment, in dem das
-  -- Deck echt wird — und zwar still.
-  select qty, category_id into v_have, v_kat
+  select qty into v_have
     from public.deck_entries
    where deck_id = p_deck and card_id = p_from_card;
   if not found then
     raise exception 'Karte liegt nicht in diesem Deck' using hint = 'no_entry';
   end if;
+
+  -- Die eigenen Kategorien wandern mit: Wer eine Wunschkarte unter "Removal"
+  -- eingeplant hat, hat DEN PLATZ eingeordnet, nicht den Platzhalter. Gingen sie
+  -- beim Kauf verloren, zerfiele die Einteilung genau in dem Moment, in dem das
+  -- Deck echt wird — und zwar still.
+  --
+  -- Gemerkt wird VOR dem Abziehen: Verschwindet die Wunschzeile, nimmt der
+  -- Fremdschlüssel ihre Zuordnungen mit (on delete cascade). Danach wären sie
+  -- nicht mehr zu lesen.
+  select array_agg(category_id), max(category_id) filter (where is_primary)
+    into v_kats, v_prim
+    from public.deck_entry_categories
+   where deck_id = p_deck and card_id = p_from_card;
 
   v_n := least(greatest(coalesce(p_n, 1), 1), v_have);
 
@@ -1149,14 +1220,21 @@ begin
      where deck_id = p_deck and card_id = p_from_card;
   end if;
 
-  -- Lag die gekaufte Auflage schon im Deck, behält sie ihre eigene Einordnung:
-  -- coalesce nimmt die vorhandene und greift nur, wenn dort nichts steht. Die
-  -- Kategorie der Wunschzeile ist der Ersatz, nicht die Ansage.
-  insert into public.deck_entries (deck_id, card_id, user_id, qty, category_id)
-       values (p_deck, p_to_card, v_uid, v_n, v_kat)
+  insert into public.deck_entries (deck_id, card_id, user_id, qty)
+       values (p_deck, p_to_card, v_uid, v_n)
   on conflict (deck_id, card_id)
-    do update set qty = public.deck_entries.qty + excluded.qty,
-                  category_id = coalesce(public.deck_entries.category_id, excluded.category_id);
+    do update set qty = public.deck_entries.qty + excluded.qty;
+
+  -- Lag die gekaufte Auflage schon im Deck und ist selbst eingeordnet, behält
+  -- sie ihre eigene Einteilung: Die der Wunschzeile ist der Ersatz, nicht die
+  -- Ansage. Erst hier, denn der Fremdschlüssel verlangt den Deckplatz.
+  if v_kats is not null and not exists (
+       select 1 from public.deck_entry_categories
+        where deck_id = p_deck and card_id = p_to_card) then
+    insert into public.deck_entry_categories (deck_id, card_id, category_id, user_id, is_primary)
+      select p_deck, p_to_card, k, v_uid, (k = v_prim) from unnest(v_kats) as k
+      on conflict do nothing;
+  end if;
 
   return v_n;
 end $$;
