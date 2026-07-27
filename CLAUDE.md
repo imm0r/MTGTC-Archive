@@ -5,6 +5,33 @@
 Nicht nachfragen. Sobald die Voraussetzungen erfüllt sind, mergen — per
 **Squash**, wie seit #91 üblich (linearer Verlauf, `(#NN)` im Titel).
 
+Die Zusammenfassung dabei **von Hand schreiben**, nicht die Liste der einzelnen
+Commits übernehmen, die GitHub vorschlägt. Zwei Gründe: der Verlauf auf `main`
+liest sich als ein Text je Änderung, und der Commit der Versions-Automatik
+trägt die Sprungmarke `[skip ci]` im Betreff (siehe
+`.github/workflows/version.yml`) — wanderte die mit nach `main`, liefe dort
+kein Workflow aus `.github/workflows` mehr an. Heute hängt keiner davon an
+`push` (`prices.yml` und `uptime-monitor.yml` laufen nach Zeitplan), der
+Schaden bliebe also klein; der nächste, den jemand hinzufügt, bliebe
+stillschweigend aus.
+
+### Die Sprungmarke nie ausschreiben
+
+**In keiner Commit-Nachricht und keiner PR-Beschreibung.** GitHub sucht sie
+IRGENDWO im Text, nicht nur am Zeilenanfang, und macht keinen Unterschied
+zwischen „hier wirkt sie" und „hier ist bloß von ihr die Rede". Eine Nachricht,
+die sie erklärt, schaltet die Prüfläufe genauso ab wie eine, die sie meint.
+
+Das ist keine Theorie: der Commit, der diese Zeilen einführte, erwähnte sie im
+Rumpf — prompt lief `version.yml` für den Pull Request gar nicht erst an, und
+die Version blieb stehen. (CodeQL lief weiter; dessen Default-Setup liegt nicht
+unter `.github/workflows` und schert sich nicht um die Marke. Das Ausbleiben
+fällt also nicht dadurch auf, dass alles rot wird — sondern gar nicht.)
+
+Umschreiben statt ausschreiben: „die Sprungmarke ‚skip ci' in eckigen
+Klammern". In Dateien wie dieser hier darf sie stehen; nur Commit-Nachrichten
+und PR-Beschreibungen liest GitHub daraufhin aus.
+
 Voraussetzungen, alle vier:
 
 * alle Prüfungen grün (`skipped` zählt als in Ordnung),

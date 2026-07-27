@@ -112,11 +112,47 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
-          git commit -m "Version und Cache-Buster ($STUFE)" \
+          # „[skip ci]" im Betreff, und zwar aus einem handfesten Grund:
+          #
+          # Dieser Push ist selbst ein synchronize-Ereignis am Pull Request und
+          # stößt damit genau diesen Workflow erneut an. In eine SCHLEIFE liefe
+          # das nicht — einen mit GITHUB_TOKEN gepushten Lauf führt GitHub nicht
+          # aus —, aber er wird trotzdem ANGELEGT und bleibt als
+          # „action_required" gelb stehen, bis ihn jemand von Hand freigibt. Der
+          # Pull Request steht solange auf „unstable". Genau diese Handarbeit
+          # soll die Automatik abnehmen; die Marke verhindert schon das Anlegen.
+          #
+          # (Der frühere Kommentar hier behauptete, ein GITHUB_TOKEN-Push löse
+          # gar nichts aus. Halb richtig: er löst keinen LAUF aus, hinterlässt
+          # aber den freigabepflichtigen Eintrag — beobachtet an #107.)
+          #
+          # Sie wirkt NUR auf Workflows unter .github/workflows. CodeQL läuft
+          # weiter (dessen Default-Setup liegt nicht dort und schert sich nicht
+          # um die Marke) — gemessen an #108, wo CodeQL den Versions-Commit
+          # sehr wohl gescannt hat. Die Prüftiefe des Pull Requests bleibt also,
+          # weg fällt allein dieser eine Leerlauf.
+          #
+          # In den Squash-Text nach main gehört sie trotzdem nicht: dort bliebe
+          # jeder künftige push-Workflow stillschweigend aus. Die
+          # Zusammenfassung wird von Hand geschrieben (CLAUDE.md), nicht aus der
+          # Commit-Liste übernommen — deshalb steht die Marke im Betreff, wo sie
+          # dabei ins Auge fällt, statt versteckt im Rumpf.
+          #
+          # Und sie darf in KEINER Commit-Nachricht bloß erwähnt werden: GitHub
+          # sucht sie irgendwo im Text. Der erste Anlauf dieser Änderung
+          # erklärte sie im Rumpf und schaltete damit diesen Workflow für den
+          # eigenen Pull Request ab.
+          git commit -m "Version und Cache-Buster ($STUFE) [skip ci]" \
                      -m "Gesetzt von .github/workflows/version.yml aus dem PR-Titel."
-          # Ein Push mit GITHUB_TOKEN löst KEINEN neuen Workflow-Lauf aus —
-          # deshalb kann das hier nicht in eine Schleife geraten.
           git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
+
+          # Was dieser Lauf gerade geschrieben hat, prüft folglich kein zweiter
+          # Lauf mehr nach. Das ist vertretbar: der Commit fasst ausschließlich
+          # index.html an, und zwar nur die Versionszeile und die ?v=-Werte, die
+          # scripts/version.mjs selbst berechnet hat. Alles Übrige des Pull
+          # Requests ist auf dem vorherigen Stand geprüft worden, und main wird
+          # nach dem Zusammenführen ohnehin erneut gescannt.
+          echo "::notice::Version gesetzt. Der Commit trägt [skip ci], damit kein freigabepflichtiger Leerlauf entsteht."
 
       - name: Nichts zu tun
         if: steps.setzen.outputs.geaendert == 'nein'
