@@ -79,14 +79,44 @@ nav button.on{background:var(--akt-flaeche);border-color:var(--akt-rand);color:v
   padding:8px 11px;text-align:left;font-size:14px;cursor:pointer;width:100%;font-weight:400}
 .who-menu .menu button:hover{background:var(--panel)}
 .who-menu .menu button.on{background:var(--akt-flaeche);color:var(--acc2);font-weight:600}
+/* ---------------------------------------------------- Breite der Seite
+   1100 px ist die Grundeinstellung und gilt für alles, was vorwiegend TEXT ist
+   — Profil, Einstellungen, Regelfrage, Community. Dort ist eine breite Zeile
+   kein Gewinn, sondern anstrengend zu lesen.
+
+   Zwei Arten von Ansicht brauchen mehr, und beide aus demselben Grund: Sie
+   zeigen kein Fließtext, sondern eine Anordnung, deren Teile nebeneinander
+   gehören.
+
+   Welche Ansicht offen ist, entscheidet CSS über :has() und nicht JavaScript
+   über eine Klasse am body. Der Unterschied ist kein Geschmack: Die
+   Startansicht steht schon in index.html auf "on", ohne dass je ein Klick auf
+   die Navigation fiel — ein Umschalter im Klick-Handler ließe genau sie aus,
+   und man müsste ihn beim Start ein zweites Mal aufrufen. :has() fragt danach,
+   was tatsächlich sichtbar ist, und kann deshalb nicht auseinanderlaufen. */
 main{padding:14px;max-width:1100px;margin:0 auto}
-/* Die Spielrunde bekommt mehr Breite als der Rest der App. Die Matte hat feste
-   schmale Spalten (Steuer, Kommandozone, Bibliothek, Exil, Lebenspunkte,
-   Friedhof) — alles, was darüber hinaus da ist, geht ans Schlachtfeld, an die
-   Länder und an den Handfächer. Auf einem 3440-px-Monitor saß der ganze Tisch
-   sonst in 1100 px, während rechts und links je gut ein Meter Platz brachlag.
-   1800 px ist die eine Zahl, an der das hängt. */
-body.breit main{max-width:1800px}
+
+/* Die Spielrunde: Die Matte hat feste schmale Spalten (Steuer, Kommandozone,
+   Bibliothek, Exil, Lebenspunkte, Friedhof) — alles, was darüber hinaus da
+   ist, geht ans Schlachtfeld, an die Länder und an den Handfächer. Auf einem
+   3440-px-Monitor saß der ganze Tisch sonst in 1100 px, während rechts und
+   links je gut ein Meter Platz brachlag. */
+main:has(#v-session.on){max-width:1800px}
+
+/* Sammlung, Wunschliste und Decks: Kartentabellen mit zehn bis zwölf Spalten.
+   In 1100 px wird der Kartenname abgeschnitten, die Kategorie-Marken drängeln
+   sich, und auf schmalen Fenstern muss die Tabelle waagerecht rollen. Jede
+   zusätzliche Breite geht an genau diese beiden Spalten — die übrigen (Mana,
+   Set, Sprache, Anzahl) sind inhaltlich fest.
+
+   2400 statt "so breit wie das Fenster": Ab einer gewissen Zeilenlänge verliert
+   man beim Blick von der Karte zur Menge die Zeile. Auf einem 3440er sind das
+   rund siebzig Prozent der Breite — deutlich mehr als bisher, aber noch eine
+   Strecke, die das Auge in einem Zug schafft. Auf allem darunter greift ohnehin
+   die Fensterbreite, nicht diese Zahl. */
+main:has(#v-coll.on),
+main:has(#v-wish.on),
+main:has(#v-decks.on){max-width:2400px}
 .view{display:none} .view.on{display:block}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:14px}
 button,select,input,textarea{font:inherit}
