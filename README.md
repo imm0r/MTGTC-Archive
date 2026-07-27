@@ -270,16 +270,41 @@ Die Sprache kommt daher in dieser Reihenfolge:
 
 1. **Der gedruckte Name** aus dem `alt`-Text des gezogenen Bildes — der beste
    Beleg, wenn Cardmarket ihn landessprachlich ausliefert.
-2. **Der Sprachteil der Adresse** (`cardmarket.com/de/…`), wenn du den
-   Produkt*link* ziehst.
-3. **Das Dropdown „Sprache"** unter *Karten scannen*. Nötig, weil die
+2. **`?language=N`** in der Adresse. Cardmarket hängt die Nummer an gefilterte
+   Produktseiten (`3` = Deutsch), und sie benennt die gesuchte **Karte** —
+   anders als der Pfadteil `/de/`, der nur die Anzeigesprache der Seite meint.
+   Ein deutscher Nutzer sieht dort auch englische Karten.
+3. **Der Sprachteil der Adresse** (`cardmarket.com/de/…`).
+4. **Das Dropdown „Sprache"** unter *Karten scannen*. Nötig, weil die
    Bild­adresse (`product-images.s3.cardmarket.com/…`) gar keinen Sprachteil
    hat — und das Bild ist genau das, was man zieht. Steht das Dropdown auf
    Deutsch, holt der Import die deutsche Auflage samt deutschem Artwork.
 
-Führt Scryfall die Auflage in der gewünschten Sprache nicht, bleibt es bei der
-gefundenen — eine fehlende Sprachfassung ist kein Grund, die Karte
-fallenzulassen.
+#### Wenn Scryfall die Auflage nicht in der Sprache führt
+
+Das kommt für **ganze Sets** vor: Von Innistrad Remastered kennt Scryfall keine
+einzige deutsche Karte, obwohl es sie gedruckt gibt. Dann greift ein Rückfall
+in zwei Stufen:
+
+1. Gibt es die **Auflage** in der Sprache, wird sie genommen — dann stimmt auch
+   das Bild.
+2. Sonst wenigstens der **gedruckte Name** aus einer anderen Auflage derselben
+   Karte. Der Name gehört zur Karte, nicht zur Auflage: „Angelic Purge" aus
+   Innistrad Remastered heißt auf Deutsch „Engelhafte Säuberung", nachweisbar
+   über die Auflage aus *Shadows over Innistrad*. Bild und Kennung bleiben
+   dann die gefundenen — etwas Besseres hat Scryfall nicht —, die Zeile führt
+   aber Sprache und deutschen Namen.
+
+Findet sich beides nicht (typisch für Tokens), bleibt es bei der englischen
+Auflage: eine fehlende Sprachfassung ist kein Grund, die Karte fallenzulassen.
+
+**Altbestand** wird beim Start einmalig nachgezogen (`backfillGedruckteNamen`):
+Zeilen, die eine Fremdsprache behaupten, aber den englischen Druck halten,
+bekommen nach denselben zwei Stufen ihren gedruckten Namen und — wo die
+Auflage existiert — auch das richtige Bild. Angefasst werden ausschließlich
+Anzeigefelder; Menge, Zustand, Ausführung, Sprache und Preis bleiben
+unberührt. Was nichts hergibt, wird gerätelokal vermerkt und nicht bei jedem
+Start erneut abgefragt.
 
 **Bei Scryfall und Gatherer steht die Sprache in der Adresse und schlägt alles**
 — eine englische Scryfall-Adresse bleibt englisch, auch wenn das Dropdown auf

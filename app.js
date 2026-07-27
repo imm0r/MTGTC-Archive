@@ -1482,6 +1482,13 @@ function gathererLang(gebiet) {
 const cmSlugName = s => String(s || "").replace(/-V\d+$/i, "").replace(/[-_]+/g, " ")
   .replace(/\s+/g, " ").trim();
 
+/* Cardmarkets Sprachnummern (der „?language=N"-Filter auf Produktseiten) auf
+   Scryfalls Kürzel. Die Nummer ist die verlässlichste Sprachangabe, die
+   Cardmarket überhaupt macht: Sie benennt die gesuchte KARTE, während der
+   Pfadteil (/de/) nur die Anzeigesprache der Seite meint. */
+const CM_SPRACHE = { 1: "en", 2: "fr", 3: "de", 4: "es", 5: "it",
+                     6: "zhs", 7: "ja", 8: "pt", 9: "ru", 10: "ko", 11: "zht" };
+
 /* Setnamen wortblind vergleichen: Cardmarket sagt „Commander: Outlaws of
    Thunder Junction", Scryfall „Outlaws of Thunder Junction Commander" —
    dieselben Worte, andere Reihenfolge. Sortiert verglichen treffen sie sich;
@@ -1542,7 +1549,12 @@ function ziehKennung(adresse) {
     // und Set in dieser Sprache und ist zugleich die beste Vorauswahl für die
     // Sprache der Karte. Bilder von den S3-Wirten tragen sie nicht.
     const erst = (teile[0] || "").toLowerCase();
-    const lang = ["de", "en", "fr", "es", "it"].includes(erst) ? erst : null;
+    // Zwei Quellen, die stärkere zuerst: Cardmarket hängt an gefilterte
+    // Produktseiten „?language=N" — DAS ist die Sprache der gesuchten Karte.
+    // Der Pfadteil (/de/) sagt nur, in welcher Sprache die Seite angezeigt
+    // wird; ein deutscher Nutzer sieht dort auch englische Karten.
+    const lang = CM_SPRACHE[param("language")] ||
+      (["de", "en", "fr", "es", "it"].includes(erst) ? erst : null);
     // Produktnummer im Fragezeichenteil — so verlinkt auch Scryfall dorthin.
     const pid = param("idproduct");
     if (pid && /^\d+$/.test(pid)) return { art: "cmid", quelle: "Cardmarket", id: pid, lang };
@@ -1580,7 +1592,33 @@ const ziehRang = k => (k.unsicher ? 10 : 0) + ZIEH_ARTEN.indexOf(k.art);
    Name, eigene scryfall_id. */
 async function inSprache(card, lang) {
   if (!card || !lang || card.lang === lang) return card;
-  return (await sfCode(card.set, card.collector_number, lang)) || card;
+  const genau = await sfCode(card.set, card.collector_number, lang);
+  if (genau) return genau;
+  // Scryfall führt diese AUFLAGE nicht in der Sprache — bei ganzen Sets kommt
+  // das vor (Innistrad Remastered hat dort keine einzige deutsche Karte),
+  // obwohl es die Karte gedruckt sehr wohl auf Deutsch gibt. Dann wenigstens
+  // den gedruckten NAMEN retten: Der gehört zur KARTE, nicht zur Auflage, und
+  // steht bei jeder anderen Auflage derselben Karte in dieser Sprache.
+  const schwester = await schwesterAuflage(card, lang);
+  if (!schwester) return card;   // gar keine Fassung (typisch für Tokens)
+  // Bild und Kennung bleiben die gefundenen — etwas Besseres hat Scryfall
+  // nicht. Sprache und gedruckte Texte kommen von der Schwester: Die Karte im
+  // Regal IST in dieser Sprache, und so heißt sie darauf.
+  return { ...card, lang,
+    printed_name: schwester.printed_name ?? null,
+    printed_type_line: schwester.printed_type_line ?? null,
+    printed_text: schwester.printed_text ?? null };
+}
+
+/* Irgendeine Auflage DERSELBEN Karte in der gewünschten Sprache. Gesucht wird
+   über den englischen Namen und gegen die oracle_id gegengeprüft, damit nicht
+   eine gleichnamige andere Karte einspringt. */
+async function schwesterAuflage(card, lang) {
+  if (!card?.name) return null;
+  let hits = [];
+  try { hits = await sfSearch(`!"${card.name.replace(/"/g, "")}" lang:${lang}`, 8); }
+  catch { return null; }
+  return hits.find(c => c.lang === lang && c.oracle_id && c.oracle_id === card.oracle_id) || null;
 }
 
 /* `standardLang` ist die Sprache aus dem Scan-Dropdown. Sie greift NUR dort,
@@ -2280,6 +2318,96 @@ function filtered(bereich = "coll") {
    sammelweise über Scryfalls /cards/collection holen (75 je Anfrage) und in
    WENIGEN Sammel-Updates speichern (nach Identität gruppiert). Läuft im
    Hintergrund beim ersten Laden; ist alles erfasst, tut die Funktion nichts. */
+/* --------------------------------------- Fremdsprachige Zeilen geraderücken
+   Altbestand: Zeilen, die eine Fremdsprache behaupten, aber den ENGLISCHEN
+   Druck halten — erkennbar daran, dass der gedruckte Name fehlt (den führt
+   Scryfall bei jeder fremdsprachigen Auflage). So entstanden sie über den
+   Scan-Weg, wo die Sprache aus dem Dropdown kommt, die Karte aber über
+   findByCode aufgelöst wird: Kennt Scryfall die Auflage in der Sprache nicht,
+   fällt findByCode auf Englisch zurück — geschrieben wird trotzdem die
+   gewünschte Sprache. Dasselbe konnte der Zieh-Import über Cardmarket liefern.
+
+   Aufgeräumt wird in zwei Stufen, genau wie beim Import (inSprache):
+   1. Gibt es die AUFLAGE in der Sprache, wird sie übernommen — dann stimmt
+      auch das Bild.
+   2. Sonst wenigstens der gedruckte Name aus einer Schwester-Auflage.
+   Findet sich beides nicht (typisch für Tokens), bleibt die Zeile unberührt.
+
+   Angefasst werden ausschließlich Anzeigefelder. Menge, Zustand, Ausführung,
+   Sprache und Preis bleiben, wie der Nutzer sie erfasst hat. */
+/* Gedächtnis für Auflagen, die in einer Sprache nichts hergeben. Gerätelokal
+   und bewusst gedeckelt: Es ist eine Sparmaßnahme, kein Datenbestand — geht es
+   verloren, wird eben einmal mehr nachgefragt. Schlüssel ist scryfall_id +
+   Sprache, denn dieselbe Auflage kann auf Deutsch leer ausgehen und auf
+   Japanisch nicht. */
+const TAUB_MAX = 400;
+function ziehTaubeAuflagen() {
+  try { return new Set(JSON.parse(localStorage.getItem("mtg-ohne-druckname") || "[]")); }
+  catch { return new Set(); }
+}
+function taubVermerken(schluessel) {
+  const s = ziehTaubeAuflagen();
+  if (s.has(schluessel)) return;
+  s.add(schluessel);
+  // Beim Überlaufen die ältesten fallen lassen (Set behält die Einfügefolge).
+  const liste = [...s].slice(-TAUB_MAX);
+  try { localStorage.setItem("mtg-ohne-druckname", JSON.stringify(liste)); } catch { /* voll */ }
+}
+
+async function backfillGedruckteNamen() {
+  if (backfillGedruckteNamen._laeuft) return;
+  // Was einmal nichts hergab, gibt bei nächster Gelegenheit wieder nichts her:
+  // Tokens und Karten, die Scryfall in dieser Sprache schlicht nicht führt.
+  // Ohne dieses Gedächtnis fragte JEDER App-Start sie erneut ab — für immer.
+  const taub = ziehTaubeAuflagen();
+  const offen = CARDS.filter(c => c.lang && c.lang !== "en" && !c.printed_name &&
+                                  c.scryfall_id && !taub.has(c.scryfall_id + "/" + c.lang));
+  if (!offen.length) return;
+  backfillGedruckteNamen._laeuft = true;
+  let geaendert = 0;
+  try {
+    for (const zeile of offen) {
+      let alt = null;
+      try { alt = await sfById(zeile.scryfall_id); } catch { continue; }
+      if (!alt) continue;
+      let neu = null;
+      try { neu = await inSprache(alt, zeile.lang); } catch { continue; }
+      if (!neu || !neu.printed_name) {              // nichts gewonnen
+        taubVermerken(zeile.scryfall_id + "/" + zeile.lang);
+        continue;
+      }
+
+      const patch = { printed_name: neu.printed_name };
+      const pty = printedTypeOf(neu); if (pty != null) patch.printed_type_line = pty;
+      const pt  = printedTextOf(neu); if (pt  != null) patch.printed_text = pt;
+      // Nur wenn Scryfall die Auflage wirklich in dieser Sprache führt, wandert
+      // auch die Kennung mit — und damit das Bild. Der geliehene Name allein
+      // ändert die Auflage nicht.
+      const echteAuflage = neu.id && neu.id !== alt.id;
+      if (echteAuflage) {
+        patch.scryfall_id = neu.id;
+        patch.img = imgOf(neu) || zeile.img;
+        const fc = facesOf(neu); if (fc) patch.faces = fc;
+      }
+      try {
+        const { error } = await sb.from("cards").update(patch)
+          .eq("id", zeile.id).eq("user_id", USER.id);
+        // Die Auflage kann schon als eigene Zeile liegen (unique über
+        // user_id+scryfall_id+foil+lang+condition). Dann ohne Kennung erneut:
+        // der Name allein ist immer noch besser als nichts.
+        if (error && echteAuflage) {
+          delete patch.scryfall_id; delete patch.img; delete patch.faces;
+          await sb.from("cards").update(patch).eq("id", zeile.id).eq("user_id", USER.id);
+        } else if (error) continue;
+      } catch { continue; }
+      Object.assign(zeile, patch);
+      zeile.disp = zeile.printed_name || zeile.name;
+      geaendert++;
+    }
+  } finally { backfillGedruckteNamen._laeuft = false; }
+  if (geaendert) { zeichneOffeneKartenliste(); toast(t("fix.printedNames", { n: geaendert })); }
+}
+
 async function backfillFarbident() {
   if (backfillFarbident._laeuft) return;
   const fehlen = CARDS.filter(c => c.color_identity == null && c.scryfall_id);
@@ -7694,6 +7822,9 @@ async function afterLogin(user) {
   // des Farbidentitäts-Filters). Nicht kritisch, blockiert den Start nicht; ist
   // alles erfasst, kehrt es sofort zurück.
   backfillFarbident().catch(() => {});
+  // Fremdsprachige Zeilen, die den englischen Druck halten, einmalig
+  // geraderücken (siehe backfillGedruckteNamen). Ebenfalls im Hintergrund.
+  backfillGedruckteNamen().catch(() => {});
   // Die geteilte MTGJSON-Preishistorie lädt reload() selbst nach — dort, wo
   // CARDS befüllt wird, und damit auch für später erfasste Karten. Hier steht
   // deshalb kein eigener Aufruf mehr.
