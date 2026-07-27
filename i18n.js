@@ -4115,7 +4115,7 @@ Object.assign(I18N.it, {
 
 /* ---- Teil 34: Diagnose des Zieh-Imports (gerätelokal einschaltbar) ---- */
 Object.assign(I18N.de, {
-  "diag.toggle": "Zieh-Import: Diagnose anzeigen",
+  "diag.toggle": "Diagnose anzeigen",
   "diag.title": "Diagnose des Zieh-Imports",
   "diag.payload": "Abgelegte Daten (roh)",
   "diag.urls": "Gefundene Adressen",
@@ -4131,10 +4131,12 @@ Object.assign(I18N.de, {
   "diag.copy": "Als JSON kopieren",
   "diag.copied": "Diagnose in die Zwischenablage kopiert.",
   "diag.copyFail": "Kopieren nicht möglich.",
+  "diag.adminTitle": "Zieh-Import",
+  "diag.adminHint": "Zeigt neben jeder gezogenen Karte, was aus dem Ablegen gelesen wurde: rohe Nutzlast, Adressen, Namen, erkannte Kennungen, jeden Versuch und die Felder der gefundenen Karte. Nur auf diesem Gerät, und nur für die Adminrolle. Solange sie an ist, bleibt die Kachel nach dem Übernehmen stehen.",
   "diag.error": "Fehler",
 });
 Object.assign(I18N.en, {
-  "diag.toggle": "Drag import: show diagnostics",
+  "diag.toggle": "Show diagnostics",
   "diag.title": "Drag import diagnostics",
   "diag.payload": "Dropped data (raw)",
   "diag.urls": "URLs found",
@@ -4150,10 +4152,12 @@ Object.assign(I18N.en, {
   "diag.copy": "Copy as JSON",
   "diag.copied": "Diagnostics copied to the clipboard.",
   "diag.copyFail": "Copying failed.",
+  "diag.adminTitle": "Drag import",
+  "diag.adminHint": "Shows, next to each dragged card, what was read from the drop: raw payload, URLs, names, recognised identifiers, every attempt and the fields of the card found. This device only, and admins only. While it is on, the tile stays after adding.",
   "diag.error": "Error",
 });
 Object.assign(I18N.fr, {
-  "diag.toggle": "Import par glisser : afficher le diagnostic",
+  "diag.toggle": "Afficher le diagnostic",
   "diag.title": "Diagnostic de l'import par glisser",
   "diag.payload": "Données déposées (brut)",
   "diag.urls": "Adresses trouvées",
@@ -4169,10 +4173,12 @@ Object.assign(I18N.fr, {
   "diag.copy": "Copier en JSON",
   "diag.copied": "Diagnostic copié dans le presse-papiers.",
   "diag.copyFail": "Copie impossible.",
+  "diag.adminTitle": "Import par glisser",
+  "diag.adminHint": "Affiche, à côté de chaque carte déposée, ce qui a été lu : données brutes, adresses, noms, identifiants reconnus, chaque tentative et les champs de la carte trouvée. Sur cet appareil uniquement, et pour les administrateurs uniquement. Tant que c'est actif, la vignette reste après l'ajout.",
   "diag.error": "Erreur",
 });
 Object.assign(I18N.es, {
-  "diag.toggle": "Importar arrastrando: mostrar diagnóstico",
+  "diag.toggle": "Mostrar diagnóstico",
   "diag.title": "Diagnóstico del importar arrastrando",
   "diag.payload": "Datos soltados (en bruto)",
   "diag.urls": "Direcciones encontradas",
@@ -4188,10 +4194,12 @@ Object.assign(I18N.es, {
   "diag.copy": "Copiar como JSON",
   "diag.copied": "Diagnóstico copiado al portapapeles.",
   "diag.copyFail": "No se pudo copiar.",
+  "diag.adminTitle": "Importar arrastrando",
+  "diag.adminHint": "Muestra, junto a cada carta soltada, lo que se leyó: datos en bruto, direcciones, nombres, identificadores reconocidos, cada intento y los campos de la carta encontrada. Solo en este dispositivo y solo para administradores. Mientras esté activo, la tarjeta permanece tras añadirla.",
   "diag.error": "Error",
 });
 Object.assign(I18N.it, {
-  "diag.toggle": "Import con trascinamento: mostra diagnostica",
+  "diag.toggle": "Mostra diagnostica",
   "diag.title": "Diagnostica dell'import con trascinamento",
   "diag.payload": "Dati rilasciati (grezzi)",
   "diag.urls": "Indirizzi trovati",
@@ -4207,6 +4215,8 @@ Object.assign(I18N.it, {
   "diag.copy": "Copia come JSON",
   "diag.copied": "Diagnostica copiata negli appunti.",
   "diag.copyFail": "Copia non riuscita.",
+  "diag.adminTitle": "Import con trascinamento",
+  "diag.adminHint": "Mostra, accanto a ogni carta trascinata, ciò che è stato letto: dati grezzi, indirizzi, nomi, identificatori riconosciuti, ogni tentativo e i campi della carta trovata. Solo su questo dispositivo e solo per gli amministratori. Finché è attivo, la scheda resta dopo l'aggiunta.",
   "diag.error": "Errore",
 });
 

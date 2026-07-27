@@ -1744,8 +1744,18 @@ function tagAttribute(html, tag, attrs, je) {
 
    Solange sie an ist, bleibt die Kachel im Zieh-Kasten stehen, auch wenn die
    Karte längst geschrieben ist: Die Diagnose gehört zum Vorgang und wäre mit
-   der Kachel weg, bevor man sie lesen kann. */
-function ziehDiagnose() { return localStorage.getItem("mtg-zieh-diag") === "1"; }
+   der Kachel weg, bevor man sie lesen kann.
+
+   Der Schalter steht in den Einstellungen unter „Verwaltung" und ist damit
+   der Adminrolle vorbehalten. Geprüft wird IS_ADMIN aber auch hier, nicht nur
+   beim Zeichnen des Hakens: Sonst liefe die Diagnose bei jemandem weiter, der
+   sie als Admin eingeschaltet hatte und die Rolle später verlor — der Eintrag
+   im Gerätespeicher überdauert das. Eine Sicherheitsgrenze ist das nicht und
+   soll es nicht sein: Gezeigt wird ausschließlich, was der Nutzer selbst
+   gerade herübergezogen hat, plus die öffentliche Scryfall-Antwort darauf. */
+function ziehDiagnose() {
+  return IS_ADMIN && localStorage.getItem("mtg-zieh-diag") === "1";
+}
 function ziehDiagnoseSetzen(an) { localStorage.setItem("mtg-zieh-diag", an ? "1" : "0"); }
 
 function ziehNutzlast(dt, mitRoh) {
@@ -8038,6 +8048,13 @@ function renderSettings() {
       <label>${esc(t("admin.rolesTitle"))}</label>
       <div id="admin-rechte"><div class="meta"><span class="syn-spin">&#9881;</span></div></div>
       <p class="hint">${esc(t("admin.rolesHint"))}</p>
+      <div class="sec-sep"></div>
+      <label>${esc(t("diag.adminTitle"))}</label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:14px;color:var(--txt);margin-top:6px">
+        <input type="checkbox" id="d-diag"${ziehDiagnose() ? " checked" : ""} style="width:auto">
+        <span>${esc(t("diag.toggle"))}</span>
+      </label>
+      <p class="hint">${esc(t("diag.adminHint"))}</p>
     </div>` : ""}
     <p class="hint app-version">${esc(t("settings.version", { v: APP_VERSION || "—" }))}</p>`;
   // Eigenes Sprach-Dropdown mit Flaggen (ein natives <option> kann kein SVG
@@ -8092,6 +8109,10 @@ function renderSettings() {
     catch (e) { cb.checked = !an; toast(dbErr(e)); }
     finally { cb.disabled = false; }
   });
+  // Zieh-Diagnose: gerätelokal wie „Treffer sofort übernehmen", deshalb ohne
+  // Datenbank und ohne Toast — der Haken selbst ist die Rückmeldung.
+  const dg = $("#d-diag");
+  if (dg) dg.onchange = () => ziehDiagnoseSetzen(dg.checked);
   if (IS_ADMIN) { zeichneFreigaben(); zeichneRechte(); }
 }
 
@@ -11730,11 +11751,6 @@ function wireApp() {
   if (auto) {
     auto.checked = autoUebernehmen();
     auto.onchange = () => autoUebernehmenSetzen(auto.checked);
-  }
-  const diag = $("#d-diag");
-  if (diag) {
-    diag.checked = ziehDiagnose();
-    diag.onchange = () => ziehDiagnoseSetzen(diag.checked);
   }
 
   $("#drop").onclick = () => $("#file").click();

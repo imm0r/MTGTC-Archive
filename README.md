@@ -293,10 +293,15 @@ Adresse aus der Adressleiste** herüber — sie trägt Set, Nummer und Sprache
 #### Diagnose: was genau gelesen wurde
 
 Findet ein Zug die falsche Auflage, hilft Raten wenig — deshalb gibt es unter
-**Card Management → Karten scannen** den Schalter **„Zieh-Import: Diagnose
-anzeigen"** (gerätelokal, wie „Treffer sofort übernehmen"). Solange er an ist,
-bleibt die Kachel im Zieh-Kasten stehen und trägt darunter die vollständige
-Aufschlüsselung:
+**Einstellungen → Verwaltung → Zieh-Import** den Schalter **„Diagnose
+anzeigen"**. Er ist der **Adminrolle** vorbehalten und wirkt nur auf dem Gerät,
+an dem er gesetzt wurde (localStorage, wie „Treffer sofort übernehmen"). Die
+Rolle wird nicht nur beim Zeichnen geprüft, sondern auch bei jedem Zug: Sonst
+liefe die Diagnose bei jemandem weiter, der sie als Admin eingeschaltet hatte
+und die Rolle später verlor.
+
+Solange er an ist, bleibt die Kachel im Zieh-Kasten stehen und trägt darunter
+die vollständige Aufschlüsselung:
 
 | Abschnitt | Inhalt |
 | --- | --- |
