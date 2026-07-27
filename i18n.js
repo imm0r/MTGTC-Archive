@@ -3930,8 +3930,8 @@ Object.assign(I18N.de, {
   "wish.empty": "Noch keine Wunschkarten. Sie entstehen, wenn du eine Karte in ein Deck legst, die du nicht besitzt.",
   "wish.noDeck": "in keinem Deck",
   "wish.sum": "{p} zu kaufen",
-  "wish.buyBtn": "Alle bei Cardmarket",
-  "wish.buyTitle": "Die ganze Wunschliste als Wants-Liste für Cardmarket",
+  "wish.buyBtn": "in Wants übertragen",
+  "wish.buyTitle": "Die ganze Wunschliste in Cardmarket-Wants-Listen übertragen",
   "wish.removeTitle": "Von der Wunschliste nehmen",
   "wish.removeAsk": "„{name}“ von der Wunschliste nehmen? Damit fällt auch ihr Platz in diesen Decks weg: {decks}.",
   "wish.removeAskNoDeck": "„{name}“ von der Wunschliste nehmen? Sie liegt in keinem Deck.",
@@ -3947,8 +3947,8 @@ Object.assign(I18N.en, {
   "wish.empty": "No wishlist cards yet. They appear when you put a card you don't own into a deck.",
   "wish.noDeck": "in no deck",
   "wish.sum": "{p} to buy",
-  "wish.buyBtn": "All on Cardmarket",
-  "wish.buyTitle": "The whole wishlist as a wants list for Cardmarket",
+  "wish.buyBtn": "Transfer to Wants",
+  "wish.buyTitle": "Transfer the whole wishlist into Cardmarket wants lists",
   "wish.removeTitle": "Remove from the wishlist",
   "wish.removeAsk": "Remove “{name}” from the wishlist? Its slot in these decks goes with it: {decks}.",
   "wish.removeAskNoDeck": "Remove “{name}” from the wishlist? It is in no deck.",
@@ -3964,8 +3964,8 @@ Object.assign(I18N.fr, {
   "wish.empty": "Aucune carte souhaitée pour l’instant. Elles apparaissent quand tu mets dans un deck une carte que tu ne possèdes pas.",
   "wish.noDeck": "dans aucun deck",
   "wish.sum": "{p} à acheter",
-  "wish.buyBtn": "Tout sur Cardmarket",
-  "wish.buyTitle": "Toute la liste de souhaits comme liste de wants pour Cardmarket",
+  "wish.buyBtn": "Transférer vers Wants",
+  "wish.buyTitle": "Transférer toute la liste de souhaits dans des listes de wants Cardmarket",
   "wish.removeTitle": "Retirer de la liste de souhaits",
   "wish.removeAsk": "Retirer « {name} » de la liste de souhaits ? Sa place dans ces decks disparaît aussi : {decks}.",
   "wish.removeAskNoDeck": "Retirer « {name} » de la liste de souhaits ? Elle n’est dans aucun deck.",
@@ -3981,8 +3981,8 @@ Object.assign(I18N.es, {
   "wish.empty": "Todavía no hay cartas deseadas. Aparecen cuando pones en un mazo una carta que no tienes.",
   "wish.noDeck": "en ningún mazo",
   "wish.sum": "{p} por comprar",
-  "wish.buyBtn": "Todo en Cardmarket",
-  "wish.buyTitle": "Toda la lista de deseos como lista de wants para Cardmarket",
+  "wish.buyBtn": "Transferir a Wants",
+  "wish.buyTitle": "Transferir toda la lista de deseos a listas de wants de Cardmarket",
   "wish.removeTitle": "Quitar de la lista de deseos",
   "wish.removeAsk": "¿Quitar «{name}» de la lista de deseos? Su hueco en estos mazos se va con ella: {decks}.",
   "wish.removeAskNoDeck": "¿Quitar «{name}» de la lista de deseos? No está en ningún mazo.",
@@ -3998,8 +3998,8 @@ Object.assign(I18N.it, {
   "wish.empty": "Ancora nessuna carta desiderata. Nascono quando metti in un mazzo una carta che non possiedi.",
   "wish.noDeck": "in nessun mazzo",
   "wish.sum": "{p} da comprare",
-  "wish.buyBtn": "Tutto su Cardmarket",
-  "wish.buyTitle": "Tutta la lista dei desideri come lista wants per Cardmarket",
+  "wish.buyBtn": "Trasferisci in Wants",
+  "wish.buyTitle": "Trasferisci tutta la lista dei desideri in liste wants di Cardmarket",
   "wish.removeTitle": "Togliere dalla lista dei desideri",
   "wish.removeAsk": "Togliere «{name}» dalla lista dei desideri? Con lei sparisce anche il suo posto in questi mazzi: {decks}.",
   "wish.removeAskNoDeck": "Togliere «{name}» dalla lista dei desideri? Non è in nessun mazzo.",
@@ -4007,6 +4007,43 @@ Object.assign(I18N.it, {
   "wish.removed": "«{name}» tolta dalla lista dei desideri",
   "wish.fulfilled": "«{name}» era un desiderio: ora è nella tua collezione e al suo posto nel mazzo.",
   "wish.fulfilledN": "{n} carte desiderate ottenute",
+});
+
+/* ---- Teil 30: Wants-Übertrag in 60er-Teillisten (Cardmarket-Limit) ---- */
+Object.assign(I18N.de, {
+  "buy.openWants": "Cardmarket-Wants öffnen",
+  "buy.chunkInfo": "Cardmarket erlaubt {max} Karten pro Wants-Liste. Deine {n} Karten sind in {m} Teillisten aufgeteilt:",
+  "buy.chunkBtn": "Teil {i}/{m} ({n})",
+  "buy.chunkHint": "Auf Cardmarket je Teil eine NEUE Wants-Liste anlegen: Teil antippen (kopiert), dort einfügen (Strg+V), speichern, nächster Teil. Kopierte Teile sind abgehakt.",
+  "buy.chunkCopied": "Teil {i}/{m} kopiert – auf Cardmarket als neue Wants-Liste einfügen (Strg+V).",
+});
+Object.assign(I18N.en, {
+  "buy.openWants": "Open Cardmarket Wants",
+  "buy.chunkInfo": "Cardmarket allows {max} cards per wants list. Your {n} cards are split into {m} parts:",
+  "buy.chunkBtn": "Part {i}/{m} ({n})",
+  "buy.chunkHint": "On Cardmarket create a NEW wants list per part: tap a part (copies it), paste there (Ctrl+V), save, next part. Copied parts are ticked off.",
+  "buy.chunkCopied": "Part {i}/{m} copied – paste it into a new Cardmarket wants list (Ctrl+V).",
+});
+Object.assign(I18N.fr, {
+  "buy.openWants": "Ouvrir les Wants Cardmarket",
+  "buy.chunkInfo": "Cardmarket autorise {max} cartes par liste de wants. Tes {n} cartes sont réparties en {m} parties :",
+  "buy.chunkBtn": "Partie {i}/{m} ({n})",
+  "buy.chunkHint": "Sur Cardmarket, crée une NOUVELLE liste de wants par partie : clique une partie (copiée), colle-la là (Ctrl+V), enregistre, partie suivante. Les parties copiées sont cochées.",
+  "buy.chunkCopied": "Partie {i}/{m} copiée – colle-la dans une nouvelle liste de wants Cardmarket (Ctrl+V).",
+});
+Object.assign(I18N.es, {
+  "buy.openWants": "Abrir Wants de Cardmarket",
+  "buy.chunkInfo": "Cardmarket permite {max} cartas por lista de wants. Tus {n} cartas se dividen en {m} partes:",
+  "buy.chunkBtn": "Parte {i}/{m} ({n})",
+  "buy.chunkHint": "En Cardmarket crea una NUEVA lista de wants por parte: pulsa una parte (se copia), pégala allí (Ctrl+V), guarda, siguiente parte. Las partes copiadas quedan marcadas.",
+  "buy.chunkCopied": "Parte {i}/{m} copiada – pégala en una nueva lista de wants de Cardmarket (Ctrl+V).",
+});
+Object.assign(I18N.it, {
+  "buy.openWants": "Apri Wants di Cardmarket",
+  "buy.chunkInfo": "Cardmarket consente {max} carte per lista wants. Le tue {n} carte sono divise in {m} parti:",
+  "buy.chunkBtn": "Parte {i}/{m} ({n})",
+  "buy.chunkHint": "Su Cardmarket crea una NUOVA lista wants per parte: tocca una parte (copiata), incollala lì (Ctrl+V), salva, parte successiva. Le parti copiate sono spuntate.",
+  "buy.chunkCopied": "Parte {i}/{m} copiata – incollala in una nuova lista wants di Cardmarket (Ctrl+V).",
 });
 
 initLang();

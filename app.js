@@ -6409,12 +6409,24 @@ function cmKaufLink(c) {
     : `https://www.cardmarket.com/${cmSprache()}/Magic/Products/Search?searchString=${encodeURIComponent(cmName(c))}`;
 }
 
+// Eine Cardmarket-Wants-Liste fasst höchstens 60 Karten; man kann aber beliebig
+// viele Listen anlegen. Längere Listen zerlegen wir daher in 60er-Teile, die
+// nacheinander (je Teil eine neue Wants-Liste) eingefügt werden.
+const CM_WANTS_MAX = 60;
+function kaufChunks(items) {
+  const out = [];
+  for (let i = 0; i < items.length; i += CM_WANTS_MAX) out.push(items.slice(i, i + CM_WANTS_MAX));
+  return out;
+}
+const KAUF_CHUNK_DONE = new Set();   // welche Teile im offenen Dialog schon kopiert sind
+
 let KAUF_DECK_ID = null;   // Deck, dessen Fehlliste der Kauf-Dialog gerade zeigt
 let KAUF_WUNSCH = false;   // statt eines Decks: die ganze Wunschliste
 
 function oeffneKauf(deckId) {
   KAUF_WUNSCH = false;
   KAUF_DECK_ID = deckId;
+  KAUF_CHUNK_DONE.clear();
   renderKauf();
   $("#buy-dlg").showModal();
 }
@@ -6423,6 +6435,7 @@ function oeffneKauf(deckId) {
 function oeffneKaufWunschliste() {
   KAUF_WUNSCH = true;
   KAUF_DECK_ID = null;
+  KAUF_CHUNK_DONE.clear();
   renderKauf();
   $("#buy-dlg").showModal();
 }
@@ -6458,15 +6471,50 @@ function renderKauf() {
       <a class="cm cm-logo" href="${esc(cmKaufLink(c))}" target="_blank" rel="noopener noreferrer"
          title="${esc(t("buy.cmSearch"))}">${CM_LOGO}</a>
     </div>`).join("");
-  const actions = `
+  // Cardmarket nimmt höchstens 60 Karten je Wants-Liste. Bis 60: ein Knopf, der
+  // alles kopiert und die Wants-Seite öffnet. Darüber: je 60er-Teil ein Knopf,
+  // der nur diesen Teil kopiert (auf Cardmarket je Teil eine neue Wants-Liste).
+  const chunks = kaufChunks(items);
+  const cmBtn = (id, tag, label, extra = "") =>
+    `<${tag} class="btn cm-btn" id="${id}"${extra}><span class="cm-btn-logo">${CM_LOGO}</span><span>${esc(label)}</span></${tag}>`;
+  let actions;
+  if (chunks.length <= 1) {
+    actions = `
     <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap">
-      <div style="flex:none"><button class="btn" id="buy-go">${esc(t("buy.copyOpen"))}</button></div>
+      <div style="flex:none">${cmBtn("buy-go", "button", t("wish.buyBtn"))}</div>
       <div style="flex:none"><button class="btn ghost" id="buy-txt">${esc(t("buy.txt"))}</button></div>
     </div>
     <p class="hint" style="margin-top:8px">${esc(t("buy.hint"))}</p>`;
+  } else {
+    const grid = chunks.map((ch, i) => {
+      const done = KAUF_CHUNK_DONE.has(i);
+      return `<button class="btn ghost sm chunk-btn${done ? " done" : ""}" data-chunk="${i}">${
+        esc(t("buy.chunkBtn", { i: i + 1, m: chunks.length, n: ch.length }))}${done ? " ✓" : ""}</button>`;
+    }).join("");
+    actions = `
+    <p class="hint" style="margin:12px 0 6px">${esc(t("buy.chunkInfo", { n: items.length, m: chunks.length, max: CM_WANTS_MAX }))}</p>
+    <div class="chunk-grid">${grid}</div>
+    <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
+      <div style="flex:none">${cmBtn("buy-open-cm", "a", t("buy.openWants"), ` href="${esc(cmWantsUrl())}" target="_blank" rel="noopener noreferrer"`)}</div>
+      <div style="flex:none"><button class="btn ghost" id="buy-txt">${esc(t("buy.txt"))}</button></div>
+    </div>
+    <p class="hint" style="margin-top:8px">${esc(t("buy.chunkHint"))}</p>`;
+  }
   body.innerHTML = head + sub + `<div class="sell-liste">${liste}</div>` + actions;
-  const go = $("#buy-go"); if (go) go.onclick = kaufKopierenUndOeffnen;
   const tx = $("#buy-txt"); if (tx) tx.onclick = kaufTxt;
+  if (chunks.length <= 1) {
+    const go = $("#buy-go"); if (go) go.onclick = kaufKopierenUndOeffnen;
+  } else {
+    $$("#buy-body .chunk-btn").forEach(b => b.onclick = async () => {
+      const i = +b.dataset.chunk;
+      try { await navigator.clipboard.writeText(kaufWantlist(chunks[i])); }
+      catch { toast(t("buy.copyFail")); return; }
+      KAUF_CHUNK_DONE.add(i);
+      b.classList.add("done");
+      b.textContent = t("buy.chunkBtn", { i: i + 1, m: chunks.length, n: chunks[i].length }) + " ✓";
+      toast(t("buy.chunkCopied", { i: i + 1, m: chunks.length }));
+    });
+  }
 }
 
 async function kaufKopierenUndOeffnen() {
@@ -10993,6 +11041,7 @@ function wireApp() {
   // Karten kaufen" am einzelnen Deck.
   const wKauf = $("#wish-buy");
   if (wKauf) wKauf.onclick = oeffneKaufWunschliste;
+  const wKaufLogo = $("#wish-buy-cm"); if (wKaufLogo) wKaufLogo.innerHTML = CM_LOGO;   // Cardmarket-Logo vor „in Wants übertragen"
 
   // „Deine Combos": komplette Combos quer über den ganzen Bestand. Karten nach
   // Namen dedupliziert (dieselbe Karte in mehreren Auflagen zählt einmal).
