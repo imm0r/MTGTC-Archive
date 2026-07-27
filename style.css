@@ -950,6 +950,14 @@ td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000
 .cm-logo .brandlogo,.sf-logo .brandlogo{display:block;vertical-align:middle}
 .sf-logo .brandlogo{width:15px;height:15px}
 .cm-logo .brandlogo{width:14px;height:14px;fill:#fff}
+/* Knopf mit vorangestelltem Cardmarket-Logo („in Wants übertragen", „Wants
+   öffnen"). Das Logo wird weiß gefärbt wie überall, damit es auf dem Knopf sitzt. */
+.btn.cm-btn{display:inline-flex;align-items:center;gap:6px}
+.cm-btn-logo{line-height:0;display:inline-flex}
+.cm-btn-logo .brandlogo{width:15px;height:15px;fill:#fff;display:block}
+/* Wants-Teillisten (60er-Stückelung): je Teil ein Knopf, kopierte sind abgehakt. */
+.chunk-grid{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.chunk-btn.done{border-color:var(--ok);color:var(--ok);opacity:.75}
 /* Manasymbole (Mana-Font, assets/mana): je Symbol ein <i class="ms … ms-cost">.
    ms-cost zeichnet den runden, farbigen Pip wie auf der Karte; die Grundregeln
    stehen in mana.css (VOR style.css geladen), hier nur Größe/Ausrichtung fein.
