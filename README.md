@@ -673,6 +673,49 @@ wo es war. Fächer, in denen die Karte schon liegt, sind beim Ziehen als solche
 gekennzeichnet. Eine Fläche **„+ Neue Kategorie"** legt eines an und ordnet
 gleich ein.
 
+### Kartenansicht: das Deck als Stapel
+
+Über der Liste steht neben der Gruppierung ein zweiter Umschalter: **Tabelle**
+oder **Karten**. In der Kartenansicht wird jede Gruppe eine **Spalte**, und die
+Karten darin liegen als Stapel — sichtbar ist von jeder nur ihr
+**Namensbalken**, also der obere Streifen des echten Kartenbildes. Beim
+Überfahren klappt die Karte in voller Größe auf und schiebt den Stapel nach
+unten.
+
+Warum der Bildausschnitt und nicht Text: Der Balken trägt Name, Manakosten und
+die Rahmenfarbe in der Gestaltung der Karte selbst. Das ist dieselbe Auskunft,
+die eine Tabellenzeile in vier Spalten gibt — nur erkennt man sie, ohne zu
+lesen. Wer Magic spielt, liest Karten ohnehin an ihrem Balken; genau so liegen
+sie im Regal und in der Hand.
+
+**Die Geometrie ist der ganze Trick.** Eine Magic-Karte misst 63 × 88 mm, ihr
+Seitenverhältnis ist also 1 : 1,397, und der Namensbalken sitzt zwischen rund
+4 % und 10 % der Kartenhöhe. Beides sind *Anteile*, keine Pixel — deshalb stimmt
+der Ausschnitt bei jeder Spaltenbreite und auf jedem Bildschirm, ohne eine
+einzige Pixelangabe:
+
+* Das Fenster bekommt `aspect-ratio: 8/1`. Bei Breite B ist es B/8 hoch, also
+  8,9 % der Kartenhöhe (B × 1,397) — das deckt den Balken samt Oberkante ab.
+* Das Bild wird auf volle Breite gezogen und um 3,5 % **seiner eigenen Höhe**
+  nach oben geschoben. Prozentwerte in `translateY` beziehen sich auf das
+  Element selbst; genau das macht die Rechnung auflösungsunabhängig.
+* Beim Überfahren wechselt das Fenster auf `aspect-ratio: 63/88` und der
+  Versatz entfällt — aus dem Balken wird die ganze Karte.
+
+Der Kopf jeder Spalte nennt **Anzahl und Wert** der Gruppe und klappt sie zu;
+der Zustand ist derselbe wie in der Tabelle. Eine fehlende Karte trägt eine rote
+Kante statt der roten Pille, der Commander eine goldene — in einem Stapel ist
+der Rand die einzige Fläche, die frei bleibt. Hat eine Auflage bei Scryfall kein
+Bild, zeigt der Balken schlicht den Namen.
+
+**Ziehen funktioniert hier genauso.** Streifen anfassen, Fächer erscheinen,
+loslassen — mit der Maus überall, mit dem Finger an der Mengenangabe links.
+Beide Ansichten teilen sich dieselbe Verdrahtung; zwei getrennte liefen
+auseinander, sobald eine von beiden geändert würde.
+
+Auf Geräten ohne Zeiger gibt es das Aufklappen nicht: Dort führt der Tipp zur
+Detailansicht, die ohnehin mehr zeigt als das Bild allein.
+
 ### Warum Zeigereignisse und nicht HTML5-Ziehen
 
 Der erste Anlauf hing an `draggable="true"` samt `dragstart`/`drop` — die

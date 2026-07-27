@@ -2856,19 +2856,7 @@ function wireCardRows(root) {
     const kat = tr.querySelector("[data-kat]");
     if (kat) kat.onclick = () => kategorienZuordnen(deck, id);
 
-    if (deck) {
-      // Der Griff ist das verlässliche Ziel: Er trägt touch-action:none, also
-      // rollt die Seite unter dem Finger nicht weg, während man zieht.
-      const griff = tr.querySelector("[data-ziehgriff]");
-      griff?.addEventListener("pointerdown", e => katZiehAnfassen(e, tr, deck, id));
-      // Mit der Maus darf man die Zeile auch irgendwo sonst anfassen — dort ist
-      // Rollen keine konkurrierende Geste. Mit dem Finger nur am Griff.
-      tr.addEventListener("pointerdown", e => {
-        if (e.pointerType === "mouse") katZiehAnfassen(e, tr, deck, id);
-      });
-      tr.addEventListener("pointermove", katZiehBewegt);
-      tr.addEventListener("pointerup", katZiehLos);
-    }
+    if (deck) ziehVerdrahten(tr, deck, id);
 
     const sl = tr.querySelector("[data-sell]");
     if (sl) sl.onclick = () => toggleSale(id, sl);
@@ -6738,11 +6726,31 @@ function deckGruppen(d, eintraege) {
                   items: gruppen.get("t:" + en) }));
 }
 
-/* Leiste über der Deck-Tabelle: Umschalter und Zugang zur Verwaltung. Sie
-   sitzt dort und nicht in der Werkzeugleiste darüber, weil sie genau das
-   steuert, was direkt darunter steht. */
+/* Welche Darstellung ein Deck zeigt: die Tabelle oder die Kartenansicht. Wie
+   die Gruppierung eine Sache der Ansicht und damit des Geräts — am Handy will
+   man anderes sehen als am breiten Bildschirm. Voreingestellt bleibt die
+   Tabelle: Sie war immer da, und wer die Kartenansicht will, findet sie im
+   Umschalter. */
+const deckAnsicht = {
+  lies() { try { return JSON.parse(localStorage.getItem("mtg-deck-ansicht") || "{}") || {}; }
+           catch { return {}; } },
+  karten(id) { return this.lies()[id] === "karten"; },
+  setze(id, wert) {
+    const m = this.lies(); m[id] = wert;
+    try { localStorage.setItem("mtg-deck-ansicht", JSON.stringify(m)); } catch { /* voll */ }
+  },
+};
+
+/* Leiste über der Deck-Tabelle: die beiden Umschalter und der Zugang zur
+   Verwaltung. Sie sitzt dort und nicht in der Werkzeugleiste darüber, weil sie
+   genau das steuert, was direkt darunter steht.
+
+   Gruppierung und Darstellung sind zwei unabhängige Fragen — WONACH sortiert
+   wird und WIE es aussieht. Beide Umschalter stehen deshalb nebeneinander,
+   statt zu einem einzigen mit vier Kombinationen verschmolzen zu werden. */
 function deckGruppeLeisteHtml(d) {
   const nachKat = deckGruppe.nachKat(d);
+  const karten = deckAnsicht.karten(d.id);
   const n = (d.kategorien || []).length;
   return `<div class="deck-gruppe-leiste">
     <span class="tool-label" style="margin:0">${esc(t("kat.groupBy"))}</span>
@@ -6752,9 +6760,83 @@ function deckGruppeLeisteHtml(d) {
       <button class="btn ghost sm${nachKat ? " on" : ""}" data-gruppe="kat" data-deck="${d.id}"
         title="${esc(t("kat.byOwnTitle"))}">${esc(t("kat.byOwn"))}${n ? ` <span class="gruppe-zahl">${n}</span>` : ""}</button>
     </div>
+    <span class="tool-label" style="margin:0">${esc(t("ansicht.label"))}</span>
+    <div class="gruppe-schalter" role="group">
+      <button class="btn ghost sm${karten ? "" : " on"}" data-ansicht="tabelle" data-deck="${d.id}"
+        title="${esc(t("ansicht.tableTitle"))}">${esc(t("ansicht.table"))}</button>
+      <button class="btn ghost sm${karten ? " on" : ""}" data-ansicht="karten" data-deck="${d.id}"
+        title="${esc(t("ansicht.cardsTitle"))}">${esc(t("ansicht.cards"))}</button>
+    </div>
     <button class="btn ghost sm" data-katverw="${d.id}"
       title="${esc(t("kat.manageTitle"))}">&#127991; ${esc(t("kat.manage"))}</button>
   </div>`;
+}
+
+/* ------------------------------------------------ Kartenansicht (Stapel)
+   Das Deck als Spalten, in jeder ein Stapel Karten — sichtbar ist von jeder
+   nur ihr NAMENSBALKEN, also der obere Streifen des echten Kartenbildes.
+   Beim Überfahren klappt die Karte in voller Größe auf.
+
+   Warum der Ausschnitt und nicht Text: Der Balken trägt Name, Manakosten und
+   die Farbe des Rahmens in der Schrift und Gestaltung der Karte selbst. Das
+   ist dieselbe Auskunft, die eine Tabellenzeile in vier Spalten gibt — nur
+   erkennt man sie, ohne zu lesen. Wer Magic spielt, liest Karten ohnehin an
+   ihrem Balken; genau so liegen sie im Regal und in der Hand.
+
+   Gerechnet wird in Anteilen der Bildbreite, nicht in Pixeln: Eine Karte ist
+   63 × 88 mm, ihr Namensbalken sitzt zwischen etwa 4 % und 10 % der Höhe. Das
+   gilt für jede Auflösung und jede Spaltenbreite. Die Werte stehen in
+   style.css, damit sie nicht zwischen zwei Sprachen wandern. */
+function deckStapelHtml(d, gruppen) {
+  return `<div class="deck-stapel">${gruppen.map(g => {
+    const anz  = g.items.reduce((s, x) => s + x.e.qty, 0);
+    const wert = g.items.reduce((s, x) => s + (x.c.price || 0) * x.e.qty, 0);
+    const zu   = deckCatZu.has(`${d.id}|${g.key}`);
+    return `<div class="stapel-spalte${zu ? " zu" : ""}">
+      <div class="stapel-kopf" data-cattoggle="${d.id}|${g.key}">
+        <span class="deck-cat-arrow">${zu ? "&#9654;" : "&#9660;"}</span>
+        <span class="stapel-name">${esc(g.label)}</span>
+        <span class="stapel-zahl">${anz}</span>
+        <span class="stapel-preis">${eur(wert)}</span>
+      </div>
+      <div class="stapel-karten">${g.items.map(x => stapelKarteHtml(d, g, x)).join("")}</div>
+    </div>`;
+  }).join("")}</div>`;
+}
+
+function stapelKarteHtml(d, g, { e, c }) {
+  const fehlt = Math.max(0, e.qty - bestandVon(c));
+  // Dasselbe Bild wie in der Zeile, nur größer geholt: Der Balken wird auf
+  // Spaltenbreite gezogen, und "small" (146 px) würde dabei matschig.
+  const bild = (c.img || "").replace("/small/", "/normal/");
+  const haupt = d.main_card_id === c.id || d.second_card_id === c.id;
+  return `<div class="stapel-karte${fehlt ? " fehlt" : ""}${haupt ? " cmd" : ""}"
+       data-id="${c.id}" data-deck="${esc(d.id)}"
+       data-vonkat="${esc(g.key.startsWith("k:") ? g.key.slice(2) : "")}"
+       title="${esc(c.disp)}${fehlt ? " — " + esc(t("row.missing", { n: fehlt })) : ""}">
+    <span class="stapel-menge" data-ziehgriff>${e.qty}</span>
+    <div class="stapel-fenster">${bild
+      ? `<img src="${esc(bild)}" alt="" loading="lazy">`
+      // Ohne Bild bleibt der Balken leer — dann trägt er den Namen als Text.
+      // Scryfall führt nicht zu jeder Auflage ein Foto; eine graue Fläche ohne
+      // Auskunft wäre schlechter als eine schlichte Zeile.
+      : `<span class="stapel-ersatz">${esc(c.disp)}</span>`}</div>
+  </div>`;
+}
+
+/* Die Streifen verdrahten: ziehen wie eine Tabellenzeile, Klick öffnet die
+   Detailansicht. Das Aufklappen beim Überfahren macht CSS allein — dafür
+   braucht es kein Ereignis, und auf Geräten ohne Zeiger gibt es es zu Recht
+   nicht: Dort führt der Klick zur Detailansicht, die mehr zeigt. */
+function wireStapel(root) {
+  root.querySelectorAll(".stapel-karte").forEach(el => {
+    const id = el.dataset.id, deck = el.dataset.deck;
+    ziehVerdrahten(el, deck, id);
+    el.addEventListener("click", ev => {
+      if (ev.target.closest("[data-ziehgriff]")) return;
+      showCardDetail(id);
+    });
+  });
 }
 
 /* Die Kategorien einer Karte als Marken für die Tabellenzelle. Die primäre
@@ -6946,7 +7028,9 @@ async function katsFertig(deckId, cardId) {
 /* Nach dem Umsortieren auf die Zeile zeigen: In der Kategorie-Ansicht springt
    sie in eine andere Gruppe, und ohne diesen Hinweis sucht man sie dort. */
 function zeigeDeckZeile(deckId, cardId) {
-  const tr = $(`.deck-tbl tr[data-deck="${CSS.escape(deckId)}"][data-id="${CSS.escape(cardId)}"]`);
+  // Trifft die Tabellenzeile ebenso wie den Streifen der Kartenansicht — beide
+  // tragen dieselben Merkmale.
+  const tr = $(`[data-deck="${CSS.escape(deckId)}"][data-id="${CSS.escape(cardId)}"]`);
   if (!tr) return;                       // Gruppe zugeklappt oder Deck zu
   tr.scrollIntoView({ behavior: "smooth", block: "nearest" });
   // Dieselbe Markierung wie beim Sprung aus dem Zieh-Import in die Sammlung —
@@ -7044,7 +7128,8 @@ function katZiehAus() {
   ziehKat = null;
   ziehAnsatz = null;
   document.body.classList.remove("zieht-gerade");
-  $$("tr.zieht").forEach(tr => tr.classList.remove("zieht"));
+  // Nicht nur Tabellenzeilen: In der Kartenansicht zieht man einen Stapelstreifen.
+  $$(".zieht").forEach(el => el.classList.remove("zieht"));
   katGeistAus();
   katDropAus();
 }
@@ -7090,6 +7175,24 @@ function katKlickSchlucken() {
   const h = ev => { ev.stopPropagation(); ev.preventDefault(); };
   document.addEventListener("click", h, true);
   setTimeout(() => document.removeEventListener("click", h, true), 0);
+}
+
+/* Ein Element zum Ziehen freigeben — Tabellenzeile wie Stapelstreifen. Beide
+   Ansichten teilen sich diesen einen Weg; zwei getrennte Verdrahtungen liefen
+   auseinander, sobald eine von beiden geändert würde.
+
+   Der Griff ist das verlässliche Ziel: Er trägt touch-action:none, also rollt
+   die Seite unter dem Finger nicht weg, während man zieht. Mit der Maus darf
+   man auch irgendwo sonst anfassen — dort ist Rollen keine konkurrierende
+   Geste. */
+function ziehVerdrahten(el, deckId, cardId) {
+  el.querySelector("[data-ziehgriff]")
+    ?.addEventListener("pointerdown", e => katZiehAnfassen(e, el, deckId, cardId));
+  el.addEventListener("pointerdown", e => {
+    if (e.pointerType === "mouse") katZiehAnfassen(e, el, deckId, cardId);
+  });
+  el.addEventListener("pointermove", katZiehBewegt);
+  el.addEventListener("pointerup", katZiehLos);
 }
 
 /* Abbruch mit Escape — und mit dem Zeiger, den das System uns wegnimmt
@@ -7386,7 +7489,11 @@ function renderDecks() {
     const rows = eintraege.length;
     // Erster Commander als Kartenobjekt: Grundlage der Partner-Prüfung je Zeile.
     const mainCard = d.main_card_id ? CARDS.find(x => x.id === d.main_card_id) : null;
-    const deckKoerper = deckGruppen(d, eintraege).map(g => {
+    // Einmal gruppieren, zwei Darstellungen: Tabelle und Kartenansicht zeigen
+    // dieselbe Einteilung, nur anders. Zweimal zu rechnen hieße, sie
+    // auseinanderlaufen zu lassen.
+    const gruppen = deckGruppen(d, eintraege);
+    const deckKoerper = gruppen.map(g => {
       const items = g.items;
       const anz = items.reduce((s, x) => s + x.e.qty, 0);
       const zu = deckCatZu.has(`${d.id}|${g.key}`);
@@ -7508,8 +7615,10 @@ function renderDecks() {
         </div>
         <div class="deck-dash" data-dash="${d.id}" style="margin-top:12px"></div>
         ${rows ? `${deckGruppeLeisteHtml(d)}
-                  <div class="xscroll" style="overflow-x:auto"><table class="deck-tbl">
-                    <thead>${cardHead("deck")}</thead>${deckKoerper}</table></div>`
+                  ${deckAnsicht.karten(d.id)
+                    ? deckStapelHtml(d, gruppen)
+                    : `<div class="xscroll" style="overflow-x:auto"><table class="deck-tbl">
+                         <thead>${cardHead("deck")}</thead>${deckKoerper}</table></div>`}`
                : `<div class="empty">${esc(t("deck.emptyDeck"))}</div>`}
         <div class="deck-syn" data-synbox="${d.id}" style="margin-top:12px"></div>
         <div class="deck-combos" data-combobox="${d.id}" style="margin-top:12px"></div>
@@ -7558,6 +7667,7 @@ function renderDecks() {
   });
 
   $$("#deck-list .deck-tbl").forEach(t => wireCardRows(t));
+  $$("#deck-list .deck-stapel").forEach(el => wireStapel(el));
 
   // Umschalter der Gruppierung. Neu gezeichnet wird das ganze Deck-Panel —
   // die Tabelle wird ja umgebaut. Ein Klick auf die schon gewählte Ordnung
@@ -7567,13 +7677,19 @@ function renderDecks() {
     deckGruppe.setze(b.dataset.deck, b.dataset.gruppe);
     renderDecks();
   });
+  $$("#deck-list [data-ansicht]").forEach(b => b.onclick = () => {
+    deckAnsicht.setze(b.dataset.deck, b.dataset.ansicht);
+    renderDecks();
+  });
   $$("#deck-list [data-katverw]").forEach(b => b.onclick = () => kategorienVerwalten(b.dataset.katverw));
 
   // Gruppen im Deck auf-/zuklappen: nur die Kartenzeilen dieses <tbody>
   // ausblenden, Zustand in deckCatZu merken (übersteht das nächste renderDecks).
-  $$("#deck-list .deck-cat-head").forEach(h => h.onclick = () => {
-    const tb = h.closest(".deck-cat-body");
-    const zu = tb.classList.toggle("zu");
+  $$("#deck-list .deck-cat-head, #deck-list .stapel-kopf").forEach(h => h.onclick = () => {
+    // In der Tabelle steckt die Gruppe in einem <tbody>, in der Kartenansicht
+    // in einer Spalte — derselbe Zustand, zwei Hüllen.
+    const box = h.closest(".deck-cat-body, .stapel-spalte");
+    const zu = box.classList.toggle("zu");
     zu ? deckCatZu.add(h.dataset.cattoggle) : deckCatZu.delete(h.dataset.cattoggle);
     h.querySelector(".deck-cat-arrow").innerHTML = zu ? "&#9654;" : "&#9660;";
   });
