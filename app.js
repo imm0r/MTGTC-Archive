@@ -1256,6 +1256,20 @@ async function addToCollection(card, el, opts) {
       <button class="btn ghost sm" data-fix style="margin-left:6px">${esc(t("scan.wrongCard"))}</button>
     </div>`;
   el.querySelector("[data-fix]").onclick = () => renderManual(el, card.name);
+  // Im schwebenden Zieh-Kasten ist die Quittung nach dem Schreiben erledigt —
+  // stehenbleibend wirkte sie wie eine weitere Rückfrage. Kurz zeigen, dann
+  // selbst wegräumen, den leeren Kasten gleich mit; „Falsche Karte?" bricht
+  // den Abbau ab, wer korrigiert, braucht die Kachel weiter. Die Scan-
+  // Warteschlange behält ihre Quittungen: dort ist die Liste der Beleg über
+  // einen ganzen Stapel.
+  const kasten = el.closest("#dropbox-list");
+  if (kasten) {
+    const weg = setTimeout(() => {
+      el.remove();
+      if (!kasten.children.length) { const b = $("#dropbox"); if (b) b.hidden = true; }
+    }, 5000);
+    el.querySelector("[data-fix]").onclick = () => { clearTimeout(weg); renderManual(el, card.name); };
+  }
   if (meldung) toast(meldung);
 }
 
@@ -1469,6 +1483,13 @@ function gathererLang(gebiet) {
 const cmSlugName = s => String(s || "").replace(/-V\d+$/i, "").replace(/[-_]+/g, " ")
   .replace(/\s+/g, " ").trim();
 
+/* Setnamen wortblind vergleichen: Cardmarket sagt „Commander: Outlaws of
+   Thunder Junction", Scryfall „Outlaws of Thunder Junction Commander" —
+   dieselben Worte, andere Reihenfolge. Sortiert verglichen treffen sie sich;
+   das bloße norm()-Gleich davor scheiterte genau daran (ein gezogener
+   Sonnenring landete im falschen Set). */
+const setWorte = s => norm(s).split(" ").filter(Boolean).sort().join(" ");
+
 /* Eine Adresse auf eine Kennung abklopfen. REINE TEXTARBEIT, kein Netz —
    deshalb einzeln prüfbar. Rückgabe: { art, quelle, … } oder null. Die
    Reihenfolge hier drin ist gleichgültig, eine Adresse trifft höchstens eines
@@ -1518,19 +1539,24 @@ function ziehKennung(adresse) {
   if (mv && /^\d+$/.test(mv)) return { art: "multiverse", quelle: "Gatherer", id: mv };
 
   if (host("cardmarket.com")) {
+    // Die Seitensprache steht vorn im Pfad (/de/Magic/…). Sie benennt Produkt
+    // und Set in dieser Sprache und ist zugleich die beste Vorauswahl für die
+    // Sprache der Karte. Bilder von den S3-Wirten tragen sie nicht.
+    const erst = (teile[0] || "").toLowerCase();
+    const lang = ["de", "en", "fr", "es", "it"].includes(erst) ? erst : null;
     // Produktnummer im Fragezeichenteil — so verlinkt auch Scryfall dorthin.
     const pid = param("idproduct");
-    if (pid && /^\d+$/.test(pid)) return { art: "cmid", quelle: "Cardmarket", id: pid };
+    if (pid && /^\d+$/.test(pid)) return { art: "cmid", quelle: "Cardmarket", id: pid, lang };
     // Sprechende Produktadresse: /de/Magic/Products/Singles/<Set>/<Karte>.
     const i = teile.findIndex(x => x.toLowerCase() === "singles");
     if (i >= 0 && teile[i + 2])
-      return { art: "cmname", quelle: "Cardmarket",
+      return { art: "cmname", quelle: "Cardmarket", lang,
                name: cmSlugName(teile[i + 2]), setName: cmSlugName(teile[i + 1]) };
     // Produktbild: …/<Produktnummer>.jpg. Dass diese Zahl die Produktnummer
     // ist, ist GERATEN — deshalb „unsicher": der Treffer gilt erst, wenn der
     // mitgezogene Name dazu passt (siehe karteAusKennung).
     const bild = (teile[teile.length - 1] || "").match(/^(\d{2,9})\.(?:jpe?g|png|webp|gif)$/i);
-    if (bild) return { art: "cmid", quelle: "Cardmarket", id: bild[1], unsicher: true };
+    if (bild) return { art: "cmid", quelle: "Cardmarket", id: bild[1], unsicher: true, lang };
   }
   return null;
 }
@@ -1550,11 +1576,49 @@ async function karteAusKennung(k, nameHinweis) {
     return withPrice(await sf("/cards/multiverse/" + encodeURIComponent(k.id)));
   if (k.art === "cmid") {
     const hit = await sf("/cards/cardmarket/" + encodeURIComponent(k.id));
+    if (!hit) return null;
     // Aus einem Dateinamen geratene Nummer: nur gelten lassen, wenn der
     // mitgezogene Name dazu passt. Eine falsche Karte still in die Sammlung zu
     // schreiben wäre schlimmer als gar keine — ohne Namen fällt der Weg durch
     // und der Namensweg bekommt seine Chance.
-    if (k.unsicher && !(hit && nameHinweis && nameHitMatchesRead(hit, nameHinweis))) return null;
+    if (k.unsicher) {
+      if (!nameHinweis) return null;
+      if (!nameHitMatchesRead(hit, nameHinweis)) {
+        // Der Vergleich muss SPRACHBLIND sein: auf cardmarket.com/de heißt
+        // das gezogene Bild „Sonnenring", die Produkt-Auflösung liefert aber
+        // den englischen Druck („Sol Ring") — wörtlich verglichen flog so der
+        // RICHTIGE Treffer raus, und die Namenssuche danach fand irgendeine
+        // andere Auflage. Passt der Name nicht wörtlich, wird er deshalb als
+        // gedruckter Name aufgelöst und die KARTE verglichen (oracle_id).
+        // Scryfall findet gedruckte Namen nur MIT lang:-Filter; die Sprache
+        // des alt-Texts ist unbekannt, also die übrigen Cardmarket-Sprachen
+        // der Reihe nach, bis eine trifft.
+        let passt = null;
+        for (const l of ["de", "fr", "it", "es"]) {
+          let fremd = [];
+          try { fremd = await sfSearch(`name:"${nameHinweis.replace(/"/g, "")}" lang:${l}`, 8); }
+          catch { /* nächste Sprache */ }
+          passt = fremd.find(c => c.oracle_id && c.oracle_id === hit.oracle_id &&
+                                  nameHitMatchesRead(c, nameHinweis)) || null;
+          if (passt) break;
+        }
+        if (!passt) return null;
+        // Der fremdsprachige Name verrät zugleich die Sprache — dieselbe
+        // Auflage in ihr ist die bessere Vorauswahl als der englische Druck.
+        if (passt.lang && passt.lang !== hit.lang) {
+          const uebers = await sfCode(hit.set, hit.collector_number, passt.lang);
+          if (uebers) return withPrice(uebers);
+        }
+      }
+      return withPrice(hit);
+    }
+    // Sichere Produktnummer von einer Produktseite: die Seitensprache als
+    // Vorauswahl, sofern Scryfall die Auflage in ihr führt (ein Cardmarket-
+    // Produkt führt alle Sprachen desselben Drucks).
+    if (k.lang && k.lang !== "en" && hit.lang !== k.lang) {
+      const uebers = await sfCode(hit.set, hit.collector_number, k.lang);
+      if (uebers) return withPrice(uebers);
+    }
     return withPrice(hit);
   }
   if (k.art === "druck") {
@@ -1564,35 +1628,50 @@ async function karteAusKennung(k, nameHinweis) {
     const genau = await sfCode(k.set, k.cn, k.lang);
     return genau ? withPrice(genau) : findByCode(k.set, k.cn, k.lang);
   }
-  if (k.art === "cmname") return cmKarteAusNamen(k.name, k.setName);
+  if (k.art === "cmname") return cmKarteAusNamen(k.name, k.setName, k.lang);
   return null;
 }
 
 /* Cardmarket nennt in seinen Adressen Set und Karte im Klartext, aber keine
-   Sammlernummer. Der Name führt über die unscharfe Namenssuche zur Karte, der
-   Setname wählt danach unter deren Auflagen die passende aus. Findet sich
+   Sammlernummer — und auf cardmarket.com/de/… stehen beide in der Sprache der
+   Seite. Der Name läuft deshalb durch findCard, das auch gedruckte Namen
+   fremder Sprachen auflöst (die unscharfe Namenssuche kennt nur Englisch);
+   der Setname wählt danach unter den Auflagen die passende aus. Findet sich
    keine — Cardmarket schneidet Sets teils anders zu und benennt sie anders —,
    bleibt es beim Treffer der Namenssuche: dieselbe Karte, nur womöglich eine
-   andere Auflage. Englisch wird bevorzugt, weil eine Produktseite bei
-   Cardmarket alle Sprachen desselben Drucks führt. */
-async function cmKarteAusNamen(name, setName) {
+   andere Auflage. */
+async function cmKarteAusNamen(name, setName, lang) {
   if (!name) return null;
   let hit = null;
-  try { hit = await sfNamed(name); } catch { /* mehrdeutig — dann ohne Set */ }
+  try { hit = (await findCard(name, lang)).card; } catch { /* unten null */ }
   if (!hit) return null;
-  const gesucht = norm(setName);
+  const gesucht = setWorte(setName);
   if (!gesucht) return withPrice(hit);
+  // Alle Auflagen der Karte, EINE je Druck (unique=prints, OHNE Sprach-
+  // fassungen): mit include_multilingual multipliziert sich die Liste mit den
+  // Sprachen, und bei viel Gedrucktem wie einem Sol Ring schöbe die Deckelung
+  // das gesuchte Set aus dem Fenster. Eine Seite (175) reicht für alles außer
+  // Standardländern — und wer die zieht, dem genügt auch der Namenstreffer.
   let drucke = [];
-  try { drucke = await sfSearch(`!"${hit.name.replace(/"/g, "")}"`, 80); }
-  catch { /* dann eben die Auflage der Namenssuche */ }
+  try {
+    const r = await sf("/cards/search?unique=prints&order=released&dir=desc&q=" +
+                       encodeURIComponent(`!"${hit.name.replace(/"/g, "")}"`));
+    drucke = r?.data || [];
+  } catch { /* dann eben die Auflage der Namenssuche */ }
   // Unter den Auflagen des Sets die REGULÄRE: Cardmarket hängt an Showcase-
   // und Sonderrahmen ein "-V2"/"-V3" an — die nackte Adresse meint den
-  // Normaldruck, und der trägt die niedrigste Sammlernummer. Englisch zuerst,
-  // weil ein Cardmarket-Produkt alle Sprachen desselben Drucks führt.
+  // Normaldruck, und der trägt die niedrigste Sammlernummer.
   const nr = c => parseInt(String(c.collector_number).replace(/\D/g, ""), 10) || 1e9;
-  const treffer = drucke.filter(c => norm(c.set_name) === gesucht)
-    .sort((a, b) => (a.lang === "en" ? 0 : 1) - (b.lang === "en" ? 0 : 1) || nr(a) - nr(b))[0];
-  return withPrice(treffer || hit);
+  const regulaer = drucke.filter(c => setWorte(c.set_name) === gesucht)
+    .sort((a, b) => nr(a) - nr(b))[0];
+  if (!regulaer) return withPrice(hit);
+  // Als Vorauswahl die Sprache der Cardmarket-Seite, sofern Scryfall die
+  // Auflage in ihr führt (ein Cardmarket-Produkt führt alle Sprachen).
+  if (lang && lang !== "en" && regulaer.lang !== lang) {
+    const uebers = await sfCode(regulaer.set, regulaer.collector_number, lang);
+    if (uebers) return withPrice(uebers);
+  }
+  return withPrice(regulaer);
 }
 
 /* Zuletzt der Name: alt/title des gezogenen Bildes oder mitgezogener Text.

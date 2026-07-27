@@ -220,6 +220,16 @@ mitgezogene Name (das `alt` des Bildes), notfalls mit Auswahlliste; auch ein
 markierter Kartenname lässt sich so herüberziehen. Aus dem Dateimanager
 gezogene Bilddateien gehen weiter den gewohnten Scan-Weg.
 
+Bei Cardmarket wird die Sprache der Seite (`cardmarket.com/de/…`) als
+Kartensprache vorgewählt — ein Cardmarket-Produkt führt alle Sprachen
+desselben Drucks, die Seitensprache ist die beste Vermutung und bleibt
+änderbar. **Eine Ausnahme ist der neue Gatherer:** Sein Kartenbild trägt
+weder Kennung noch Sprache (der Dateiname ist ein Hash, das `alt` immer
+englisch), das Ziehen des Bildes findet die Karte also nur über den Namen.
+Wer die Auflage samt Sprache exakt treffen will, zieht stattdessen **die
+Adresse aus der Adressleiste** herüber — sie trägt Set, Nummer und Sprache
+(`…/LTC/de-de/68/…`), genau wie ein Kartenlink aus den Gatherer-Suchtreffern.
+
 ### Edge Function einrichten
 
 Die Funktion existiert aus einem einzigen Grund: Der Anthropic-Schlüssel darf
