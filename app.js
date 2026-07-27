@@ -2045,6 +2045,24 @@ function ziehDiagnoseZeigen(el, d) {
   };
 }
 
+/* „Bild doch auslesen": Hängt die Bilddatei am Ablegen, bleibt die
+   Bilderkennung über diesen Knopf erreichbar — sie läuft nur nicht mehr von
+   selbst an. Der Hinweis auf die Dauer steht in der Beschriftung, damit die
+   Wartezeit niemanden überrascht; gedrückt wird die Kachel durch die des
+   Scans ersetzt, der Weg ist von da an der gewohnte.
+
+   Warum überhaupt anbieten: In der Praxis las die Erkennung den Namen fast
+   richtig („Agent of Erebos" mit einer verirrten Ziffer). Ein Weg, der beinahe
+   trägt, gehört nicht weggeworfen — nur nicht ungefragt bezahlt. */
+function ziehScanKnopf(el, dateien, ziel) {
+  const body = el.querySelector(".body");
+  if (!body || !dateien.length) return;
+  body.insertAdjacentHTML("beforeend",
+    `<button class="btn ghost sm" data-scan style="margin-top:8px">${esc(t("drag.scanBtn"))}</button>`);
+  const b = body.querySelector("[data-scan]");
+  if (b) b.onclick = () => { el.remove(); dateien.forEach(f => scanFile(f, ziel)); };
+}
+
 /* Ein abgelegtes Etwas übernehmen. `ziel` ist der Behälter für die Kachel:
    im Scan-Bereich die dortige Warteschlange, sonst der schwebende Kasten.
    WICHTIG: dt (der DataTransfer) ist nur während des drop-Ereignisses lesbar —
@@ -2056,13 +2074,18 @@ async function ziehImport(dt, ziel) {
   // die gar keine Adresse tragen.
   //
   // ABER: Kam das Ablegen von einer Webseite (es lagen Adressen bei) und keine
-  // davon trug, ist die Bilderkennung der falsche Rückfall. Sie bekäme ein
-  // Vorschaubild von wenigen hundert Pixeln zu lesen, liest daran Kauderwelsch
-  // („feet J oF i“) und schickt das anschließend durch mehrere
-  // Scryfall-Suchen — gemessen über zwei Minuten, am Ende doch die
-  // Handkorrektur. Und ein Modellaufruf kostet KI-Kontingent. Also nur dann
-  // scannen, wenn das Ablegen gar keine Adresse mitbrachte: dann kommt es aus
-  // dem Dateimanager und ist vermutlich ein echtes Foto.
+  // davon trug, läuft die Bilderkennung nicht mehr UNGEFRAGT an. Nicht, weil
+  // sie nichts könnte — beobachtet hat sie „Agent of Erebos" durchaus gelesen,
+  // nur mit einer verirrten Ziffer dahinter. Sondern weil sie teuer ist: ein
+  // Modellaufruf kostet KI-Kontingent, und ihre Namenssuchen dauerten in einem
+  // gemessenen Fall über zwei Minuten, an deren Ende doch die Handkorrektur
+  // stand. Diese Kosten ungefragt auszulösen, nachdem der Nutzer nur ein Bild
+  // herübergezogen hat, ist die falsche Vorgabe.
+  //
+  // Also: sofort in die Handkorrektur — und dort ein Knopf, der die
+  // Bilderkennung auf Wunsch doch noch anwirft (ziehScanKnopf). Ohne jede
+  // Adresse im Ablegen bleibt es beim Scan-Weg: dann kommt das Bild aus dem
+  // Dateimanager und ist vermutlich ein echtes Foto, wo er hingehört.
   const dateien = [...(dt.files || [])].filter(f => f.type.startsWith("image/"));
   const diagAn = ziehDiagnose();
   const nutzlast = ziehNutzlast(dt, diagAn);
@@ -2084,11 +2107,11 @@ async function ziehImport(dt, ziel) {
     const bar = el.querySelector(".bar i");
     if (bar) bar.style.width = "100%";
     if (!r.card) {
-      // Kein Treffer. Die Bilderkennung springt hier NICHT ein — siehe oben:
-      // Das Vorschaubild einer Webseite gibt sie nicht her, und der Versuch
-      // kostet Minuten und Kontingent. Stattdessen sofort die Handkorrektur,
-      // wo man den Namen tippt oder Setcode und Nummer einträgt.
+      // Kein Treffer: sofort die Handkorrektur, wo man den Namen tippt oder
+      // Setcode und Nummer einträgt — und, wenn eine Bilddatei mitkam, der
+      // Knopf für die Bilderkennung. Angeboten statt aufgedrängt (siehe oben).
       renderManual(el, r.guess || "", r.candidates);
+      if (dateien.length) ziehScanKnopf(el, dateien, ziel);
       return ziehDiagnoseZeigen(el, diag);
     }
     // Die Sprache steht in der Auflage, die die Adresse bezeichnet — sie
