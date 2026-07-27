@@ -7065,14 +7065,18 @@ function katZielHervorheben(x, y, zusatz) {
   if (fuss) fuss.textContent = t(zusatz ? "katdrop.hintAdd" : "katdrop.hint");
 }
 
-/* Das Schild am Zeiger: nur der Kartenname. Ein mitgezogenes Kartenbild sähe
-   hübscher aus, verdeckte aber genau die Fläche, auf die man zielt. */
+/* Das Schild am Zeiger: das Kartenbild, sonst nichts. Der Name steht schon in
+   der Überschrift über den Flächen — ihn hier zu wiederholen kostete Breite und
+   verdeckte damit gerade das, worauf man zielt. Fehlt das Bild (Scryfall führt
+   nicht zu jeder Auflage eines), springt der Name ein: ein leeres Schild wäre
+   schlechter als ein wortreiches. */
 function katGeistAn(cardId) {
   const c = CARDS.find(x => x.id === cardId);
   katGeistAus();
   ziehGeist = document.createElement("div");
-  ziehGeist.className = "zieh-geist";
-  ziehGeist.textContent = c?.disp || "";
+  ziehGeist.className = "zieh-geist" + (c?.img ? " bild" : "");
+  if (c?.img) ziehGeist.innerHTML = `<img src="${esc(c.img)}" alt="">`;
+  else ziehGeist.textContent = c?.disp || "";
   document.body.appendChild(ziehGeist);
 }
 function katGeistBewegen(x, y) {
