@@ -1015,6 +1015,32 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
   color:var(--acc2);transform:scale(1.03)}
 /* Die gezogene Zeile bleibt sichtbar, tritt aber zurück. */
 tr.zieht>td{opacity:.45}
+
+/* Der Griff. Er ist der Grund, dass man das Ziehen überhaupt findet — deshalb
+   sichtbar und nicht erst beim Überfahren. touch-action:none ist hier
+   entscheidend: Ohne das rollt die Seite unter dem Finger weg, statt die Karte
+   mitzunehmen, und auf dem Handy ließe sich nichts ziehen. */
+.zieh-griff{display:inline-block;vertical-align:middle;margin-right:6px;padding:2px 3px;
+  color:var(--dim);font-size:13px;line-height:1;letter-spacing:-2px;cursor:grab;
+  touch-action:none;user-select:none}
+.zieh-griff:hover{color:var(--acc)}
+tr.zieht .zieh-griff{cursor:grabbing}
+/* Mit der Maus lässt sich die ganze Zeile anfassen; der Zeiger sagt es an. */
+@media(hover:hover){ .deck-tbl tbody tr[data-deck]{cursor:grab} }
+.deck-tbl tbody tr.zieht{cursor:grabbing}
+/* Während eines Zuges darf nichts markiert werden — sonst zieht man Text
+   statt der Karte. Eingabefelder bleiben ausgenommen. */
+body.zieht-gerade{user-select:none}
+body.zieht-gerade input{user-select:text}
+
+/* Das Schild am Zeiger: nur der Name, damit es die Zielfläche nicht verdeckt.
+   pointer-events:none, sonst träfe die Prüfung „was liegt unter dem Zeiger"
+   immer das Schild selbst. */
+.zieh-geist{position:fixed;z-index:70;pointer-events:none;transform:translate(14px,12px);
+  max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  padding:5px 10px;border-radius:8px;font-size:12.5px;font-weight:600;
+  background:var(--akt-flaeche);border:1px solid var(--akt-rand);color:var(--acc2);
+  box-shadow:0 6px 18px rgba(0,0,0,.45)}
 @media(prefers-reduced-motion:reduce){ .katdrop-feld.ueber{transform:none} }
 
 /* Zuordnungsdialog: Häkchen, Name, Stern für die primäre. */

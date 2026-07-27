@@ -2704,8 +2704,13 @@ function cardRow(c, o = {}) {
          Ablageflächen ein (katDropAn). Die Gruppe, aus der gezogen wurde, steht
          in data-vonkat — nur so lässt sich "verschieben" von "hinzufügen"
          unterscheiden; leer heißt "aus keiner". -->
-    <tr data-id="${c.id}"${imDeck ? ` data-deck="${esc(o.deckId)}" draggable="true" data-vonkat="${esc(o.vonKat || "")}"` : ""}${wunsch ? " data-wish" : ""}>
-      <td class="hide-s">${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy" data-view
+    <tr data-id="${c.id}"${imDeck ? ` data-deck="${esc(o.deckId)}" data-vonkat="${esc(o.vonKat || "")}"` : ""}${wunsch ? " data-wish" : ""}>
+      <!-- Erste Zelle: im Deck zusätzlich der Griff zum Ziehen. Er steht sichtbar
+           da, weil man einer Zeile sonst nicht ansieht, dass sie sich anfassen
+           lässt — das war der eigentliche Fehler des ersten Anlaufs. -->
+      <td class="hide-s">${imDeck ? `<span class="zieh-griff" data-ziehgriff
+             title="${esc(t("katdrop.handle"))}" aria-hidden="true">&#8942;&#8942;</span>` : ""}${
+        c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy" data-view
              style="cursor:pointer" title="${esc(t("row.viewTitle"))}">` : ""}</td>
       <td><div data-view style="cursor:pointer" title="${esc(t("row.viewTitle"))}">${esc(c.disp)}</div>
           <div style="font-size:12px;color:var(--dim)">
@@ -2852,21 +2857,17 @@ function wireCardRows(root) {
     if (kat) kat.onclick = () => kategorienZuordnen(deck, id);
 
     if (deck) {
-      tr.ondragstart = e => {
-        // In einem Bedienelement begonnen? Dann gehört der Zug dorthin — eine
-        // markierte Zahl im Mengenfeld zu ziehen ist eine gültige Absicht.
-        if (e.target?.closest?.("input, button, select, textarea, a")) return e.preventDefault();
-        if (DECK_KAT_TABELLE_FEHLT) return e.preventDefault();
-        ziehKat = { deckId: deck, cardId: id, vonKat: tr.dataset.vonkat || null };
-        // Firefox startet einen Zug nur mit gesetzten Daten. Der eigene Typ
-        // hält zugleich den Zieh-Import fern, der auf Bild- und Textarten hört.
-        e.dataTransfer.setData(ZIEH_KAT_TYP, id);
-        e.dataTransfer.effectAllowed = "copyMove";
-        tr.classList.add("zieht");
-        katDropAn(deck, id);
-      };
-      // Deckt auch den Abbruch mit Escape ab — dann bleibt kein Schleier stehen.
-      tr.ondragend = () => { tr.classList.remove("zieht"); katDropAus(); };
+      // Der Griff ist das verlässliche Ziel: Er trägt touch-action:none, also
+      // rollt die Seite unter dem Finger nicht weg, während man zieht.
+      const griff = tr.querySelector("[data-ziehgriff]");
+      griff?.addEventListener("pointerdown", e => katZiehAnfassen(e, tr, deck, id));
+      // Mit der Maus darf man die Zeile auch irgendwo sonst anfassen — dort ist
+      // Rollen keine konkurrierende Geste. Mit dem Finger nur am Griff.
+      tr.addEventListener("pointerdown", e => {
+        if (e.pointerType === "mouse") katZiehAnfassen(e, tr, deck, id);
+      });
+      tr.addEventListener("pointermove", katZiehBewegt);
+      tr.addEventListener("pointerup", katZiehLos);
     }
 
     const sl = tr.querySelector("[data-sell]");
@@ -6968,8 +6969,129 @@ function zeigeDeckZeile(deckId, cardId) {
    Auf Touch-Geräten gibt es kein HTML5-Ziehen. Dort bleibt der Weg über die
    Marken in der Zeile, der dieselbe Arbeit erledigt; deshalb wird er nicht
    ersetzt, sondern ergänzt. */
-const ZIEH_KAT_TYP = "application/x-arcanum-deckkarte";
+/* WARUM NICHT HTML5-ZIEHEN: Der erste Anlauf hing an draggable="true" samt
+   dragstart/drop. Das ist die naheliegende Wahl und die falsche:
+
+   • Auf Touch-Geräten gibt es es schlicht nicht — kein Finger löst je ein
+     dragstart aus.
+   • Safari behandelt ziehbare Tabellenzeilen eigenwillig.
+   • Am Rechner konkurriert es mit der Textmarkierung: Wer auf einem Kartennamen
+     drückt und zieht, markiert vielleicht nur Text.
+   • Und vor allem: Man SIEHT einer Zeile nicht an, dass sie ziehbar ist.
+
+   Zeigereignisse haben keines dieser Probleme. Sie sind für Maus, Finger und
+   Stift dieselben, sie liefern die Bewegung selbst (kein Browser-Zugbild, das
+   je nach Programm anders aussieht), und sie lassen sich an einem sichtbaren
+   Griff aufhängen. Dass der Zieh-Import nicht mehr in die Quere kommen kann,
+   ist ein Nebenertrag: Es feuert gar kein Zieh-Ereignis mehr. */
+
+/* Erst ab dieser Strecke ist es ein Zug und kein Klick. Sechs Pixel sind genug,
+   um ein Zittern der Hand nicht als Zug zu lesen, und wenig genug, dass der Zug
+   sofort einsetzt, wenn er gemeint war. */
+const ZIEH_SCHWELLE = 6;
 let ziehKat = null;          // {deckId, cardId, vonKat} während eines Zuges
+let ziehAnsatz = null;       // gedrückt, aber noch unter der Schwelle
+let ziehGeist = null;        // das mitwandernde Schild am Zeiger
+
+/* Anfassen — noch kein Zug. Erst die Bewegung entscheidet, ob daraus einer
+   wird; sonst wäre jeder Klick auf eine Zeile einer. */
+function katZiehAnfassen(e, tr, deckId, cardId) {
+  if (e.button != null && e.button !== 0) return;      // nur die Haupttaste
+  if (DECK_KAT_TABELLE_FEHLT) return;
+  if (e.target?.closest?.("input, button, select, textarea, a")) return;
+  ziehAnsatz = { x: e.clientX, y: e.clientY, tr, deckId, cardId,
+                 vonKat: tr.dataset.vonkat || null, id: e.pointerId };
+}
+
+function katZiehBewegt(e) {
+  if (ziehAnsatz && !ziehKat) {
+    if (Math.hypot(e.clientX - ziehAnsatz.x, e.clientY - ziehAnsatz.y) < ZIEH_SCHWELLE) return;
+    const a = ziehAnsatz;
+    ziehKat = { deckId: a.deckId, cardId: a.cardId, vonKat: a.vonKat };
+    // Der Zeiger gehört ab jetzt der Zeile: Auch wenn er über andere Elemente
+    // fährt, kommen ihre Ereignisse weiter hier an — ohne das reißt der Zug ab,
+    // sobald man die Tabelle verlässt.
+    try { a.tr.setPointerCapture(a.id); } catch { /* Zeiger schon weg */ }
+    a.tr.classList.add("zieht");
+    document.body.classList.add("zieht-gerade");   // nichts markieren während des Zuges
+    hideHover();                     // die Vorschau schwebt höher als die Flächen
+    katGeistAn(a.cardId);
+    katDropAn(a.deckId, a.cardId);
+  }
+  if (!ziehKat) return;
+  e.preventDefault();                // kein Textmarkieren, kein Wegrollen
+  katGeistBewegen(e.clientX, e.clientY);
+  katZielHervorheben(e.clientX, e.clientY, e.ctrlKey || e.metaKey);
+}
+
+/* Loslassen. Was unter dem Zeiger liegt, entscheidet — nicht, wo der Zug begann.
+   elementFromPoint statt eines Ablage-Ereignisses: Das Schild am Zeiger ist für
+   Zeigeereignisse durchlässig, also trifft die Prüfung die Fläche darunter. */
+function katZiehLos(e) {
+  const zug = ziehKat;
+  const ansatz = ziehAnsatz;
+  ziehAnsatz = null;
+  if (!zug) return;                                   // war doch nur ein Klick
+  const feld = katFeldUnter(e.clientX, e.clientY);
+  katZiehAus();
+  // Ein Klick, der aus einem Zug entstand, darf die Detailansicht nicht öffnen.
+  katKlickSchlucken();
+  try { ansatz?.tr.releasePointerCapture(ansatz.id); } catch { /* egal */ }
+  if (feld) katAbgelegt(zug, feld.dataset.katdrop, e.ctrlKey || e.metaKey);
+}
+
+function katZiehAus() {
+  ziehKat = null;
+  ziehAnsatz = null;
+  document.body.classList.remove("zieht-gerade");
+  $$("tr.zieht").forEach(tr => tr.classList.remove("zieht"));
+  katGeistAus();
+  katDropAus();
+}
+
+function katFeldUnter(x, y) {
+  return document.elementFromPoint(x, y)?.closest?.("[data-katdrop]") || null;
+}
+
+function katZielHervorheben(x, y, zusatz) {
+  const feld = katFeldUnter(x, y);
+  $$("#kat-drop .katdrop-feld").forEach(f => f.classList.toggle("ueber", f === feld));
+  const box = $("#kat-drop");
+  if (!box) return;
+  box.classList.toggle("zusatz", !!zusatz);
+  // Der Hinweis wechselt mit der Taste, damit man VOR dem Loslassen sieht, was
+  // passieren wird — und nicht erst danach.
+  const fuss = $("#katdrop-fuss");
+  if (fuss) fuss.textContent = t(zusatz ? "katdrop.hintAdd" : "katdrop.hint");
+}
+
+/* Das Schild am Zeiger: nur der Kartenname. Ein mitgezogenes Kartenbild sähe
+   hübscher aus, verdeckte aber genau die Fläche, auf die man zielt. */
+function katGeistAn(cardId) {
+  const c = CARDS.find(x => x.id === cardId);
+  katGeistAus();
+  ziehGeist = document.createElement("div");
+  ziehGeist.className = "zieh-geist";
+  ziehGeist.textContent = c?.disp || "";
+  document.body.appendChild(ziehGeist);
+}
+function katGeistBewegen(x, y) {
+  if (ziehGeist) { ziehGeist.style.left = x + "px"; ziehGeist.style.top = y + "px"; }
+}
+function katGeistAus() { ziehGeist?.remove(); ziehGeist = null; }
+
+/* Den einen Klick abfangen, der dem Loslassen folgt. Ohne das öffnete jeder
+   Zug, der auf dem Kartenbild begann, hinterher die Detailansicht. */
+function katKlickSchlucken() {
+  const h = ev => { ev.stopPropagation(); ev.preventDefault(); };
+  document.addEventListener("click", h, true);
+  setTimeout(() => document.removeEventListener("click", h, true), 0);
+}
+
+/* Abbruch mit Escape — und mit dem Zeiger, den das System uns wegnimmt
+   (Anruf, Fensterwechsel). Einmal für die ganze Sitzung verdrahtet. */
+addEventListener("keydown", e => { if (e.key === "Escape" && ziehKat) katZiehAus(); });
+addEventListener("pointercancel", () => { if (ziehKat) katZiehAus(); });
 
 /* Die Ablagefläche entsteht einmal und bleibt danach im Baum — sie wird nur
    neu gefüllt. Ein bei jedem Zug neu gebautes Element verlöre den Zug in dem
@@ -7017,27 +7139,10 @@ function katDropAn(deckId, cardId) {
   ].join("");
   $("#katdrop-fuss").textContent = t("katdrop.hint");
   box.hidden = false;
-
-  box.querySelectorAll("[data-katdrop]").forEach(f => {
-    f.ondragover = e => {
-      e.preventDefault();                      // ohne das nimmt nichts etwas an
-      e.dataTransfer.dropEffect = e.ctrlKey || e.metaKey ? "copy" : "move";
-      f.classList.add("ueber");
-      // Der Hinweis wechselt mit der Taste, damit man vor dem Loslassen sieht,
-      // was passieren wird — und nicht erst danach.
-      const zusatz = e.ctrlKey || e.metaKey;
-      box.classList.toggle("zusatz", zusatz);
-      $("#katdrop-fuss").textContent = t(zusatz ? "katdrop.hintAdd" : "katdrop.hint");
-    };
-    f.ondragleave = () => f.classList.remove("ueber");
-    f.ondrop = e => {
-      e.preventDefault();
-      f.classList.remove("ueber");
-      const zug = ziehKat;
-      katDropAus();
-      if (zug) katAbgelegt(zug, f.dataset.katdrop, e.ctrlKey || e.metaKey);
-    };
-  });
+  // Die Flächen brauchen keine eigenen Ereignisse: Welche gemeint ist, ergibt
+  // sich beim Loslassen aus der Zeigerposition (katFeldUnter). Ein Zug, der
+  // unterwegs "verloren" geht, weil ein Element dazwischenkommt, kann es so
+  // nicht geben.
 }
 
 /* Was ein Ablegen bedeutet — eine Regel, in einem Satz erklärbar:

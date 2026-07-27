@@ -646,9 +646,11 @@ Karte genau einmal — nur die Zahlen an den Gruppen zählen Zuordnungen.
 
 ### Einordnen durch Ziehen
 
-Der schnelle Weg: **eine Kartenzeile anfassen und ziehen**. Sobald der Zug
-beginnt, legen sich die Fächer als **Ablageflächen über die Oberfläche** —
-darunter bleibt das Deck sichtbar, nur zurückgenommen. Fallen lassen, fertig.
+Der schnelle Weg: **die Karte am Griff anfassen und ziehen** — das ⋮⋮ links in
+der Zeile. Sobald der Zug beginnt, legen sich die Fächer als **Ablageflächen
+über die Oberfläche**; darunter bleibt das Deck sichtbar, nur zurückgenommen.
+Fallen lassen, fertig. Mit der Maus lässt sich auch die Zeile selbst irgendwo
+anfassen, nicht nur der Griff.
 
 Das ist nicht bloß Schauwert. Flächen, die schweben, brauchen im Layout **keinen
 Platz**: Sie verhalten sich bei jeder Auflösung gleich, funktionieren in der
@@ -671,18 +673,42 @@ wo es war. Fächer, in denen die Karte schon liegt, sind beim Ziehen als solche
 gekennzeichnet. Eine Fläche **„+ Neue Kategorie"** legt eines an und ordnet
 gleich ein.
 
-Der **Zieh-Import** (Karten aus einem zweiten Fenster hereinziehen) kommt sich
-damit nicht in die Quere: Der merkt sich, ob ein Zug *innerhalb* der App begann,
-und hält sich dann heraus — dafür war die Unterscheidung von Anfang an da.
+### Warum Zeigereignisse und nicht HTML5-Ziehen
+
+Der erste Anlauf hing an `draggable="true"` samt `dragstart`/`drop` — die
+naheliegende Wahl und die falsche:
+
+* Auf **Touch-Geräten gibt es das schlicht nicht.** Kein Finger löst je ein
+  `dragstart` aus; auf dem Handy wäre gar nichts zu ziehen gewesen.
+* **Safari** behandelt ziehbare Tabellenzeilen eigenwillig.
+* Am Rechner konkurriert es mit der **Textmarkierung**: Wer auf einem
+  Kartennamen drückt und zieht, markiert unter Umständen nur Text.
+* Und vor allem: **Man sieht einer Zeile nicht an, dass sie ziehbar ist.**
+
+Zeigereignisse haben keines dieser Probleme. Sie sind für Maus, Finger und Stift
+dieselben, sie liefern die Bewegung selbst, und sie hängen an einem sichtbaren
+Griff. Der trägt `touch-action: none` — ohne das rollt die Seite unter dem
+Finger weg, statt die Karte mitzunehmen.
+
+Ein Zug beginnt erst nach **sechs Pixeln** Bewegung: genug, um ein Zittern der
+Hand nicht als Zug zu lesen, wenig genug, dass er sofort einsetzt, wenn er
+gemeint war. Darunter bleibt es ein Klick, der wie bisher die Detailansicht
+öffnet. Umgekehrt wird der Klick, der einem Zug folgt, verschluckt — sonst ginge
+nach jedem Ziehen vom Kartenbild aus die Detailansicht auf.
+
+Dass der **Zieh-Import** (Karten aus einem zweiten Fenster hereinziehen) nicht
+mehr in die Quere kommen kann, ist ein Nebenertrag: Es feuert gar kein
+Zieh-Ereignis mehr, an dem er sich stören könnte.
 
 ### … und der Weg ohne Ziehen
 
-Auf Touch-Geräten gibt es kein HTML5-Ziehen. Deshalb bleibt die
-**Kategorie-Spalte** der Kartenzeile, was sie war: Sie zeigt die Fächer als
-Marken (die primäre hervorgehoben) und öffnet auf Klick eine Auswahl mit Häkchen
-und Stern. Dort lässt sich ebenfalls gleich eine neue Kategorie anlegen. Beide
-Wege schreiben durch dieselbe Funktion — zwei Wege zu derselben Datenbank, die
-auseinanderliefen, wären zwei Fehlerquellen.
+Die **Kategorie-Spalte** der Kartenzeile bleibt, was sie war: Sie zeigt die
+Fächer als Marken (die primäre hervorgehoben) und öffnet auf Klick eine Auswahl
+mit Häkchen und Stern. Das ist der bequemere Weg, wenn eine Karte gleich in
+mehrere Fächer soll — und am Handy der Weg für alles, was über ein Verschieben
+hinausgeht, denn eine Strg-Taste gibt es dort nicht. Beide Wege schreiben durch
+dieselbe Funktion; zwei Wege zu derselben Datenbank, die auseinanderliefen,
+wären zwei Fehlerquellen.
 
 **Beide Ordnungen bleiben.** Umgeschaltet wird je Deck und je Gerät, gemerkt im
 Browser. Das ist keine Unentschlossenheit: Ein halb eingeordnetes Deck ist der
