@@ -257,10 +257,33 @@ mitgezogene Name (das `alt` des Bildes), notfalls mit Auswahlliste; auch ein
 markierter Kartenname lässt sich so herüberziehen. Aus dem Dateimanager
 gezogene Bilddateien gehen weiter den gewohnten Scan-Weg.
 
-Bei Cardmarket wird die Sprache der Seite (`cardmarket.com/de/…`) als
-Kartensprache vorgewählt — ein Cardmarket-Produkt führt alle Sprachen
-desselben Drucks, die Seitensprache ist die beste Vermutung und bleibt
-änderbar. **Eine Ausnahme ist der neue Gatherer:** Sein Kartenbild trägt
+#### Die Sprache bei Cardmarket
+
+Cardmarket führt je Auflage **ein** Produkt für alle Sprachen — die Sprache ist
+dort eine Eigenschaft des einzelnen Angebots, nicht des Produkts. Deshalb zeigt
+Cardmarket auch immer das englische Kartenbild, und die `cardmarket_id` einer
+Karte gehört bei Scryfall stets dem **englischen** Druck. Über sie allein
+landet man also zwangsläufig bei der englischen Auflage — mit englischem
+Artwork, englischem gedruckten Namen und eigener `scryfall_id`.
+
+Die Sprache kommt daher in dieser Reihenfolge:
+
+1. **Der gedruckte Name** aus dem `alt`-Text des gezogenen Bildes — der beste
+   Beleg, wenn Cardmarket ihn landessprachlich ausliefert.
+2. **Der Sprachteil der Adresse** (`cardmarket.com/de/…`), wenn du den
+   Produkt*link* ziehst.
+3. **Das Dropdown „Sprache"** unter *Karten scannen*. Nötig, weil die
+   Bild­adresse (`product-images.s3.cardmarket.com/…`) gar keinen Sprachteil
+   hat — und das Bild ist genau das, was man zieht. Steht das Dropdown auf
+   Deutsch, holt der Import die deutsche Auflage samt deutschem Artwork.
+
+Führt Scryfall die Auflage in der gewünschten Sprache nicht, bleibt es bei der
+gefundenen — eine fehlende Sprachfassung ist kein Grund, die Karte
+fallenzulassen.
+
+**Bei Scryfall und Gatherer steht die Sprache in der Adresse und schlägt alles**
+— eine englische Scryfall-Adresse bleibt englisch, auch wenn das Dropdown auf
+Deutsch steht. **Eine Ausnahme ist der neue Gatherer:** Sein Kartenbild trägt
 weder Kennung noch Sprache (der Dateiname ist ein Hash, das `alt` immer
 englisch), das Ziehen des Bildes findet die Karte also nur über den Namen.
 Wer die Auflage samt Sprache exakt treffen will, zieht stattdessen **die
