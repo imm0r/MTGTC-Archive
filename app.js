@@ -2700,7 +2700,11 @@ function cardRow(c, o = {}) {
   // gegen die einzelne verknüpfte Zeile — wichtig bei importierten Decks.
   const fehlt = imDeck ? Math.max(0, qty - bestandVon(c)) : 0;
   return `
-    <tr data-id="${c.id}"${imDeck ? ` data-deck="${esc(o.deckId)}"` : ""}${wunsch ? " data-wish" : ""}>
+    <!-- Im Deck ist die Zeile ziehbar: Anfassen blendet die Fächer als
+         Ablageflächen ein (katDropAn). Die Gruppe, aus der gezogen wurde, steht
+         in data-vonkat — nur so lässt sich "verschieben" von "hinzufügen"
+         unterscheiden; leer heißt "aus keiner". -->
+    <tr data-id="${c.id}"${imDeck ? ` data-deck="${esc(o.deckId)}" draggable="true" data-vonkat="${esc(o.vonKat || "")}"` : ""}${wunsch ? " data-wish" : ""}>
       <td class="hide-s">${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy" data-view
              style="cursor:pointer" title="${esc(t("row.viewTitle"))}">` : ""}</td>
       <td><div data-view style="cursor:pointer" title="${esc(t("row.viewTitle"))}">${esc(c.disp)}</div>
@@ -2842,9 +2846,28 @@ function wireCardRows(root) {
     };
 
     // Eigene Kategorien zuordnen (nur im Deck) — der Dialog erledigt alles
-    // Weitere, weil eine Karte in mehreren Fächern stehen darf.
+    // Weitere, weil eine Karte in mehreren Fächern stehen darf. Auf Touch der
+    // einzige Weg, am Rechner die Alternative zum Ziehen.
     const kat = tr.querySelector("[data-kat]");
     if (kat) kat.onclick = () => kategorienZuordnen(deck, id);
+
+    if (deck) {
+      tr.ondragstart = e => {
+        // In einem Bedienelement begonnen? Dann gehört der Zug dorthin — eine
+        // markierte Zahl im Mengenfeld zu ziehen ist eine gültige Absicht.
+        if (e.target?.closest?.("input, button, select, textarea, a")) return e.preventDefault();
+        if (DECK_KAT_TABELLE_FEHLT) return e.preventDefault();
+        ziehKat = { deckId: deck, cardId: id, vonKat: tr.dataset.vonkat || null };
+        // Firefox startet einen Zug nur mit gesetzten Daten. Der eigene Typ
+        // hält zugleich den Zieh-Import fern, der auf Bild- und Textarten hört.
+        e.dataTransfer.setData(ZIEH_KAT_TYP, id);
+        e.dataTransfer.effectAllowed = "copyMove";
+        tr.classList.add("zieht");
+        katDropAn(deck, id);
+      };
+      // Deckt auch den Abbruch mit Escape ab — dann bleibt kein Schleier stehen.
+      tr.ondragend = () => { tr.classList.remove("zieht"); katDropAus(); };
+    }
 
     const sl = tr.querySelector("[data-sell]");
     if (sl) sl.onclick = () => toggleSale(id, sl);
@@ -6837,16 +6860,10 @@ async function kategorienZuordnen(deckId, cardId) {
   });
   if (!ok) return;
 
-  const primAlt = alt.find(z => z.primaer)?.id || null;
-  const wegIds  = alt.filter(z => !gewaehlt.has(z.id)).map(z => z.id);
-  const dazuIds = [...gewaehlt].filter(x => !x.startsWith("neu:") && !alt.some(z => z.id === x));
-  const neueGewaehlt = neue.map((n, i) => ({ n, key: "neu:" + i })).filter(x => gewaehlt.has(x.key));
   // Angelegt wird auch, was am Ende nicht angehakt ist: Wer den Namen eintippt,
   // will das Fach — ob diese eine Karte hineingehört, ist eine zweite Frage.
-  if (!wegIds.length && !dazuIds.length && !neue.length && primaer === primAlt) return;
-
   try {
-    // 1) Neue Kategorien anlegen und ihre Stellvertreter-Schlüssel auflösen.
+    // Erst die neuen Kategorien anlegen, dann sind alle Schlüssel echte IDs.
     const echt = new Map();
     if (neue.length) {
       const start = (d.kategorien || []).length;
@@ -6860,47 +6877,69 @@ async function kategorienZuordnen(deckId, cardId) {
       });
     }
     const alsId = key => (key.startsWith("neu:") ? echt.get(key) : key);
-
-    // 2) Weggenommene Zuordnungen löschen.
-    if (wegIds.length) {
-      const { error } = await sb.from("deck_entry_categories").delete()
-        .eq("deck_id", d.id).eq("card_id", cardId).in("category_id", wegIds);
-      if (error) throw error;
-    }
-    // 3) Das alte Primär-Kennzeichen räumen, BEVOR ein neues gesetzt wird: Der
-    //    Teilindex lässt nur eine primäre je Karte zu, und zwei Anweisungen
-    //    laufen nacheinander, nicht gleichzeitig.
-    if (primAlt && primAlt !== primaer) {
-      const { error } = await sb.from("deck_entry_categories").update({ is_primary: false })
-        .eq("deck_id", d.id).eq("card_id", cardId).eq("category_id", primAlt);
-      if (error) throw error;
-    }
-    // 4) Neue Zuordnungen, zunächst alle ohne Kennzeichen.
-    const dazu = [...dazuIds, ...neueGewaehlt.map(x => alsId(x.key))].filter(Boolean);
-    if (dazu.length) {
-      const { error } = await sb.from("deck_entry_categories")
-        .insert(dazu.map(id => ({ deck_id: d.id, card_id: cardId, category_id: id, is_primary: false })));
-      if (error) throw error;
-    }
-    // 5) Und zuletzt die primäre setzen.
-    const primNeu = primaer ? alsId(primaer) : null;
-    if (primNeu && primNeu !== primAlt) {
-      const { error } = await sb.from("deck_entry_categories").update({ is_primary: true })
-        .eq("deck_id", d.id).eq("card_id", cardId).eq("category_id", primNeu);
-      if (error) throw error;
-    }
-
-    await reload(); renderDecks();
-    zeigeDeckZeile(d.id, cardId);
-    // Gemeldet wird der Stand NACH dem Neuladen, nicht die Absicht davor: Bei
-    // genau einem Fach ist sein Name die klarere Auskunft als die Zahl 1.
-    const dNeu = DECKS.find(x => x.id === d.id);
-    const jetzt = (dNeu?.entries || []).find(en => en.cardId === cardId)?.kats || [];
-    toast(jetzt.length === 0 ? t("kat.unassigned")
-        : jetzt.length === 1
-          ? t("kat.assigned", { name: (dNeu.kategorien || []).find(k => k.id === jetzt[0].id)?.name || "" })
-          : t("kat.assignedN", { n: jetzt.length }));
+    const soll = [...gewaehlt].map(alsId).filter(Boolean);
+    const geschrieben = await katsSchreiben(d.id, cardId, soll, primaer ? alsId(primaer) : null);
+    if (geschrieben || neue.length) await katsFertig(d.id, cardId);
   } catch (e) { toast(dbErr(e)); }
+}
+
+/* Die Kategorien EINER Karte auf einen SOLL-Stand bringen: Was fehlt, kommt
+   dazu, was übrig ist, fällt weg, und genau eine trägt das Kennzeichen. Der
+   gemeinsame Schreibweg von Dialog und Ablagefläche — zwei Wege zu derselben
+   Datenbank, die auseinanderliefen, wären zwei Fehlerquellen.
+
+   Rückgabe: ob überhaupt etwas geschrieben wurde. Wirft bei Fehlern; die
+   Aufrufer melden. */
+async function katsSchreiben(deckId, cardId, zielIds, primaerId) {
+  const d = DECKS.find(x => x.id === deckId);
+  if (!d) return false;
+  const alt  = ((d.entries || []).find(en => en.cardId === cardId)?.kats) || [];
+  const soll = [...new Set(zielIds.filter(Boolean))];
+  // Die primäre muss unter dem Soll sein; sonst rutscht sie auf das erste Fach.
+  const primNeu = soll.includes(primaerId) ? primaerId : (soll[0] || null);
+  const primAlt = alt.find(z => z.primaer)?.id || null;
+  const weg  = alt.filter(z => !soll.includes(z.id)).map(z => z.id);
+  const dazu = soll.filter(id => !alt.some(z => z.id === id));
+  if (!weg.length && !dazu.length && primNeu === primAlt) return false;
+
+  if (weg.length) {
+    const { error } = await sb.from("deck_entry_categories").delete()
+      .eq("deck_id", deckId).eq("card_id", cardId).in("category_id", weg);
+    if (error) throw error;
+  }
+  // Das alte Kennzeichen räumen, BEVOR ein neues gesetzt wird: Der Teilindex
+  // lässt nur eine primäre je Karte zu, und zwei Anweisungen laufen
+  // nacheinander, nicht gleichzeitig.
+  if (primAlt && primAlt !== primNeu) {
+    const { error } = await sb.from("deck_entry_categories").update({ is_primary: false })
+      .eq("deck_id", deckId).eq("card_id", cardId).eq("category_id", primAlt);
+    if (error) throw error;
+  }
+  if (dazu.length) {
+    const { error } = await sb.from("deck_entry_categories")
+      .insert(dazu.map(id => ({ deck_id: deckId, card_id: cardId, category_id: id, is_primary: false })));
+    if (error) throw error;
+  }
+  if (primNeu && primNeu !== primAlt) {
+    const { error } = await sb.from("deck_entry_categories").update({ is_primary: true })
+      .eq("deck_id", deckId).eq("card_id", cardId).eq("category_id", primNeu);
+    if (error) throw error;
+  }
+  return true;
+}
+
+/* Nachbereitung beider Wege: neu laden, zeichnen, auf die Zeile zeigen und den
+   Stand melden — den NACH dem Neuladen, nicht die Absicht davor. Bei genau
+   einem Fach ist sein Name die klarere Auskunft als die Zahl 1. */
+async function katsFertig(deckId, cardId) {
+  await reload(); renderDecks();
+  zeigeDeckZeile(deckId, cardId);
+  const d = DECKS.find(x => x.id === deckId);
+  const jetzt = (d?.entries || []).find(en => en.cardId === cardId)?.kats || [];
+  toast(jetzt.length === 0 ? t("kat.unassigned")
+      : jetzt.length === 1
+        ? t("kat.assigned", { name: (d.kategorien || []).find(k => k.id === jetzt[0].id)?.name || "" })
+        : t("kat.assignedN", { n: jetzt.length }));
 }
 
 /* Nach dem Umsortieren auf die Zeile zeigen: In der Kategorie-Ansicht springt
@@ -6913,6 +6952,155 @@ function zeigeDeckZeile(deckId, cardId) {
   // eine zweite Art, "hier ist sie" zu sagen, bräuchte niemand.
   tr.classList.add("treffer");
   setTimeout(() => tr.classList.remove("treffer"), TREFFER_MS);
+}
+
+/* ---- Einordnen durch Ziehen ------------------------------------------
+   Eine Kartenzeile anfassen, und die Fächer erscheinen als Flächen ÜBER der
+   Oberfläche. Der Vorteil ist nicht bloß Schauwert: Ablageflächen, die
+   schweben, brauchen im Layout keinen Platz — sie funktionieren bei jeder
+   Auflösung gleich, in der Tabelle wie später in der Spaltenansicht, und
+   ersparen das Einordnen Karte für Karte über einen Dialog.
+
+   Der Zieh-IMPORT (Karten aus einem zweiten Fenster) kommt sich damit nicht in
+   die Quere: Der merkt sich in `eigenerZug`, ob ein Zug innerhalb der App
+   begann, und hält sich dann vollständig heraus — genau für diesen Fall gebaut.
+
+   Auf Touch-Geräten gibt es kein HTML5-Ziehen. Dort bleibt der Weg über die
+   Marken in der Zeile, der dieselbe Arbeit erledigt; deshalb wird er nicht
+   ersetzt, sondern ergänzt. */
+const ZIEH_KAT_TYP = "application/x-arcanum-deckkarte";
+let ziehKat = null;          // {deckId, cardId, vonKat} während eines Zuges
+
+/* Die Ablagefläche entsteht einmal und bleibt danach im Baum — sie wird nur
+   neu gefüllt. Ein bei jedem Zug neu gebautes Element verlöre den Zug in dem
+   Moment, in dem es eingehängt wird. */
+function katDropBox() {
+  let el = $("#kat-drop");
+  if (el) return el;
+  el = document.createElement("div");
+  el.id = "kat-drop";
+  el.hidden = true;
+  el.innerHTML = `<div class="katdrop-innen">
+      <div class="katdrop-kopf" id="katdrop-kopf"></div>
+      <div class="katdrop-felder" id="katdrop-felder"></div>
+      <div class="katdrop-fuss" id="katdrop-fuss"></div>
+    </div>`;
+  document.body.appendChild(el);
+  return el;
+}
+
+function katDropAus() {
+  ziehKat = null;
+  const el = $("#kat-drop");
+  if (el) { el.hidden = true; el.classList.remove("zusatz"); }
+}
+
+/* Die Flächen aufbauen und einblenden. Schon belegte Fächer sind erkennbar —
+   sonst zöge man eine Karte dorthin, wo sie längst liegt. */
+function katDropAn(deckId, cardId) {
+  const d = DECKS.find(x => x.id === deckId);
+  const karte = CARDS.find(x => x.id === cardId);
+  if (!d || !karte) return;
+  const drin = new Set((((d.entries || []).find(en => en.cardId === cardId)?.kats) || []).map(z => z.id));
+  const box = katDropBox();
+  $("#katdrop-kopf").textContent = t("katdrop.title", { name: karte.disp });
+  $("#katdrop-felder").innerHTML = [
+    ...(d.kategorien || []).map(k =>
+      `<button type="button" class="katdrop-feld${drin.has(k.id) ? " drin" : ""}" data-katdrop="${esc(k.id)}">
+         <span class="katdrop-name">${esc(k.name)}</span>
+         ${drin.has(k.id) ? `<span class="katdrop-marke">${esc(t("katdrop.already"))}</span>` : ""}
+       </button>`),
+    `<button type="button" class="katdrop-feld leer" data-katdrop="">
+       <span class="katdrop-name">${esc(t("kat.none"))}</span></button>`,
+    `<button type="button" class="katdrop-feld neu" data-katdrop="+">
+       <span class="katdrop-name">&plus; ${esc(t("kat.addLabel"))}</span></button>`,
+  ].join("");
+  $("#katdrop-fuss").textContent = t("katdrop.hint");
+  box.hidden = false;
+
+  box.querySelectorAll("[data-katdrop]").forEach(f => {
+    f.ondragover = e => {
+      e.preventDefault();                      // ohne das nimmt nichts etwas an
+      e.dataTransfer.dropEffect = e.ctrlKey || e.metaKey ? "copy" : "move";
+      f.classList.add("ueber");
+      // Der Hinweis wechselt mit der Taste, damit man vor dem Loslassen sieht,
+      // was passieren wird — und nicht erst danach.
+      const zusatz = e.ctrlKey || e.metaKey;
+      box.classList.toggle("zusatz", zusatz);
+      $("#katdrop-fuss").textContent = t(zusatz ? "katdrop.hintAdd" : "katdrop.hint");
+    };
+    f.ondragleave = () => f.classList.remove("ueber");
+    f.ondrop = e => {
+      e.preventDefault();
+      f.classList.remove("ueber");
+      const zug = ziehKat;
+      katDropAus();
+      if (zug) katAbgelegt(zug, f.dataset.katdrop, e.ctrlKey || e.metaKey);
+    };
+  });
+}
+
+/* Was ein Ablegen bedeutet — eine Regel, in einem Satz erklärbar:
+
+   • Loslassen ordnet in das Fach ein und nimmt die Karte aus dem Fach heraus,
+     aus dem sie GEZOGEN wurde. Kam sie aus keinem (Typ-Ansicht oder "Ohne
+     Kategorie"), kommt das Ziel schlicht hinzu.
+   • Mit Strg (bzw. Cmd) kommt es immer nur hinzu, es fällt nichts weg.
+   • Auf "Ohne Kategorie" abgelegt, fallen alle Zuordnungen weg.
+
+   Das Kennzeichen "primär" wandert mit: Es geht ans Ziel, wenn die Karte noch
+   keines hatte oder wenn ausgerechnet das ersetzte Fach es trug. Sonst bleibt
+   es, wo es war.
+
+   Eigene Funktion ohne Netz und ohne DOM, weil hier die ganze Bedeutung des
+   Zuges steckt — der Rest ist Schreiben und Zeichnen. */
+function katDropSoll(alt, vonKat, zielId, zusatz) {
+  const altIds = (alt || []).map(z => z.id);
+  const primAlt = (alt || []).find(z => z.primaer)?.id || null;
+  if (!zielId) return { soll: [], prim: null };                 // "Ohne Kategorie"
+  if (zusatz)  return { soll: [...altIds, zielId], prim: primAlt || zielId };
+  return {
+    soll: altIds.filter(id => id !== vonKat).concat(zielId),
+    prim: (!primAlt || primAlt === vonKat) ? zielId : primAlt,
+  };
+}
+
+async function katAbgelegt(zug, ziel, zusatz) {
+  const { deckId, cardId, vonKat } = zug;
+  const d = DECKS.find(x => x.id === deckId);
+  if (!d) return;
+  if (DECK_KAT_TABELLE_FEHLT) return toast(t("kat.needSchema"));
+  const alt = ((d.entries || []).find(en => en.cardId === cardId)?.kats) || [];
+
+  try {
+    let zielId = ziel;
+    if (ziel === "+") {
+      const name = await katNameFragen();
+      if (!name) return;
+      const { data, error } = await sb.from("deck_categories")
+        .insert({ deck_id: deckId, name, pos: (d.kategorien || []).length })
+        .select("id").single();
+      if (error) throw error;
+      zielId = data.id;
+    }
+    const { soll, prim } = katDropSoll(alt, vonKat, zielId, zusatz);
+    const geschrieben = await katsSchreiben(deckId, cardId, soll, prim);
+    if (geschrieben || ziel === "+") await katsFertig(deckId, cardId);
+  } catch (e) { toast(dbErr(e)); }
+}
+
+/* Nach einem Namen fragen — für die Fläche "Neue Kategorie". Eigener Dialog
+   statt window.prompt: der sieht auf jedem Browser anders aus, lässt sich nicht
+   übersetzen und wird auf manchen Geräten unterdrückt. */
+async function katNameFragen() {
+  const ok = await confirmDlg(`
+    <b>${esc(t("kat.addLabel"))}</b>
+    <div style="margin-top:10px">
+      <input type="text" id="kat-neu-name" maxlength="40"
+        placeholder="${esc(t("kat.addPh"))}" autofocus>
+    </div>`);
+  if (!ok) return null;
+  return $("#kat-neu-name")?.value.trim() || null;
 }
 
 /* Verwaltung der Kategorien eines Decks: anlegen, umbenennen, umsortieren,
@@ -7106,6 +7294,10 @@ function renderDecks() {
         // Zeile ihr Auswahlfeld. Leere Liste = das Feld bietet nur "—" und
         // "Neu…" an, was zugleich der Einstieg ohne Umweg über die Verwaltung ist.
         kategorien: d.kategorien || [], kats: e.kats || [],
+        // Aus welchem Fach diese Zeile gerade stammt — Grundlage dafür, dass
+        // ein Ablegen VERSCHIEBT statt nur hinzuzufügen. In der Typ-Ansicht
+        // und in der Restgruppe gibt es keins.
+        vonKat: g.key.startsWith("k:") ? (g.key.slice(2) || null) : null,
         istHaupt: d.main_card_id === c.id,
         istZweit: d.second_card_id === c.id,
         // Partner-Stern anbieten, wenn ein erster Commander steht, diese Karte
