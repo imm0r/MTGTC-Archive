@@ -4049,7 +4049,7 @@ Object.assign(I18N.it, {
 /* ---- Teil 31: Zieh-Import (Kartenbild aus einem zweiten Fenster) ---- */
 Object.assign(I18N.de, {
   "drag.veilTitle": "Karte hier ablegen",
-  "drag.veilSub": "Kartenbild von Scryfall, Cardmarket oder Gatherer herüberziehen — die Karte wird erkannt und zur Übernahme angeboten.",
+  "drag.veilSub": "Kartenbild von Scryfall, Cardmarket oder Gatherer herüberziehen — die Karte wird erkannt und in die Sammlung übernommen.",
   "drag.boxTitle": "Gezogene Karten",
   "drag.reading": "Karte wird erkannt…",
   "drag.stepStart": "Abgelegtes wird gelesen…",
@@ -4062,7 +4062,7 @@ Object.assign(I18N.de, {
 });
 Object.assign(I18N.en, {
   "drag.veilTitle": "Drop card here",
-  "drag.veilSub": "Drag a card image over from Scryfall, Cardmarket or Gatherer — the card is identified and offered for adding.",
+  "drag.veilSub": "Drag a card image over from Scryfall, Cardmarket or Gatherer — the card is identified and added to your collection.",
   "drag.boxTitle": "Dragged cards",
   "drag.reading": "Identifying card…",
   "drag.stepStart": "Reading the drop…",
@@ -4075,7 +4075,7 @@ Object.assign(I18N.en, {
 });
 Object.assign(I18N.fr, {
   "drag.veilTitle": "Dépose la carte ici",
-  "drag.veilSub": "Fais glisser une image de carte depuis Scryfall, Cardmarket ou Gatherer — la carte est identifiée et proposée à l'ajout.",
+  "drag.veilSub": "Fais glisser une image de carte depuis Scryfall, Cardmarket ou Gatherer — la carte est identifiée et ajoutée à ta collection.",
   "drag.boxTitle": "Cartes déposées",
   "drag.reading": "Identification de la carte…",
   "drag.stepStart": "Lecture du dépôt…",
@@ -4088,7 +4088,7 @@ Object.assign(I18N.fr, {
 });
 Object.assign(I18N.es, {
   "drag.veilTitle": "Suelta la carta aquí",
-  "drag.veilSub": "Arrastra una imagen de carta desde Scryfall, Cardmarket o Gatherer — la carta se identifica y se ofrece para añadirla.",
+  "drag.veilSub": "Arrastra una imagen de carta desde Scryfall, Cardmarket o Gatherer — la carta se identifica y se añade a tu colección.",
   "drag.boxTitle": "Cartas arrastradas",
   "drag.reading": "Identificando la carta…",
   "drag.stepStart": "Leyendo lo soltado…",
@@ -4101,7 +4101,7 @@ Object.assign(I18N.es, {
 });
 Object.assign(I18N.it, {
   "drag.veilTitle": "Rilascia qui la carta",
-  "drag.veilSub": "Trascina l'immagine di una carta da Scryfall, Cardmarket o Gatherer — la carta viene identificata e proposta per l'aggiunta.",
+  "drag.veilSub": "Trascina l'immagine di una carta da Scryfall, Cardmarket o Gatherer — la carta viene identificata e aggiunta alla tua collezione.",
   "drag.boxTitle": "Carte trascinate",
   "drag.reading": "Identificazione della carta…",
   "drag.stepStart": "Lettura di quanto rilasciato…",
