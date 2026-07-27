@@ -307,6 +307,26 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .pick i{font-size:11px;color:var(--dim);font-style:normal}
 .bar{height:4px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:8px}
 .bar i{display:block;height:100%;background:var(--acc);width:0;transition:width .25s}
+/* ------------------------------------------- Zieh-Import (zweites Fenster)
+   Der Schleier liegt über allem außer den Toasts (99) und nimmt KEINE
+   Mausereignisse an: die Zieh-Ereignisse laufen auf window, und das Ziel
+   unter dem Zeiger (Scan-Feld oder Textfeld) muss erreichbar bleiben. */
+#dragveil{position:fixed;inset:0;z-index:97;pointer-events:none;
+  background:rgba(18,19,26,.55);padding:18px}
+#dragveil .veil-inner{height:100%;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:8px;border:3px dashed var(--acc);border-radius:var(--radius);
+  background:rgba(27,29,39,.6);text-align:center;padding:20px}
+#dragveil b{color:var(--acc);font-size:20px}
+#dragveil .veil-inner span{color:var(--txt);max-width:440px}
+/* Schwebende Warteschlange der gezogenen Karten: unten rechts, über dem
+   Inhalt, unter Hover-Vorschau (90) und Toast (99). Die Kacheln darin sind
+   dieselben .job wie im Scan-Bereich. */
+#dropbox{position:fixed;right:14px;bottom:14px;z-index:89;
+  width:min(560px,calc(100vw - 28px));max-height:min(70vh,640px);overflow:auto;
+  background:var(--panel);border:1px solid var(--acc);border-radius:var(--radius);
+  box-shadow:0 10px 34px #000c;padding:10px}
+.dropbox-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+#dropbox-list{display:flex;flex-direction:column;gap:10px}
 .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--dim)}
 /* Kartenzustand als farbiges Badge (Cardmarket-Skala). Hintergrundfarbe kommt
    inline aus CONDITIONS; Text standardmäßig weiß, „dunkel" für helle Farben. */

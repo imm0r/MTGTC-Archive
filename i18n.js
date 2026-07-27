@@ -4046,4 +4046,66 @@ Object.assign(I18N.it, {
   "buy.chunkCopied": "Parte {i}/{m} copiata – incollala in una nuova lista wants di Cardmarket (Ctrl+V).",
 });
 
+/* ---- Teil 31: Zieh-Import (Kartenbild aus einem zweiten Fenster) ---- */
+Object.assign(I18N.de, {
+  "drag.veilTitle": "Karte hier ablegen",
+  "drag.veilSub": "Kartenbild von Scryfall, Cardmarket oder Gatherer herüberziehen — die Karte wird erkannt und zur Übernahme angeboten.",
+  "drag.boxTitle": "Gezogene Karten",
+  "drag.reading": "Karte wird erkannt…",
+  "drag.stepStart": "Abgelegtes wird gelesen…",
+  "drag.stepUrl": "Nachschlagen über {q}…",
+  "drag.stepName": "Suche über den Namen…",
+  "drag.viaName": "Namenssuche",
+  "drag.via": "Erkannt über: {q}",
+  "drag.nothing": "Nichts Verwertbares abgelegt — ein Kartenbild von Scryfall, Cardmarket oder dem Gatherer herüberziehen.",
+});
+Object.assign(I18N.en, {
+  "drag.veilTitle": "Drop card here",
+  "drag.veilSub": "Drag a card image over from Scryfall, Cardmarket or Gatherer — the card is identified and offered for adding.",
+  "drag.boxTitle": "Dragged cards",
+  "drag.reading": "Identifying card…",
+  "drag.stepStart": "Reading the drop…",
+  "drag.stepUrl": "Looking up via {q}…",
+  "drag.stepName": "Searching by name…",
+  "drag.viaName": "name search",
+  "drag.via": "Identified via: {q}",
+  "drag.nothing": "Nothing usable in the drop — drag a card image from Scryfall, Cardmarket or Gatherer.",
+});
+Object.assign(I18N.fr, {
+  "drag.veilTitle": "Dépose la carte ici",
+  "drag.veilSub": "Fais glisser une image de carte depuis Scryfall, Cardmarket ou Gatherer — la carte est identifiée et proposée à l'ajout.",
+  "drag.boxTitle": "Cartes déposées",
+  "drag.reading": "Identification de la carte…",
+  "drag.stepStart": "Lecture du dépôt…",
+  "drag.stepUrl": "Recherche via {q}…",
+  "drag.stepName": "Recherche par le nom…",
+  "drag.viaName": "recherche par nom",
+  "drag.via": "Identifiée via : {q}",
+  "drag.nothing": "Rien d'exploitable dans le dépôt — fais glisser une image de carte depuis Scryfall, Cardmarket ou Gatherer.",
+});
+Object.assign(I18N.es, {
+  "drag.veilTitle": "Suelta la carta aquí",
+  "drag.veilSub": "Arrastra una imagen de carta desde Scryfall, Cardmarket o Gatherer — la carta se identifica y se ofrece para añadirla.",
+  "drag.boxTitle": "Cartas arrastradas",
+  "drag.reading": "Identificando la carta…",
+  "drag.stepStart": "Leyendo lo soltado…",
+  "drag.stepUrl": "Consultando vía {q}…",
+  "drag.stepName": "Buscando por nombre…",
+  "drag.viaName": "búsqueda por nombre",
+  "drag.via": "Identificada vía: {q}",
+  "drag.nothing": "Nada utilizable en lo soltado — arrastra una imagen de carta desde Scryfall, Cardmarket o Gatherer.",
+});
+Object.assign(I18N.it, {
+  "drag.veilTitle": "Rilascia qui la carta",
+  "drag.veilSub": "Trascina l'immagine di una carta da Scryfall, Cardmarket o Gatherer — la carta viene identificata e proposta per l'aggiunta.",
+  "drag.boxTitle": "Carte trascinate",
+  "drag.reading": "Identificazione della carta…",
+  "drag.stepStart": "Lettura di quanto rilasciato…",
+  "drag.stepUrl": "Ricerca tramite {q}…",
+  "drag.stepName": "Ricerca per nome…",
+  "drag.viaName": "ricerca per nome",
+  "drag.via": "Identificata tramite: {q}",
+  "drag.nothing": "Nulla di utilizzabile — trascina l'immagine di una carta da Scryfall, Cardmarket o Gatherer.",
+});
+
 initLang();

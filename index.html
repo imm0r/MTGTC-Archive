@@ -458,6 +458,23 @@
     <div style="flex:none"><button class="btn" id="buy-close" data-i18n="dlg.close">Schließen</button></div>
   </div>
 </dialog>
+<!-- Zieh-Import: Kartenbild aus einem zweiten Browserfenster (Scryfall,
+     Cardmarket, Gatherer) auf die App ziehen. Der Schleier erscheint beim
+     Überziehen und ist rein dekorativ (pointer-events:none) — die Ereignisse
+     fängt window in app.js (wireZiehImport). Der Kasten ist die schwebende
+     Warteschlange dafür: sichtbar in jeder Ansicht, denn gezogen wird meist
+     auf der Sammlungsseite, nicht im Scan-Bereich. -->
+<div id="dragveil" hidden aria-hidden="true"><div class="veil-inner">
+  <b data-i18n="drag.veilTitle">Karte hier ablegen</b>
+  <span data-i18n="drag.veilSub">Kartenbild von Scryfall, Cardmarket oder Gatherer herüberziehen — die Karte wird erkannt und zur Übernahme angeboten.</span>
+</div></div>
+<div id="dropbox" hidden>
+  <div class="dropbox-head">
+    <b data-i18n="drag.boxTitle">Gezogene Karten</b>
+    <button class="btn ghost sm" id="dropbox-close" data-i18n="dlg.close">Schließen</button>
+  </div>
+  <div id="dropbox-list"></div>
+</div>
 <div id="hovercard"></div>
 <div class="toast" id="toast"></div>
 <!-- Eigener Toast oben: Community-Meldungen sollen die Rückmeldung zur eigenen

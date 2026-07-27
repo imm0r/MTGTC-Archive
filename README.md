@@ -200,6 +200,26 @@ dabei entscheidend: `mkm/8` und `tmkm/8` sind zwei völlig verschiedene Karten.
 Fürs Fotografieren heißt das: Die untere linke Ecke sollte mit aufs Bild und
 scharf sein — sie ist wertvoller als der Kartenname.
 
+### Karte aus einem zweiten Fenster ziehen
+
+Zwei Browserfenster nebeneinander: links die App, rechts Scryfall, Cardmarket
+oder der Gatherer. Das Kartenbild von rechts nach links ziehen — egal in
+welche Ansicht — und die Karte wird erkannt und wie beim Scan zur Übernahme
+angeboten (Sprache aus der Quelle vorgewählt, Foil und Zustand wählst du).
+Außerhalb des Scan-Bereichs sammelt ein schwebender Kasten unten rechts die
+Treffer ein.
+
+Erkannt wird dabei **die Adresse, nicht das Bild**: Ein aus einem fremden
+Fenster gezogenes Bild kommt als Verweis an, und der trägt die Kennung schon
+in sich — bei Scryfall die Karten-ID im Dateinamen, beim Gatherer Setcode und
+Sammlernummer (bzw. die Multiverse-ID der alten Adressen), bei Cardmarket die
+Produktnummer, die Scryfall als `cardmarket_id` mitführt. Das ist exakter als
+jede Bilderkennung — es bezeichnet die Auflage, nicht bloß den Namen — und
+kostet keinen Modellaufruf. Erst wenn die Adresse nichts hergibt, zählt der
+mitgezogene Name (das `alt` des Bildes), notfalls mit Auswahlliste; auch ein
+markierter Kartenname lässt sich so herüberziehen. Aus dem Dateimanager
+gezogene Bilddateien gehen weiter den gewohnten Scan-Weg.
+
 ### Edge Function einrichten
 
 Die Funktion existiert aus einem einzigen Grund: Der Anthropic-Schlüssel darf
