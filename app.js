@@ -4494,20 +4494,43 @@ async function combosApi(body) {
   return data;
 }
 
+/* Der Name der VORDERSEITE: alles vor dem „//". Zweiteilige Namen tragen
+   Doppelkarten, Abenteuer, geteilte und umklappbare Karten
+   („Jidoor, Aristocratic Capital // Overture"). */
+const vorderName = n => (n || "").split("//")[0].trim();
+
 /* Alle in Combos vorkommenden Karten (nach Name) bei Scryfall zu vollen
    Objekten auflösen — für die Kachel-Darstellung (Bild/Typ/Preis) und den
-   „+ Deck"/„+ Wunsch"-Knopf. Sammel-Requests in Blöcken zu 75. Map name→Karte. */
+   „+ Deck"/„+ Wunsch"-Knopf. Sammel-Requests in Blöcken zu 75. Map name→Karte.
+
+   GEFRAGT WIRD MIT DER VORDERSEITE. Der Namens-Bezeichner von /cards/collection
+   nimmt nur sie: „Jidoor, Aristocratic Capital" findet die Karte,
+   „Jidoor, Aristocratic Capital // Overture" landet in not_found. Commander
+   Spellbook liefert aber genau die lange Form — jede zweiteilige Karte blieb
+   deshalb unaufgelöst und erschien als grauer Platzhalter mit Namen darunter.
+   (Am Bild lag es nie: Scryfall gibt bei diesen Karten sehr wohl ein
+   image_uris aus, es kam nur nie eine Karte an.)
+
+   ABGELEGT WIRD UNTER JEDER SCHREIBWEISE. Zurück kommt der lange Name, gesucht
+   wird mal so, mal so — je nachdem, welche Form die Combo-Quelle nennt.
+   Deshalb landet jede Karte unter ihrem vollen Namen, ihrer Vorderseite und
+   jedem einzelnen Gesichtsnamen in der Map. */
 async function comboKartenLaden(namen) {
   const byLower = new Map();
   const uniq = [...new Set(namen.map(n => (n || "").trim()).filter(Boolean))];
-  for (let i = 0; i < uniq.length; i += 75) {
+  const fragen = [...new Set(uniq.map(vorderName).filter(Boolean))];
+  const merke = c => {
+    for (const n of [c.name, vorderName(c.name), ...(c.card_faces || []).map(f => f.name)])
+      if (n) byLower.set(n.toLowerCase(), c);
+  };
+  for (let i = 0; i < fragen.length; i += 75) {
     try {
       const r = await fetch("https://api.scryfall.com/cards/collection", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ identifiers: uniq.slice(i, i + 75).map(name => ({ name })) }),
+        body: JSON.stringify({ identifiers: fragen.slice(i, i + 75).map(name => ({ name })) }),
       });
-      if (r.ok) for (const c of (await r.json()).data || []) byLower.set((c.name || "").toLowerCase(), c);
+      if (r.ok) for (const c of (await r.json()).data || []) merke(c);
     } catch { /* ohne Auflösung Fallback-Text */ }
   }
   return byLower;
