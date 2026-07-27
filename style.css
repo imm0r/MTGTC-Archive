@@ -993,15 +993,21 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
    bewusst dünn und OHNE Weichzeichner — der machte die Liste dahinter
    unleserlich und nahm damit genau die Orientierung, die er lassen sollte. */
 #kat-drop{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-start;
-  justify-content:center;background:rgba(8,6,20,.45);padding:14px 20px 20px}
+  justify-content:center;background:rgba(8,6,20,.38);padding:14px 20px 20px}
 #kat-drop[hidden]{display:none}
 /* Eine eigene Fläche statt frei schwebender Kacheln: Ohne sie blitzt die
    Tabelle zwischen den Kacheln durch, und das Ganze liest sich als Durcheinander
-   statt als eine Sache, die gerade zur Entscheidung steht. */
+   statt als eine Sache, die gerade zur Entscheidung steht.
+
+   Durchscheinend, nicht deckend — man soll sehen, worüber das Feld gerade
+   liegt. Bewusst OHNE Weichzeichner: Der nähme genau die Durchsicht wieder
+   weg, um die es hier geht. Die Deckkraft ist so gewählt, dass die Schrift
+   darauf lesbar bleibt; die Oberfläche darunter ist ohnehin dunkel, es
+   konkurriert also kein Weiß mit dem Text. */
 .katdrop-innen{width:min(900px,100%);max-height:100%;overflow-y:auto;overflow-x:hidden;
   text-align:center;padding:12px 14px 10px;border-radius:14px;
-  background:var(--panel);border:1px solid var(--akt-rand);
-  box-shadow:0 14px 40px rgba(0,0,0,.55)}
+  background:rgba(27,29,39,.62);border:1px solid var(--akt-rand);
+  box-shadow:0 14px 40px rgba(0,0,0,.5)}
 .katdrop-kopf{font-size:14px;font-weight:600;color:var(--acc2);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .katdrop-fuss{margin-top:10px;font-size:12px;color:var(--dim)}
@@ -1012,7 +1018,7 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
   grid-template-columns:repeat(auto-fit,minmax(128px,1fr))}
 .katdrop-feld{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
   min-height:74px;padding:10px 10px;border-radius:10px;cursor:copy;
-  border:2px dashed var(--line);background:var(--panel2);color:var(--txt)}
+  border:2px dashed var(--line);background:rgba(35,38,51,.55);color:var(--txt)}
 .katdrop-feld>*{pointer-events:none}   /* Kinder dürfen den Zug nicht abfangen */
 .katdrop-name{font-size:13px;font-weight:600;line-height:1.3;word-break:break-word}
 .katdrop-marke{font-size:11px;color:var(--dim)}
@@ -1023,7 +1029,12 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
    Rückmeldung, die vor dem Loslassen noch etwas ändern kann. Bewusst OHNE
    Vergrößerung: Die stieß am Rand an und brachte eine Bildlaufleiste hervor.
    Rahmen, Fläche und Schein sagen dasselbe, ohne Platz zu brauchen. */
-.katdrop-feld.ueber{border-color:var(--acc);border-style:solid;background:var(--akt-flaeche);
+/* Zwei Lagen statt einer: Auf einer durchscheinenden Fläche wäre die 13 %
+   Goldtönung der Auswahl-Sprache zu schwach, um sich abzuheben. Sie liegt
+   deshalb ÜBER dem eigenen Grund der Kachel, statt ihn zu ersetzen — dieselbe
+   Sprache, nur nicht von der Transparenz aufgezehrt. */
+.katdrop-feld.ueber{border-color:var(--acc);border-style:solid;
+  background:var(--akt-flaeche),rgba(35,38,51,.72);
   color:var(--acc2);box-shadow:0 0 0 3px rgba(201,162,39,.22)}
 /* Die gezogene Zeile bleibt sichtbar, tritt aber zurück. */
 tr.zieht>td{opacity:.45}
