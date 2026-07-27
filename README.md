@@ -242,6 +242,28 @@ Wer die Auflage samt Sprache exakt treffen will, zieht stattdessen **die
 Adresse aus der Adressleiste** herüber — sie trägt Set, Nummer und Sprache
 (`…/LTC/de-de/68/…`), genau wie ein Kartenlink aus den Gatherer-Suchtreffern.
 
+#### Diagnose: was genau gelesen wurde
+
+Findet ein Zug die falsche Auflage, hilft Raten wenig — deshalb gibt es unter
+**Card Management → Karten scannen** den Schalter **„Zieh-Import: Diagnose
+anzeigen"** (gerätelokal, wie „Treffer sofort übernehmen"). Solange er an ist,
+bleibt die Kachel im Zieh-Kasten stehen und trägt darunter die vollständige
+Aufschlüsselung:
+
+| Abschnitt | Inhalt |
+| --- | --- |
+| Abgelegte Daten (roh) | jeder Typ, den der ziehende Browser beigelegt hat, im Wortlaut (`text/uri-list`, `text/html`, …) |
+| Gefundene Adressen / Namen | was daraus gewonnen wurde, in der Reihenfolge der Auswertung |
+| Erkannte Kennungen | je Adresse Art, Quelle und alle Felder (Set, Nummer, Sprache, ID …) samt Rang |
+| Versuche der Reihe nach | welcher Weg probiert wurde und was er lieferte — auch die erfolglosen |
+| Ergebnis | Quelle, ob die Adresse eindeutig war, und die Felder der Scryfall-Karte inkl. Preisen |
+| In die Sammlung geschrieben | Zeilen-ID, Sprache, Zustand, Ausführung, Preis |
+| Fehler | die Meldung, falls etwas schiefging |
+
+**Als JSON kopieren** legt alles in die Zwischenablage — zum Weitergeben
+brauchbarer als ein Bildschirmfoto. Ausgeschaltet verhält sich alles wie
+zuvor: schreiben, springen, Kachel weg.
+
 ### Edge Function einrichten
 
 Die Funktion existiert aus einem einzigen Grund: Der Anthropic-Schlüssel darf

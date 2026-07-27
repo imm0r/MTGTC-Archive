@@ -1262,7 +1262,9 @@ async function addToCollection(card, el, opts) {
   // Popup. Wer die falsche Karte erwischt hat, korrigiert in der Sammlung.
   // Die Scan-Warteschlange behält ihre Quittungen samt „Falsche Karte?" —
   // dort ist die Liste der Beleg über einen ganzen Stapel.
-  if (el.closest("#dropbox-list")) {
+  // Bei eingeschalteter Diagnose bleibt die Kachel stehen: dort hängt gleich
+  // die Aufschlüsselung, und die wäre mit der Kachel fort, bevor man sie liest.
+  if (el.closest("#dropbox-list") && !ziehDiagnose()) {
     ziehKachelWeg(el);
     toast(meldung || t("drag.added", { name: gedruckt || card.name }));
   } else if (meldung) toast(meldung);
@@ -1723,7 +1725,21 @@ function tagAttribute(html, tag, attrs, je) {
   }
 }
 
-function ziehNutzlast(dt) {
+/* Diagnose des Zieh-Imports: zeigt neben der erkannten Karte alles, was auf dem
+   Weg dorthin gelesen wurde — die rohe Nutzlast des Ablegens, die daraus
+   gewonnenen Adressen und Namen, jede erkannte Kennung mit ihrem Rang, welcher
+   Weg zog, und die Felder der Karte, die dabei herauskam. Gerätelokal
+   einschaltbar (localStorage, wie „Treffer sofort übernehmen"): im Alltag
+   interessiert das niemanden, beim Nachstellen eines Fehlers ist es alles —
+   „welche Auflage hat er gefunden und woran?" beantwortet sonst nur Raten.
+
+   Solange sie an ist, bleibt die Kachel im Zieh-Kasten stehen, auch wenn die
+   Karte längst geschrieben ist: Die Diagnose gehört zum Vorgang und wäre mit
+   der Kachel weg, bevor man sie lesen kann. */
+function ziehDiagnose() { return localStorage.getItem("mtg-zieh-diag") === "1"; }
+function ziehDiagnoseSetzen(an) { localStorage.setItem("mtg-zieh-diag", an ? "1" : "0"); }
+
+function ziehNutzlast(dt, mitRoh) {
   const urls = [], namen = [], gesehen = new Set();
   const addUrl = x => {
     const s = String(x || "").trim();
@@ -1758,33 +1774,52 @@ function ziehNutzlast(dt) {
     });
     tagAttribute(html, "a", ["href", "title"], w => { addUrl(w.href); addName(w.title); });
   }
-  return { urls, namen };
+  // Für die Diagnose zusätzlich das Rohe: welche Typen der ziehende Browser
+  // überhaupt beigelegt hat und was in ihnen stand. Nur auf Anforderung, denn
+  // der HTML-Schnipsel kann etliche Kilobyte umfassen.
+  const rohdaten = mitRoh
+    ? [...(dt.types || [])].map(typ => ({ typ, wert: typ === "Files"
+        ? [...(dt.files || [])].map(f => `${f.name} (${f.type}, ${f.size} B)`).join(", ")
+        : daten(typ) }))
+    : null;
+  return { urls, namen, roh: rohdaten, typen: [...(dt.types || [])] };
 }
 
 /* Adressen vor Namen, exakte Kennungen vor geratenen. Meldet über `schritt`,
    welcher Weg gerade läuft — bei bis zu drei Scryfall-Abrufen ist das keine
    Zierde, sondern die einzige Rückmeldung während der Wartezeit. */
-async function ziehErkennen(nutzlast, lang, schritt) {
+async function ziehErkennen(nutzlast, lang, schritt, diag) {
   const kennungen = nutzlast.urls.map(ziehKennung).filter(Boolean)
     .sort((a, b) => ziehRang(a) - ziehRang(b));
   const nameHinweis = nutzlast.namen[0] || "";
+  if (diag) {
+    diag.kennungen = kennungen.map(k => ({ ...k, rang: ziehRang(k) }));
+    diag.nameHinweis = nameHinweis;
+  }
 
   // `sicher` heißt: die ADRESSE hat die Karte benannt, nicht ein Namensraten.
   // Jede Kennung hier bezeichnet eine bestimmte Auflage (Scryfall-Kennung,
   // Set+Nummer, Multiverse- oder Produktnummer) — geraten wird daran nichts,
   // und die aus einem Bilddateinamen gelesene Nummer hat ihre Gegenprobe
   // bereits bestanden. Nur der Namensweg unten kann die falsche Karte finden.
+  const notiz = (weg, wert, fehler) => {
+    if (diag) diag.versuche.push({ weg, ergebnis: wert, fehler: fehler || null });
+  };
   for (const k of kennungen) {
     schritt(t("drag.stepUrl", { q: k.quelle }));
-    let card = null;
+    let card = null, fehler = null;
     try { card = await karteAusKennung(k, nameHinweis); }
-    catch { /* Abruf fehlgeschlagen — nächster Weg */ }
+    catch (e) { fehler = e.message; }   /* Abruf fehlgeschlagen — nächster Weg */
+    notiz(`${k.art} · ${k.quelle}`, card ? `${card.name} [${card.set}/${card.collector_number}/${card.lang}]` : "—", fehler);
     if (card) return { card, quelle: k.quelle, sicher: true };
   }
   for (const n of nutzlast.namen) {
     schritt(t("drag.stepName"));
-    let r = null;
-    try { r = await karteAusText(n, lang); } catch { continue; }
+    let r = null, fehler = null;
+    try { r = await karteAusText(n, lang); } catch (e) { fehler = e.message; }
+    notiz(`name · ${n}`, r?.card ? `${r.card.name} [${r.card.set}/${r.card.collector_number}/${r.card.lang}]`
+      : r?.candidates.length ? `${r.candidates.length} Kandidaten` : "—", fehler);
+    if (!r) continue;
     if (r.card) return { card: r.card, quelle: t("drag.viaName"), sicher: false };
     if (r.candidates.length) return { card: null, guess: n, candidates: r.candidates };
   }
@@ -1830,6 +1865,80 @@ function ziehJob(ziel) {
   return el;
 }
 
+/* Die Felder der Scryfall-Karte, die für diesen Weg zählen: was die Auflage
+   bezeichnet, was in die Sammlung geschrieben wird, und was den Preis erklärt.
+   Bewusst eine feste Liste statt des ganzen Objekts — eine Scryfall-Karte hat
+   über siebzig Felder, und die Diagnose soll lesbar bleiben. */
+const DIAG_KARTE = ["id", "oracle_id", "name", "printed_name", "lang", "set", "set_name",
+  "collector_number", "rarity", "layout", "cardmarket_id", "released_at", "type_line"];
+
+const diagWert = v =>
+  v == null ? "—"
+  : typeof v === "boolean" ? (v ? "ja" : "nein")
+  : Array.isArray(v) ? (v.length ? v.join(", ") : "—")
+  : typeof v === "object" ? JSON.stringify(v)
+  : String(v) || "—";
+
+const diagTabelle = paare => `<table class="diag-t">${paare.map(([k, v]) =>
+  `<tr><th>${esc(k)}</th><td>${esc(diagWert(v))}</td></tr>`).join("")}</table>`;
+
+/* Die gesammelte Diagnose als aufklappbarer Block unter der Kachel. Alles
+   läuft durch esc: Der Inhalt stammt aus einem fremden Fenster, und gerade
+   das Rohe zeigt ihn unverändert. */
+function ziehDiagnoseHtml(d) {
+  const kurz = s => { const x = String(s ?? ""); return x.length > 800 ? x.slice(0, 800) + " …" : x; };
+  const teil = (titel, inhalt) => `<div class="diag-a"><h5>${esc(titel)}</h5>${inhalt}</div>`;
+  const leer = `<p class="diag-leer">${esc(t("diag.none"))}</p>`;
+  const liste = xs => xs?.length
+    ? `<ol class="diag-l">${xs.map(x => `<li>${esc(x)}</li>`).join("")}</ol>` : leer;
+
+  const roh = d.roh?.length
+    ? d.roh.map(r => `<div class="diag-roh"><b>${esc(r.typ)}</b><pre>${esc(kurz(r.wert)) || "—"}</pre></div>`).join("")
+    : leer;
+  const kennungen = d.kennungen?.length
+    ? d.kennungen.map((k, i) => diagTabelle([
+        [t("diag.rank"), `${i + 1}. — ${k.rang}`],
+        ...Object.entries(k).filter(([f]) => f !== "rang"),
+      ])).join("")
+    : leer;
+  const versuche = d.versuche?.length
+    ? diagTabelle(d.versuche.map(v => [v.weg, v.ergebnis + (v.fehler ? ` (${v.fehler})` : "")]))
+    : leer;
+
+  return `<details class="diag" open>
+    <summary>${esc(t("diag.title"))}</summary>
+    ${teil(t("diag.payload"), roh)}
+    ${teil(t("diag.urls"), liste(d.urls))}
+    ${teil(t("diag.names"), liste(d.namen))}
+    ${teil(t("diag.ids"), kennungen)}
+    ${teil(t("diag.tries"), versuche)}
+    ${teil(t("diag.result"), diagTabelle([
+      [t("diag.source"), d.quelle], [t("diag.sure"), d.sicher],
+      ...(d.karte ? DIAG_KARTE.map(f => [f, d.karte[f]])
+            .concat([["prices", d.karte.prices], ["image", imgOf(d.karte)]]) : []),
+    ]))}
+    ${d.geschrieben ? teil(t("diag.written"), diagTabelle(Object.entries(d.geschrieben))) : ""}
+    ${d.fehler ? teil(t("diag.error"), `<p class="diag-fehler">${esc(d.fehler)}</p>`) : ""}
+    <button class="btn ghost sm" data-diag-copy>${esc(t("diag.copy"))}</button>
+  </details>`;
+}
+
+/* Diagnose an die Kachel hängen. Der Kopierknopf gibt alles als JSON in die
+   Zwischenablage — zum Weitergeben ist das brauchbarer als ein Bildschirmfoto
+   der Tabelle. */
+function ziehDiagnoseZeigen(el, d) {
+  if (!el || !d) return;
+  const body = el.querySelector(".body") || el;
+  body.insertAdjacentHTML("beforeend", ziehDiagnoseHtml(d));
+  const knopf = body.querySelector("[data-diag-copy]");
+  if (knopf) knopf.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(d, null, 2));
+      toast(t("diag.copied"));
+    } catch { toast(t("diag.copyFail")); }
+  };
+}
+
 /* Ein abgelegtes Etwas übernehmen. `ziel` ist der Behälter für die Kachel:
    im Scan-Bereich die dortige Warteschlange, sonst der schwebende Kasten.
    WICHTIG: dt (der DataTransfer) ist nur während des drop-Ereignisses lesbar —
@@ -1840,7 +1949,8 @@ async function ziehImport(dt, ziel) {
   // Modellaufruf); die Datei bleibt Rückfall, falls die Adresse nichts hergibt
   // — und der Hauptweg für Bilder aus dem Dateimanager, die gar keine tragen.
   const dateien = [...(dt.files || [])].filter(f => f.type.startsWith("image/"));
-  const nutzlast = ziehNutzlast(dt);
+  const diagAn = ziehDiagnose();
+  const nutzlast = ziehNutzlast(dt, diagAn);
   if (!nutzlast.urls.length && !nutzlast.namen.length) {
     if (dateien.length) { dateien.forEach(f => scanFile(f, ziel)); return; }
     return toast(t("drag.nothing"));
@@ -1849,8 +1959,13 @@ async function ziehImport(dt, ziel) {
   const lang = $("#d-lang").value;
   const el = ziehJob(ziel);
   const schritt = s => { const n = el.querySelector("[data-step]"); if (n) n.textContent = s; };
+  // Der Merker wandert durch die ganze Kette und wird am Ende an die Kachel
+  // gehängt — auch im Fehlerfall, denn dann ist er am meisten wert.
+  const diag = diagAn ? { typen: nutzlast.typen, roh: nutzlast.roh,
+    urls: nutzlast.urls, namen: nutzlast.namen, kennungen: [], versuche: [] } : null;
   try {
-    const r = await ziehErkennen(nutzlast, lang, schritt);
+    const r = await ziehErkennen(nutzlast, lang, schritt, diag);
+    if (diag) { diag.quelle = r.quelle || null; diag.sicher = !!r.sicher; diag.karte = r.card || null; }
     const bar = el.querySelector(".bar i");
     if (bar) bar.style.width = "100%";
     if (!r.card) {
@@ -1861,7 +1976,8 @@ async function ziehImport(dt, ziel) {
         dateien.forEach(f => scanFile(f, ziel));
         return;
       }
-      return renderManual(el, r.guess || "", r.candidates);
+      renderManual(el, r.guess || "", r.candidates);
+      return ziehDiagnoseZeigen(el, diag);
     }
     // Die Sprache steht in der Auflage, die die Adresse bezeichnet — sie
     // schlägt das Dropdown, genau wie die vom Foto gelesene beim Scan. Foil
@@ -1875,6 +1991,8 @@ async function ziehImport(dt, ziel) {
     // was danach nicht besser zu beantworten wäre, ist bloß ein Klick.
     if (r.sicher || autoUebernehmen()) {
       const id = await addToCollection(r.card, el, { lang: r.card.lang });
+      if (diag) diag.geschrieben = { id, lang: r.card.lang, zustand: $("#d-cond").value,
+        foil: $("#d-foil").value === "1", preis: priceOf(r.card, $("#d-foil").value === "1") };
       if (r.sicher) await zeigeKarteInSammlung(id);
     } else {
       renderConfirm(r.card, el, { lang: r.card.lang });
@@ -1884,10 +2002,12 @@ async function ziehImport(dt, ziel) {
       if (info && r.quelle) info.insertAdjacentHTML("beforeend",
         `<div class="meta">${esc(t("drag.via", { q: r.quelle }))}</div>`);
     }
+    ziehDiagnoseZeigen(el, diag);
   } catch (e) {
     el.querySelector(".body").innerHTML =
       `<div class="title">${esc(t("scan.failed"))}</div>
        <div class="meta"><span class="pill err">${esc(e.message)}</span></div>`;
+    if (diag) { diag.fehler = e.message; ziehDiagnoseZeigen(el, diag); }
   }
 }
 
@@ -11598,6 +11718,11 @@ function wireApp() {
   if (auto) {
     auto.checked = autoUebernehmen();
     auto.onchange = () => autoUebernehmenSetzen(auto.checked);
+  }
+  const diag = $("#d-diag");
+  if (diag) {
+    diag.checked = ziehDiagnose();
+    diag.onchange = () => ziehDiagnoseSetzen(diag.checked);
   }
 
   $("#drop").onclick = () => $("#file").click();
