@@ -298,6 +298,27 @@ in zwei Stufen:
 Findet sich beides nicht (typisch für Tokens), bleibt es bei der englischen
 Auflage: eine fehlende Sprachfassung ist kein Grund, die Karte fallenzulassen.
 
+#### Das Bild kommt immer aus der eigenen Auflage
+
+Ausgetauscht wird höchstens die **Sprache derselben Auflage** — Set und
+Sammlernummer bleiben in jedem Fall gleich, das Motiv also auch. Der
+Namensrückfall oben borgt ausschließlich Text aus einer Schwester-Auflage,
+**nie das Bild**.
+
+Das ist keine Kosmetik: Im Handel trennt oft ein Vielfaches des Preises einen
+Normaldruck von seiner Showcase-Fassung. Ein Bild zu zeigen, das nicht auf der
+Karte im Regal ist, wäre dort der teuerste Fehler.
+
+Deshalb wird auch nicht geraten, wo Cardmarket uneindeutig ist: Für jedes
+abweichende Artwork führt Cardmarket ein eigenes Produkt und hängt ab dem
+zweiten ein `-V2`, `-V3` … an den Namen. **Welche** Sammlernummer damit gemeint
+ist, verrät die Adresse nicht — der Import zeigt dann die Auflagen des Sets als
+Auswahlliste, und du erkennst am Bild, welche du in der Hand hältst. Ohne
+Kürzel ist der Normaldruck gemeint, der geht direkt durch.
+
+Wer für eine bestimmte Karte ein eigenes Motiv will, hinterlegt es in den
+Kartendetails selbst („Bild ersetzen").
+
 **Altbestand** wird beim Start einmalig nachgezogen (`backfillGedruckteNamen`):
 Zeilen, die eine Fremdsprache behaupten, aber den englischen Druck halten,
 bekommen nach denselben zwei Stufen ihren gedruckten Namen und — wo die
