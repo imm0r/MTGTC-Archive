@@ -254,11 +254,24 @@ async function reload() {
    durch diese Warteschlange, die 120 ms Abstand erzwingt. */
 const sf = (() => {
   let chain = Promise.resolve(), last = 0;
+  // Geduldsgrenze je Abruf. Gemessener Anlass: /cards/search antwortete für
+  // manche Anfragen erst nach 30 s (teils mit 503), während die Punktzugriffe
+  // /cards/<set>/<nr> in 200–500 ms zurückkamen. Ohne Grenze hängt daran die
+  // ganze Warteschlange — und mit ihr ein Zieh-Import, der längst hätte
+  // weiterlaufen können. Lieber ein abgebrochener Weg als eine Oberfläche,
+  // die minutenlang steht: Jeder Aufrufer behandelt null/Fehler ohnehin.
+  const GEDULD_MS = 7000;
   const run = async (path, init) => {
     const wait = 120 - (Date.now() - last);
     if (wait > 0) await sleep(wait);
     last = Date.now();
-    const r = await fetch("https://api.scryfall.com" + path, init);
+    const stop = new AbortController();
+    const uhr = setTimeout(() => stop.abort(), GEDULD_MS);
+    let r;
+    try { r = await fetch("https://api.scryfall.com" + path, { ...init, signal: stop.signal }); }
+    catch (e) {
+      throw new Error(stop.signal.aborted ? "Scryfall antwortet nicht" : e.message);
+    } finally { clearTimeout(uhr); }
     if (r.status === 404) return null;
     if (!r.ok) throw new Error("Scryfall HTTP " + r.status);
     return r.json();
@@ -1500,6 +1513,11 @@ const cmVariante = s => {
 const CM_SPRACHE = { 1: "en", 2: "fr", 3: "de", 4: "es", 5: "it",
                      6: "zhs", 7: "ja", 8: "pt", 9: "ru", 10: "ko", 11: "zht" };
 
+/* Sprachen, in denen ein gezogener alt-Text stehen kann — die, die Cardmarket
+   führt, nach Häufigkeit geordnet. Gebraucht für die Gegenprobe eines aus dem
+   Bilddateinamen geratenen Produkts. */
+const CM_PRUEF_LANGS = ["de", "fr", "it", "es", "ja", "pt", "ru", "ko", "zhs", "zht"];
+
 /* Setnamen wortblind vergleichen: Cardmarket sagt „Commander: Outlaws of
    Thunder Junction", Scryfall „Outlaws of Thunder Junction Commander" —
    dieselben Worte, andere Reihenfolge. Sortiert verglichen treffen sie sich;
@@ -1661,24 +1679,26 @@ async function karteAusKennung(k, nameHinweis, standardLang) {
         // das gezogene Bild „Sonnenring", die Produkt-Auflösung liefert aber
         // den englischen Druck („Sol Ring") — wörtlich verglichen flog so der
         // RICHTIGE Treffer raus, und die Namenssuche danach fand irgendeine
-        // andere Auflage. Passt der Name nicht wörtlich, wird er deshalb als
-        // gedruckter Name aufgelöst und die KARTE verglichen (oracle_id).
-        // Scryfall findet gedruckte Namen nur MIT lang:-Filter; die Sprache
-        // des alt-Texts ist unbekannt, also die übrigen Cardmarket-Sprachen
-        // der Reihe nach, bis eine trifft.
+        // andere Auflage.
+        //
+        // Geprüft wird deshalb über PUNKTZUGRIFFE auf dieselbe Auflage:
+        // /cards/<set>/<nr>/<sprache> kostet 200–500 ms, während /cards/search
+        // für Namensanfragen schon mal 30 Sekunden braucht (gemessen). Das ist
+        // obendrein der schärfere Beleg — verglichen wird die Auflage mit sich
+        // selbst statt mit einer Schwester. Die vermutete Sprache zuerst, dann
+        // die übrigen Cardmarket-Sprachen.
+        const reihe = [...new Set([sprache, ...CM_PRUEF_LANGS].filter(Boolean))];
         let passt = null;
-        for (const l of ["de", "fr", "it", "es"]) {
-          let fremd = [];
-          try { fremd = await sfSearch(`name:"${nameHinweis.replace(/"/g, "")}" lang:${l}`, 8); }
+        for (const l of reihe) {
+          if (l === "en") continue;                 // war schon der Ausgangspunkt
+          let uebers = null;
+          try { uebers = await sfCode(hit.set, hit.collector_number, l); }
           catch { /* nächste Sprache */ }
-          passt = fremd.find(c => c.oracle_id && c.oracle_id === hit.oracle_id &&
-                                  nameHitMatchesRead(c, nameHinweis)) || null;
-          if (passt) break;
+          if (uebers && nameHitMatchesRead(uebers, nameHinweis)) { passt = uebers; break; }
         }
         if (!passt) return null;
-        // Der fremdsprachige Name verrät zugleich die Sprache — ein härterer
-        // Beleg als Adresse oder Dropdown, also schlägt er beide.
-        if (passt.lang) sprache = passt.lang;
+        // Treffer IST bereits die richtige Auflage in der richtigen Sprache.
+        return withPrice(passt);
       }
     }
     return withPrice(await inSprache(hit, sprache));
