@@ -277,7 +277,10 @@ const sf = (() => {
 })();
 
 const sfNamed = name => sf("/cards/named?fuzzy=" + encodeURIComponent(name));
-const sfById  = id   => sf("/cards/" + id);
+// encodeURIComponent auch hier: seit dem Zieh-Import kann die ID aus einer
+// fremden Adresse stammen, und unkodiert könnte sie den Pfad verlassen
+// („../…"). Für die ohnehin gültigen UUIDs ändert die Kodierung nichts.
+const sfById  = id   => sf("/cards/" + encodeURIComponent(id));
 
 /* Sammel-Abruf mehrerer Karten über ihre scryfall_id (max. 75 je Aufruf).
    Scryfalls /cards/collection liefert die vollen Kartenobjekte auf einen
