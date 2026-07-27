@@ -24,16 +24,29 @@
 
 name: Version und Cache-Buster
 
+#
+# WARUM AUCH AUF push:main — die Lücke bei zwei offenen Pull Requests:
+# Die neue Nummer wird aus dem ZIELZWEIG berechnet, und zwar zum Zeitpunkt des
+# Laufs. Sind A und B gleichzeitig offen, rechnet B gegen das main VOR A. Wird
+# danach A zusammengeführt, trägt B eine Nummer, die längst vergeben ist — B zu
+# mergen ließe die Version stehen oder (bei kleinerer Stufe) sogar FALLEN. Ein
+# Ereignis dafür gibt es nicht: GitHub meldet keinem Pull Request, dass sich
+# sein Zielzweig bewegt hat. Deshalb zieht der push-Lauf die offenen Pull
+# Requests selbst nach und prüft anschließend, dass die Nummer auf main
+# wirklich gestiegen ist — die Wache für den Fall, dass doch etwas durchrutscht.
+
 on:
   pull_request:
     # „edited" ist wichtig: der Titel trägt die Stufe, und der wird oft erst
     # nach dem Öffnen gesetzt oder korrigiert.
     types: [opened, synchronize, reopened, edited]
+  push:
+    branches: [main]
 
-# Ein Lauf je Pull Request. Zwei gleichzeitige Läufe würden dieselbe Datei
-# schreiben und sich gegenseitig überholen.
+# Ein Lauf je Pull Request (und einer je push auf main). Zwei gleichzeitige
+# Läufe würden dieselbe Datei schreiben und sich gegenseitig überholen.
 concurrency:
-  group: version-${{ github.event.pull_request.number }}
+  group: version-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -41,33 +54,13 @@ permissions:
 
 jobs:
   nummern:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - name: Stufe aus dem Titel lesen
-        id: stufe
-        env:
-          # Über die Umgebung, NICHT per ${{ }} in den Skriptkörper: ein Titel
-          # ist Nutzereingabe und könnte sonst Shell-Befehle einschleusen.
-          TITEL: ${{ github.event.pull_request.title }}
-        run: |
-          set -euo pipefail
-          gefunden=""
-          for s in major minor patch; do
-            if printf '%s' "$TITEL" | grep -qiF "[$s]"; then
-              if [ -n "$gefunden" ]; then
-                echo "::error::Im Titel stehen mehrere Stufen ([$gefunden] und [$s]). Bitte genau eine angeben."
-                exit 1
-              fi
-              gefunden="$s"
-            fi
-          done
-          if [ -z "$gefunden" ]; then
-            echo "::error::Im PR-Titel fehlt die Stufe. Ergänze [major], [minor] oder [patch] — siehe README.md, Abschnitt „Versionsnummer\". Titel war: $TITEL"
-            exit 1
-          fi
-          echo "wert=$gefunden" >> "$GITHUB_OUTPUT"
-          echo "Stufe: $gefunden"
-
+      # Zuerst das Skript holen — die Regel „Stufe aus dem Titel" steht dort
+      # (scripts/version.mjs, stufeAusTitel) und nicht mehr hier als Shell-
+      # Schleife: sie wird inzwischen an zwei Stellen gebraucht, und eine Regel,
+      # die zweimal geschrieben ist, driftet.
       - name: Zweig des Pull Requests auschecken
         uses: actions/checkout@v4
         with:
@@ -77,6 +70,21 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           fetch-depth: 0
+
+      - name: Stufe aus dem Titel lesen
+        id: stufe
+        env:
+          # Über die Umgebung, NICHT per ${{ }} in den Skriptkörper: ein Titel
+          # ist Nutzereingabe und könnte sonst Shell-Befehle einschleusen.
+          TITEL: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          wert="$(node scripts/version.mjs --stufe "$TITEL")" || {
+            echo "::error::$(node scripts/version.mjs --stufe "$TITEL" 2>&1 || true)"
+            exit 1
+          }
+          echo "wert=$wert" >> "$GITHUB_OUTPUT"
+          echo "Stufe: $wert"
 
       - name: Nummern setzen
         id: setzen
@@ -157,3 +165,73 @@ jobs:
       - name: Nichts zu tun
         if: steps.setzen.outputs.geaendert == 'nein'
         run: echo "index.html war schon auf Stand."
+
+  # ------------------------------------------------------------------ push
+  # Nach jedem Zusammenführen: erst nachsehen, ob die Nummer überhaupt
+  # gestiegen ist, dann die noch offenen Pull Requests auf die neue Basis
+  # umrechnen. Beides greift genau in der Lücke, die kein Ereignis meldet —
+  # dass sich der Zielzweig unter einem offenen Pull Request bewegt hat.
+  wache:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 2 }
+
+      # Der Ablauf steht in scripts/version-wache.sh, nicht hier: Was einen
+      # Merge rot färben kann, gehört geprüft — und ein Shell-Block in der YAML
+      # lässt sich nicht ausführen, ohne den Workflow laufen zu lassen.
+      - name: Ist die Version gestiegen?
+        run: scripts/version-wache.sh
+
+      - name: Offene Pull Requests auf die neue Basis umrechnen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          basis="$(grep -oE 'name="app-version" content="[^"]*"' index.html \
+                   | sed -E 's/.*content="([^"]*)"/\1/')"
+          echo "Neue Basis auf main: $basis"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Nur Pull Requests aus DIESEM Repository: in fremde Gabelungen lässt
+          # sich nicht zurückschreiben, und der Versuch bräche den Lauf ab.
+          gh pr list --state open --base main --limit 50 \
+             --json number,title,headRefName,headRepositoryOwner,isCrossRepository \
+             > offene.json
+          anzahl="$(jq 'length' offene.json)"
+          echo "Offene Pull Requests: $anzahl"
+
+          for i in $(seq 0 $((anzahl - 1))); do
+            nr="$(jq -r ".[$i].number" offene.json)"
+            fremd="$(jq -r ".[$i].isCrossRepository" offene.json)"
+            zweig="$(jq -r ".[$i].headRefName" offene.json)"
+            titel="$(jq -r ".[$i].title" offene.json)"
+            if [ "$fremd" = "true" ]; then
+              echo "#$nr liegt in einer Gabelung — übersprungen."
+              continue
+            fi
+            if ! stufe="$(node scripts/version.mjs --stufe "$titel" 2>&1)"; then
+              # Fehlt die Stufe, meldet das ohnehin der Lauf am Pull Request
+              # selbst. Hier nur vermerken und weitergehen.
+              echo "#$nr: $stufe — übersprungen."
+              continue
+            fi
+            git fetch --no-tags origin "$zweig"
+            git checkout -B "pr-$nr" "origin/$zweig"
+            node scripts/version.mjs "$stufe" "$basis"
+            if git diff --quiet -- index.html; then
+              echo "#$nr war schon auf Stand."
+            else
+              git add index.html
+              # Marke im Betreff wie beim Lauf am Pull Request: Dieser Push ist
+              # ein synchronize-Ereignis und legte sonst einen gelben,
+              # freigabepflichtigen Leerlauf an.
+              git commit -m "Version und Cache-Buster ($stufe) [skip ci]" \
+                         -m "Auf die neue Basis $basis umgerechnet, nachdem main sich bewegt hat."
+              git push origin "HEAD:$zweig"
+              echo "::notice::#$nr auf Basis $basis umgerechnet."
+            fi
+            git checkout --detach
+          done
