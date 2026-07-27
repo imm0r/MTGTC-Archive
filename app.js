@@ -1568,7 +1568,25 @@ const ziehRang = k => (k.unsicher ? 10 : 0) + ZIEH_ARTEN.indexOf(k.art);
 
 /* Kennung → Scryfall-Karte. Hier liegt das Netz; die Textarbeit steckt oben in
    ziehKennung. `nameHinweis` dient der Gegenprobe unsicherer Kennungen. */
-async function karteAusKennung(k, nameHinweis) {
+/* Dieselbe Auflage in einer anderen Sprache, sofern Scryfall sie darin führt.
+   Sonst bleibt die gefundene — eine Sprache, die es nicht gibt, ist kein Grund,
+   die Karte fallenzulassen.
+
+   Warum das gebraucht wird: Cardmarket führt je Auflage EIN Produkt für alle
+   Sprachen; die Sprache ist dort eine Eigenschaft des einzelnen Angebots, nicht
+   des Produkts. Über die cardmarket_id landet man deshalb immer beim
+   ENGLISCHEN Druck — und der trägt auch das englische Artwork. Für eine
+   deutsche Karte ist das die falsche Zeile: anderes Bild, anderer gedruckter
+   Name, eigene scryfall_id. */
+async function inSprache(card, lang) {
+  if (!card || !lang || card.lang === lang) return card;
+  return (await sfCode(card.set, card.collector_number, lang)) || card;
+}
+
+/* `standardLang` ist die Sprache aus dem Scan-Dropdown. Sie greift NUR dort,
+   wo die Quelle selbst nichts sagt — bei Scryfall und Gatherer steht die
+   Sprache in der Adresse und schlägt alles. */
+async function karteAusKennung(k, nameHinweis, standardLang) {
   if (!k) return null;
   if (k.art === "sfid") return withPrice(await sfById(k.id));
   if (k.art === "multiverse")
@@ -1576,6 +1594,12 @@ async function karteAusKennung(k, nameHinweis) {
   if (k.art === "cmid") {
     const hit = await sf("/cards/cardmarket/" + encodeURIComponent(k.id));
     if (!hit) return null;
+    // Woher die Sprache kommt, in dieser Reihenfolge: der gedruckte Name aus
+    // dem alt-Text (weiter unten, der beste Beleg), sonst der Sprachteil der
+    // Cardmarket-Adresse, sonst das Scan-Dropdown. Letzteres ist nötig, weil
+    // die BILDadresse (product-images.s3…) gar keinen Sprachteil hat — und das
+    // Bild ist genau das, was man zieht.
+    let sprache = k.lang || standardLang || null;
     // Aus einem Dateinamen geratene Nummer: nur gelten lassen, wenn der
     // mitgezogene Name dazu passt. Eine falsche Karte still in die Sammlung zu
     // schreiben wäre schlimmer als gar keine — ohne Namen fällt der Weg durch
@@ -1602,23 +1626,12 @@ async function karteAusKennung(k, nameHinweis) {
           if (passt) break;
         }
         if (!passt) return null;
-        // Der fremdsprachige Name verrät zugleich die Sprache — dieselbe
-        // Auflage in ihr ist die bessere Vorauswahl als der englische Druck.
-        if (passt.lang && passt.lang !== hit.lang) {
-          const uebers = await sfCode(hit.set, hit.collector_number, passt.lang);
-          if (uebers) return withPrice(uebers);
-        }
+        // Der fremdsprachige Name verrät zugleich die Sprache — ein härterer
+        // Beleg als Adresse oder Dropdown, also schlägt er beide.
+        if (passt.lang) sprache = passt.lang;
       }
-      return withPrice(hit);
     }
-    // Sichere Produktnummer von einer Produktseite: die Seitensprache als
-    // Vorauswahl, sofern Scryfall die Auflage in ihr führt (ein Cardmarket-
-    // Produkt führt alle Sprachen desselben Drucks).
-    if (k.lang && k.lang !== "en" && hit.lang !== k.lang) {
-      const uebers = await sfCode(hit.set, hit.collector_number, k.lang);
-      if (uebers) return withPrice(uebers);
-    }
-    return withPrice(hit);
+    return withPrice(await inSprache(hit, sprache));
   }
   if (k.art === "druck") {
     // Der Setcode aus einer Adresse ist bereits Scryfalls eigener — der direkte
@@ -1627,7 +1640,7 @@ async function karteAusKennung(k, nameHinweis) {
     const genau = await sfCode(k.set, k.cn, k.lang);
     return genau ? withPrice(genau) : findByCode(k.set, k.cn, k.lang);
   }
-  if (k.art === "cmname") return cmKarteAusNamen(k.name, k.setName, k.lang);
+  if (k.art === "cmname") return cmKarteAusNamen(k.name, k.setName, k.lang || standardLang);
   return null;
 }
 
@@ -1663,14 +1676,10 @@ async function cmKarteAusNamen(name, setName, lang) {
   const nr = c => parseInt(String(c.collector_number).replace(/\D/g, ""), 10) || 1e9;
   const regulaer = drucke.filter(c => setWorte(c.set_name) === gesucht)
     .sort((a, b) => nr(a) - nr(b))[0];
-  if (!regulaer) return withPrice(hit);
-  // Als Vorauswahl die Sprache der Cardmarket-Seite, sofern Scryfall die
+  if (!regulaer) return withPrice(await inSprache(hit, lang));
+  // Sprache der Cardmarket-Seite bzw. des Scan-Dropdowns, sofern Scryfall die
   // Auflage in ihr führt (ein Cardmarket-Produkt führt alle Sprachen).
-  if (lang && lang !== "en" && regulaer.lang !== lang) {
-    const uebers = await sfCode(regulaer.set, regulaer.collector_number, lang);
-    if (uebers) return withPrice(uebers);
-  }
-  return withPrice(regulaer);
+  return withPrice(await inSprache(regulaer, lang));
 }
 
 /* Zuletzt der Name: alt/title des gezogenen Bildes oder mitgezogener Text.
@@ -1795,6 +1804,9 @@ async function ziehErkennen(nutzlast, lang, schritt, diag) {
   if (diag) {
     diag.kennungen = kennungen.map(k => ({ ...k, rang: ziehRang(k) }));
     diag.nameHinweis = nameHinweis;
+    // Welche Sprache das Dropdown vorgibt, gehört in die Diagnose: bei
+    // Cardmarket entscheidet sie mit, welche Auflage herauskommt.
+    diag.standardLang = lang;
   }
 
   // `sicher` heißt: die ADRESSE hat die Karte benannt, nicht ein Namensraten.
@@ -1808,7 +1820,7 @@ async function ziehErkennen(nutzlast, lang, schritt, diag) {
   for (const k of kennungen) {
     schritt(t("drag.stepUrl", { q: k.quelle }));
     let card = null, fehler = null;
-    try { card = await karteAusKennung(k, nameHinweis); }
+    try { card = await karteAusKennung(k, nameHinweis, lang); }
     catch (e) { fehler = e.message; }   /* Abruf fehlgeschlagen — nächster Weg */
     notiz(`${k.art} · ${k.quelle}`, card ? `${card.name} [${card.set}/${card.collector_number}/${card.lang}]` : "—", fehler);
     if (card) return { card, quelle: k.quelle, sicher: true };
