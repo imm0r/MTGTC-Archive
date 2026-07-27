@@ -1266,6 +1266,8 @@ async function addToCollection(card, el, opts) {
     ziehKachelWeg(el);
     toast(meldung || t("drag.added", { name: gedruckt || card.name }));
   } else if (meldung) toast(meldung);
+  // Die geschriebene Zeile — der Zieh-Import springt anschließend dorthin.
+  return row?.id || null;
 }
 
 /* Erkannt, aber noch NICHT gespeichert. Erst zeigen, was gelesen wurde —
@@ -1767,18 +1769,23 @@ async function ziehErkennen(nutzlast, lang, schritt) {
     .sort((a, b) => ziehRang(a) - ziehRang(b));
   const nameHinweis = nutzlast.namen[0] || "";
 
+  // `sicher` heißt: die ADRESSE hat die Karte benannt, nicht ein Namensraten.
+  // Jede Kennung hier bezeichnet eine bestimmte Auflage (Scryfall-Kennung,
+  // Set+Nummer, Multiverse- oder Produktnummer) — geraten wird daran nichts,
+  // und die aus einem Bilddateinamen gelesene Nummer hat ihre Gegenprobe
+  // bereits bestanden. Nur der Namensweg unten kann die falsche Karte finden.
   for (const k of kennungen) {
     schritt(t("drag.stepUrl", { q: k.quelle }));
     let card = null;
     try { card = await karteAusKennung(k, nameHinweis); }
     catch { /* Abruf fehlgeschlagen — nächster Weg */ }
-    if (card) return { card, quelle: k.quelle };
+    if (card) return { card, quelle: k.quelle, sicher: true };
   }
   for (const n of nutzlast.namen) {
     schritt(t("drag.stepName"));
     let r = null;
     try { r = await karteAusText(n, lang); } catch { continue; }
-    if (r.card) return { card: r.card, quelle: t("drag.viaName") };
+    if (r.card) return { card: r.card, quelle: t("drag.viaName"), sicher: false };
     if (r.candidates.length) return { card: null, guess: n, candidates: r.candidates };
   }
   return { card: null, guess: nameHinweis, candidates: [] };
@@ -1859,8 +1866,17 @@ async function ziehImport(dt, ziel) {
     // Die Sprache steht in der Auflage, die die Adresse bezeichnet — sie
     // schlägt das Dropdown, genau wie die vom Foto gelesene beim Scan. Foil
     // und Zustand bleiben beim Nutzer, die verrät auch eine Adresse nicht.
-    if (autoUebernehmen()) await addToCollection(r.card, el, { lang: r.card.lang });
-    else {
+    //
+    // Bei einem SICHEREN Treffer wird ohne Rückfrage geschrieben und
+    // stattdessen die Zeile in der Sammlung aufgeschlagen. Die Rückfrage bot
+    // dort nur Sprache (steht schon fest), Ausführung und Zustand an — beides
+    // ändert die Zeile über „Bearbeiten" genauso, und dort steht die Karte im
+    // Bestand statt in einem Kasten davor. Eine Rückfrage, die nichts fragt,
+    // was danach nicht besser zu beantworten wäre, ist bloß ein Klick.
+    if (r.sicher || autoUebernehmen()) {
+      const id = await addToCollection(r.card, el, { lang: r.card.lang });
+      if (r.sicher) await zeigeKarteInSammlung(id);
+    } else {
       renderConfirm(r.card, el, { lang: r.card.lang });
       const info = el.querySelector(".c-info");
       // Woran es erkannt wurde, gehört sichtbar dazu: bei einem Namenstreffer
@@ -2896,6 +2912,46 @@ function renderKartenliste(bereich) {
 
 function renderCollection() { renderKartenliste("coll"); }
 function renderWunschliste() { renderKartenliste("wish"); }
+
+/* Alle Filter der Sammlung räumen. Gebraucht, wenn der Blick auf eine BESTIMMTE
+   Zeile springen soll, die gerade herausgefiltert ist — ein Sprung auf etwas
+   Unsichtbares wäre keiner. */
+function sammlungFilterZuruecksetzen() {
+  const q = lel("coll", "q"); if (q) q.value = "";
+  const foil = lel("coll", "f-foil"); if (foil) foil.value = "";
+  listSet.coll = "";
+  $$(lid("coll", "ci-filter") + " input[data-ci], " +
+     lid("coll", "type-filter") + " input[data-typ]").forEach(i => { i.checked = false; });
+  listPage.coll = 0;
+}
+
+/* In die Sammlung wechseln und auf EINE Zeile zeigen: richtige Seite
+   aufschlagen, hinscrollen, kurz hervorheben.
+
+   Das ist die Quittung des Zieh-Imports für sichere Treffer — statt einer
+   Rückfrage, die nichts fragt, was die Zeile nicht besser beantwortet: dort
+   stehen Bearbeiten und Entfernen ohnehin, und dort sieht man die Karte im
+   Bestand statt in einem Kasten davor. Verdecken die Filter die Zeile gerade,
+   werden sie geräumt — sonst zeigte der Sprung ins Leere. */
+async function zeigeKarteInSammlung(id) {
+  if (!id) return;
+  $('nav button[data-v="coll"]')?.click();
+  if (!filtered("coll").some(c => c.id === id)) sammlungFilterZuruecksetzen();
+  const rows = filtered("coll");
+  const idx = rows.findIndex(c => c.id === id);
+  if (idx < 0) return;                       // z. B. sofort wieder entfernt
+  const gr = seitenGroesse();
+  listPage.coll = gr ? Math.floor(idx / gr) : 0;
+  renderKartenliste("coll");
+  const tr = $(`#tbl tr[data-id="${CSS.escape(String(id))}"]`);
+  if (!tr) return;
+  tr.scrollIntoView({ behavior: "smooth", block: "center" });
+  // Die Hervorhebung läuft als CSS-Animation ab und nimmt sich selbst zurück;
+  // die Klasse muss trotzdem weg, sonst bliebe die Zeile beim nächsten
+  // Zeichnen unmarkiert, aber der Merker stünde noch.
+  tr.classList.add("treffer");
+  setTimeout(() => tr.classList.remove("treffer"), 2600);
+}
 
 /* Die gerade offene der beiden Kartenlisten neu zeichnen — für Nachträge, die
    im Hintergrund eintreffen (Farbidentität, Preisarchiv). Ist keine von beiden

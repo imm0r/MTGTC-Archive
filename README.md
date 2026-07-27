@@ -203,11 +203,23 @@ scharf sein — sie ist wertvoller als der Kartenname.
 ### Karte aus einem zweiten Fenster ziehen
 
 Zwei Browserfenster nebeneinander: links die App, rechts Scryfall, Cardmarket
-oder der Gatherer. Das Kartenbild von rechts nach links ziehen — egal in
-welche Ansicht — und die Karte wird erkannt und wie beim Scan zur Übernahme
-angeboten (Sprache aus der Quelle vorgewählt, Foil und Zustand wählst du).
-Außerhalb des Scan-Bereichs sammelt ein schwebender Kasten unten rechts die
-Treffer ein.
+oder der Gatherer. Das Kartenbild von rechts nach links ziehen — egal in welche
+Ansicht — und die Karte landet in der Sammlung.
+
+**Wie viel gefragt wird, hängt davon ab, wie sicher der Treffer ist.** Benennt
+die Adresse die Auflage eindeutig (Scryfall-Kennung, Set und Sammlernummer,
+Multiverse- oder Cardmarket-Produktnummer), wird ohne Rückfrage geschrieben:
+Die Sammlung springt auf die neue Zeile und hebt sie kurz hervor. Dort stehen
+Bearbeiten und Entfernen ohnehin — eine Rückfrage davor hätte nur Sprache
+(steht schon fest), Ausführung und Zustand angeboten, und die ändert die Zeile
+genauso. Bleibt nur der **Namensweg** (Gatherer-Bild, markierter Text), kann
+die falsche Karte herauskommen — dann erscheint die Bestätigung wie beim Scan,
+in einem schwebenden Kasten unten rechts, samt Auswahlliste bei
+Mehrdeutigkeit.
+
+Voreinstellung ist dabei „Normal" und „NM" — wer regelmäßig Foils oder
+gespielte Karten zieht, stellt die Dropdowns unter **Card Management → Karten
+scannen** einmal um; sie gelten für beide Wege.
 
 Erkannt wird dabei **die Adresse, nicht das Bild**: Ein aus einem fremden
 Fenster gezogenes Bild kommt als Verweis an, und der trägt die Kennung schon
