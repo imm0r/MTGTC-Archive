@@ -96,6 +96,81 @@ function dialogBackdropSchliesst(dlg) {
   });
 }
 
+/* ------------------------------------------- Eigener Zahlen-Steller ---
+   Jedes Zahlenfeld bekommt eine Hülle und darin zwei eigene Pfeile; die CSS
+   dazu hängt an .num-wrap. Die Browser-Pfeile sind ein Fremdkörper, dessen
+   Form sich nicht gestalten lässt — nur wegnehmen und selbst zeichnen hilft.
+
+   Die Breite wandert vom Feld auf die Hülle. Ohne das säße der Steller am
+   rechten Rand der Hülle statt am rechten Rand des Feldes: die schmalen
+   Mengenfelder der Tabelle tragen ihre 54 px als Inline-Angabe, die Hülle
+   hingegen ist von Haus aus 100 % breit.
+
+   Idempotent über data-num-fertig — die Funktion darf beliebig oft über
+   denselben Baum laufen. */
+function zahlenfelderAufwerten(root = document) {
+  root.querySelectorAll("input[type=number]:not([data-num-fertig])").forEach(inp => {
+    inp.dataset.numFertig = "1";
+    const huelle = document.createElement("span");
+    huelle.className = "num-wrap";
+    if (inp.style.width) { huelle.style.width = inp.style.width; inp.style.width = ""; }
+    inp.replaceWith(huelle);
+    huelle.appendChild(inp);
+    // Den Platz für den Steller inline freihalten. Aus dem Stylesheet allein
+    // reicht es nicht: mehrere Felder bringen ihr Polster als Kurzform im
+    // style-Attribut mit (cardRow: padding:4px 6px), und die schlägt jede
+    // Regel. Die Breite kommt aus der CSS-Variablen, damit sie nur an einer
+    // Stelle steht.
+    inp.style.paddingRight = "calc(var(--num-step-breite) + 5px)";
+    // aria-hidden und tabindex -1: die Pfeile sind reine Mausbedienung. Über
+    // die Tastatur zählt das Feld selbst hoch und runter, ein zweiter Weg
+    // dorthin wäre für Screenreader und Tabulator nur Ballast.
+    huelle.insertAdjacentHTML("beforeend",
+      `<span class="num-step" aria-hidden="true">
+         <button type="button" tabindex="-1" data-num="1">&#9650;</button>
+         <button type="button" tabindex="-1" data-num="-1">&#9660;</button>
+       </span>`);
+  });
+}
+
+/* Einmal verdrahten: Klicks auf die Pfeile (delegiert, die Felder entstehen
+   ja bei jedem Neuzeichnen neu) und ein Beobachter, der neue Zahlenfelder
+   aufwertet. Der Beobachter statt Aufrufen in jeder Render-Funktion: es gibt
+   zwölf Zahlenfelder in sieben davon, und ein vergessener Aufruf fiele erst
+   auf, wenn jemand das Feld sucht. Seine eigenen Einfügungen lösen ihn zwar
+   erneut aus, aber der zweite Durchlauf findet nichts mehr und endet. */
+function wireZahlenfelder() {
+  // Nur einmal, wie initTooltip. Ein zweiter Aufruf hinge einen zweiten
+  // Klick-Horcher an — jeder Pfeil zählte dann zwei Schritte auf einmal und
+  // schriebe zweimal in die Datenbank.
+  if (wireZahlenfelder._steht) return;
+  wireZahlenfelder._steht = true;
+
+  document.addEventListener("click", e => {
+    const b = e.target.closest?.(".num-step button[data-num]");
+    if (!b) return;
+    const inp = b.closest(".num-wrap")?.querySelector("input[type=number]");
+    if (!inp || inp.disabled || inp.readOnly) return;
+    // stepUp/stepDown achten von sich aus auf min, max und step — deshalb sie
+    // und keine eigene Rechnung. Bei leerem oder unlesbarem Feld werfen sie;
+    // dann bleibt es eben stehen.
+    try { (+b.dataset.num > 0 ? inp.stepUp() : inp.stepDown()); }
+    catch { return; }
+    // Von Hand ausgelöst: stepUp/stepDown melden nichts von selbst, und die
+    // Mengenfelder speichern auf change.
+    inp.dispatchEvent(new Event("input",  { bubbles: true }));
+    inp.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+
+  zahlenfelderAufwerten();
+  let geplant = false;
+  new MutationObserver(() => {
+    if (geplant) return;
+    geplant = true;
+    requestAnimationFrame(() => { geplant = false; zahlenfelderAufwerten(); });
+  }).observe(document.body, { childList: true, subtree: true });
+}
+
 /* ============================== Supabase ============================== */
 let sb = null, USER = null, PROFILE = null;
 let FLAGS = {}, IS_ADMIN = false;   // globale Feature-Schalter + ob der Nutzer Admin ist
@@ -1731,16 +1806,18 @@ function cardRow(c, o = {}) {
              title="${esc(d.name)} &middot; ${d.qty}&times; — ${esc(t("detail.inDeckGo"))}"><span
              class="dc-nm">${esc(d.name)}</span><span class="dc-n">&middot; ${d.qty}&times;</span></button>`).join("")
         : `<span class="hint">${esc(t("wish.noDeck"))}</span>`}</td>` : ""}
-      <!-- 54 px ist die schmalste Breite, bei der drei Stellen noch ganz
-           hineinpassen (gemessen, inklusive Spinner-Pfeilen; ab 50 px wird
-           abgeschnitten). Zwei Stellen sind der Regelfall, aber 100 Wälder
-           sind kein Sonderfall genug, um sie unlesbar zu machen.
+      <!-- 62 px ist die schmalste Breite, bei der drei Stellen noch ganz
+           hineinpassen (gemessen; darunter wird abgeschnitten). Zwei Stellen
+           sind der Regelfall, aber 100 Wälder sind kein Sonderfall genug, um
+           sie unlesbar zu machen. Vorher waren es 54 px — der eigene Steller
+           ist ein paar Pixel breiter als die Browser-Pfeile, die dort früher
+           standen, und die Differenz ging genau von der dritten Stelle ab.
            In der Wunschliste steht dort keine Eingabe: die Menge gehört dem
            Deckplatz, nicht dem Platzhalter — geändert wird sie im Deck. -->
       <td class="num">${wunsch
         ? `<b>${qty}</b>`
         : `<input type="number" min="0" value="${qty}" data-qty
-             style="width:54px;padding:4px 6px;text-align:right">`}</td>
+             style="width:62px;padding:4px 6px;text-align:right">`}</td>
       ${imDeck ? `<td class="num">${fehlt
         ? `<span class="pill err">${esc(t("row.missing", { n: fehlt }))}</span>`
         : `<span class="pill ok">${esc(t("row.present"))}</span>`}</td>`
@@ -10758,6 +10835,7 @@ function statusZeichnen(el, d) {
 
 function wireApp() {
   initTooltip();
+  wireZahlenfelder();
   $$("nav button[data-v]").forEach(b => b.onclick = () => {
     $$("nav button[data-v]").forEach(x => x.classList.toggle("on", x === b));
     $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + b.dataset.v));

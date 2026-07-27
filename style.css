@@ -1,4 +1,12 @@
 :root{
+  /* Dem Browser sagen, dass diese Oberfläche dunkel ist. Ohne das zeichnet er
+     sein natives Zubehör im Hellschema — am auffälligsten die Auf-/Ab-Pfeile
+     der Zahlenfelder, ein weisser Kasten mitten im dunklen Feld. Betroffen
+     sind ausserdem die Aufklappliste jedes <select>, der Datumswähler und der
+     Autofill-Hintergrund. Eine Zeile, die all das auf einmal richtigstellt;
+     die eigenen Rollbalken weiter unten überschreiben es ohnehin. */
+  color-scheme:dark;
+
   --bg:#12131a; --panel:#1b1d27; --panel2:#232633; --line:#31364a;
   --txt:#e8e9f0; --dim:#9aa0b8; --acc:#c9a227; --acc2:#e3bf4a;
   --ok:#4caf7d; --err:#e0605e; --radius:12px;
@@ -105,6 +113,60 @@ input[type=time]::-webkit-calendar-picker-indicator{
 input[type=datetime-local]::-webkit-calendar-picker-indicator:hover,
 input[type=date]::-webkit-calendar-picker-indicator:hover,
 input[type=time]::-webkit-calendar-picker-indicator:hover{opacity:1}
+/* Der Auf-/Ab-Steller der Zahlenfelder, mit demselben Goldton wie das
+   Kalender-Symbol darüber. color-scheme:dark stellt ihn schon dunkel; der
+   Filter bringt ihn vollends ins Design.
+
+   Sichtbar wird er wie im Original erst beim Überfahren oder im Fokus. Das ist
+   Absicht und keine Sparsamkeit: dauerhaft sichtbar stünde er in einer
+   Sammlungstabelle fünfzig Mal untereinander — die Mengenspalte wäre eine
+   Reihe goldener Kästchen statt einer Reihe Zahlen. Ausgeblendet wird über die
+   Deckkraft, nicht über display, damit der Platz reserviert bleibt und die
+   Zahl beim Überfahren nicht verspringt. Anklickbar ist er die ganze Zeit;
+   sichtbar ist er, sobald der Zeiger im Feld steht, also lange bevor man ihn
+   trifft. */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button{
+  filter:invert(70%) sepia(30%) saturate(600%) hue-rotate(2deg);
+  opacity:0;cursor:pointer;transition:opacity .12s}
+input[type=number]:hover::-webkit-inner-spin-button,
+input[type=number]:focus::-webkit-inner-spin-button{opacity:.9}
+
+/* -------------------------------------------- Eigener Zahlen-Steller ---
+   Die Browser-Pfeile sind ein Fremdkörper: ein Doppeldreieck in einem Kasten,
+   dessen Form sich nicht gestalten lässt — nur ein-, ausblenden oder einfärben.
+   Deshalb ausschalten und selbst bauen: senkrecht geteilte Fläche am rechten
+   Feldrand, dieselbe Trennlinie und dieselbe Umriss-Sprache wie überall, beim
+   Überfahren die getönte Aktiv-Fläche aus :root.
+
+   Die Regeln hängen ALLE an .num-wrap, nicht an input[type=number]. Das ist
+   der Rückfall: zahlenfelderAufwerten() setzt die Hülle, und wo sie einmal
+   nicht ankommt, bleibt der native Steller stehen (oben eingefärbt) statt dass
+   ein Feld ganz ohne Pfeile dasteht. */
+.num-wrap{--num-step-breite:19px;
+  position:relative;display:inline-block;width:100%;vertical-align:middle}
+/* Der rechte Innenabstand haelt den Steller frei und wird von
+   zahlenfelderAufwerten() zusaetzlich INLINE gesetzt: mehrere Felder tragen ihr
+   Polster als Kurzform im style-Attribut (cardRow: padding:4px 6px), und die
+   schlaegt jede Regel von hier. Ohne das lief die Zahl unter die Pfeile — aus
+   "100" wurde sichtbar "10". Die Breite steht oben als Variable, damit JS sie
+   nicht ein zweites Mal kennen muss. */
+.num-wrap input[type=number]{width:100%;padding-right:calc(var(--num-step-breite) + 5px);
+  -moz-appearance:textfield;appearance:textfield}
+.num-wrap input[type=number]::-webkit-inner-spin-button,
+.num-wrap input[type=number]::-webkit-outer-spin-button{
+  -webkit-appearance:none;appearance:none;margin:0;opacity:0}
+.num-step{position:absolute;top:1px;right:1px;bottom:1px;width:var(--num-step-breite);display:flex;
+  flex-direction:column;border-left:1px solid var(--line);border-radius:0 7px 7px 0;overflow:hidden}
+.num-step button{flex:1;display:flex;align-items:center;justify-content:center;
+  background:var(--panel);border:0;padding:0;margin:0;color:var(--dim);
+  font-size:8px;line-height:1;cursor:pointer;transition:background .12s,color .12s}
+.num-step button:first-child{border-bottom:1px solid var(--line)}
+.num-step button:hover{background:var(--akt-flaeche);color:var(--acc2)}
+.num-step button:active{background:rgba(201,162,39,.24);color:var(--acc2)}
+/* Feld im Fokus: die Trennlinie geht mit dem Rahmen auf Gold. */
+.num-wrap input[type=number]:focus~.num-step{border-left-color:var(--acc)}
+.num-wrap input[type=number]:disabled~.num-step{opacity:.4;pointer-events:none}
 label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transform:uppercase;letter-spacing:.6px}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
 .row>div{flex:1;min-width:110px}
