@@ -673,6 +673,21 @@ wo es war. Fächer, in denen die Karte schon liegt, sind beim Ziehen als solche
 gekennzeichnet. Eine Fläche **„+ Neue Kategorie"** legt eines an und ordnet
 gleich ein.
 
+### Geteilte Decks: die Einteilung des Erbauers
+
+Gibt ein Freund ein Deck frei, sieht man dort jetzt **seine** Kategorien —
+gruppiert wie bei ihm, mit Anzahl je Fach, „Ohne Kategorie" zuletzt. Das ist
+Teil dessen, was geteilt wird: Ein Deck ohne Einteilung ist eine Liste, mit ihr
+ein Bauplan.
+
+Hat er keine angelegt, bleibt es bei der schlichten alphabetischen Liste — hier
+wird nichts umgruppiert, was er nicht selbst so angelegt hat. Aus demselben
+Grund gibt es hier auch **keinen Umschalter** zwischen Typ und Kategorien: Der
+gehört dem Eigentümer der Ansicht und liegt in seinem Browser. Für einen fremden
+Blick gibt es nur eine richtige Ordnung, die des Erbauers.
+
+Die Kopfzeilen klappen nichts auf und sehen deshalb auch nicht danach aus.
+
 ### Automatisch einordnen
 
 Hundert Karten von Hand einzuordnen ist auch mit Ziehen ein Abend Arbeit. Der
