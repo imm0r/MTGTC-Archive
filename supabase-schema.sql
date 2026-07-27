@@ -1023,8 +1023,21 @@ begin
 
   -- Nur Auflagen DERSELBEN Karte dürfen getauscht werden, sonst wäre das hier
   -- ein Weg, am 100-Karten-Trigger vorbei beliebig umzubauen.
+  --
+  -- Drei Wege, jeder genügt allein — dieselbe Regel wie selbeKarte() im Client,
+  -- sonst liesse der eine zu, was der andere abweist:
+  --   * Set + Sammlernummer bezeichnen EINE Auflage, und eine Auflage ist eine
+  --     bestimmte Karte. Setcode buchstabenblind: Scryfall liefert ihn klein,
+  --     die Sammlungswege schreiben ihn gross, Altbestand hat beides.
+  --   * oracle_id — teilen alle Drucke, Sprachen und Foil-Fassungen.
+  --   * Der englische Name, für Uralt-Zeilen ohne oracle_id.
+  -- Sprache, Ausführung und Zustand bleiben bei allen dreien aussen vor: eine
+  -- Wunschkarte entsteht als englische Nicht-Foil-Zeile, gekauft wird, was da
+  -- ist. Ein Abgleich, der darauf bestünde, träfe nie zu.
   if not (
-    (v_from.oracle_id is not null and v_from.oracle_id = v_to.oracle_id)
+    (v_from.set_code is not null and v_from.cn is not null
+       and upper(v_from.set_code) = upper(v_to.set_code) and v_from.cn = v_to.cn)
+    or (v_from.oracle_id is not null and v_from.oracle_id = v_to.oracle_id)
     or lower(v_from.name) = lower(v_to.name)
   ) then
     raise exception 'Andere Karte — Umhängen nur zwischen Auflagen derselben Karte'

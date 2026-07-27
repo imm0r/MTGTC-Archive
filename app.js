@@ -1393,16 +1393,31 @@ const deckSort = {};
    demselben Set + Sammlernummer. (Über Set+Nummer, nicht scryfall_id:
    verschiedene Sprachfassungen derselben Auflage tragen eigene IDs.)
    Ohne Set/Nummer (Uralt-Zeilen) zählt die einzelne Zeile. */
+/* Set + Sammlernummer bezeichnen GENAU EINE Auflage — und zwar unabhängig von
+   Sprache, Ausführung und Zustand. Zwei Zeilen mit demselben Paar sind also
+   dieselbe Karte, egal was sonst in ihnen steht.
+
+   Der Setcode wird dabei buchstabenblind verglichen, und das ist kein
+   vorsorglicher Luxus: Scryfall liefert ihn klein ("ltr"), die Sammlungswege
+   schreiben ihn groß ("LTR"), und wunschkarteZumDeck reichte ihn lange roh
+   durch. Eine über „+ Wunsch" angelegte Zeile trug deshalb "ltr" und traf per
+   Set+Nummer nie auf ihre gescannte Fassung. Geschrieben wird jetzt überall
+   groß; hier wird trotzdem verglichen, ohne darauf zu bauen — Altbestand aus
+   der Zeit davor liegt ja weiter in der Datenbank. */
+const gleicherDruck = (a, b) =>
+  !!(a && b && a.set && a.cn && b.set && b.cn) &&
+  a.set.toUpperCase() === b.set.toUpperCase() && a.cn === b.cn;
+
 function bestandVon(c) {
   if (!c.set || !c.cn) return c.qty;
-  return CARDS.reduce((s, x) => s + (x.set === c.set && x.cn === c.cn ? x.qty : 0), 0);
+  return CARDS.reduce((s, x) => s + (gleicherDruck(x, c) ? x.qty : 0), 0);
 }
 
 /* Zwei Sammlungszeilen sind „dieselbe Karte" — fürs Deck-Kontingent und die
    Deck-Zugehörigkeit — über Set + Sammlernummer, genau wie bestandVon (sprach-,
    foil- und zustandsunabhängig). Ohne Set/Nummer (Uralt-Zeilen) zählt die ID. */
 function gleicheKarte(a, b) {
-  if (a.set && a.cn && b.set && b.cn) return a.set === b.set && a.cn === b.cn;
+  if (a.set && a.cn && b.set && b.cn) return gleicherDruck(a, b);
   return a.id === b.id;
 }
 
@@ -3997,7 +4012,11 @@ async function wunschkarteZumDeck(deckId, c) {
     p_deck: deckId,
     p_scryfall_id: c.id, p_oracle_id: c.oracle_id || null, p_name: c.name,
     p_printed_name: printedNameOf(c),
-    p_set_code: c.set || null, p_set_name: c.set_name || null, p_cn: c.collector_number || null,
+    // Setcode GROSS, wie auf allen Sammlungswegen (add_card macht es genauso).
+    // Scryfall liefert ihn klein; ungewandelt trug eine Wunschzeile "ltr", wo die
+    // gescannte Karte "LTR" trägt — und jeder Vergleich über Set+Nummer ging ins Leere.
+    p_set_code: (c.set || "").toUpperCase() || null, p_set_name: c.set_name || null,
+    p_cn: c.collector_number || null,
     p_img: c.image_uris?.normal || c.image_uris?.small || face.image_uris?.normal || null,
     p_lang: c.lang || "en",
     p_price: c.prices?.eur ? parseFloat(c.prices.eur) : null,
@@ -5126,14 +5145,27 @@ function deckVollMelden(d) {
   toast(t("deck.fullToast", { n: deckGroesse(d), max: DECK_MAX }));
 }
 
-/* Dieselbe KARTE, egal welche Auflage — über die oracle_id, die alle Drucke,
-   Sprachen und Foil-Fassungen teilen; Name als Rückfall für Uralt-Zeilen ohne
-   oracle_id. Bewusst NICHT gleicheKarte(): das vergleicht Set + Sammlernummer,
-   also die einzelne Auflage, und beantwortet damit eine andere Frage (welches
-   Exemplar aus dem Regal steckt in welchem Deck). Hier geht es ums Spielen,
-   und dafür ist jede Auflage dieselbe Karte. */
+/* Dieselbe KARTE, egal welche Auflage. Hier geht es ums Spielen, und dafür ist
+   jede Auflage dieselbe Karte — anders als bei gleicheKarte(), das die einzelne
+   Auflage meint (welches Exemplar aus dem Regal steckt in welchem Deck).
+
+   Drei Wege, und jeder darf allein genügen:
+
+   1. Set + Sammlernummer. Das Paar bezeichnet eine Auflage, und eine Auflage
+      IST eine bestimmte Karte — was in oracle_id oder name steht, kann dann
+      nur falsch sein. Zuerst geprüft, weil es die Angabe ist, die auf der
+      Karte steht und die man selbst nachschlagen kann.
+   2. oracle_id — teilen alle Drucke, Sprachen und Foil-Fassungen. Greift auch
+      dann, wenn man eine ANDERE Auflage gekauft hat als die gewünschte.
+   3. Der englische Name, für Uralt-Zeilen ohne oracle_id.
+
+   Sprache, Ausführung und Zustand spielen bei keinem der drei eine Rolle: Wer
+   sich eine Karte wünscht, bekommt sie standardmäßig als englische, nicht-foil
+   Zeile eingetragen und kauft dann, was der Laden hergibt. Ein Abgleich, der
+   darauf bestünde, würde nie zutreffen. */
 function selbeKarte(a, b) {
   if (!a || !b) return false;
+  if (gleicherDruck(a, b)) return true;
   if (a.oracle_id && b.oracle_id) return a.oracle_id === b.oracle_id;
   return (a.name || "").toLowerCase() === (b.name || "").toLowerCase();
 }
@@ -6365,7 +6397,10 @@ async function importJson(file) {
       const { error } = await sb.rpc("add_card", {
         p_scryfall_id: c.scryfall_id, p_oracle_id: c.oracle_id, p_name: c.name,
         p_printed_name: c.printed_name || null,
-        p_set_code: c.set || c.set_code, p_set_name: c.set_name, p_cn: c.cn, p_img: c.img,
+        // Aus einer alten Sicherung — Schreibweise des Setcodes unbekannt, deshalb
+        // hier vereinheitlichen statt sie in die Datenbank durchzureichen.
+        p_set_code: (c.set || c.set_code || "").toUpperCase() || null,
+        p_set_name: c.set_name, p_cn: c.cn, p_img: c.img,
         p_cm_id: c.cm_id ?? null,
         p_lang: c.lang || "en", p_condition: c.condition || "NM",
         p_foil: !!c.foil, p_price: c.price ?? null,
