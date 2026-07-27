@@ -152,7 +152,17 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .coll-count{margin:0 2px 8px;text-align:right;font-size:12px;color:var(--dim)}
 .coll-count:empty{display:none}
 .coll-count b{color:var(--acc);font-weight:700;font-variant-numeric:tabular-nums}
-#tbl{scroll-margin-top:70px}
+#tbl,#wtbl{scroll-margin-top:70px}
+/* Wunschliste: die Spalte „Geplant in" trägt je Deck einen Chip (wie in den
+   Kartendetails). Umbrechen statt die Spalte breit zu ziehen — eine Wunschkarte
+   kann in mehreren Decks eingeplant sein, die Tabelle soll darüber nicht
+   ausufern. */
+.wunsch-decks{max-width:220px}
+.wunsch-decks .deck-chip{margin:1px 3px 1px 0}
+/* Zähler am Navigationspunkt: auf dem AKTIVEN Knopf liegt Gold auf Gold —
+   dort die Farben tauschen, sonst wäre die Zahl unsichtbar. Gilt auch für die
+   Zähler im Benutzermenü (Nachrichten, Spielrunde). */
+nav button.on .menu-badge{background:#1a1400;color:var(--acc)}
 .tabs{display:flex;gap:6px;margin-bottom:12px}
 .tabs button{flex:1;background:transparent;border:1px solid var(--line);color:var(--dim);
              padding:8px;border-radius:8px;cursor:pointer}
