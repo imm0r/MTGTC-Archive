@@ -9,8 +9,11 @@ Die Zusammenfassung dabei **von Hand schreiben**, nicht die Liste der einzelnen
 Commits übernehmen, die GitHub vorschlägt. Zwei Gründe: der Verlauf auf `main`
 liest sich als ein Text je Änderung, und der Commit der Versions-Automatik
 trägt die Sprungmarke `[skip ci]` im Betreff (siehe
-`.github/workflows/version.yml`) — wanderte die mit nach `main`, übersprängen
-Pages-Build und CodeQL den Stand.
+`.github/workflows/version.yml`) — wanderte die mit nach `main`, liefe dort
+kein Workflow aus `.github/workflows` mehr an. Heute hängt keiner davon an
+`push` (`prices.yml` und `uptime-monitor.yml` laufen nach Zeitplan), der
+Schaden bliebe also klein; der nächste, den jemand hinzufügt, bliebe
+stillschweigend aus.
 
 ### Die Sprungmarke nie ausschreiben
 

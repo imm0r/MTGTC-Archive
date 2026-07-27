@@ -126,11 +126,22 @@ jobs:
           # gar nichts aus. Halb richtig: er löst keinen LAUF aus, hinterlässt
           # aber den freigabepflichtigen Eintrag — beobachtet an #107.)
           #
-          # Die Marke darf NICHT in den Squash-Text nach main wandern: dort
-          # übersprünge sie den Pages-Build und CodeQL. Die Zusammenfassung wird
-          # von Hand geschrieben (CLAUDE.md), nicht aus der Commit-Liste
-          # übernommen — deshalb steht sie im Betreff, wo sie beim Schreiben der
-          # Zusammenfassung ins Auge fällt, statt versteckt im Rumpf.
+          # Sie wirkt NUR auf Workflows unter .github/workflows. CodeQL läuft
+          # weiter (dessen Default-Setup liegt nicht dort und schert sich nicht
+          # um die Marke) — gemessen an #108, wo CodeQL den Versions-Commit
+          # sehr wohl gescannt hat. Die Prüftiefe des Pull Requests bleibt also,
+          # weg fällt allein dieser eine Leerlauf.
+          #
+          # In den Squash-Text nach main gehört sie trotzdem nicht: dort bliebe
+          # jeder künftige push-Workflow stillschweigend aus. Die
+          # Zusammenfassung wird von Hand geschrieben (CLAUDE.md), nicht aus der
+          # Commit-Liste übernommen — deshalb steht die Marke im Betreff, wo sie
+          # dabei ins Auge fällt, statt versteckt im Rumpf.
+          #
+          # Und sie darf in KEINER Commit-Nachricht bloß erwähnt werden: GitHub
+          # sucht sie irgendwo im Text. Der erste Anlauf dieser Änderung
+          # erklärte sie im Rumpf und schaltete damit diesen Workflow für den
+          # eigenen Pull Request ab.
           git commit -m "Version und Cache-Buster ($STUFE) [skip ci]" \
                      -m "Gesetzt von .github/workflows/version.yml aus dem PR-Titel."
           git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
