@@ -611,6 +611,77 @@ nächste Zugang versucht es erneut.
 > `fulfil_wish_in_deck` — `supabase-schema.sql` erneut im SQL Editor ausführen
 > (oder `supabase/migrations/20260725050000_fulfil_wish_in_deck.sql` einzeln).
 
+## Eigene Kategorien: wozu eine Karte im Deck steht
+
+Die Deck-Tabelle gruppierte lange allein nach **Kartentyp**. Diese Ordnung
+bringt die Karte mit, nicht der Spieler: Sie sagt, *was* eine Karte ist, aber
+nicht, *wozu* sie im Deck steht. Ein Sol Ring ist ein Artefakt, gespielt wird er
+als Ramp; ein Swords to Plowshares ist eine Spontanzauberei, im Deck ist es
+Removal. Wer ein Deck baut, denkt in der zweiten Ordnung — und rechnet in ihr:
+„acht Ramp, zehn Removal, elf Kartenziehen" ist die Frage, die man an eine
+Deckliste stellt, nicht „wie viele Spontanzauber".
+
+Deshalb legt jeder Nutzer für **jedes seiner Decks** eigene Kategorien an. Über
+der Tabelle steht der Umschalter **Nach Typ / Eigene Kategorien**, daneben
+**Kategorien** für Anlegen, Umbenennen, Sortieren und Löschen.
+
+**Je Deck, nicht je Nutzer.** Dieselbe Karte kann in einem Deck Ramp sein und im
+nächsten Fixing, und ein Aggro-Deck braucht andere Fächer als ein Control-Deck.
+Eine nutzerweite Liste hätte jedem Deck Kategorien aufgedrängt, die es nicht
+braucht, und ein Umbenennen hätte überall gewirkt. Wer eine Liste
+wiederverwenden will, übernimmt sie im Verwaltungsdialog aus einem anderen Deck
+— **kopiert**, nicht geteilt.
+
+**Eine Karte, eine Kategorie.** Damit bleibt wahr, was schon für die Typ-Gruppen
+gilt: Die Summe der Gruppen ist die Deckgröße. Und man findet die Karte, weil es
+nur einen Ort gibt, an dem sie stehen kann. Zugeordnet wird im Auswahlfeld der
+Kartenzeile; `＋ Neu…` legt dort gleich eine Kategorie an, damit die erste
+Einordnung nicht über die Verwaltung führen muss.
+
+**Beide Ordnungen bleiben.** Umgeschaltet wird je Deck und je Gerät, gemerkt im
+Browser. Das ist keine Unentschlossenheit: Ein halb eingeordnetes Deck ist der
+Regelfall — 100 Karten ordnet niemand in einem Zug ein —, und solange das so
+ist, sagt die Typ-Ansicht mehr. Voreingestellt ist deshalb keine feste Ordnung,
+sondern eine Frage an das Deck: Hat es eigene Kategorien, zeigt es sie; sonst
+bleibt alles wie zuvor. Die erste angelegte Kategorie wirkt so sofort und auf
+jedem Gerät, ohne dass irgendwo etwas eingestellt sein müsste.
+
+Nicht zugeordnete Karten sammeln sich unter **„Ohne Kategorie"** — am Ende, wie
+schon die Restgruppe der Typ-Ansicht. Eine **leere eigene** Kategorie bleibt
+dagegen stehen: Sie ist eine Aussage des Nutzers, und wer gerade „Ramp"
+angelegt hat, soll sie sehen. Eine leere Typgruppe fällt weg, denn sie ist
+abgeleitet — „0 Planeswalker" hat niemand behauptet.
+
+### Was beim Umbauen mit der Kategorie geschieht
+
+Sie hängt am **Deckplatz** (`deck_entries.category_id`), nicht an der Karte —
+dieselbe Karte darf in einem anderen Deck etwas anderes sein. Daraus folgt, was
+bei jedem Umhängen zu tun ist, und beides tut die App:
+
+* **Wunsch eingelöst.** `fulfil_wish_in_deck` hängt den Deckplatz von der
+  Wunschzeile auf das gekaufte Exemplar um und **nimmt die Kategorie mit**. Wer
+  eine Wunschkarte unter „Removal" eingeplant hat, hat den *Platz* eingeordnet,
+  nicht den Platzhalter; ginge sie verloren, zerfiele die Einteilung genau in
+  dem Moment, in dem das Deck echt wird.
+* **Zwei Zeilen fallen zusammen** (Bearbeiten auf eine schon vorhandene
+  Ausprägung): dasselbe. In beiden Fällen behält die **Zielzeile** ihre eigene
+  Einordnung, falls sie eine hat — die der verschwindenden springt nur ein, wo
+  noch nichts steht.
+
+Eine gelöschte Kategorie nimmt **keine Karten** mit: `on delete set null` lässt
+sie im Deck und stellt sie zurück unter „Ohne Kategorie". Wer ein Fach
+loswerden will, will nicht den Inhalt loswerden.
+
+Die Datenbank erzwingt außerdem, dass eine Zuordnung nur auf eine Kategorie
+**desselben Decks** zeigt (Trigger `deck_entries_kategorie_passt`). Eine fremde
+wäre eine Gruppe, die dieses Deck gar nicht anzeigt — die Karte verschwände aus
+der Liste.
+
+> Meldet die App „Dafür fehlt der Datenbank die Tabelle `deck_categories`", ist
+> das Schema älter als die App — `supabase-schema.sql` erneut im SQL Editor
+> ausführen (oder `supabase/migrations/20260727190000_deck_kategorien.sql`
+> einzeln). Bis dahin läuft alles wie zuvor, nur eben nach Typ gruppiert.
+
 ## Live-Spielrunde: die eigenen Karten am Tisch
 
 In der Spielrunde wählt jeder sein Deck; darunter steht der **private

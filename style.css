@@ -950,6 +950,37 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
 .deck-cat-arrow{display:inline-block;width:12px;color:var(--dim);font-size:10px;margin-right:6px}
 .deck-cat-count{color:var(--dim);font-weight:400;margin-left:8px}
 .deck-cat-body.zu tr:not(.deck-cat-head){display:none}
+
+/* ===== Eigene Kategorien je Deck =====
+   Die Leiste sitzt zwischen Werkzeugkasten und Tabelle, weil sie genau das
+   steuert, was direkt darunter steht. Sie darf umbrechen: auf dem Handy
+   stehen Umschalter und Verwaltungsknopf dann untereinander. */
+.deck-gruppe-leiste{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0 4px}
+.gruppe-schalter{display:inline-flex;gap:0}
+/* Zwei Knöpfe, die wie ein Element aussehen: innen liegende Ecken gerade,
+   damit die Wahl als Entweder-oder lesbar ist und nicht als zwei Befehle. */
+.gruppe-schalter>.btn:first-child{border-top-right-radius:0;border-bottom-right-radius:0}
+.gruppe-schalter>.btn:last-child{border-top-left-radius:0;border-bottom-left-radius:0;margin-left:-1px}
+.gruppe-schalter>.btn.on{background:var(--akt-flaeche);border-color:var(--akt-rand);
+  color:var(--acc2);font-weight:600;z-index:1}
+.gruppe-zahl{color:var(--dim);font-weight:400}
+.gruppe-schalter>.btn.on .gruppe-zahl{color:var(--acc2)}
+
+/* Auswahlfeld in der Kartenzeile. Schmal gehalten: die Spalte steht neben
+   Anzahl und Bestand, und lange Kategorienamen dürfen die Tabelle nicht
+   auseinanderziehen — das Feld kürzt selbst. */
+.kat-zelle{white-space:nowrap}
+.kat-zelle select{width:100%;min-width:104px;max-width:150px;padding:4px 6px;font-size:12.5px}
+
+/* Verwaltungsdialog: je Zeile Reihenfolge, Name, Kartenzahl, Löschen. */
+.kat-liste{display:flex;flex-direction:column;gap:6px;max-height:46vh;overflow:auto}
+.kat-zeile{display:flex;align-items:center;gap:6px}
+.kat-zeile>input{flex:1;min-width:0}
+.kat-zeile>.btn{flex:none}
+/* Die Kartenzahl der Kategorie — feste Breite, damit die Löschknöpfe in einer
+   Flucht stehen und nicht mit jeder Zahl wandern. */
+.kat-zahl{flex:none;width:34px;text-align:right;font-size:12px;color:var(--dim);
+  font-variant-numeric:tabular-nums}
 /* Aufgeräumter Deck-Kopf: Verwaltung (Bearbeiten/Teilen/Löschen) rechts im Kopf,
    darunter die gruppierte Werkzeugleiste (Karte hinzufügen / Übersicht /
    Vorschläge) mit durchgehend beschrifteten Feldern. */
