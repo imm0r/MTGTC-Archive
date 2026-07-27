@@ -12679,10 +12679,10 @@ function wireApp() {
   $$("nav button[data-v]").forEach(b => b.onclick = () => {
     $$("nav button[data-v]").forEach(x => x.classList.toggle("on", x === b));
     $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + b.dataset.v));
-    // Die Spielrunde darf breiter werden als der Rest: die Matte hat feste
-    // schmale Spalten, alles Zusätzliche geht ans Schlachtfeld und die Hand.
-    // Auf einem 3440er saß sonst der ganze Tisch in 1100 px.
-    document.body.classList.toggle("breit", b.dataset.v === "session");
+    // Wie breit die Seite sein darf, hängt an der offenen Ansicht — das
+    // entscheidet jetzt CSS über :has(.view.on) und nicht mehr eine Klasse von
+    // hier aus. Grund: Die Startansicht ist schon offen, bevor je ein Klick
+    // fiel; ein Umschalter an dieser Stelle allein ließe sie aus.
     $("#who-menu")?.classList.remove("open");   // Menüauswahl klappt das Menü zu
     if (b.dataset.v === "profile") renderProfile();
     if (b.dataset.v === "dashboard") renderDashboard();
