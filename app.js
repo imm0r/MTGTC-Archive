@@ -1160,7 +1160,10 @@ async function addToCollection(card, el, opts) {
   const row = Array.isArray(data) ? data[0] : data;
   await addCardNachtrag(row, card);
 
-  await reload(); renderAll();
+  // Neu in der Sammlung heißt womöglich: nicht mehr auf der Wunschliste. Der
+  // Abgleich hängt den Deckplatz um und räumt den Platzhalter weg.
+  const meldung = wunschMeldung(await reloadMitWunschAbgleich());
+  renderAll();
   el.classList.remove("pending");   // war es ein bestätigter Treffer, ist er nun geschrieben
   el.querySelector(".thumb").src = imgOf(card) || el.querySelector(".thumb").src;
   const gedruckt = printedNameOf(card);
@@ -1175,6 +1178,7 @@ async function addToCollection(card, el, opts) {
       <button class="btn ghost sm" data-fix style="margin-left:6px">${esc(t("scan.wrongCard"))}</button>
     </div>`;
   el.querySelector("[data-fix]").onclick = () => renderManual(el, card.name);
+  if (meldung) toast(meldung);
 }
 
 /* Erkannt, aber noch NICHT gespeichert. Erst zeigen, was gelesen wurde —
@@ -1344,8 +1348,31 @@ function attachSuggest(inp) {
   inp.addEventListener("blur", () => setTimeout(close, 150));
 }
 
-/* =========================== Sammlung-Ansicht ========================= */
-let sortKey = "name", sortDir = 1;
+/* ================= Sammlung- und Wunschlisten-Ansicht =================
+   Zwei Ansichten, eine Mechanik. Die Sammlung zeigt, was im Regal liegt
+   (Bestand > 0); die Wunschliste, was in einem Deck eingeplant ist, aber fehlt
+   (Bestand 0) — dieselbe Tabelle über der jeweils anderen Hälfte derselben
+   Zeilen. Filter, Tabelle, Sortierung und Blätterleiste sind deshalb gemeinsam
+   und werden nur über einen BEREICHSSCHLÜSSEL auseinandergehalten ("coll" /
+   "wish"). Zwei fast gleiche Ansichten getrennt zu pflegen, hieße sie driften
+   zu lassen — genau das vermeidet cardRow schon zwischen Sammlung und Deck.
+
+   Die Elemente in index.html heißen in der Wunschliste wie in der Sammlung, nur
+   mit vorangestelltem „w" (#q → #wq). So gibt es keine zweite ID-Liste. */
+const LISTE = {
+  coll: { pre: "",  karten: () => CARDS.filter(c => c.qty > 0) },
+  // Bestand 0 heißt „im Deck eingeplant, aber nicht besessen" — angelegt von
+  // add_wish_to_deck oder einem Deck-Import. Genau das ist die Wunschliste.
+  wish: { pre: "w", karten: () => CARDS.filter(c => c.qty === 0) },
+};
+const lid = (bereich, name) => "#" + LISTE[bereich].pre + name;
+const lel = (bereich, name) => $(lid(bereich, name));
+
+/* Sortierung, Seite und Set-Filter je Bereich: wer die Wunschliste sortiert,
+   meint nicht die Sammlung (gleiche Überlegung wie bei deckSort unten). */
+const listSort = { coll: { key: "name", dir: 1 }, wish: { key: "name", dir: 1 } };
+const listPage = { coll: 0, wish: 0 };
+const listSet  = { coll: "", wish: "" };
 
 /* Sortierung je Deck: wer eine Deck-Tabelle sortiert, meint diese eine und
    nicht alle. Der Zustand hängt deshalb am Deck. Voreinstellung wie in der
@@ -1398,11 +1425,32 @@ function deckVorkommen(c, exceptId) {
   return out;
 }
 
+/* In welchen Decks ist diese WUNSCHZEILE eingeplant, je Deck mit Deckmenge.
+   Bewusst über die Zeilen-ID und nicht wie deckVorkommen über Set + Nummer:
+   eine Wunschzeile ist genau ein Platzhalter, und nur die Deckplätze, die an
+   ihr hängen, verschwinden mit ihr wieder (ON DELETE CASCADE). Über Set+Nummer
+   käme auch ein besessenes Exemplar derselben Auflage mit in die Liste, das von
+   ihrem Löschen gar nicht betroffen ist. */
+function wunschDecks(c) {
+  const out = [];
+  for (const d of DECKS) {
+    const e = (d.entries || []).find(x => x.cardId === c.id);
+    if (e) out.push({ id: d.id, name: d.name, qty: e.qty });
+  }
+  return out;
+}
+
+/* Wie viele Exemplare dieser Wunschkarte insgesamt eingeplant sind. Ohne Deck
+   (Platzhalter, dessen Deck gelöscht wurde) bleibt es bei einem Exemplar —
+   sonst stünde in der Anzahl-Spalte eine 0 für eine Karte, die man will. */
+const wunschAnzahl = c => wunschDecks(c).reduce((s, x) => s + x.qty, 0) || 1;
+
 function sortWert(key, c, e) {
   const qty = e ? e.qty : c.qty;
   if (key === "name")  return c.disp;
   if (key === "mana")  return c.cmc;
   if (key === "qty")   return qty;
+  if (key === "wunsch") return wunschAnzahl(c);
   if (key === "fehlt") return e ? Math.max(0, e.qty - bestandVon(c)) : 0;
   // Erscheinungsdatum liegt als "2024-07-05" vor. Da sortiert die
   // Zeichenkette schon chronologisch — Jahr, Monat, Tag stehen in genau der
@@ -1438,34 +1486,37 @@ function farbidentPasst(c, sel) {
   return sel.every(x => s.has(x));
 }
 
-/* Aktuell angehakte Farbidentitäts-Felder (W/U/B/R/G/C). */
-const ciAuswahl = () => $$('#ci-filter input[data-ci]:checked').map(i => i.dataset.ci);
+/* Aktuell angehakte Farbidentitäts-Felder (W/U/B/R/G/C) des Bereichs. */
+const ciAuswahl = bereich => $$(lid(bereich, "ci-filter") + " input[data-ci]:checked").map(i => i.dataset.ci);
 
 /* Angehakte Kartentypen des Typ-Filters (englische Schlüssel wie in TYPEN). */
-const typAuswahl = () => $$('#type-filter input[data-typ]:checked').map(i => i.dataset.typ);
+const typAuswahl = bereich => $$(lid(bereich, "type-filter") + " input[data-typ]:checked").map(i => i.dataset.typ);
 
-/* Gewähltes Set des eigenen Set-Dropdowns ("" = Alle). Kein natives <select>,
+/* Gewähltes Set steht je Bereich in listSet ("" = Alle). Kein natives <select>,
    deshalb hält eine Variable den Zustand; renderSetFilter zeichnet ihn. */
-let setFilter = "";
-
-function filtered() {
-  const q = $("#q").value.trim().toLowerCase();
-  const ff = $("#f-foil").value;
-  const typen = typAuswahl();
-  const ci = ciAuswahl();
-  return CARDS.filter(c =>
-    // qty 0 = „im Deck, aber nicht besessen" (aus einem Deck-Import). Gehört
-    // NICHT in die Sammlung — nur ins Deck, wo es als „fehlen" erscheint.
-    c.qty > 0 &&
+function filtered(bereich = "coll") {
+  const q = lel(bereich, "q").value.trim().toLowerCase();
+  // Die Wunschliste hat keinen Ausführungs-Filter (jede Wunschkarte entsteht
+  // als „Normal"), deshalb hier nicht auf sein Vorhandensein bestehen.
+  const foilEl = lel(bereich, "f-foil");
+  const ff = foilEl ? foilEl.value : "";
+  const typen = typAuswahl(bereich);
+  const ci = ciAuswahl(bereich);
+  const set = listSet[bereich];
+  const s = listSort[bereich];
+  // Welche Hälfte der Zeilen überhaupt in Frage kommt, entscheidet LISTE:
+  // besessen (Bestand > 0) für die Sammlung, eingeplant-aber-fehlend
+  // (Bestand 0) für die Wunschliste.
+  return LISTE[bereich].karten().filter(c =>
     (!q || c.name.toLowerCase().includes(q) || c.disp.toLowerCase().includes(q) ||
            (c.set_name || "").toLowerCase().includes(q)) &&
-    (!setFilter || c.set === setFilter) &&
+    (!set || c.set === set) &&
     (ff === "" || String(c.foil ? 1 : 0) === ff) &&
     // Typen als ODER-Mehrfachauswahl: eine Karte reicht, wenn sie einen der
     // angehakten Typen trägt ("Artifact Creature" passt zu Artefakt UND Kreatur).
     (!typen.length || typen.some(en => typMatch(c.type_line, en))) &&
     (!ci.length || farbidentPasst(c, ci))
-  ).sort((a, b) => cmpWert(sortWert(sortKey, a), sortWert(sortKey, b), sortDir));
+  ).sort((a, b) => cmpWert(sortWert(s.key, a), sortWert(s.key, b), s.dir));
 }
 
 /* Farbidentität für Altbestand einmalig nachladen: Karten ohne color_identity
@@ -1505,7 +1556,7 @@ async function backfillFarbident() {
         } catch { /* beim nächsten Laden erneut versuchen */ }
       }
     }
-    if ($(".view.on")?.id === "v-coll") renderCollection();
+    zeichneOffeneKartenliste();
   } finally { backfillFarbident._laeuft = false; }
 }
 
@@ -1550,7 +1601,7 @@ async function ladePreisHistorie() {
       // zweiter Lauf sie nicht erneut abfragt.
       for (const s of chunk) if (!HISTMKT.has(s)) HISTMKT.set(s, { normal: [], foil: [] });
     }
-    if ($(".view.on")?.id === "v-coll") renderCollection();
+    zeichneOffeneKartenliste();
   } finally { ladePreisHistorie._laeuft = false; }
 }
 
@@ -1594,10 +1645,10 @@ function preisZelle(c) {
 }
 
 /* --------------------------- Gemeinsame Kartentabelle -----------------
-   Sammlung und Decks zeigen dieselben Zeilen. Drei Dinge unterscheiden
-   sich im Deck: die Anzahl ist die Deck-Menge (deck_entries.qty, nicht der
-   Sammlungsbestand), eine Spalte zeigt den Fehlbestand, und das Kreuz löst
-   nur die Zuordnung — die Karte bleibt in der Sammlung. */
+   Sammlung, Deck und Wunschliste zeigen dieselben Zeilen. Drei Dinge
+   unterscheiden sich im Deck: die Anzahl ist die Deck-Menge (deck_entries.qty,
+   nicht der Sammlungsbestand), eine Spalte zeigt den Fehlbestand, und das Kreuz
+   löst nur die Zuordnung — die Karte bleibt in der Sammlung. */
 /* Das Deck zeigt bewusst weniger: Zustand, Erscheinungsdatum, Hinzugefügt
    und Preis stehen in der Detailansicht — hier zählt, welche Karte wie oft
    drin ist und ob sie da ist. Bild, Name, Mana, Set und Sprache stehen
@@ -1605,7 +1656,14 @@ function preisZelle(c) {
    Eine Spalte "Wert" (Preis × Anzahl) gibt es nicht mehr: sie wiederholte je
    Zeile eine Multiplikation, die man im Kopf macht. Summiert wird weiterhin —
    oben als Marktwert der Sammlung und je Deck im Deckkopf. */
-function cardHead(imDeck) {
+/* Die Wunschliste lässt weg, was an einer Karte hängt, die man noch gar nicht
+   in der Hand hatte: Zustand (immer die Vorgabe NM) und Erscheinungsdatum.
+   Statt der Bestandszahl — die ist per Definition 0 — steht dort, in welchen
+   Decks der Platz schon vergeben ist und wie viele Exemplare das zusammen sind.
+   Der Preis bleibt: an eine Wunschliste stellt man genau diese Frage. */
+function cardHead(modus) {
+  const imDeck = modus === "deck";
+  const wunsch = modus === "wish";
   const s = k => ` data-s="${k}"`;
   return `<tr>
     <th class="hide-s"></th>
@@ -1613,10 +1671,12 @@ function cardHead(imDeck) {
     <th${s("mana")} class="num">${esc(t("th.mana"))}</th>
     <th${s("set_name")} class="hide-s">${esc(t("th.set"))}</th>
     <th${s("lang")} class="hide-s">${esc(t("th.langShort"))}</th>
-    ${imDeck ? "" : `<th${s("condition")} class="hide-s">${esc(t("th.condShort"))}</th>
-    <th${s("released")} class="hide-s">${esc(t("th.released"))}</th>
-    <th${s("added")} class="hide-s">${esc(t("th.added"))}</th>`}
-    <th${s("qty")} class="num">${esc(t("th.qty"))}</th>
+    ${imDeck || wunsch ? "" : `<th${s("condition")} class="hide-s">${esc(t("th.condShort"))}</th>
+    <th${s("released")} class="hide-s">${esc(t("th.released"))}</th>`}
+    ${imDeck ? "" : `<th${s("added")} class="hide-s">${esc(t("th.added"))}</th>`}
+    ${wunsch ? `<th class="hide-s">${esc(t("th.plannedIn"))}</th>` : ""}
+    ${wunsch ? `<th${s("wunsch")} class="num">${esc(t("th.qty"))}</th>`
+             : `<th${s("qty")} class="num">${esc(t("th.qty"))}</th>`}
     ${imDeck ? `<th${s("fehlt")} class="num">${esc(t("th.stock"))}</th>`
              : `<th${s("price")} class="num">${esc(t("th.price"))}</th>`}
     <th></th><th></th>
@@ -1625,12 +1685,14 @@ function cardHead(imDeck) {
 
 function cardRow(c, o = {}) {
   const imDeck = !!o.deckId;
-  const qty = imDeck ? o.qty : c.qty;
+  const wunsch = !!o.wunsch;
+  const decks = wunsch ? wunschDecks(c) : [];
+  const qty = imDeck ? o.qty : (wunsch ? wunschAnzahl(c) : c.qty);
   // Fehlbestand gegen den AUFLAGEN-Bestand (Sprache/Foil/Zustand egal), nicht
   // gegen die einzelne verknüpfte Zeile — wichtig bei importierten Decks.
   const fehlt = imDeck ? Math.max(0, qty - bestandVon(c)) : 0;
   return `
-    <tr data-id="${c.id}"${imDeck ? ` data-deck="${esc(o.deckId)}"` : ""}>
+    <tr data-id="${c.id}"${imDeck ? ` data-deck="${esc(o.deckId)}"` : ""}${wunsch ? " data-wish" : ""}>
       <td class="hide-s">${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy" data-view
              style="cursor:pointer" title="${esc(t("row.viewTitle"))}">` : ""}</td>
       <td><div data-view style="cursor:pointer" title="${esc(t("row.viewTitle"))}">${esc(c.disp)}</div>
@@ -1642,15 +1704,23 @@ function cardRow(c, o = {}) {
       <td class="hide-s set-spalte" title="${esc(c.set_name || c.set || "")}">${
         setSymbol(c.set, c.rarity)}${esc((c.set || "").toUpperCase())}</td>
       <td class="hide-s">${langHtml(c.lang)}</td>
-      ${imDeck ? "" : `<td class="hide-s">${condBadge(c.condition)}</td>
-      <td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap">${esc(datShort(c.released))}</td>
-      <td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap;line-height:1.35">${dtStacked(c.added)}</td>`}
+      ${imDeck || wunsch ? "" : `<td class="hide-s">${condBadge(c.condition)}</td>
+      <td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap">${esc(datShort(c.released))}</td>`}
+      ${imDeck ? "" : `<td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap;line-height:1.35">${dtStacked(c.added)}</td>`}
+      ${wunsch ? `<td class="hide-s wunsch-decks">${decks.length
+        ? decks.map(d => `<button class="deck-chip" data-godeck="${esc(d.id)}"
+             title="${esc(t("detail.inDeckGo"))}">${esc(d.name)} &middot; ${d.qty}&times;</button>`).join("")
+        : `<span class="hint">${esc(t("wish.noDeck"))}</span>`}</td>` : ""}
       <!-- 54 px ist die schmalste Breite, bei der drei Stellen noch ganz
            hineinpassen (gemessen, inklusive Spinner-Pfeilen; ab 50 px wird
            abgeschnitten). Zwei Stellen sind der Regelfall, aber 100 Wälder
-           sind kein Sonderfall genug, um sie unlesbar zu machen. -->
-      <td class="num"><input type="number" min="0" value="${qty}" data-qty
-             style="width:54px;padding:4px 6px;text-align:right"></td>
+           sind kein Sonderfall genug, um sie unlesbar zu machen.
+           In der Wunschliste steht dort keine Eingabe: die Menge gehört dem
+           Deckplatz, nicht dem Platzhalter — geändert wird sie im Deck. -->
+      <td class="num">${wunsch
+        ? `<b>${qty}</b>`
+        : `<input type="number" min="0" value="${qty}" data-qty
+             style="width:54px;padding:4px 6px;text-align:right">`}</td>
       ${imDeck ? `<td class="num">${fehlt
         ? `<span class="pill err">${esc(t("row.missing", { n: fehlt }))}</span>`
         : `<span class="pill ok">${esc(t("row.present"))}</span>`}</td>`
@@ -1673,11 +1743,18 @@ function cardRow(c, o = {}) {
               ? `<button class="btn ghost sm${o.istZweit ? " star2-on" : ""}" data-second
                 title="${o.istZweit ? esc(t("row.second2IsTitle")) : esc(t("row.second2SetTitle"))}">${o.istZweit ? "&#10022;" : "&#10023;"}</button>`
               : ""}`
+          // Die Wunschliste kennt weder Bearbeiten (Sprache, Zustand und
+          // Ausführung entscheidet man beim Kauf, nicht beim Wünschen) noch die
+          // Verkaufsliste — verkaufen lässt sich nur, was man hat. Der Preis
+          // bleibt: er ist der Grund, eine Wunschliste zu führen.
+          : wunsch
+          ? `<button class="btn ghost sm" data-price title="${esc(t("row.priceTitle"))}">&#8635;</button>`
           : `<button class="btn ghost sm" data-edit title="${esc(t("row.editTitle"))}">&#9998;</button>
         <button class="btn ghost sm" data-price title="${esc(t("row.priceTitle"))}">&#8635;</button>
         <button class="btn ghost sm sell-toggle${c.for_sale ? " on" : ""}" data-sell title="${esc(t("row.sellTitle"))}">&#8364;</button>`}
         <button class="btn ghost sm" data-del title="${imDeck
-          ? esc(t("row.removeFromDeck")) : esc(t("row.removeRow"))}">&times;</button>
+          ? esc(t("row.removeFromDeck"))
+          : wunsch ? esc(t("wish.removeTitle")) : esc(t("row.removeRow"))}">&times;</button>
       </td>
     </tr>`;
 }
@@ -1685,6 +1762,10 @@ function cardRow(c, o = {}) {
 function wireCardRows(root) {
   root.querySelectorAll("tbody tr[data-id]").forEach(tr => {
     const id = tr.dataset.id, deck = tr.dataset.deck;
+    const wunsch = "wish" in tr.dataset;
+
+    tr.querySelectorAll("[data-godeck]").forEach(ch =>
+      ch.onclick = () => zeigeDeck(ch.dataset.godeck));
 
     tr.querySelectorAll("[data-view]").forEach(el => {
       el.onclick = () => { hideHover(); showCardDetail(id); };
@@ -1715,7 +1796,9 @@ function wireCardRows(root) {
       } catch (e) { pb.disabled = false; toast(e.message); }
     };
 
-    tr.querySelector("[data-qty]").onchange = async ev => {
+    // Die Wunschliste hat kein Mengenfeld — dort steht die Zahl nur da.
+    const qb = tr.querySelector("[data-qty]");
+    if (qb) qb.onchange = async ev => {
       const q = Math.max(0, parseInt(ev.target.value) || 0);
       try {
         const { error } = deck
@@ -1741,6 +1824,8 @@ function wireCardRows(root) {
 
     const db = tr.querySelector("[data-del]");
     if (db) db.onclick = async () => {
+      // Ein Wunsch zieht Deckplätze nach sich — das wird gefragt, nicht getan.
+      if (wunsch) return wunschEntfernen(id);
       try {
         const { error } = deck
           ? await sb.from("deck_entries").delete().eq("deck_id", deck).eq("card_id", id)
@@ -1751,6 +1836,131 @@ function wireCardRows(root) {
       } catch (e) { toast(dbErr(e)); }
     };
   });
+}
+
+/* ======================= Wunschliste ↔ Sammlung =======================
+   Eine Wunschkarte ist keine eigene Tabelle, sondern eine Sammlungszeile mit
+   BESTAND 0: „im Deck eingeplant, aber nicht besessen". Damit liegt sie genau
+   dort, wo sie hingehört — der Deckplatz hängt an ihr wie an jeder anderen
+   Karte, und Bild, Preis und Kartendaten sind dieselben. Die Sammlung blendet
+   diese Zeilen aus (filtered), die Wunschliste zeigt genau sie. */
+
+/* Karte von der Wunschliste nehmen. Sie ist nur ein Platzhalter — mit ihr
+   verschwindet auch der Deckplatz, den sie belegt (deck_entries hängt per
+   ON DELETE CASCADE an der Kartenzeile). Genau das ist gewollt: den Wunsch zu
+   streichen und die Lücke im Deck stehen zu lassen, hieße einen Platz für
+   nichts zu reservieren. Weil das mehr als eine Zeile trifft, wird gefragt —
+   und zwar mit den Namen der betroffenen Decks. */
+async function wunschEntfernen(id) {
+  const c = CARDS.find(x => x.id === id);
+  if (!c) return;
+  const decks = wunschDecks(c);
+  const name = c.disp || c.name;
+  // Ein noch nicht besessener Commander ist möglich (die Regel prüft nur die
+  // Typzeile). Sein Wegfall löscht kein Deck, nimmt ihm aber die Hauptkarte —
+  // das gehört vor die Entscheidung, nicht danach in einen Fehlerton.
+  const alsCmd = DECKS.filter(d => d.main_card_id === id || d.second_card_id === id);
+  const ok = await confirmDlg(`<b>${esc(t("wish.removeTitle"))}</b>
+    <p style="margin:8px 0 0">${decks.length
+      ? t("wish.removeAsk", { name: esc(name), decks: esc(decks.map(d => d.name).join(", ")) })
+      : t("wish.removeAskNoDeck", { name: esc(name) })}</p>
+    ${alsCmd.length ? `<p class="hint" style="margin:8px 0 0;color:var(--err)">${
+      esc(t("wish.removeCommander", { decks: alsCmd.map(d => d.name).join(", ") }))}</p>` : ""}`);
+  if (!ok) return;
+  try {
+    const { error } = await sb.from("cards").delete().eq("id", id);
+    if (error) throw error;
+    await reload(); renderAll();
+    toast(t("wish.removed", { name }));
+  } catch (e) { toast(dbErr(e)); }
+}
+
+/* Wunschliste gegen den Bestand abgleichen — läuft nach JEDEM Zugang zur
+   Sammlung (Scan, Handeingabe, beide Importe).
+
+   Der Fall: Man plant eine Karte ins Deck, die man nicht hat; es entsteht eine
+   Wunschzeile mit Bestand 0, die den Deckplatz hält. Später kauft man die Karte
+   und scannt sie — meist in einer ANDEREN Auflage, also als eigene Zeile. Jetzt
+   steht dieselbe Karte zweimal in der Datenbank: der Platzhalter mit dem
+   Deckplatz und das echte Exemplar ohne.
+
+   Richtig ist dann nicht, das Exemplar zusätzlich ins Deck zu legen — der Platz
+   ist längst vergeben, die Karte wäre die 101. und im Commander zugleich eine
+   zweite Kopie derselben Karte. Richtig ist, den Deckplatz UMZUHÄNGEN und den
+   Platzhalter fallen zu lassen. Das Umhängen erledigt fulfil_wish_in_deck in
+   einem Schritt in der Datenbank, damit das Deck zwischendurch weder zu groß
+   noch zu klein ist.
+
+   Die Funktion ist wiederholbar und arbeitet über den ganzen Bestand, nicht nur
+   über die eben gescannte Karte: Gibt es zu einer Wunschzeile keine besessene
+   Auflage, tut sie nichts. So heilt sie auch Wünsche, die aus anderen Gründen
+   stehen geblieben sind. Gibt die Namen der eingelösten Karten zurück. */
+async function wunschAbgleich() {
+  const erfuellt = [];
+  for (const w of CARDS.filter(c => c.qty === 0)) {
+    // Die besessene Auflage derselben Karte — zuletzt erfasste zuerst, das ist
+    // bei mehreren die eben hinzugefügte.
+    const eigen = CARDS
+      .filter(c => c.qty > 0 && c.id !== w.id && selbeKarte(c, w))
+      .sort((a, b) => String(b.added || "").localeCompare(String(a.added || "")))[0];
+    if (!eigen) continue;
+    try {
+      for (const d of DECKS) {
+        const e = (d.entries || []).find(x => x.cardId === w.id);
+        if (!e) continue;
+        const { error } = await sb.rpc("fulfil_wish_in_deck", {
+          p_deck: d.id, p_from_card: w.id, p_to_card: eigen.id, p_n: e.qty });
+        if (error) throw error;
+      }
+      // War der Wunsch der Commander des Decks, muss auch dieser Verweis mit
+      // umziehen. Sonst nähme das Löschen der Wunschzeile dem Deck still seine
+      // Hauptkarte (decks.main_card_id ist ON DELETE SET NULL).
+      for (const d of DECKS) {
+        const patch = {};
+        if (d.main_card_id === w.id) patch.main_card_id = eigen.id;
+        if (d.second_card_id === w.id) patch.second_card_id = eigen.id;
+        if (!Object.keys(patch).length) continue;
+        const { error } = await sb.from("decks").update(patch).eq("id", d.id);
+        if (error) throw error;
+      }
+      // Jetzt hängt nichts mehr an ihr: kein Bestand, kein Deckplatz.
+      const { error } = await sb.from("cards").delete().eq("id", w.id);
+      if (error) throw error;
+      erfuellt.push(w.disp || w.name);
+    } catch (e) {
+      // Ein misslungener Abgleich darf den Zugang nicht mitreißen: die Karte
+      // IST in der Sammlung, nur der Platzhalter blieb stehen. Der nächste
+      // Zugang versucht es erneut.
+      toast(dbErr(e));
+    }
+  }
+  return erfuellt;
+}
+
+/* Neu laden nach einem Zugang zur Sammlung — mit Wunschabgleich. Bewusst
+   getrennt von reload(): das läuft an Dutzenden Stellen und liest nur; eine
+   Funktion, die beim Lesen schreibt, wäre an keiner davon zu erwarten. */
+async function reloadMitWunschAbgleich() {
+  // Vor dem Neuladen festhalten, was gerade noch Wunsch war. Traf der Zugang
+  // die Wunschzeile SELBST (gleiche Auflage, Sprache, Zustand und Ausführung),
+  // hat add_card sie schlicht auf Bestand 1 gesetzt: nichts umzuhängen, der
+  // Deckplatz sitzt schon richtig — erfüllt ist der Wunsch trotzdem.
+  const vorher = new Map(CARDS.filter(c => c.qty === 0).map(c => [c.id, c.disp || c.name]));
+  await reload();
+  const erfuellt = await wunschAbgleich();
+  if (erfuellt.length) await reload();
+  for (const [id, name] of vorher)
+    if ((CARDS.find(c => c.id === id)?.qty ?? 0) > 0) erfuellt.push(name);
+  return erfuellt;
+}
+
+/* Meldung über eingelöste Wünsche. Leer, wenn keiner dabei war. */
+function wunschMeldung(erfuellt) {
+  const namen = [...new Set(erfuellt || [])];
+  if (!namen.length) return "";
+  return namen.length === 1
+    ? t("wish.fulfilled", { name: namen[0] })
+    : t("wish.fulfilledN", { n: namen.length });
 }
 
 /* ============================== Dashboard ============================= */
@@ -1982,112 +2192,146 @@ function renderDash(rows, ziel = $("#dash"), gefiltert = false) {
   ziel.querySelectorAll("[data-ans-ende]").forEach(el => el.scrollLeft = el.scrollWidth);
 }
 
-/* Aktuelle Seite der Sammlungstabelle (0-basiert). Nur im Speicher: eine
-   Seitenzahl ist kein Dauerzustand. Filter, Suche und Sortierung springen
-   zurück auf Seite 1. */
-let collPage = 0;
-
 /* Karten je Sammlungsseite aus dem Profil (Einstellungen): 0 = alles in einer
-   Liste, NULL/fehlt = Voreinstellung 50. */
+   Liste, NULL/fehlt = Voreinstellung 50. Gilt für Sammlung und Wunschliste. */
 function seitenGroesse() {
   const n = Number(PROFILE?.page_size);
   return Number.isFinite(n) && n >= 0 ? n : 50;
 }
 
-/* Zeichnet das eigene Set-Dropdown neu: „Alle" plus jedes besessene Set, jeweils
-   mit neutralem Keyrune-Icon und Setcode. Der aktuelle Filter (setFilter) bleibt
-   erhalten; zeigt die Sammlung das gewählte Set nicht mehr (letztes Exemplar
-   verkauft/gelöscht), fällt er auf „Alle" zurück. Trigger zeigt die Auswahl.
-   Klicks liegen delegiert auf #set-menu (in wireApp), deshalb genügt hier das
-   Neusetzen des innerHTML. */
-function renderSetFilter(besessen) {
-  const sets = [...new Set(besessen.map(c => c.set))].filter(Boolean).sort();
-  if (setFilter && !sets.includes(setFilter)) setFilter = "";
+/* Zeichnet das eigene Set-Dropdown neu: „Alle" plus jedes vorkommende Set, jeweils
+   mit neutralem Keyrune-Icon und Setcode. Der aktuelle Filter (listSet) bleibt
+   erhalten; zeigt die Liste das gewählte Set nicht mehr (letztes Exemplar
+   verkauft/gelöscht, Wunsch erfüllt), fällt er auf „Alle" zurück. Trigger zeigt
+   die Auswahl. Klicks liegen delegiert auf dem Menü (in wireApp), deshalb genügt
+   hier das Neusetzen des innerHTML. */
+function renderSetFilter(karten, bereich = "coll") {
+  const sets = [...new Set(karten.map(c => c.set))].filter(Boolean).sort();
+  if (listSet[bereich] && !sets.includes(listSet[bereich])) listSet[bereich] = "";
+  const gewaehlt = listSet[bereich];
   const eintrag = (code, label) =>
-    `<li role="option" class="set-item${code === setFilter ? " on" : ""}" data-set="${esc(code)}"
-         aria-selected="${code === setFilter}">${code ? setIcon(code) : ""}<span>${esc(label)}</span></li>`;
-  $("#set-menu").innerHTML =
+    `<li role="option" class="set-item${code === gewaehlt ? " on" : ""}" data-set="${esc(code)}"
+         aria-selected="${code === gewaehlt}">${code ? setIcon(code) : ""}<span>${esc(label)}</span></li>`;
+  lel(bereich, "set-menu").innerHTML =
     eintrag("", t("coll.all")) + sets.map(s => eintrag(s, s.toUpperCase())).join("");
-  $("#set-trigger-inner").innerHTML = setFilter
-    ? `${setIcon(setFilter)}<span>${esc(setFilter.toUpperCase())}</span>`
+  lel(bereich, "set-trigger-inner").innerHTML = gewaehlt
+    ? `${setIcon(gewaehlt)}<span>${esc(gewaehlt.toUpperCase())}</span>`
     : esc(t("coll.all"));
 }
 
-function renderCollection() {
-  const rows = filtered();
-  // Das Dashboard sitzt jetzt in einer eigenen Ansicht (renderDashboard) und
-  // nicht mehr über der Sammlungstabelle. qty-0-Zeilen (Import-Platzhalter)
-  // sind nie Teil der Sammlung.
-  const besessen = CARDS.filter(c => c.qty > 0);
+/* Sammlung und Wunschliste in einem: Filter zeichnen, Treffer zählen, Tabelle
+   und Blätterleiste bauen. Was die beiden unterscheidet, steckt in LISTE
+   (welche Zeilen) und im Tabellenmodus (welche Spalten und Knöpfe). */
+function renderKartenliste(bereich) {
+  const wunsch = bereich === "wish";
+  const rows = filtered(bereich);
+  // Das Dashboard sitzt in einer eigenen Ansicht (renderDashboard) und nicht
+  // mehr über der Sammlungstabelle.
+  const alle = LISTE[bereich].karten();
 
-  renderSetFilter(besessen);
+  renderSetFilter(alle, bereich);
 
-  // Trefferzähler: wie viele Zeilen die aktuellen Filter zeigen, von allen
-  // besessenen. Ohne Filter nur die Gesamtzahl (kein „318 von 318"). Die
-  // hervorgehobene Zahl baut die CSS (.coll-count b).
-  const cc = $("#coll-count");
-  if (cc) cc.innerHTML = rows.length === besessen.length
-    ? t("coll.countAll", { total: `<b>${besessen.length}</b>` })
-    : t("coll.count", { n: `<b>${rows.length}</b>`, total: besessen.length });
+  // Trefferzähler: wie viele Zeilen die aktuellen Filter zeigen, von allen des
+  // Bereichs. Ohne Filter nur die Gesamtzahl (kein „318 von 318"). Die
+  // hervorgehobene Zahl baut die CSS (.coll-count b). In der Wunschliste steht
+  // dahinter, was die angezeigten Karten zusammen kosten — die Frage, die man
+  // an eine Wunschliste stellt.
+  const cc = lel(bereich, "coll-count");
+  if (cc) {
+    const zahl = rows.length === alle.length
+      ? t("coll.countAll", { total: `<b>${alle.length}</b>` })
+      : t("coll.count", { n: `<b>${rows.length}</b>`, total: alle.length });
+    const summe = wunsch
+      ? rows.reduce((s, c) => s + (c.price || 0) * wunschAnzahl(c), 0) : 0;
+    cc.innerHTML = zahl + (wunsch && rows.length
+      ? ` &middot; ${t("wish.sum", { p: `<b>${eur(summe)}</b>` })}` : "");
+  }
 
-  $("#coll-empty").textContent = besessen.length
+  const leer = lel(bereich, "coll-empty");
+  leer.textContent = alle.length
     ? t("coll.emptyFilter")
-    : t("coll.empty");
-  $("#coll-empty").style.display = rows.length ? "none" : "block";
-  $("#tbl").style.display = rows.length ? "" : "none";
+    : t(wunsch ? "wish.empty" : "coll.empty");
+  leer.style.display = rows.length ? "none" : "block";
+  const tbl = lel(bereich, "tbl");
+  tbl.style.display = rows.length ? "" : "none";
 
   // Seitenaufteilung — nur für die Tabelle. Die Seitenzahl klemmt sich fest,
   // falls Löschen oder ein engerer Filter sie über das Ende geschoben hat.
   const gr = seitenGroesse();
   const seiten = gr ? Math.max(1, Math.ceil(rows.length / gr)) : 1;
-  collPage = Math.max(0, Math.min(collPage, seiten - 1));
-  const seite = gr ? rows.slice(collPage * gr, (collPage + 1) * gr) : rows;
+  listPage[bereich] = Math.max(0, Math.min(listPage[bereich], seiten - 1));
+  const p = listPage[bereich];
+  const seite = gr ? rows.slice(p * gr, (p + 1) * gr) : rows;
 
-  $("#tbl thead").innerHTML = cardHead(false);
-  $("#tbl tbody").innerHTML = seite.map(c => cardRow(c)).join("");
-  wireCardRows($("#tbl"));
-  renderPager(rows.length, seiten);
-  aktualisiereVerkaufZaehler();
+  tbl.querySelector("thead").innerHTML = cardHead(bereich);
+  tbl.querySelector("tbody").innerHTML =
+    seite.map(c => cardRow(c, wunsch ? { wunsch: true } : {})).join("");
+  wireCardRows(tbl);
+  renderPager(rows.length, seiten, bereich);
+  // Jeder Bereich führt seinen eigenen Zähler: die Sammlung den der
+  // Verkaufsliste in der Filterzeile, die Wunschliste den am Navigationspunkt.
+  if (wunsch) zeigeWunschZaehler(); else aktualisiereVerkaufZaehler();
 
   // Die Kopfzeile wird bei jedem Rendern neu gebaut, also auch die
   // Sortier-Handler neu hängen.
-  $$("#tbl th[data-s]").forEach(th => th.onclick = () => {
-    const z = { key: sortKey, dir: sortDir };
-    sortUm(z, th.dataset.s);
-    sortKey = z.key; sortDir = z.dir;
-    collPage = 0;                          // neue Ordnung: oben anfangen
-    renderCollection();
+  tbl.querySelectorAll("th[data-s]").forEach(th => th.onclick = () => {
+    sortUm(listSort[bereich], th.dataset.s);
+    listPage[bereich] = 0;                 // neue Ordnung: oben anfangen
+    renderKartenliste(bereich);
   });
 }
 
-/* Blätterleiste unter der Sammlungstabelle. Erscheint erst ab zwei Seiten.
-   Kompakte Seitenliste: erste, letzte und die Umgebung der aktuellen Seite,
-   Lücken als „…". */
-function renderPager(gesamt, seiten) {
-  const el = $("#pager");
+function renderCollection() { renderKartenliste("coll"); }
+function renderWunschliste() { renderKartenliste("wish"); }
+
+/* Die gerade offene der beiden Kartenlisten neu zeichnen — für Nachträge, die
+   im Hintergrund eintreffen (Farbidentität, Preisarchiv). Ist keine von beiden
+   offen, gibt es nichts zu tun; beim Wechsel dorthin wird ohnehin gezeichnet. */
+function zeichneOffeneKartenliste() {
+  const id = $(".view.on")?.id;
+  if (id === "v-coll") renderCollection();
+  else if (id === "v-wish") renderWunschliste();
+}
+
+/* Zahl offener Wünsche am Navigationspunkt. Eine Wunschliste ist nur nützlich,
+   wenn man sieht, dass etwas darauf steht, ohne sie zu öffnen. */
+function zeigeWunschZaehler() {
+  const el = $("#wish-badge");
+  if (!el) return;
+  const n = LISTE.wish.karten().length;
+  el.textContent = n;
+  el.hidden = !n;
+}
+
+/* Blätterleiste unter der Tabelle. Erscheint erst ab zwei Seiten. Kompakte
+   Seitenliste: erste, letzte und die Umgebung der aktuellen Seite, Lücken
+   als „…". */
+function renderPager(gesamt, seiten, bereich = "coll") {
+  const el = lel(bereich, "pager");
   if (!el) return;
   if (seiten <= 1) { el.innerHTML = ""; return; }
   const gr = seitenGroesse();
-  const von = collPage * gr + 1, bis = Math.min(gesamt, (collPage + 1) * gr);
-  const nums = [...new Set([0, seiten - 1, collPage - 1, collPage, collPage + 1])]
+  const p = listPage[bereich];
+  const von = p * gr + 1, bis = Math.min(gesamt, (p + 1) * gr);
+  const nums = [...new Set([0, seiten - 1, p - 1, p, p + 1])]
     .filter(n => n >= 0 && n < seiten).sort((a, b) => a - b);
   let knoepfe = "", prev = -1;
   for (const n of nums) {
     if (prev >= 0 && n - prev > 1) knoepfe += '<span class="pager-dots">&hellip;</span>';
-    knoepfe += `<button class="btn ghost sm${n === collPage ? " pager-on" : ""}" data-page="${n}">${n + 1}</button>`;
+    knoepfe += `<button class="btn ghost sm${n === p ? " pager-on" : ""}" data-page="${n}">${n + 1}</button>`;
     prev = n;
   }
   el.innerHTML = `
-    <button class="btn ghost sm" data-page="${collPage - 1}"${collPage === 0 ? " disabled" : ""}>&lsaquo; ${esc(t("pager.back"))}</button>
+    <button class="btn ghost sm" data-page="${p - 1}"${p === 0 ? " disabled" : ""}>&lsaquo; ${esc(t("pager.back"))}</button>
     ${knoepfe}
-    <button class="btn ghost sm" data-page="${collPage + 1}"${collPage >= seiten - 1 ? " disabled" : ""}>${esc(t("pager.next"))} &rsaquo;</button>
+    <button class="btn ghost sm" data-page="${p + 1}"${p >= seiten - 1 ? " disabled" : ""}>${esc(t("pager.next"))} &rsaquo;</button>
     <span class="hint" style="margin-left:auto">${esc(t("pager.range", { von, bis, gesamt }))}</span>`;
   el.querySelectorAll("[data-page]").forEach(b => b.onclick = () => {
-    collPage = Math.max(0, Math.min(seiten - 1, parseInt(b.dataset.page)));
-    renderCollection();
+    listPage[bereich] = Math.max(0, Math.min(seiten - 1, parseInt(b.dataset.page)));
+    renderKartenliste(bereich);
     // Beim Blättern an den Tabellenanfang — sonst steht man am Seitenfuß.
     // scroll-margin-top in der CSS hält den klebenden Kopf frei.
-    $("#tbl").scrollIntoView({ behavior: "smooth", block: "start" });
+    lel(bereich, "tbl").scrollIntoView({ behavior: "smooth", block: "start" });
   });
 }
 
@@ -5376,7 +5620,7 @@ function renderDecks() {
         </div>
         <div class="deck-dash" data-dash="${d.id}" style="margin-top:12px"></div>
         ${rows ? `<div class="xscroll" style="overflow-x:auto"><table class="deck-tbl" style="margin-top:10px">
-                    <thead>${cardHead(true)}</thead>${deckKoerper}</table></div>`
+                    <thead>${cardHead("deck")}</thead>${deckKoerper}</table></div>`
                : `<div class="empty">${esc(t("deck.emptyDeck"))}</div>`}
         <div class="deck-syn" data-synbox="${d.id}" style="margin-top:12px"></div>
         <div class="deck-combos" data-combobox="${d.id}" style="margin-top:12px"></div>
@@ -5645,7 +5889,11 @@ function renderDecks() {
           p_deck: deckId, p_from_card: wunsch.karte.id, p_to_card: cardId, p_n: n,
         });
         if (error) throw error;
-        await reload(); renderAll();
+        // Der Abgleich räumt die zurückbleibende Wunschzeile weg (sie hat jetzt
+        // weder Bestand noch Deckplatz) und hängt sie, liegt sie noch in
+        // weiteren Decks, auch dort um. Ohne ihn stünde sie weiter auf der
+        // Wunschliste, obwohl die Karte längst im Regal liegt.
+        await reloadMitWunschAbgleich(); renderAll();
         toast(t("deck.wishFilled", { name: pick.disp || pick.name, n }));
       } catch (e) { toast(dbErr(e)); btn.disabled = false; }
       return;
@@ -6018,20 +6266,39 @@ function cmKaufLink(c) {
 }
 
 let KAUF_DECK_ID = null;   // Deck, dessen Fehlliste der Kauf-Dialog gerade zeigt
+let KAUF_WUNSCH = false;   // statt eines Decks: die ganze Wunschliste
 
 function oeffneKauf(deckId) {
+  KAUF_WUNSCH = false;
   KAUF_DECK_ID = deckId;
+  renderKauf();
+  $("#buy-dlg").showModal();
+}
+/* Derselbe Dialog über der ganzen Wunschliste statt über einem Deck: der
+   Einkaufszettel ist derselbe, nur die Quelle ist eine andere. */
+function oeffneKaufWunschliste() {
+  KAUF_WUNSCH = true;
+  KAUF_DECK_ID = null;
   renderKauf();
   $("#buy-dlg").showModal();
 }
 function kaufDeck() { return DECKS.find(d => d.id === KAUF_DECK_ID) || null; }
 
+/* Was der Dialog gerade zeigt, in der Form { c, fehlt } — damit Liste,
+   Wants-Text und Datei nichts davon wissen müssen, woher die Posten kommen. */
+function kaufPosten() {
+  if (KAUF_WUNSCH) return LISTE.wish.karten().map(c => ({ c, fehlt: wunschAnzahl(c) }));
+  const d = kaufDeck();
+  return d ? fehlendeKarten(d) : [];
+}
+
 function renderKauf() {
   const body = $("#buy-body");
   if (!body) return;
   const d = kaufDeck();
-  const items = d ? fehlendeKarten(d) : [];
-  const head = `<h3 style="margin:0 0 6px">${esc(t("buy.title"))}${d ? " – " + esc(d.name) : ""}</h3>`;
+  const items = kaufPosten();
+  const titel = KAUF_WUNSCH ? t("nav.wishlist") : t("buy.title");
+  const head = `<h3 style="margin:0 0 6px">${esc(titel)}${d ? " – " + esc(d.name) : ""}</h3>`;
   if (!items.length) { body.innerHTML = head + `<p class="hint">${esc(t("buy.complete"))}</p>`; return; }
   const stueck = items.reduce((s, x) => s + x.fehlt, 0);
   const summe  = items.reduce((s, x) => s + (x.c.price || 0) * x.fehlt, 0);
@@ -6059,7 +6326,7 @@ function renderKauf() {
 }
 
 async function kaufKopierenUndOeffnen() {
-  const d = kaufDeck(); const items = d ? fehlendeKarten(d) : [];
+  const items = kaufPosten();
   if (!items.length) return;
   try { await navigator.clipboard.writeText(kaufWantlist(items)); toast(t("buy.copied")); }
   catch { toast(t("buy.copyFail")); }
@@ -6067,9 +6334,10 @@ async function kaufKopierenUndOeffnen() {
   window.open(cmWantsUrl(), "_blank", "noopener");
 }
 function kaufTxt() {
-  const d = kaufDeck(); const items = d ? fehlendeKarten(d) : [];
+  const items = kaufPosten();
   if (!items.length) return;
-  const nm = (d?.name || "deck").replace(/[^\w-]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase() || "deck";
+  const nm = KAUF_WUNSCH ? "wishlist"
+    : (kaufDeck()?.name || "deck").replace(/[^\w-]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase() || "deck";
   download(`wants-${nm}-${today()}.txt`, kaufWantlist(items), "text/plain");
 }
 
@@ -6099,8 +6367,13 @@ async function importJson(file) {
       if (error) { bad++; break; } else ok++;
     }
   }
-  await reload(); renderAll();
-  toast(bad ? t("toast.importedCardsSome", { ok, bad }) : t("toast.importedCards", { ok }));
+  // Auch der Import ist ein Zugang: was hier ankommt, kann längst gewünscht
+  // gewesen sein. Die eigene Meldung des Imports bleibt stehen — im Stapel
+  // interessiert die Summe, den Rest zeigen Wunschliste und Deck.
+  const erfuellt = await reloadMitWunschAbgleich();
+  renderAll();
+  toast((bad ? t("toast.importedCardsSome", { ok, bad }) : t("toast.importedCards", { ok })) +
+        (erfuellt.length ? " · " + t("wish.fulfilledN", { n: new Set(erfuellt).size }) : ""));
 }
 
 /* ==================== Import aus Mythic Tools (CSV) ===================
@@ -6284,7 +6557,8 @@ async function importCsv(file) {
     }
   }
 
-  await reload(); renderAll();
+  const erfuellt = await reloadMitWunschAbgleich();
+  renderAll();
   say(t("imp.done", {
     imported, skipped, deckMsg,
     failedLine: failed.length ? t("imp.failedList", {
@@ -6293,7 +6567,8 @@ async function importCsv(file) {
     }) : ""
   }));
   toast(t("toast.importedN", { n: imported }) +
-        (skipped ? t("toast.importedSkippedSuffix", { n: skipped }) : ""));
+        (skipped ? t("toast.importedSkippedSuffix", { n: skipped }) : "") +
+        (erfuellt.length ? " · " + t("wish.fulfilledN", { n: new Set(erfuellt).size }) : ""));
 }
 
 /* ================= Manueller Import (Set + Nummer) ====================
@@ -6385,13 +6660,18 @@ async function miImport() {
       sag("✓ " + (printedNameOf(card) || card.name) + (price != null ? " · " + eur(price) : ""), "var(--ok)");
       ok++;
     }
-    await reload(); renderAll();
-    toast(t("toast.importedN", { n: ok }) + (fail ? t("toast.importedFailedSuffix", { n: fail }) : ""));
+    const erfuellt = await reloadMitWunschAbgleich();
+    renderAll();
+    toast(t("toast.importedN", { n: ok }) + (fail ? t("toast.importedFailedSuffix", { n: fail }) : "") +
+          (erfuellt.length ? " · " + t("wish.fulfilledN", { n: new Set(erfuellt).size }) : ""));
   } finally { btn.disabled = false; }
 }
 
 /* =============================== Rendern ============================== */
-function renderAll() { renderCollection(); renderDecks(); }
+/* Die Wunschliste gehört dazu: sie zeigt die andere Hälfte derselben Zeilen,
+   und fast jede Änderung an Sammlung oder Deck verschiebt etwas zwischen den
+   beiden. */
+function renderAll() { renderCollection(); renderWunschliste(); renderDecks(); }
 
 /* ============================ Login / Start =========================== */
 function showGate(mode) {
@@ -7239,14 +7519,14 @@ async function communitySichtbarkeitSpeichern(wert) {
 }
 
 /* Karten je Sammlungsseite speichern (Profil-Einstellung, gilt damit auf allen
-   Geräten). 0 = keine Seitenaufteilung. */
+   Geräten). 0 = keine Seitenaufteilung. Betrifft beide Kartenlisten. */
 async function pageSizeSpeichern(n) {
   try {
     const { error } = await sb.from("profiles").update({ page_size: n }).eq("id", USER.id);
     if (error) throw error;
     PROFILE.page_size = n;
-    collPage = 0;
-    renderCollection();
+    listPage.coll = 0; listPage.wish = 0;
+    renderCollection(); renderWunschliste();
     toast(n ? t("toast.pageSetN", { n }) : t("toast.pageSetAll"));
   } catch (e) { toast(dbErr(e)); }
 }
@@ -10429,6 +10709,7 @@ function wireApp() {
     if (b.dataset.v === "rules") renderRules();
     if (b.dataset.v === "status") renderStatus();
     if (b.dataset.v === "settings") renderSettings();
+    if (b.dataset.v === "wish") renderWunschliste();
   });
   // Der Verweis neben dem Logo drückt den gleichnamigen Knopf im Benutzermenü:
   // Umschalten, Markierung und Nachladen bleiben so an einer einzigen Stelle.
@@ -10447,11 +10728,13 @@ function wireApp() {
     if (m && !m.contains(e.target)) m.classList.remove("open");
     const ls = $("#lang-select");
     if (ls && !ls.contains(e.target)) ls.classList.remove("open");
-    const ss = $("#set-select");
-    if (ss && !ss.contains(e.target)) {
+    // Beide Set-Dropdowns (Sammlung und Wunschliste) über die Klasse, nicht
+    // über die ID: sonst bliebe das zweite offen stehen.
+    $$(".set-select").forEach(ss => {
+      if (ss.contains(e.target)) return;
       ss.classList.remove("open");
-      $("#set-trigger")?.setAttribute("aria-expanded", "false");
-    }
+      ss.querySelector(".set-trigger")?.setAttribute("aria-expanded", "false");
+    });
   });
 
   // „Als Wunschkarte ins Deck" bei Synergie-/Analyse-Vorschlägen. Delegation, weil
@@ -10509,30 +10792,39 @@ function wireApp() {
   $("#drop").addEventListener("drop", e =>
     [...e.dataTransfer.files].filter(f => f.type.startsWith("image/")).forEach(scanFile));
 
-  // Suche/Filter ändern die Treffermenge — immer zurück auf Seite 1.
-  $("#q").oninput = () => { collPage = 0; renderCollection(); };
-  $("#f-foil").onchange = () => { collPage = 0; renderCollection(); };
-  // Eigenes Set-Dropdown: Trigger klappt auf/zu, Klick auf einen Eintrag setzt
-  // den Filter. Klicks liegen delegiert auf dem Menü, weil renderSetFilter die
-  // Einträge neu baut. Außenklick schließt (Handler weiter unten).
-  const setSel = $("#set-select");
-  $("#set-trigger").onclick = ev => {
-    ev.stopPropagation();
-    const offen = setSel.classList.toggle("open");
-    $("#set-trigger").setAttribute("aria-expanded", offen);
-  };
-  $("#set-menu").onclick = ev => {
-    const li = ev.target.closest("[data-set]");
-    if (!li) return;
-    setFilter = li.dataset.set;
-    setSel.classList.remove("open");
-    $("#set-trigger").setAttribute("aria-expanded", "false");
-    collPage = 0; renderCollection();
-  };
-  // Farbidentitäts- und Typ-Filter: jede Checkbox zeichnet die Sammlung neu.
-  $$('#ci-filter input[data-ci], #type-filter input[data-typ]').forEach(inp =>
-    inp.onchange = () => { collPage = 0; renderCollection(); });
+  // Filterleiste von Sammlung UND Wunschliste — dieselbe Verdrahtung, einmal je
+  // Bereich. Suche/Filter ändern die Treffermenge, also immer zurück auf Seite 1.
+  for (const bereich of Object.keys(LISTE)) {
+    const neu = () => { listPage[bereich] = 0; renderKartenliste(bereich); };
+    lel(bereich, "q").oninput = neu;
+    const foil = lel(bereich, "f-foil");
+    if (foil) foil.onchange = neu;          // die Wunschliste hat keinen
+    // Eigenes Set-Dropdown: Trigger klappt auf/zu, Klick auf einen Eintrag setzt
+    // den Filter. Klicks liegen delegiert auf dem Menü, weil renderSetFilter die
+    // Einträge neu baut. Außenklick schließt (Handler weiter oben).
+    const setSel = lel(bereich, "set-select");
+    const setTrg = lel(bereich, "set-trigger");
+    setTrg.onclick = ev => {
+      ev.stopPropagation();
+      setTrg.setAttribute("aria-expanded", setSel.classList.toggle("open"));
+    };
+    lel(bereich, "set-menu").onclick = ev => {
+      const li = ev.target.closest("[data-set]");
+      if (!li) return;
+      listSet[bereich] = li.dataset.set;
+      setSel.classList.remove("open");
+      setTrg.setAttribute("aria-expanded", "false");
+      neu();
+    };
+    // Farbidentitäts- und Typ-Filter: jede Checkbox zeichnet die Liste neu.
+    $$(lid(bereich, "ci-filter") + " input[data-ci], " +
+       lid(bereich, "type-filter") + " input[data-typ]").forEach(inp => inp.onchange = neu);
+  }
   $("#upd").onclick = updatePrices;
+  // Einkaufszettel über die ganze Wunschliste — derselbe Dialog wie „Fehlende
+  // Karten kaufen" am einzelnen Deck.
+  const wKauf = $("#wish-buy");
+  if (wKauf) wKauf.onclick = oeffneKaufWunschliste;
 
   // „Deine Combos": komplette Combos quer über den ganzen Bestand. Karten nach
   // Namen dedupliziert (dieselbe Karte in mehreren Auflagen zählt einmal).

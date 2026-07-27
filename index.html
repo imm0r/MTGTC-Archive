@@ -106,6 +106,9 @@
   <nav>
     <button data-v="coll" class="on" data-i18n="nav.collection">Sammlung</button>
     <button data-v="decks" data-i18n="nav.decks">Decks</button>
+    <!-- Dritte Kartenkategorie hinter Decks: was in einem Deck eingeplant, aber
+         noch nicht besessen ist. Die Zahl daneben füllt zeigeWunschZaehler(). -->
+    <button data-v="wish"><span data-i18n="nav.wishlist">Wunschliste</span><span id="wish-badge" class="menu-badge" hidden></span></button>
     <button data-v="more" data-i18n="nav.cardmgmt">Card Management</button>
     <!-- Profil, Freunde und Abmelden wohnen im Menü hinter Avatar + Name:
          aufklappen per Hover (Desktop) bzw. Klick (Touch). Die data-v-Knöpfe
@@ -222,6 +225,69 @@
     </div>
   </div>
   <div id="deck-list"></div>
+</section>
+
+<!-- ---------------- Wunschliste ---------------- -->
+<!-- Dritte Kartenkategorie neben Sammlung und Decks: Karten, die in einem Deck
+     eingeplant sind, aber (noch) nicht im Regal liegen — in der Datenbank sind
+     das Sammlungszeilen mit Bestand 0, die die Sammlung deshalb ausblendet.
+     Aufbau bewusst gleich wie die Sammlung: dieselben Filter, dieselbe Tabelle
+     (cardHead/cardRow), dieselbe Blätterleiste. Die IDs sind die der Sammlung
+     mit vorangestelltem „w" — renderKartenliste() findet sie darüber
+     (LISTE.wish.pre in app.js), sodass keine zweite Liste von IDs zu pflegen
+     ist, die auseinanderlaufen könnte.
+     Ohne Ausführungs-Filter: eine Wunschkarte entsteht immer als „Normal",
+     ein Foil-Filter hätte hier nie etwas zu filtern. -->
+<section class="view" id="v-wish">
+  <div class="card">
+    <div class="row" style="margin-bottom:12px">
+      <div style="flex:2"><label data-i18n="coll.search">Suche</label><input type="text" id="wq" data-i18n-ph="coll.searchPh" placeholder="Name oder Set…"></div>
+      <div><label data-i18n="coll.set">Set</label>
+        <div class="set-select" id="wset-select">
+          <button type="button" class="set-trigger" id="wset-trigger" aria-haspopup="listbox" aria-expanded="false">
+            <span class="set-trigger-inner" id="wset-trigger-inner">Alle</span>
+            <span class="set-caret" aria-hidden="true">&#9662;</span>
+          </button>
+          <ul class="set-menu" id="wset-menu" role="listbox"></ul>
+        </div>
+      </div>
+      <div style="flex:none"><button class="btn ghost" id="wish-buy" data-i18n="wish.buyBtn" data-i18n-title="wish.buyTitle">Alle bei Cardmarket</button></div>
+    </div>
+    <div class="row ci-row" style="margin-bottom:12px">
+      <div style="flex:none">
+        <label data-i18n="coll.colorId">Farbidentität</label>
+        <div class="ci-filter" id="wci-filter">
+          <label class="ci-box" data-i18n-title="color.W"><input type="checkbox" data-ci="W"><span class="ci-sym"><i class="ms ms-w ms-cost" aria-hidden="true"></i></span></label>
+          <label class="ci-box" data-i18n-title="color.U"><input type="checkbox" data-ci="U"><span class="ci-sym"><i class="ms ms-u ms-cost" aria-hidden="true"></i></span></label>
+          <label class="ci-box" data-i18n-title="color.B"><input type="checkbox" data-ci="B"><span class="ci-sym"><i class="ms ms-b ms-cost" aria-hidden="true"></i></span></label>
+          <label class="ci-box" data-i18n-title="color.R"><input type="checkbox" data-ci="R"><span class="ci-sym"><i class="ms ms-r ms-cost" aria-hidden="true"></i></span></label>
+          <label class="ci-box" data-i18n-title="color.G"><input type="checkbox" data-ci="G"><span class="ci-sym"><i class="ms ms-g ms-cost" aria-hidden="true"></i></span></label>
+          <label class="ci-box" data-i18n-title="color.C"><input type="checkbox" data-ci="C"><span class="ci-sym"><i class="ms ms-c ms-cost" aria-hidden="true"></i></span></label>
+        </div>
+      </div>
+      <div style="flex:none" class="ci-gruppe-abstand">
+        <label data-i18n="coll.type">Kartentyp</label>
+        <div class="ci-filter" id="wtype-filter">
+          <label class="ci-box" data-i18n-title="type.creature"><input type="checkbox" data-typ="Creature"><span class="ci-sym"><i class="ms ms-creature" aria-hidden="true"></i></span></label>
+          <label class="ci-box" data-i18n-title="type.land"><input type="checkbox" data-typ="Land"><span class="ci-sym"><i class="ms ms-land" aria-hidden="true"></i></span></label>
+          <label class="ci-box" data-i18n-title="type.instant"><input type="checkbox" data-typ="Instant"><span class="ci-sym"><i class="ms ms-instant" aria-hidden="true"></i></span></label>
+          <label class="ci-box" data-i18n-title="type.sorcery"><input type="checkbox" data-typ="Sorcery"><span class="ci-sym"><i class="ms ms-sorcery" aria-hidden="true"></i></span></label>
+          <label class="ci-box" data-i18n-title="type.artifact"><input type="checkbox" data-typ="Artifact"><span class="ci-sym"><i class="ms ms-artifact" aria-hidden="true"></i></span></label>
+          <label class="ci-box" data-i18n-title="type.enchantment"><input type="checkbox" data-typ="Enchantment"><span class="ci-sym"><i class="ms ms-enchantment" aria-hidden="true"></i></span></label>
+          <label class="ci-box" data-i18n-title="type.planeswalker"><input type="checkbox" data-typ="Planeswalker"><span class="ci-sym"><i class="ms ms-planeswalker" aria-hidden="true"></i></span></label>
+          <label class="ci-box" data-i18n-title="type.battle"><input type="checkbox" data-typ="Battle"><span class="ci-sym"><i class="ms ms-battle" aria-hidden="true"></i></span></label>
+        </div>
+      </div>
+    </div>
+    <p class="hint" style="margin-top:0" data-i18n="wish.hint">Diese Karten sind in einem Deck eingeplant, liegen aber noch nicht in deiner Sammlung.
+      Nimm eine Karte in die Sammlung auf, wandert sie von hier ins Deck. Das &times; streicht den Wunsch — samt seinem Deckplatz.</p>
+    <div class="coll-count" id="wcoll-count" aria-live="polite"></div>
+    <div class="xscroll" style="overflow-x:auto">
+      <table id="wtbl"><thead></thead><tbody></tbody></table>
+    </div>
+    <div class="pager" id="wpager"></div>
+    <div class="empty" id="wcoll-empty">Noch keine Wunschkarten.</div>
+  </div>
 </section>
 
 <!-- ------------- Card Management (Scannen, Import, Export) ------------- -->

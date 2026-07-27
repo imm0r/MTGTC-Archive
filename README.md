@@ -357,6 +357,82 @@ Absender ist das eigene Postfach — dafür gelten dessen Tageslimits (Gmail
 ~500 Mails/Tag), was für eine Spielgruppe reichlich ist. Der `CRON_SECRET`
 gehört wie alle Secrets **nicht** ins Repository.
 
+## Wunschliste: eingeplant, aber noch nicht besessen
+
+Decks lassen sich mit Karten bauen, die man gar nicht hat — aus den
+Synergie-Vorschlägen, aus einem Deck-Import oder von Hand. Diese Karten
+belegen im Deck bereits ihren Platz und erscheinen dort als „fehlen“. Neben
+**Sammlung** und **Decks** listet die dritte Kategorie **Wunschliste** genau
+sie auf.
+
+Es ist **keine eigene Tabelle**: Eine Wunschkarte ist eine ganz normale
+Sammlungszeile mit **Bestand 0** — „im Deck eingeplant, aber nicht besessen“.
+Genau dort gehört sie hin, denn der Deckplatz hängt an ihr wie an jeder
+anderen Karte, und Bild, Preis und Kartendaten sind dieselben. Die Sammlung
+blendet diese Zeilen aus, die Wunschliste zeigt ausschließlich sie. Eine
+zweite Tabelle hätte dieselben Spalten, dieselbe RLS und dieselben Fremd­
+schlüssel gebraucht — und die Frage aufgeworfen, was beim Kauf zwischen den
+beiden zu wandern hat.
+
+Die Ansicht ist deshalb auch dieselbe wie die Sammlung: gleiche Tabelle
+(`cardHead`/`cardRow`), gleiche Filter, gleiche Blätterleiste, unterschieden
+nur durch einen Bereichsschlüssel. Zwei fast gleiche Ansichten getrennt zu
+pflegen, hieße sie driften zu lassen. Was die Wunschliste weglässt, wäre
+dort ohne Aussage: **Zustand** (immer die Vorgabe NM) und **Erscheinungsdatum**
+gehören zu einer Karte, die man in der Hand hatte; ein **Foil-Filter** hätte
+nie etwas zu filtern, weil jede Wunschkarte als „Normal“ entsteht. Statt der
+Bestandszahl — die ist per Definition 0 — steht dort, **in welchen Decks** der
+Platz schon vergeben ist. Der Preis bleibt, samt Summe über der Tabelle: das
+ist die Frage, die man an eine Wunschliste stellt. „Alle bei Cardmarket“
+öffnet dieselbe Wants-Liste wie „Fehlende Karten kaufen“ am einzelnen Deck,
+nur über den gesamten Bestand an Wünschen.
+
+### Wunsch streichen
+
+Das × nimmt eine Karte von der Liste — **und damit auch ihren Deckplatz**
+(`deck_entries` hängt per `ON DELETE CASCADE` an der Kartenzeile). Das ist
+Absicht: den Wunsch zu streichen und die Lücke im Deck stehen zu lassen,
+hieße einen Platz für nichts zu reservieren. Weil das mehr als eine Zeile
+trifft, wird vorher gefragt — mit den Namen der betroffenen Decks, und mit
+einer Warnung, falls die Karte dort Commander ist.
+
+### Kauft man sie, löst sie sich von selbst ein
+
+Nach **jedem** Zugang zur Sammlung — Scan, Handeingabe, Sicherung, Mythic-
+Tools-CSV — gleicht die App Wunschliste und Bestand ab. Findet sie zu einer
+Wunschzeile eine besessene Auflage derselben Karte (über `oracle_id`, sonst
+den Namen — jede Auflage ist dieselbe Karte), dann
+
+1. **wandert der Deckplatz** von der Wunschzeile auf das echte Exemplar, in
+   jedem Deck, in dem sie eingeplant war,
+2. **zieht ein Commander-Verweis mit um** (`decks.main_card_id` /
+   `second_card_id`), damit das Deck nicht still seine Hauptkarte verliert,
+3. **fällt der Platzhalter weg** — er hat jetzt weder Bestand noch Deckplatz.
+
+Warum umhängen und nicht einfach zusätzlich einlegen: Der Platz ist längst
+vergeben. Die gekaufte Karte wäre die 101. im Deck und im Commander zugleich
+eine zweite Kopie derselben Karte. Das Umhängen erledigt
+`fulfil_wish_in_deck` in **einem** Schritt in der Datenbank — zwei getrennte
+Aufrufe aus dem Browser könnten dazwischen abbrechen und das Deck um eine
+Karte kürzen, und in der falschen Reihenfolge liefe das Gutschreiben in den
+100-Karten-Trigger.
+
+Trifft der Zugang zufällig **dieselbe** Auflage in derselben Sprache,
+Ausführung und demselben Zustand, gibt es nichts umzuhängen: `add_card` setzt
+die vorhandene Zeile per `ON CONFLICT` auf Bestand 1, der Deckplatz sitzt
+schon richtig. Die App meldet auch das als erfüllten Wunsch.
+
+Der Abgleich läuft über den ganzen Bestand, nicht nur über die eben gescannte
+Karte, und ist beliebig wiederholbar: Gibt es zu einer Wunschzeile keine
+besessene Auflage, tut er nichts. So heilt er auch Wünsche, die aus anderen
+Gründen stehen geblieben sind. Schlägt er fehl, bleibt der Zugang trotzdem
+stehen — die Karte **ist** in der Sammlung, nur der Platzhalter blieb; der
+nächste Zugang versucht es erneut.
+
+> Meldet die App beim Einlösen einen Fehler, fehlt der Datenbank vermutlich
+> `fulfil_wish_in_deck` — `supabase-schema.sql` erneut im SQL Editor ausführen
+> (oder `supabase/migrations/20260725050000_fulfil_wish_in_deck.sql` einzeln).
+
 ## Live-Spielrunde: die eigenen Karten am Tisch
 
 In der Spielrunde wählt jeder sein Deck; darunter steht der **private
