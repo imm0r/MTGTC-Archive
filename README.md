@@ -254,8 +254,17 @@ Produktnummer, die Scryfall als `cardmarket_id` mitführt. Das ist exakter als
 jede Bilderkennung — es bezeichnet die Auflage, nicht bloß den Namen — und
 kostet keinen Modellaufruf. Erst wenn die Adresse nichts hergibt, zählt der
 mitgezogene Name (das `alt` des Bildes), notfalls mit Auswahlliste; auch ein
-markierter Kartenname lässt sich so herüberziehen. Aus dem Dateimanager
-gezogene Bilddateien gehen weiter den gewohnten Scan-Weg.
+markierter Kartenname lässt sich so herüberziehen.
+
+**Die Bilderkennung springt beim Ziehen von einer Webseite nicht ein.** Chromium
+legt die Bilddatei beim Ziehen oft mit bei — sie zu scannen wäre hier aber der
+falsche Rückfall: Zu lesen gäbe es ein Vorschaubild von wenigen hundert Pixeln,
+heraus kommt Kauderwelsch, das anschließend durch mehrere Scryfall-Suchen läuft
+(gemessen: über zwei Minuten, am Ende doch die Handkorrektur) — und ein
+Modellaufruf kostet KI-Kontingent. Trägt keine Adresse, geht es deshalb sofort
+in die Handkorrektur, wo man den Namen tippt oder Setcode und Nummer einträgt.
+Aus dem **Dateimanager** gezogene Bilder haben gar keine Adresse dabei; die
+gehen weiter den gewohnten Scan-Weg, denn dort ist ein echtes Foto zu erwarten.
 
 #### Die Sprache bei Cardmarket
 

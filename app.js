@@ -2052,8 +2052,17 @@ function ziehDiagnoseZeigen(el, d) {
 async function ziehImport(dt, ziel) {
   // Chromium legt beim Ziehen eines Bildes aus einem anderen Browserfenster
   // oft ZUSÄTZLICH die Bilddatei bei. Die Adresse geht vor (exakt, ohne
-  // Modellaufruf); die Datei bleibt Rückfall, falls die Adresse nichts hergibt
-  // — und der Hauptweg für Bilder aus dem Dateimanager, die gar keine tragen.
+  // Modellaufruf); die Datei ist der Hauptweg für Bilder aus dem Dateimanager,
+  // die gar keine Adresse tragen.
+  //
+  // ABER: Kam das Ablegen von einer Webseite (es lagen Adressen bei) und keine
+  // davon trug, ist die Bilderkennung der falsche Rückfall. Sie bekäme ein
+  // Vorschaubild von wenigen hundert Pixeln zu lesen, liest daran Kauderwelsch
+  // („feet J oF i“) und schickt das anschließend durch mehrere
+  // Scryfall-Suchen — gemessen über zwei Minuten, am Ende doch die
+  // Handkorrektur. Und ein Modellaufruf kostet KI-Kontingent. Also nur dann
+  // scannen, wenn das Ablegen gar keine Adresse mitbrachte: dann kommt es aus
+  // dem Dateimanager und ist vermutlich ein echtes Foto.
   const dateien = [...(dt.files || [])].filter(f => f.type.startsWith("image/"));
   const diagAn = ziehDiagnose();
   const nutzlast = ziehNutzlast(dt, diagAn);
@@ -2075,13 +2084,10 @@ async function ziehImport(dt, ziel) {
     const bar = el.querySelector(".bar i");
     if (bar) bar.style.width = "100%";
     if (!r.card) {
-      // Adresse und Name ergebnislos, aber eine Bilddatei kam mit: dann eben
-      // der Scan-Weg mit seiner Bilderkennung — Kachel ersetzen.
-      if (!r.candidates.length && dateien.length) {
-        el.remove();
-        dateien.forEach(f => scanFile(f, ziel));
-        return;
-      }
+      // Kein Treffer. Die Bilderkennung springt hier NICHT ein — siehe oben:
+      // Das Vorschaubild einer Webseite gibt sie nicht her, und der Versuch
+      // kostet Minuten und Kontingent. Stattdessen sofort die Handkorrektur,
+      // wo man den Namen tippt oder Setcode und Nummer einträgt.
       renderManual(el, r.guess || "", r.candidates);
       return ziehDiagnoseZeigen(el, diag);
     }
