@@ -950,17 +950,43 @@ th{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.6px;
    background:var(--bg);cursor:pointer;white-space:nowrap}
 td img{width:34px;height:47px;object-fit:cover;border-radius:4px;background:#000;display:block}
 /* Eben per Ziehen hinzugefügt: Die Ansicht springt auf die Zeile, und damit man
-   sie in einer langen Liste auch findet, blitzt sie kurz golden auf. Bewusst
-   ohne bleibende Markierung — der Hinweis gilt für diesen einen Moment.
-   prefers-reduced-motion: dann steht die Tönung still statt zu pulsieren, denn
-   ganz ohne Hinweis wäre der Sprung nicht nachvollziehbar. */
+   sie in einer langen Liste auch findet, leuchtet sie golden auf und blendet
+   über knapp drei Sekunden aus. Bewusst ohne bleibende Markierung — der Hinweis
+   gilt für diesen einen Moment.
+
+   Die Tönung ist kräftiger als das --akt-flaeche der Auswahl-Zustände (.30
+   gegen .13) und das mit Absicht: „ausgewählt" darf leise sein, weil es stehen
+   bleibt und man es sucht; dieser Hinweis hat nur den einen Moment, in dem der
+   Blick nach dem Scrollen ankommt. Darüber geht der Textkontrast nicht verloren
+   — bei .48 verlöre die graue Zweitzeile ihn.
+
+   Nur der Hintergrund, KEINE inset-Kante: die lag an jeder Zelle und zog damit
+   goldene Striche durch alle Spaltengrenzen — das las sich als Tabellengitter,
+   nicht als Markierung.
+
+   prefers-reduced-motion: dann steht die Tönung still statt auszublenden (weg
+   ist sie mit der Klasse ohnehin), denn ganz ohne Hinweis wäre der Sprung nicht
+   nachvollziehbar. */
 @keyframes trefferBlitz{
-  0%,55%{background:var(--akt-flaeche);box-shadow:inset 3px 0 0 var(--acc)}
-  100%{background:transparent;box-shadow:inset 3px 0 0 transparent}
+  0%,22%{background:rgba(201,162,39,.30)}
+  100%{background:transparent}
 }
-tr.treffer>td{animation:trefferBlitz 2.4s ease-out both}
+/* Die Verzögerung kommt als ererbte CSS-Variable vom <tr> und ist im Regelfall
+   0. Zeichnet die Liste mitten im Ausblenden neu, setzt app.js sie auf die
+   schon verstrichene Zeit (negativ) — die Animation läuft dann dort weiter, wo
+   sie war, statt von vorn zu beginnen. Sie muss über die Variable laufen:
+   animation-delay selbst vererbt nicht, und die Animation hängt an den Zellen,
+   die Markierung aber an der Zeile. Longhand statt Kurzform, damit die Variable
+   nicht als Dauer missverstanden werden kann. */
+tr.treffer>td{
+  animation-name:trefferBlitz;
+  animation-duration:2.8s;
+  animation-timing-function:ease-out;
+  animation-fill-mode:both;
+  animation-delay:var(--treffer-ab,0s);
+}
 @media(prefers-reduced-motion:reduce){
-  tr.treffer>td{animation:none;background:var(--akt-flaeche);box-shadow:inset 3px 0 0 var(--acc)}
+  tr.treffer>td{animation:none;background:rgba(201,162,39,.30)}
 }
 .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .cm{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.5px;
