@@ -4009,7 +4009,7 @@ Object.assign(I18N.it, {
   "wish.fulfilledN": "{n} carte desiderate ottenute",
 });
 
-/* ---- Teil 30: Wants-Übertrag in 60er-Teillisten (Cardmarket-Limit) ---- */
+/* ---- Teil 30: Wants-Übertrag in 150er-Teillisten (Cardmarket-Limit) ---- */
 Object.assign(I18N.de, {
   "buy.openWants": "Cardmarket-Wants öffnen",
   "buy.chunkInfo": "Cardmarket erlaubt {max} Karten pro Wants-Liste. Deine {n} Karten sind in {m} Teillisten aufgeteilt:",

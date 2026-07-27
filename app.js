@@ -6409,10 +6409,10 @@ function cmKaufLink(c) {
     : `https://www.cardmarket.com/${cmSprache()}/Magic/Products/Search?searchString=${encodeURIComponent(cmName(c))}`;
 }
 
-// Eine Cardmarket-Wants-Liste fasst höchstens 60 Karten; man kann aber beliebig
-// viele Listen anlegen. Längere Listen zerlegen wir daher in 60er-Teile, die
+// Eine Cardmarket-Wants-Liste fasst höchstens 150 Karten; man kann aber beliebig
+// viele Listen anlegen. Längere Listen zerlegen wir daher in 150er-Teile, die
 // nacheinander (je Teil eine neue Wants-Liste) eingefügt werden.
-const CM_WANTS_MAX = 60;
+const CM_WANTS_MAX = 150;
 function kaufChunks(items) {
   const out = [];
   for (let i = 0; i < items.length; i += CM_WANTS_MAX) out.push(items.slice(i, i + CM_WANTS_MAX));
@@ -6471,8 +6471,8 @@ function renderKauf() {
       <a class="cm cm-logo" href="${esc(cmKaufLink(c))}" target="_blank" rel="noopener noreferrer"
          title="${esc(t("buy.cmSearch"))}">${CM_LOGO}</a>
     </div>`).join("");
-  // Cardmarket nimmt höchstens 60 Karten je Wants-Liste. Bis 60: ein Knopf, der
-  // alles kopiert und die Wants-Seite öffnet. Darüber: je 60er-Teil ein Knopf,
+  // Cardmarket nimmt höchstens 150 Karten je Wants-Liste. Bis 150: ein Knopf, der
+  // alles kopiert und die Wants-Seite öffnet. Darüber: je 150er-Teil ein Knopf,
   // der nur diesen Teil kopiert (auf Cardmarket je Teil eine neue Wants-Liste).
   const chunks = kaufChunks(items);
   const cmBtn = (id, tag, label, extra = "") =>
