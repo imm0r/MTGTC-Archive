@@ -1708,8 +1708,13 @@ function cardRow(c, o = {}) {
       <td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap">${esc(datShort(c.released))}</td>`}
       ${imDeck ? "" : `<td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap;line-height:1.35">${dtStacked(c.added)}</td>`}
       ${wunsch ? `<td class="hide-s wunsch-decks">${decks.length
+        // Deckname und Anzahl in eigenen Elementen: nur der NAME wird bei
+        // Platzmangel gekürzt, die Anzahl steht immer da — sie ist die
+        // eigentliche Aussage der Spalte. Der Titel trägt den ganzen Namen,
+        // damit das Kürzen nichts verschluckt.
         ? decks.map(d => `<button class="deck-chip" data-godeck="${esc(d.id)}"
-             title="${esc(t("detail.inDeckGo"))}">${esc(d.name)} &middot; ${d.qty}&times;</button>`).join("")
+             title="${esc(d.name)} &middot; ${d.qty}&times; — ${esc(t("detail.inDeckGo"))}"><span
+             class="dc-nm">${esc(d.name)}</span><span class="dc-n">&middot; ${d.qty}&times;</span></button>`).join("")
         : `<span class="hint">${esc(t("wish.noDeck"))}</span>`}</td>` : ""}
       <!-- 54 px ist die schmalste Breite, bei der drei Stellen noch ganz
            hineinpassen (gemessen, inklusive Spinner-Pfeilen; ab 50 px wird
@@ -1725,9 +1730,16 @@ function cardRow(c, o = {}) {
         ? `<span class="pill err">${esc(t("row.missing", { n: fehlt }))}</span>`
         : `<span class="pill ok">${esc(t("row.present"))}</span>`}</td>`
       : `<td class="num" style="line-height:1.5">${preisZelle(c)}</td>`}
-      <td class="num cm-cell" style="white-space:nowrap">${cmLink(c.cm_id)
-        ? `<a class="cm cm-logo" href="${esc(cmLink(c.cm_id))}" target="_blank" rel="noopener noreferrer"
-             title="${esc(t("row.cmTitle"))}">${CM_LOGO}</a>` : ""}${sfLink(c)
+      <!-- Cardmarket: In der Wunschliste über cmKaufLink statt über die cm_id.
+           Eine Wunschkarte hat nämlich keine: add_wish_to_deck legt die Zeile
+           mit cm_id = NULL an (die Produkt-ID kommt sonst vom Scan, und
+           gescannt wurde hier nichts). Ohne Rückfall fehlte im Wunsch-Zeile
+           ausgerechnet der Link zum Kaufen — der Grund, die Liste zu führen.
+           cmKaufLink nimmt die cm_id, wenn es sie doch gibt (Deck-Import
+           bringt sie mit), sonst die Cardmarket-Suche nach dem Kartennamen. -->
+      <td class="num cm-cell" style="white-space:nowrap">${(wunsch ? cmKaufLink(c) : cmLink(c.cm_id))
+        ? `<a class="cm cm-logo" href="${esc(wunsch ? cmKaufLink(c) : cmLink(c.cm_id))}" target="_blank" rel="noopener noreferrer"
+             title="${esc(t(wunsch && !c.cm_id ? "buy.cmSearch" : "row.cmTitle"))}">${CM_LOGO}</a>` : ""}${sfLink(c)
         ? `<a class="cm sf-logo" href="${esc(sfLink(c))}" target="_blank" rel="noopener noreferrer"
              title="${esc(t("row.sfTitle"))}">${SF_LOGO}</a>` : ""}</td>
       <td class="num" style="white-space:nowrap">
