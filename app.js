@@ -226,7 +226,7 @@ async function reload() {
   // erlaubt die RLS auch das Lesen geteilter Freundes-Decks/-Karten — die
   // dürfen hier aber nicht in die eigene Sammlung/Deckliste sickern. Fremdes
   // wird nur gezielt beim Ansehen eines Freundes geladen.
-  const [c, d, e, k] = await Promise.all([
+  const [c, d, e, k, z] = await Promise.all([
     sb.from("cards").select("*").eq("user_id", USER.id).order("name"),
     sb.from("decks").select("*").eq("user_id", USER.id).order("created"),
     sb.from("deck_entries").select("*").eq("user_id", USER.id),
@@ -234,23 +234,34 @@ async function reload() {
     // (frisch angelegt, noch nicht sortiert) soll die Reihenfolge wenigstens
     // stabil sein und nicht bei jedem Laden springen.
     sb.from("deck_categories").select("*").eq("user_id", USER.id)
-      .order("pos").order("created")
+      .order("pos").order("created"),
+    // Die Zuordnungen Karte → Kategorie. Eine Karte darf in mehreren stehen,
+    // genau eine davon ist die primäre.
+    sb.from("deck_entry_categories").select("*").eq("user_id", USER.id)
   ]);
   for (const r of [c, d, e]) if (r.error) throw r.error;
   // Die Kategorien werden NICHT mitgeworfen: Wer das Schema noch nicht
-  // nachgezogen hat, soll seine Sammlung trotzdem sehen. Fehlt die Tabelle,
-  // bleibt es bei der Gruppierung nach Kartentyp, und der erste Versuch, etwas
-  // einzuordnen, sagt in Klartext, was zu tun ist. Dasselbe gilt für die
-  // Spalte category_id: fehlt sie, liefert select("*") sie schlicht nicht mit,
-  // und jede Karte landet in "Ohne Kategorie".
-  DECK_KAT_TABELLE_FEHLT = !!k.error;
+  // nachgezogen hat, soll seine Sammlung trotzdem sehen. Fehlt eine der beiden
+  // Tabellen, bleibt es bei der Gruppierung nach Kartentyp, und der erste
+  // Versuch, etwas einzuordnen, sagt in Klartext, was zu tun ist.
+  DECK_KAT_TABELLE_FEHLT = !!(k.error || z.error);
   const kats = k.error ? [] : k.data;
+  // Zuordnungen einmal nach "Deck|Karte" bündeln, statt sie je Eintrag erneut
+  // zu durchsuchen — bei 30 Decks à 100 Karten wäre das sonst eine Suche über
+  // Tausende Zeilen je Eintrag.
+  const zuord = new Map();
+  for (const x of (z.error ? [] : z.data)) {
+    const s = x.deck_id + "|" + x.card_id;
+    if (!zuord.has(s)) zuord.set(s, []);
+    zuord.get(s).push({ id: x.category_id, primaer: !!x.is_primary });
+  }
   // disp = was auf der Karte steht; name bleibt der englische Name, unter
   // dem man die Karte überall sonst wiederfindet.
   CARDS = c.data.map(x => ({ ...x, set: x.set_code, disp: x.printed_name || x.name }));
   DECKS = d.data.map(dk => ({ ...dk,
     entries: e.data.filter(en => en.deck_id === dk.id)
-                   .map(en => ({ cardId: en.card_id, qty: en.qty, katId: en.category_id || null })),
+                   .map(en => ({ cardId: en.card_id, qty: en.qty,
+                                 kats: zuord.get(dk.id + "|" + en.card_id) || [] })),
     kategorien: kats.filter(x => x.deck_id === dk.id) }));
 
   // Preisarchiv für neu dazugekommene Karten nachladen. Das lief früher nur
@@ -2704,18 +2715,12 @@ function cardRow(c, o = {}) {
       ${imDeck || wunsch ? "" : `<td class="hide-s">${condBadge(c.condition)}</td>
       <td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap">${esc(datShort(c.released))}</td>`}
       ${imDeck ? "" : `<td class="hide-s" style="font-size:12px;color:var(--dim);white-space:nowrap;line-height:1.35">${dtStacked(c.added)}</td>`}
-      <!-- Zuordnung zu einer eigenen Kategorie. Ein natives <select> statt
-           eines eigenen Menüs: es öffnet auf dem Handy die Auswahl des Systems,
-           kennt Tastaturbedienung von Haus aus und braucht keine Positionierung
-           in einer waagerecht rollenden Tabelle. "＋ Neu…" legt eine Kategorie
-           an und ordnet gleich zu — sonst müsste man für die erste Karte erst
-           in die Verwaltung. -->
-      ${imDeck ? `<td class="kat-zelle"><select data-kat title="${esc(t("kat.col"))}">
-        <option value=""${o.katId ? "" : " selected"}>—</option>
-        ${(o.kategorien || []).map(k =>
-          `<option value="${esc(k.id)}"${o.katId === k.id ? " selected" : ""}>${esc(k.name)}</option>`).join("")}
-        <option value="+">${esc(t("kat.newOption"))}</option>
-      </select></td>` : ""}
+      <!-- Zuordnung zu eigenen Kategorien. Kein <select>, seit eine Karte in
+           mehreren stehen darf: Ein Auswahlfeld kennt genau einen Wert, und
+           ein Mehrfach-select ist auf dem Handy unbedienbar. Stattdessen zeigt
+           die Zelle die Fächer als Marken und öffnet auf Klick die Auswahl —
+           die primäre steht vorn und ist hervorgehoben. -->
+      ${imDeck ? `<td class="kat-zelle">${katZelleHtml(o.kategorien, o.kats)}</td>` : ""}
       ${wunsch ? `<td class="hide-s wunsch-decks">${decks.length
         // Deckname und Anzahl in eigenen Elementen: nur der NAME wird bei
         // Platzmangel gekürzt, die Anzahl steht immer da — sie ist die
@@ -2836,43 +2841,10 @@ function wireCardRows(root) {
       } catch (e) { toast(dbErr(e)); }
     };
 
-    // Eigene Kategorie zuordnen (nur im Deck). Der vorige Wert kommt aus
-    // DECKS, nicht aus dem Feld: nach einem Fehlschlag soll dort wieder
-    // stehen, was in der Datenbank steht, und nicht, was man eben wählte.
+    // Eigene Kategorien zuordnen (nur im Deck) — der Dialog erledigt alles
+    // Weitere, weil eine Karte in mehreren Fächern stehen darf.
     const kat = tr.querySelector("[data-kat]");
-    if (kat) kat.onchange = async () => {
-      const eintrag = DECKS.find(x => x.id === deck)?.entries.find(en => en.cardId === id);
-      const alt = eintrag?.katId || "";
-      if (DECK_KAT_TABELLE_FEHLT) { kat.value = alt; return toast(t("kat.needSchema")); }
-      let ziel = kat.value;
-      kat.disabled = true;
-      try {
-        if (ziel === "+") {
-          const neuName = await nameFragen(t("kat.newTitle"));
-          if (!neuName) { kat.value = alt; return; }       // abgebrochen
-          const d = DECKS.find(x => x.id === deck);
-          const { data, error } = await sb.from("deck_categories")
-            .insert({ deck_id: deck, name: neuName, pos: (d?.kategorien || []).length })
-            .select("id").single();
-          if (error) throw error;
-          ziel = data.id;
-        }
-        await kategorieZuordnen(deck, id, ziel);
-        await reload(); renderDecks();
-        // Der Name wird erst NACH dem Neuladen nachgeschlagen — eine eben
-        // angelegte Kategorie steht vorher noch in keinem DECKS-Eintrag.
-        const name = ziel
-          ? (DECKS.find(x => x.id === deck)?.kategorien.find(k => k.id === ziel)?.name || "")
-          : "";
-        // Erst nach dem Zeichnen: in der Kategorie-Ansicht steht die Zeile
-        // jetzt in einer anderen Gruppe.
-        zeigeDeckZeile(deck, id);
-        toast(ziel ? t("kat.assigned", { name }) : t("kat.unassigned"));
-      } catch (e) {
-        kat.value = alt;
-        toast(dbErr(e));
-      } finally { kat.disabled = false; }
-    };
+    if (kat) kat.onclick = () => kategorienZuordnen(deck, id);
 
     const sl = tr.querySelector("[data-sell]");
     if (sl) sl.onclick = () => toggleSale(id, sl);
@@ -6144,18 +6116,29 @@ async function applyCardEdit(c, lang, cond, foil, neu) {
     if (up.error) throw new Error(dbErr(up.error));
     const de = await sb.from("deck_entries").select("*").eq("card_id", c.id);
     for (const en of (de.data || [])) {
-      const ex = await sb.from("deck_entries").select("qty, category_id")
+      const ex = await sb.from("deck_entries").select("qty")
         .eq("deck_id", en.deck_id).eq("card_id", twin.id).maybeSingle();
+      // Die Einordnung der verschwindenden Zeile merken, BEVOR sie gelöscht
+      // wird: Die Zuordnungen hängen am Deckplatz und gehen mit ihm verloren
+      // (on delete cascade). Dieselbe Regel wie beim Einlösen eines Wunsches.
+      const zu = DECK_KAT_TABELLE_FEHLT ? { data: [] }
+        : await sb.from("deck_entry_categories").select("category_id, is_primary")
+            .eq("deck_id", en.deck_id).eq("card_id", c.id);
       const merge = await sb.from("deck_entries").upsert(
-        // Die Einordnung der Zielzeile hat Vorrang; die der verschwindenden
-        // springt nur ein, wo dort noch keine steht. Ohne das verlöre eine
-        // eingeordnete Karte ihr Fach, sobald zwei Zeilen zusammenfallen —
-        // dieselbe Regel wie beim Einlösen eines Wunsches.
-        [{ deck_id: en.deck_id, card_id: twin.id, qty: (ex.data?.qty || 0) + en.qty,
-           category_id: ex.data?.category_id ?? en.category_id ?? null }],
+        [{ deck_id: en.deck_id, card_id: twin.id, qty: (ex.data?.qty || 0) + en.qty }],
         { onConflict: "deck_id,card_id" });
-      if (!merge.error)
+      if (!merge.error) {
+        // Die Zielzeile behält ihre eigene Einteilung, falls sie eine hat; die
+        // der verschwindenden springt nur ein, wo dort noch nichts steht.
+        const hat = DECK_KAT_TABELLE_FEHLT ? { data: [1] }
+          : await sb.from("deck_entry_categories").select("category_id")
+              .eq("deck_id", en.deck_id).eq("card_id", twin.id).limit(1);
+        if (!hat.error && !(hat.data || []).length && (zu.data || []).length)
+          await sb.from("deck_entry_categories").insert((zu.data).map(x => ({
+            deck_id: en.deck_id, card_id: twin.id,
+            category_id: x.category_id, is_primary: x.is_primary })));
         await sb.from("deck_entries").delete().eq("deck_id", en.deck_id).eq("card_id", c.id);
+      }
     }
     const del = await sb.from("cards").delete().eq("id", c.id);
     if (del.error) throw new Error(dbErr(del.error));
@@ -6697,7 +6680,12 @@ const deckGruppe = {
    LEERE GRUPPEN: Eine eigene Kategorie bleibt stehen, auch wenn noch keine
    Karte darin liegt — sie ist eine Aussage des Nutzers, und wer gerade "Ramp"
    angelegt hat, soll es sehen. Eine leere Typgruppe fällt weg: sie ist
-   abgeleitet, und "0 Planeswalker" hat niemand behauptet. */
+   abgeleitet, und "0 Planeswalker" hat niemand behauptet.
+
+   MEHRFACH: Eine Karte steht in JEDER Kategorie, der sie zugeordnet ist — ein
+   Sol Ring erscheint unter Ramp und unter Artefakt-Paket. Die Summe der Gruppen
+   ist damit nicht mehr die Deckgröße; das ist der Preis dafür, dass beide
+   Rechnungen stimmen. Die Zahl über der Tabelle zählt weiter jede Karte einmal. */
 function deckGruppen(d, eintraege) {
   const gruppen = new Map();
   const leg = (key, x) => {
@@ -6707,10 +6695,14 @@ function deckGruppen(d, eintraege) {
   if (deckGruppe.nachKat(d)) {
     const kats = d.kategorien || [];
     const bekannt = new Set(kats.map(k => k.id));
-    // Eine Zuordnung, die auf eine gelöschte Kategorie zeigt, gibt es nach
-    // "on delete set null" nicht mehr — die Prüfung deckt den kurzen Moment
-    // ab, in dem die Anzeige älter ist als die Datenbank.
-    for (const x of eintraege) leg(bekannt.has(x.e.katId) ? "k:" + x.e.katId : "k:", x);
+    for (const x of eintraege) {
+      // Zuordnungen auf eine gelöschte Kategorie fallen beim Löschen weg
+      // (on delete cascade) — die Prüfung deckt den kurzen Moment ab, in dem
+      // die Anzeige älter ist als die Datenbank.
+      const meine = (x.e.kats || []).filter(zu => bekannt.has(zu.id));
+      if (!meine.length) leg("k:", x);
+      else for (const zu of meine) leg("k:" + zu.id, x);
+    }
     const rest = gruppen.get("k:") || [];
     return kats.map(k => ({ key: "k:" + k.id, label: k.name, items: gruppen.get("k:" + k.id) || [] }))
       .concat(rest.length ? [{ key: "k:", label: t("kat.none"), items: rest }] : []);
@@ -6741,14 +6733,174 @@ function deckGruppeLeisteHtml(d) {
   </div>`;
 }
 
-/* Eine Karte in eine Kategorie einordnen — oder mit "" wieder herausnehmen.
-   Geschrieben wird auf den Deckeintrag, die Karte selbst bleibt unberührt:
-   dieselbe Karte kann in einem anderen Deck etwas ganz anderes sein. */
-async function kategorieZuordnen(deckId, cardId, katId) {
-  const { error } = await sb.from("deck_entries")
-    .update({ category_id: katId || null })
-    .eq("deck_id", deckId).eq("card_id", cardId);
-  if (error) throw error;
+/* Die Kategorien einer Karte als Marken für die Tabellenzelle. Die primäre
+   steht vorn und ist hervorgehoben, der Rest folgt in der Reihenfolge des
+   Decks. Ohne Zuordnung bleibt ein stilles Pluszeichen — es lädt zum Einordnen
+   ein, ohne wie ein Fehler auszusehen. */
+function katZelleHtml(kategorien, zuord) {
+  const liste = kategorien || [];
+  const rang = new Map(liste.map((k, i) => [k.id, i]));
+  const name = new Map(liste.map(k => [k.id, k.name]));
+  const meine = (zuord || []).filter(z => name.has(z.id)).sort((a, b) =>
+    (b.primaer - a.primaer) || (rang.get(a.id) - rang.get(b.id)));
+  const inhalt = meine.length
+    ? meine.map(z => `<span class="kat-chip${z.primaer ? " prim" : ""}">${esc(name.get(z.id))}</span>`).join("")
+    : `<span class="kat-leer">&plus;</span>`;
+  return `<button type="button" class="kat-knopf" data-kat title="${esc(
+    meine.length ? t("kat.assignEdit") : t("kat.assignAdd"))}">${inhalt}</button>`;
+}
+
+/* Die Kategorien EINER Karte in EINEM Deck festlegen: mehrere erlaubt, genau
+   eine davon primär.
+
+   Wie in der Verwaltung wird auf einer Kopie gearbeitet und erst bei OK
+   geschrieben — auch neu angelegte Kategorien entstehen erst dann. Abbrechen
+   soll wirklich abbrechen, und ein halb angelegtes Fach wäre das Gegenteil. */
+async function kategorienZuordnen(deckId, cardId) {
+  const d = DECKS.find(x => x.id === deckId);
+  if (!d) return;
+  if (DECK_KAT_TABELLE_FEHLT) return toast(t("kat.needSchema"));
+  const eintrag = (d.entries || []).find(en => en.cardId === cardId);
+  const karte = CARDS.find(x => x.id === cardId);
+  if (!eintrag || !karte) return;
+
+  const alt = eintrag.kats || [];
+  const gewaehlt = new Set(alt.map(z => z.id));
+  let primaer = alt.find(z => z.primaer)?.id || null;
+  // Im Dialog angelegte Kategorien, solange ohne ID. Der Schlüssel "neu:0"
+  // steht bis zum Schreiben stellvertretend für sie.
+  const neue = [];
+  const zeilen = () => [
+    ...(d.kategorien || []).map(k => ({ key: k.id, name: k.name })),
+    ...neue.map((n, i) => ({ key: "neu:" + i, name: n })),
+  ];
+
+  const zeichne = () => {
+    const box = $("#katz-liste");
+    if (!box) return;
+    const rs = zeilen();
+    // Eine primäre gibt es nur, wenn überhaupt etwas angehakt ist — und sie
+    // muss unter dem Angehakten sein. Sonst rutscht sie auf das erste.
+    if (!gewaehlt.size) primaer = null;
+    else if (!primaer || !gewaehlt.has(primaer)) primaer = rs.find(r => gewaehlt.has(r.key))?.key || null;
+    box.innerHTML = rs.length ? rs.map(r => `
+      <label class="katz-zeile${gewaehlt.has(r.key) ? " an" : ""}">
+        <input type="checkbox" data-katz="${esc(r.key)}"${gewaehlt.has(r.key) ? " checked" : ""}>
+        <span class="katz-name">${esc(r.name)}</span>
+        <button type="button" class="katz-stern${primaer === r.key ? " on" : ""}"
+          data-katprim="${esc(r.key)}" title="${esc(t("kat.primaryTitle"))}"
+          ${gewaehlt.has(r.key) ? "" : "disabled"}>${primaer === r.key ? "&#9733;" : "&#9734;"}</button>
+      </label>`).join("") : `<div class="empty">${esc(t("kat.empty"))}</div>`;
+
+    box.querySelectorAll("[data-katz]").forEach(cb => cb.onchange = () => {
+      cb.checked ? gewaehlt.add(cb.dataset.katz) : gewaehlt.delete(cb.dataset.katz);
+      zeichne();
+    });
+    box.querySelectorAll("[data-katprim]").forEach(b => b.onclick = ev => {
+      ev.preventDefault();                       // sonst schaltet das <label> das Häkchen um
+      primaer = b.dataset.katprim;
+      zeichne();
+    });
+  };
+
+  $("#dlg-body").innerHTML = `
+    <b>${esc(t("kat.assignTitle", { name: karte.disp }))}</b>
+    <p class="hint" style="margin:8px 0 10px">${esc(t("kat.assignHint"))}</p>
+    <div id="katz-liste" class="katz-liste"></div>
+    <div class="row" style="margin-top:10px;align-items:flex-end">
+      <div style="flex:1"><label>${esc(t("kat.addLabel"))}</label>
+        <input type="text" id="katz-neu" maxlength="40" placeholder="${esc(t("kat.addPh"))}"></div>
+      <div style="flex:none"><button class="btn ghost" id="katz-add">${esc(t("kat.add"))}</button></div>
+    </div>`;
+  zeichne();
+
+  $("#katz-add").onclick = () => {
+    const n = $("#katz-neu").value.trim();
+    if (!n) return;
+    const doppelt = zeilen().some(r => r.name.toLowerCase() === n.toLowerCase());
+    if (doppelt) return toast(t("kat.dup", { name: n }));
+    neue.push(n);
+    gewaehlt.add("neu:" + (neue.length - 1));    // frisch angelegt heißt gemeint
+    $("#katz-neu").value = "";
+    zeichne();
+    $("#katz-neu").focus();
+  };
+  $("#katz-neu").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); $("#katz-add").click(); } };
+
+  const dlg = $("#dlg");
+  const ok = await new Promise(res => {
+    const zu = v => { dlg.close(); res(v); };
+    $("#dlg-yes").onclick = () => zu(true);
+    $("#dlg-no").onclick  = () => zu(false);
+    dlg.onclose = () => res(false);
+    dlg.showModal();
+  });
+  if (!ok) return;
+
+  const primAlt = alt.find(z => z.primaer)?.id || null;
+  const wegIds  = alt.filter(z => !gewaehlt.has(z.id)).map(z => z.id);
+  const dazuIds = [...gewaehlt].filter(x => !x.startsWith("neu:") && !alt.some(z => z.id === x));
+  const neueGewaehlt = neue.map((n, i) => ({ n, key: "neu:" + i })).filter(x => gewaehlt.has(x.key));
+  // Angelegt wird auch, was am Ende nicht angehakt ist: Wer den Namen eintippt,
+  // will das Fach — ob diese eine Karte hineingehört, ist eine zweite Frage.
+  if (!wegIds.length && !dazuIds.length && !neue.length && primaer === primAlt) return;
+
+  try {
+    // 1) Neue Kategorien anlegen und ihre Stellvertreter-Schlüssel auflösen.
+    const echt = new Map();
+    if (neue.length) {
+      const start = (d.kategorien || []).length;
+      const { data, error } = await sb.from("deck_categories")
+        .insert(neue.map((n, i) => ({ deck_id: d.id, name: n, pos: start + i })))
+        .select("id, name");
+      if (error) throw error;
+      neue.forEach((n, i) => {
+        const treffer = data.find(x => x.name === n);
+        if (treffer) echt.set("neu:" + i, treffer.id);
+      });
+    }
+    const alsId = key => (key.startsWith("neu:") ? echt.get(key) : key);
+
+    // 2) Weggenommene Zuordnungen löschen.
+    if (wegIds.length) {
+      const { error } = await sb.from("deck_entry_categories").delete()
+        .eq("deck_id", d.id).eq("card_id", cardId).in("category_id", wegIds);
+      if (error) throw error;
+    }
+    // 3) Das alte Primär-Kennzeichen räumen, BEVOR ein neues gesetzt wird: Der
+    //    Teilindex lässt nur eine primäre je Karte zu, und zwei Anweisungen
+    //    laufen nacheinander, nicht gleichzeitig.
+    if (primAlt && primAlt !== primaer) {
+      const { error } = await sb.from("deck_entry_categories").update({ is_primary: false })
+        .eq("deck_id", d.id).eq("card_id", cardId).eq("category_id", primAlt);
+      if (error) throw error;
+    }
+    // 4) Neue Zuordnungen, zunächst alle ohne Kennzeichen.
+    const dazu = [...dazuIds, ...neueGewaehlt.map(x => alsId(x.key))].filter(Boolean);
+    if (dazu.length) {
+      const { error } = await sb.from("deck_entry_categories")
+        .insert(dazu.map(id => ({ deck_id: d.id, card_id: cardId, category_id: id, is_primary: false })));
+      if (error) throw error;
+    }
+    // 5) Und zuletzt die primäre setzen.
+    const primNeu = primaer ? alsId(primaer) : null;
+    if (primNeu && primNeu !== primAlt) {
+      const { error } = await sb.from("deck_entry_categories").update({ is_primary: true })
+        .eq("deck_id", d.id).eq("card_id", cardId).eq("category_id", primNeu);
+      if (error) throw error;
+    }
+
+    await reload(); renderDecks();
+    zeigeDeckZeile(d.id, cardId);
+    // Gemeldet wird der Stand NACH dem Neuladen, nicht die Absicht davor: Bei
+    // genau einem Fach ist sein Name die klarere Auskunft als die Zahl 1.
+    const dNeu = DECKS.find(x => x.id === d.id);
+    const jetzt = (dNeu?.entries || []).find(en => en.cardId === cardId)?.kats || [];
+    toast(jetzt.length === 0 ? t("kat.unassigned")
+        : jetzt.length === 1
+          ? t("kat.assigned", { name: (dNeu.kategorien || []).find(k => k.id === jetzt[0].id)?.name || "" })
+          : t("kat.assignedN", { n: jetzt.length }));
+  } catch (e) { toast(dbErr(e)); }
 }
 
 /* Nach dem Umsortieren auf die Zeile zeigen: In der Kategorie-Ansicht springt
@@ -6761,20 +6913,6 @@ function zeigeDeckZeile(deckId, cardId) {
   // eine zweite Art, "hier ist sie" zu sagen, bräuchte niemand.
   tr.classList.add("treffer");
   setTimeout(() => tr.classList.remove("treffer"), TREFFER_MS);
-}
-
-/* Kleiner Dialog für einen einzelnen Namen. Eigener statt window.prompt: der
-   sieht auf jedem Browser anders aus, lässt sich nicht übersetzen und wird auf
-   manchen Geräten unterdrückt. */
-async function nameFragen(titel, vorgabe = "") {
-  const ok = await confirmDlg(`
-    <b>${esc(titel)}</b>
-    <div style="margin-top:10px">
-      <input type="text" id="kat-name-neu" maxlength="40" value="${esc(vorgabe)}"
-        placeholder="${esc(t("kat.namePh"))}" autofocus>
-    </div>`);
-  if (!ok) return null;
-  return $("#kat-name-neu")?.value.trim() || null;
 }
 
 /* Verwaltung der Kategorien eines Decks: anlegen, umbenennen, umsortieren,
@@ -6803,7 +6941,8 @@ async function kategorienVerwalten(deckId) {
         <button class="btn ghost sm" data-kup="${i}" title="${esc(t("kat.up"))}" ${i === 0 ? "disabled" : ""}>&#9650;</button>
         <button class="btn ghost sm" data-kdown="${i}" title="${esc(t("kat.down"))}" ${i === arbeit.length - 1 ? "disabled" : ""}>&#9660;</button>
         <input type="text" data-kname="${i}" maxlength="40" value="${esc(a.name)}">
-        <span class="kat-zahl">${(d.entries || []).filter(e => a.id && e.katId === a.id)
+        <span class="kat-zahl">${(d.entries || [])
+          .filter(e => a.id && (e.kats || []).some(z => z.id === a.id))
           .reduce((s, e) => s + e.qty, 0)}</span>
         <button class="btn danger sm" data-kdel="${i}" title="${esc(t("kat.del"))}">&times;</button>
       </div>`).join("") : `<div class="empty">${esc(t("kat.empty"))}</div>`;
@@ -6966,7 +7105,7 @@ function renderDecks() {
         // Eigene Kategorien des Decks samt aktueller Zuordnung: daraus baut die
         // Zeile ihr Auswahlfeld. Leere Liste = das Feld bietet nur "—" und
         // "Neu…" an, was zugleich der Einstieg ohne Umweg über die Verwaltung ist.
-        kategorien: d.kategorien || [], katId: e.katId,
+        kategorien: d.kategorien || [], kats: e.kats || [],
         istHaupt: d.main_card_id === c.id,
         istZweit: d.second_card_id === c.id,
         // Partner-Stern anbieten, wenn ein erster Commander steht, diese Karte
