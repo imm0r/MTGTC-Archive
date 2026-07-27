@@ -1256,21 +1256,16 @@ async function addToCollection(card, el, opts) {
       <button class="btn ghost sm" data-fix style="margin-left:6px">${esc(t("scan.wrongCard"))}</button>
     </div>`;
   el.querySelector("[data-fix]").onclick = () => renderManual(el, card.name);
-  // Im schwebenden Zieh-Kasten ist die Quittung nach dem Schreiben erledigt —
-  // stehenbleibend wirkte sie wie eine weitere Rückfrage. Kurz zeigen, dann
-  // selbst wegräumen, den leeren Kasten gleich mit; „Falsche Karte?" bricht
-  // den Abbau ab, wer korrigiert, braucht die Kachel weiter. Die Scan-
-  // Warteschlange behält ihre Quittungen: dort ist die Liste der Beleg über
-  // einen ganzen Stapel.
-  const kasten = el.closest("#dropbox-list");
-  if (kasten) {
-    const weg = setTimeout(() => {
-      el.remove();
-      if (!kasten.children.length) { const b = $("#dropbox"); if (b) b.hidden = true; }
-    }, 5000);
-    el.querySelector("[data-fix]").onclick = () => { clearTimeout(weg); renderManual(el, card.name); };
-  }
-  if (meldung) toast(meldung);
+  // Im schwebenden Zieh-Kasten ist mit dem Schreiben alles gesagt: Kachel
+  // sofort weg (der leere Kasten mit), als Quittung genügt die Toast-Zeile.
+  // Selbst die fünf Sekunden Quittung aus #118 lasen sich noch als weiteres
+  // Popup. Wer die falsche Karte erwischt hat, korrigiert in der Sammlung.
+  // Die Scan-Warteschlange behält ihre Quittungen samt „Falsche Karte?" —
+  // dort ist die Liste der Beleg über einen ganzen Stapel.
+  if (el.closest("#dropbox-list")) {
+    ziehKachelWeg(el);
+    toast(meldung || t("drag.added", { name: gedruckt || card.name }));
+  } else if (meldung) toast(meldung);
 }
 
 /* Erkannt, aber noch NICHT gespeichert. Erst zeigen, was gelesen wurde —
@@ -1331,7 +1326,7 @@ function renderConfirm(card, el, detected) {
     } catch (e) { toast(e.message); }
   };
   el.querySelector("[data-fix]").onclick = () => renderManual(el, card.name);
-  el.querySelector("[data-drop]").onclick = () => el.remove();
+  el.querySelector("[data-drop]").onclick = () => ziehKachelWeg(el);
 }
 
 function renderManual(el, guess, candidates) {
@@ -1797,6 +1792,20 @@ function ziehKasten() {
   const box = $("#dropbox");
   if (box) box.hidden = false;
   return $("#dropbox-list") || $("#queue");
+}
+
+/* Kachel entfernen — und einen dadurch leer gewordenen schwebenden Kasten
+   gleich mit. Vorher blieb nach „Verwerfen" die leere Kopfzeile „Gezogene
+   Karten" stehen und wollte per „Schließen" extra weggeklickt werden — genau
+   das zweite Popup, das keiner braucht. Kacheln in der Scan-Warteschlange
+   betrifft das nicht (closest findet dort keinen Kasten). */
+function ziehKachelWeg(el) {
+  const kasten = el.closest("#dropbox-list");
+  el.remove();
+  if (kasten && !kasten.children.length) {
+    const b = $("#dropbox");
+    if (b) b.hidden = true;
+  }
 }
 
 /* Die Kachel startet mit leerem Vorschaubild; das Kartenbild setzen erst

@@ -4058,6 +4058,7 @@ Object.assign(I18N.de, {
   "drag.viaName": "Namenssuche",
   "drag.via": "Erkannt über: {q}",
   "drag.nothing": "Nichts Verwertbares abgelegt — ein Kartenbild von Scryfall, Cardmarket oder dem Gatherer herüberziehen.",
+  "drag.added": "{name} in die Sammlung übernommen.",
 });
 Object.assign(I18N.en, {
   "drag.veilTitle": "Drop card here",
@@ -4070,6 +4071,7 @@ Object.assign(I18N.en, {
   "drag.viaName": "name search",
   "drag.via": "Identified via: {q}",
   "drag.nothing": "Nothing usable in the drop — drag a card image from Scryfall, Cardmarket or Gatherer.",
+  "drag.added": "{name} added to your collection.",
 });
 Object.assign(I18N.fr, {
   "drag.veilTitle": "Dépose la carte ici",
@@ -4082,6 +4084,7 @@ Object.assign(I18N.fr, {
   "drag.viaName": "recherche par nom",
   "drag.via": "Identifiée via : {q}",
   "drag.nothing": "Rien d'exploitable dans le dépôt — fais glisser une image de carte depuis Scryfall, Cardmarket ou Gatherer.",
+  "drag.added": "{name} ajoutée à ta collection.",
 });
 Object.assign(I18N.es, {
   "drag.veilTitle": "Suelta la carta aquí",
@@ -4094,6 +4097,7 @@ Object.assign(I18N.es, {
   "drag.viaName": "búsqueda por nombre",
   "drag.via": "Identificada vía: {q}",
   "drag.nothing": "Nada utilizable en lo soltado — arrastra una imagen de carta desde Scryfall, Cardmarket o Gatherer.",
+  "drag.added": "{name} añadida a tu colección.",
 });
 Object.assign(I18N.it, {
   "drag.veilTitle": "Rilascia qui la carta",
@@ -4106,6 +4110,7 @@ Object.assign(I18N.it, {
   "drag.viaName": "ricerca per nome",
   "drag.via": "Identificata tramite: {q}",
   "drag.nothing": "Nulla di utilizzabile — trascina l'immagine di una carta da Scryfall, Cardmarket o Gatherer.",
+  "drag.added": "{name} aggiunta alla tua collezione.",
 });
 
 initLang();
