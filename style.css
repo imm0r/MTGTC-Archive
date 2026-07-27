@@ -1028,11 +1028,25 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
 .stapel-ersatz{position:absolute;inset:0;display:flex;align-items:center;padding:0 8px;
   font-size:12px;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
+/* Die LETZTE Karte liegt immer offen da. Ein Stapel wird ja deshalb
+   beschnitten, weil jede Karte die nächste verdeckt — unter der letzten liegt
+   aber nichts mehr. Sie zu beschneiden spart keinen Platz und nimmt nur den
+   Blick auf sie. So sieht auch ein echter Fächer aus: lauter Namensbalken und
+   obenauf eine ganze Karte.
+
+   Gilt auf jedem Gerät, nicht nur mit Zeiger: Mit dem Finger gibt es kein
+   Überfahren, und dann bliebe sonst gar keine Karte zu sehen. */
+/* :has(img), weil es ohne Bild nichts aufzuklappen gibt — eine Karte, für die
+   Scryfall kein Foto führt, würde sonst zu einem großen leeren Rechteck mit
+   einem Namen darin. Ihr Balken bleibt ein Balken. */
+.stapel-karte:last-child .stapel-fenster:has(img){aspect-ratio:63/88}
+.stapel-karte:last-child .stapel-fenster img{transform:none}
+
 /* Aufklappen beim Überfahren: aus dem Balken wird die ganze Karte, der Stapel
    darunter rückt nach. Nur auf Geräten mit Zeiger — mit dem Finger führt der
    Tipp zur Detailansicht, die mehr zeigt als das Bild. */
 @media(hover:hover){
-  .stapel-karte:hover .stapel-fenster{aspect-ratio:63/88}
+  .stapel-karte:hover .stapel-fenster:has(img){aspect-ratio:63/88}
   .stapel-karte:hover .stapel-fenster img{transform:none}
 }
 @media(prefers-reduced-motion:reduce){ .stapel-fenster{transition:none} }
