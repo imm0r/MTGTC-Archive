@@ -268,7 +268,13 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
   color:var(--dim);background:var(--panel);border-radius:6px;font-size:26px}
 .syn-name{font-size:13px;font-weight:600;line-height:1.2}
 .syn-type{font-size:11px;color:var(--dim);line-height:1.15}
-.syn-exp{font-size:11px;color:var(--dim);line-height:1.28;margin-top:2px;
+/* Die Begründung ist auf vier Zeilen geklemmt — sonst wären die Kacheln
+   verschieden hoch und das Raster unruhig. Der ganze Text hängt im title und
+   erscheint beim Überfahren; cursor:help sagt, dass es dort etwas zu holen
+   gibt. Bei kurzen Begründungen zeigt der Zeiger das auch dann an, wenn nichts
+   abgeschnitten ist — ob geklemmt wird, weiss erst das Layout, und dafür eine
+   Messung je Kachel zu fahren wäre teurer als der kleine Fehlhinweis. */
+.syn-exp{font-size:11px;color:var(--dim);line-height:1.28;margin-top:2px;cursor:help;
   display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
 .syn-foot{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:auto;padding-top:2px}
 .syn-price{font-size:12px;color:var(--acc);font-weight:600}

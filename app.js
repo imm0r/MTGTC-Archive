@@ -10364,6 +10364,21 @@ function initTooltip() {
   const zeige = () => {
     if (!ziel || !ziel.isConnected) return;
     tip.textContent = text;
+    // Steckt das Ziel in einem MODALEN Dialog, muss der Tooltip mit hinein.
+    // showModal() hebt den Dialog in die Top-Layer, und die liegt über allem,
+    // was im normalen Baum steht — auch über z-index:9999. Am body hängend war
+    // der Tooltip in jedem Dialog unsichtbar: er wurde erzeugt und richtig
+    // platziert, nur eben dahinter gezeichnet. Aufgefallen ist das an den
+    // KI-Begründungen in der Kartenansicht, wo der Text auf vier Zeilen
+    // gekürzt ist und der Tooltip die einzige Stelle war, an der er ganz
+    // stand. Betroffen war aber jeder Tooltip in jedem Dialog.
+    //
+    // Umhängen statt aufstocken: einen z-index gibt es gegen die Top-Layer
+    // nicht. position:fixed bleibt dabei am Viewport ausgerichtet — kein
+    // Dialog der App setzt transform, filter oder backdrop-filter, was einen
+    // eigenen Bezugsrahmen aufspannen würde. platziere() rechnet unverändert.
+    const wirt = ziel.closest?.("dialog[open]") || document.body;
+    if (tip.parentElement !== wirt) wirt.appendChild(tip);
     tip.classList.add("on");
     platziere();
     cancelAnimationFrame(raf);
@@ -10378,6 +10393,11 @@ function initTooltip() {
   function verstecke() {
     clearTimeout(timer); cancelAnimationFrame(raf);
     tip.classList.remove("on");
+    // Zurück an den body. Sonst bliebe der Tooltip Kind eines Dialogs, der
+    // sich womöglich schliesst, ohne dass ein pointerout kam — er hinge dann
+    // in einem display:none-Baum und tauchte beim nächsten Umhängen ohne die
+    // übliche Verzögerung sofort wieder auf.
+    if (tip.parentElement !== document.body) document.body.appendChild(tip);
     if (ziel) einhaengen(ziel);
     ziel = null; text = "";
   }
