@@ -277,7 +277,10 @@ const sf = (() => {
 })();
 
 const sfNamed = name => sf("/cards/named?fuzzy=" + encodeURIComponent(name));
-const sfById  = id   => sf("/cards/" + id);
+// encodeURIComponent auch hier: seit dem Zieh-Import kann die ID aus einer
+// fremden Adresse stammen, und unkodiert könnte sie den Pfad verlassen
+// („../…"). Für die ohnehin gültigen UUIDs ändert die Kodierung nichts.
+const sfById  = id   => sf("/cards/" + encodeURIComponent(id));
 
 /* Sammel-Abruf mehrerer Karten über ihre scryfall_id (max. 75 je Aufruf).
    Scryfalls /cards/collection liefert die vollen Kartenobjekte auf einen
@@ -914,14 +917,14 @@ function autoUebernehmenSetzen(an) { localStorage.setItem("mtg-scan-auto", an ? 
    ein <img> ODER ein <canvas> — beide lassen sich gleich zeichnen und messen.
    Genutzt vom Einzelscan (ein Foto = eine Karte) UND vom Mehrfach-Scan (ein
    Foto = mehrere Karten, je Ausschnitt ein Aufruf hierher). */
-async function scanBild(img, thumbSrc, lang) {
+async function scanBild(img, thumbSrc, lang, ziel) {
   const el = document.createElement("div");
   el.className = "job";
   el.innerHTML = `<img class="thumb" src="${esc(thumbSrc)}" alt="">
     <div class="body"><div class="title">${esc(t("scan.processing"))}</div>
     <div class="meta" data-step>${esc(t("scan.reading"))}</div>
     <div class="bar"><i style="width:35%"></i></div></div>`;
-  $("#queue").prepend(el);
+  (ziel || $("#queue")).prepend(el);
   const step = t => { const n = el.querySelector("[data-step]"); if (n) n.textContent = t; };
   const prog = p => { const n = el.querySelector(".bar i"); if (n) n.style.width = p + "%"; };
   try {
@@ -944,10 +947,10 @@ async function scanBild(img, thumbSrc, lang) {
   }
 }
 
-async function scanFile(file) {
+async function scanFile(file, ziel) {
   try {
     const img = await loadImg(file);
-    await scanBild(img, URL.createObjectURL(file), $("#d-lang").value);
+    await scanBild(img, URL.createObjectURL(file), $("#d-lang").value, ziel);
   } catch { toast(t("scan.imgUnreadable")); }
 }
 
@@ -1421,6 +1424,424 @@ function attachSuggest(inp) {
     } else if (e.key === "Escape") close();
   });
   inp.addEventListener("blur", () => setTimeout(close, 150));
+}
+
+/* ==================== Karte per Ziehen übernehmen =====================
+   Zwei Fenster nebeneinander: links diese App, rechts Scryfall, Cardmarket
+   oder Gatherer. Das Kartenbild von dort herüberziehen — die Karte landet in
+   derselben Warteschlange wie ein Scan und wird genauso bestätigt.
+
+   Ein Bild aus einem FREMDEN Fenster kommt nicht als Datei an, sondern als
+   Adresse (text/uri-list) samt HTML-Schnipsel des <img> (text/html). Genau
+   darin steckt aber schon alles Nötige: Scryfall trägt die Kartenkennung im
+   Dateinamen, Gatherer Setcode und Sammlernummer im Pfad, Cardmarket die
+   Produktnummer. Erkannt wird deshalb NICHT das Bild, sondern die Adresse —
+   ohne Modellaufruf, ohne Ratequote, und die Auflage stimmt auf Anhieb statt
+   nur der Name. Erst wenn keine Adresse trägt, zählt der Name aus alt/title
+   des Bildes oder der mitgezogene Text; das ist derselbe Namensweg wie in der
+   Handkorrektur, mit Auswahlliste bei Mehrdeutigkeit.
+
+   Die Bildpixel rührt dieser Weg nie an. Ein Herunterladen des fremden Bildes
+   scheitert ohnehin meist an CORS, und die Bilderkennung darauf loszulassen
+   würde KI-Kontingent für eine Frage verbrauchen, die die Adresse längst
+   beantwortet. */
+
+/* Sprachen, die Scryfall in seinen Adressen führt. Gebraucht, um in
+   /card/<set>/<nr>/<x> zu entscheiden, ob <x> die Sprache ist oder schon der
+   Namensteil ("…/8/de/mord-im-hause-karlov" gegen "…/8/anzrag"). */
+const SF_URL_LANGS = new Set(["en", "es", "fr", "de", "it", "pt", "ja", "ko",
+                              "ru", "zhs", "zht", "he", "la", "grc", "ar", "sa", "ph"]);
+
+/* Gatherers Gebietsschema (en-us, de-de, zh-tw …) auf Scryfalls Sprachkürzel.
+   Chinesisch ist der einzige Fall, in dem die ersten zwei Zeichen nicht
+   reichen: Scryfall trennt vereinfacht (zhs) und traditionell (zht). */
+function gathererLang(gebiet) {
+  const g = String(gebiet || "").toLowerCase();
+  if (g.startsWith("zh")) return /tw|hant|hk/.test(g) ? "zht" : "zhs";
+  const zwei = g.slice(0, 2);
+  return SF_URL_LANGS.has(zwei) ? zwei : "en";
+}
+
+/* Cardmarket schreibt Namen in seine Adressen mit Bindestrich statt Leerzeichen
+   und hängt bei mehreren Motiven derselben Karte eine Fassung an ("Forest-V3").
+   Beides zurückdrehen; die Bindestriche echter Namen ("Quake-Mole") schadet das
+   nicht, weil Scryfalls unscharfe Namenssuche darüber hinwegsieht. */
+const cmSlugName = s => String(s || "").replace(/-V\d+$/i, "").replace(/[-_]+/g, " ")
+  .replace(/\s+/g, " ").trim();
+
+/* Eine Adresse auf eine Kennung abklopfen. REINE TEXTARBEIT, kein Netz —
+   deshalb einzeln prüfbar. Rückgabe: { art, quelle, … } oder null. Die
+   Reihenfolge hier drin ist gleichgültig, eine Adresse trifft höchstens eines
+   der Muster; über den Vorrang entscheidet ziehRang. */
+function ziehKennung(adresse) {
+  let u;
+  try { u = new URL(adresse); } catch { return null; }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+  const host = d => u.hostname === d || u.hostname.endsWith("." + d);
+  let teile;
+  try { teile = u.pathname.split("/").filter(Boolean).map(decodeURIComponent); }
+  catch { teile = u.pathname.split("/").filter(Boolean); }   // kaputte %-Folge
+  const param = n => {
+    for (const [k, v] of u.searchParams) if (k.toLowerCase() === n) return v;
+    return null;
+  };
+
+  // Scryfall-Bild oder -API: die Kartenkennung steht als Dateiname bzw. im
+  // Pfad. Die exakteste Angabe überhaupt — sie meint GENAU diese Auflage in
+  // GENAU dieser Sprache, auch bei Rückseiten und Ausschnitten (alle Bilder
+  // einer Karte laufen unter derselben Kennung).
+  if (host("scryfall.io") || host("scryfall.com")) {
+    const m = u.pathname.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+    if (m) return { art: "sfid", quelle: "Scryfall", id: m[0].toLowerCase() };
+  }
+  // Scryfall-Kartenseite: /card/<set>/<nummer>[/<sprache>]/<name>. Setcode und
+  // Nummer streng prüfen — sie wandern in einen API-Pfad und sollen nichts
+  // anderes sein können als ein Setcode und eine Sammlernummer.
+  if (host("scryfall.com") && teile[0] === "card" &&
+      /^[a-z0-9]{2,6}$/i.test(teile[1] || "") && /^[0-9a-z★†.\-]{1,10}$/i.test(teile[2] || "")) {
+    const dritt = (teile[3] || "").toLowerCase();
+    return { art: "druck", quelle: "Scryfall", set: teile[1], cn: teile[2],
+             lang: SF_URL_LANGS.has(dritt) ? dritt : "en" };
+  }
+  // Gatherer seit dem Umbau 2024: /<SET>/<gebiet>/<nummer>/<name>. Die alten
+  // Details.aspx-Adressen leiten selbst hierher um, tragen aber auch weiterhin
+  // die Multiverse-ID — die fängt der nächste Block.
+  if (host("gatherer.wizards.com") && teile.length >= 3 &&
+      /^[a-z0-9]{2,6}$/i.test(teile[0]) && /^[a-z]{2}(-[a-z]{2,4})?$/i.test(teile[1]) &&
+      /^\d{1,4}[a-z★]?$/i.test(teile[2]))
+    return { art: "druck", quelle: "Gatherer", set: teile[0], cn: teile[2],
+             lang: gathererLang(teile[1]) };
+  // Multiverse-ID: Gatherers alte Kennung, die Scryfall mitführt. Der Name ist
+  // eindeutig genug, dass er auf jedem Wirt gelten darf (verlinkt wird Gatherer
+  // von überall her).
+  const mv = param("multiverseid");
+  if (mv && /^\d+$/.test(mv)) return { art: "multiverse", quelle: "Gatherer", id: mv };
+
+  if (host("cardmarket.com")) {
+    // Produktnummer im Fragezeichenteil — so verlinkt auch Scryfall dorthin.
+    const pid = param("idproduct");
+    if (pid && /^\d+$/.test(pid)) return { art: "cmid", quelle: "Cardmarket", id: pid };
+    // Sprechende Produktadresse: /de/Magic/Products/Singles/<Set>/<Karte>.
+    const i = teile.findIndex(x => x.toLowerCase() === "singles");
+    if (i >= 0 && teile[i + 2])
+      return { art: "cmname", quelle: "Cardmarket",
+               name: cmSlugName(teile[i + 2]), setName: cmSlugName(teile[i + 1]) };
+    // Produktbild: …/<Produktnummer>.jpg. Dass diese Zahl die Produktnummer
+    // ist, ist GERATEN — deshalb „unsicher": der Treffer gilt erst, wenn der
+    // mitgezogene Name dazu passt (siehe karteAusKennung).
+    const bild = (teile[teile.length - 1] || "").match(/^(\d{2,9})\.(?:jpe?g|png|webp|gif)$/i);
+    if (bild) return { art: "cmid", quelle: "Cardmarket", id: bild[1], unsicher: true };
+  }
+  return null;
+}
+
+/* Vorrang der Wege: eine Kennung, die GENAU EINE Auflage bezeichnet, schlägt
+   jede Namenssuche — und unter den Kennungen die exakteste zuerst. Geraten
+   Gelesenes kommt in jedem Fall zuletzt. */
+const ZIEH_ARTEN = ["sfid", "druck", "multiverse", "cmid", "cmname"];
+const ziehRang = k => (k.unsicher ? 10 : 0) + ZIEH_ARTEN.indexOf(k.art);
+
+/* Kennung → Scryfall-Karte. Hier liegt das Netz; die Textarbeit steckt oben in
+   ziehKennung. `nameHinweis` dient der Gegenprobe unsicherer Kennungen. */
+async function karteAusKennung(k, nameHinweis) {
+  if (!k) return null;
+  if (k.art === "sfid") return withPrice(await sfById(k.id));
+  if (k.art === "multiverse")
+    return withPrice(await sf("/cards/multiverse/" + encodeURIComponent(k.id)));
+  if (k.art === "cmid") {
+    const hit = await sf("/cards/cardmarket/" + encodeURIComponent(k.id));
+    // Aus einem Dateinamen geratene Nummer: nur gelten lassen, wenn der
+    // mitgezogene Name dazu passt. Eine falsche Karte still in die Sammlung zu
+    // schreiben wäre schlimmer als gar keine — ohne Namen fällt der Weg durch
+    // und der Namensweg bekommt seine Chance.
+    if (k.unsicher && !(hit && nameHinweis && nameHitMatchesRead(hit, nameHinweis))) return null;
+    return withPrice(hit);
+  }
+  if (k.art === "druck") {
+    // Der Setcode aus einer Adresse ist bereits Scryfalls eigener — der direkte
+    // Abruf trifft. findByCode mit seinen t-/p-Präfixen bleibt als Netz für den
+    // Fall, dass die Sprache in dieser Auflage nicht geführt wird.
+    const genau = await sfCode(k.set, k.cn, k.lang);
+    return genau ? withPrice(genau) : findByCode(k.set, k.cn, k.lang);
+  }
+  if (k.art === "cmname") return cmKarteAusNamen(k.name, k.setName);
+  return null;
+}
+
+/* Cardmarket nennt in seinen Adressen Set und Karte im Klartext, aber keine
+   Sammlernummer. Der Name führt über die unscharfe Namenssuche zur Karte, der
+   Setname wählt danach unter deren Auflagen die passende aus. Findet sich
+   keine — Cardmarket schneidet Sets teils anders zu und benennt sie anders —,
+   bleibt es beim Treffer der Namenssuche: dieselbe Karte, nur womöglich eine
+   andere Auflage. Englisch wird bevorzugt, weil eine Produktseite bei
+   Cardmarket alle Sprachen desselben Drucks führt. */
+async function cmKarteAusNamen(name, setName) {
+  if (!name) return null;
+  let hit = null;
+  try { hit = await sfNamed(name); } catch { /* mehrdeutig — dann ohne Set */ }
+  if (!hit) return null;
+  const gesucht = norm(setName);
+  if (!gesucht) return withPrice(hit);
+  let drucke = [];
+  try { drucke = await sfSearch(`!"${hit.name.replace(/"/g, "")}"`, 80); }
+  catch { /* dann eben die Auflage der Namenssuche */ }
+  // Unter den Auflagen des Sets die REGULÄRE: Cardmarket hängt an Showcase-
+  // und Sonderrahmen ein "-V2"/"-V3" an — die nackte Adresse meint den
+  // Normaldruck, und der trägt die niedrigste Sammlernummer. Englisch zuerst,
+  // weil ein Cardmarket-Produkt alle Sprachen desselben Drucks führt.
+  const nr = c => parseInt(String(c.collector_number).replace(/\D/g, ""), 10) || 1e9;
+  const treffer = drucke.filter(c => norm(c.set_name) === gesucht)
+    .sort((a, b) => (a.lang === "en" ? 0 : 1) - (b.lang === "en" ? 0 : 1) || nr(a) - nr(b))[0];
+  return withPrice(treffer || hit);
+}
+
+/* Zuletzt der Name: alt/title des gezogenen Bildes oder mitgezogener Text.
+   Erst die Setcode-Schreibweise ("MKM 8"), dann die Namenssuche — dieselben
+   zwei Wege wie in der Handkorrektur. */
+async function karteAusText(text, lang) {
+  const v = String(text || "").trim();
+  if (!v) return { card: null, candidates: [] };
+  const m = v.match(/^([a-z0-9]{3,5})[\s\-\/·•]+(\d{1,4}[a-z★]?)(?:\s+(t))?$/i);
+  if (m) {
+    const c = await findByCode(m[1], m[2], lang, !!m[3]);
+    if (c) return { card: c, candidates: [] };
+  }
+  return findCard(v, lang);
+}
+
+/* Was ein Ziehen mitbringt, auf Adressen und Namen eindampfen. Welcher Browser
+   welchen Typ füllt, ist verschieden (Firefox text/x-moz-url, Chromium
+   text/html mit dem <img> im Original), deshalb alles einsammeln statt sich auf
+   einen Typ zu verlassen. Reihenfolge der Namen ist Rangfolge: alt und title
+   eines Bildes benennen die Karte, ein markierter Kartenname kommt als
+   text/plain. */
+const ZIEH_TYPEN = ["text/uri-list", "text/html", "text/plain", "text/x-moz-url", "Files"];
+
+/* Die wenigen HTML-Entitäten, die in Adressen und Kartennamen vorkommen —
+   allen voran &amp; in Abfrageteilen und &#39; in Namen. &amp; zuletzt, sonst
+   würde „&amp;lt;" zweistufig zu „<". */
+const entEsc = s => String(s)
+  .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(+n))
+  .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+  .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&nbsp;/g, " ")
+  .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+
+/* Attribute aus dem HTML-Schnipsel lesen — mit Mustern statt DOMParser.
+   Bewusst KEIN echtes Parsen: der Schnipsel ist fremder, unvertrauter Inhalt,
+   und auch wenn ein per DOMParser erzeugtes Dokument träge ist (nichts lädt,
+   nichts läuft), bliebe das Parsen ein Verdachtsfall für die statische
+   Sicherheitsanalyse. Nötig ist es auch nicht: den Schnipsel serialisiert der
+   ziehende Browser selbst — wohlgeformt, Attribute stets in Anführungszeichen
+   —, dafür reicht ein Muster je Tag. `je` bekommt je Fund die gewünschten
+   Attribute als Objekt. */
+function tagAttribute(html, tag, attrs, je) {
+  const tagRx = new RegExp(`<${tag}\\b([^>]*)>`, "gi");
+  for (let m; (m = tagRx.exec(html)); ) {
+    const werte = {};
+    for (const a of attrs) {
+      const w = m[1].match(new RegExp(`\\b${a}\\s*=\\s*"([^"]*)"`, "i")) ||
+                m[1].match(new RegExp(`\\b${a}\\s*=\\s*'([^']*)'`, "i"));
+      werte[a] = w ? entEsc(w[1]) : null;
+    }
+    je(werte);
+  }
+}
+
+function ziehNutzlast(dt) {
+  const urls = [], namen = [], gesehen = new Set();
+  const addUrl = x => {
+    const s = String(x || "").trim();
+    if (/^https?:\/\//i.test(s) && !urls.includes(s)) urls.push(s);
+  };
+  const addName = x => {
+    const s = String(x || "").replace(/\s+/g, " ").trim();
+    const k = s.toLowerCase();
+    if (s.length < 2 || s.length > 80 || /^https?:\/\//i.test(s) || gesehen.has(k)) return;
+    gesehen.add(k); namen.push(s);
+  };
+  const daten = typ => { try { return dt.getData(typ) || ""; } catch { return ""; } };
+
+  // text/uri-list: eine Adresse je Zeile, mit # beginnende Zeilen sind Kommentar.
+  daten("text/uri-list").split(/\r?\n/).forEach(z => { if (!z.startsWith("#")) addUrl(z); });
+  // Firefox: Adresse und Beschriftung im Wechsel.
+  daten("text/x-moz-url").split(/\r?\n/).forEach((z, i) => (i % 2 ? addName(z) : addUrl(z)));
+  const roh = daten("text/plain").trim();
+  if (/^https?:\/\//i.test(roh)) addUrl(roh); else addName(roh);
+
+  // Der HTML-Schnipsel ist das gezogene Element im Original — beim Bild also
+  // das <img> mit src, srcset und dem Kartennamen in alt.
+  const html = daten("text/html");
+  if (html) {
+    tagAttribute(html, "img", ["src", "srcset", "alt", "title"], w => {
+      addUrl(w.src);
+      // srcset führt oft eine andere (größere) Fassung — und manchmal die
+      // einzige, die die Kennung im Dateinamen trägt.
+      (w.srcset || "").split(",").forEach(s => addUrl(s.trim().split(/\s+/)[0]));
+      addName(w.alt);
+      addName(w.title);
+    });
+    tagAttribute(html, "a", ["href", "title"], w => { addUrl(w.href); addName(w.title); });
+  }
+  return { urls, namen };
+}
+
+/* Adressen vor Namen, exakte Kennungen vor geratenen. Meldet über `schritt`,
+   welcher Weg gerade läuft — bei bis zu drei Scryfall-Abrufen ist das keine
+   Zierde, sondern die einzige Rückmeldung während der Wartezeit. */
+async function ziehErkennen(nutzlast, lang, schritt) {
+  const kennungen = nutzlast.urls.map(ziehKennung).filter(Boolean)
+    .sort((a, b) => ziehRang(a) - ziehRang(b));
+  const nameHinweis = nutzlast.namen[0] || "";
+
+  for (const k of kennungen) {
+    schritt(t("drag.stepUrl", { q: k.quelle }));
+    let card = null;
+    try { card = await karteAusKennung(k, nameHinweis); }
+    catch { /* Abruf fehlgeschlagen — nächster Weg */ }
+    if (card) return { card, quelle: k.quelle };
+  }
+  for (const n of nutzlast.namen) {
+    schritt(t("drag.stepName"));
+    let r = null;
+    try { r = await karteAusText(n, lang); } catch { continue; }
+    if (r.card) return { card: r.card, quelle: t("drag.viaName") };
+    if (r.candidates.length) return { card: null, guess: n, candidates: r.candidates };
+  }
+  return { card: null, guess: nameHinweis, candidates: [] };
+}
+
+/* Die Warteschlange für gezogene Karten schwebt über der Oberfläche: gezogen
+   wird auf der Sammlungsseite, gezeigt werden muss der Treffer aber trotzdem —
+   und zwar dort, wo die Karte gerade abgelegt wurde. Die Einträge sind
+   dieselben .job-Kacheln wie beim Scan, samt Bestätigungsschritt. */
+function ziehKasten() {
+  const box = $("#dropbox");
+  if (box) box.hidden = false;
+  return $("#dropbox-list") || $("#queue");
+}
+
+/* Die Kachel startet mit leerem Vorschaubild; das Kartenbild setzen erst
+   Bestätigung bzw. Übernahme aus dem Scryfall-Treffer. Das gezogene Bild
+   selbst wird bewusst NICHT eingebunden: eine fremde Adresse gehört nicht
+   ungeprüft in ein src (und viele Wirte sperren Hotlinks ohnehin aus). */
+function ziehJob(ziel) {
+  const el = document.createElement("div");
+  el.className = "job";
+  el.innerHTML = `<img class="thumb" alt="">
+    <div class="body"><div class="title">${esc(t("drag.reading"))}</div>
+    <div class="meta" data-step>${esc(t("drag.stepStart"))}</div>
+    <div class="bar"><i style="width:35%"></i></div></div>`;
+  ziel.prepend(el);
+  return el;
+}
+
+/* Ein abgelegtes Etwas übernehmen. `ziel` ist der Behälter für die Kachel:
+   im Scan-Bereich die dortige Warteschlange, sonst der schwebende Kasten.
+   WICHTIG: dt (der DataTransfer) ist nur während des drop-Ereignisses lesbar —
+   alles wird deshalb VOR dem ersten await herausgezogen. */
+async function ziehImport(dt, ziel) {
+  // Chromium legt beim Ziehen eines Bildes aus einem anderen Browserfenster
+  // oft ZUSÄTZLICH die Bilddatei bei. Die Adresse geht vor (exakt, ohne
+  // Modellaufruf); die Datei bleibt Rückfall, falls die Adresse nichts hergibt
+  // — und der Hauptweg für Bilder aus dem Dateimanager, die gar keine tragen.
+  const dateien = [...(dt.files || [])].filter(f => f.type.startsWith("image/"));
+  const nutzlast = ziehNutzlast(dt);
+  if (!nutzlast.urls.length && !nutzlast.namen.length) {
+    if (dateien.length) { dateien.forEach(f => scanFile(f, ziel)); return; }
+    return toast(t("drag.nothing"));
+  }
+
+  const lang = $("#d-lang").value;
+  const el = ziehJob(ziel);
+  const schritt = s => { const n = el.querySelector("[data-step]"); if (n) n.textContent = s; };
+  try {
+    const r = await ziehErkennen(nutzlast, lang, schritt);
+    const bar = el.querySelector(".bar i");
+    if (bar) bar.style.width = "100%";
+    if (!r.card) {
+      // Adresse und Name ergebnislos, aber eine Bilddatei kam mit: dann eben
+      // der Scan-Weg mit seiner Bilderkennung — Kachel ersetzen.
+      if (!r.candidates.length && dateien.length) {
+        el.remove();
+        dateien.forEach(f => scanFile(f, ziel));
+        return;
+      }
+      return renderManual(el, r.guess || "", r.candidates);
+    }
+    // Die Sprache steht in der Auflage, die die Adresse bezeichnet — sie
+    // schlägt das Dropdown, genau wie die vom Foto gelesene beim Scan. Foil
+    // und Zustand bleiben beim Nutzer, die verrät auch eine Adresse nicht.
+    if (autoUebernehmen()) await addToCollection(r.card, el, { lang: r.card.lang });
+    else {
+      renderConfirm(r.card, el, { lang: r.card.lang });
+      const info = el.querySelector(".c-info");
+      // Woran es erkannt wurde, gehört sichtbar dazu: bei einem Namenstreffer
+      // lohnt der Blick aufs Bild mehr als bei einer eindeutigen Kennung.
+      if (info && r.quelle) info.insertAdjacentHTML("beforeend",
+        `<div class="meta">${esc(t("drag.via", { q: r.quelle }))}</div>`);
+    }
+  } catch (e) {
+    el.querySelector(".body").innerHTML =
+      `<div class="title">${esc(t("scan.failed"))}</div>
+       <div class="meta"><span class="pill err">${esc(e.message)}</span></div>`;
+  }
+}
+
+/* Verdrahtung: Schleier beim Überziehen, Übernahme beim Ablegen. Liegt in einer
+   eigenen Funktion, weil sie an window hängt und nicht an einem Bereich. */
+function wireZiehImport() {
+  const schleier = $("#dragveil");
+  const kasten = $("#dropbox");
+  const zu = $("#dropbox-close");
+  if (zu) zu.onclick = () => {
+    $("#dropbox-list").innerHTML = "";
+    if (kasten) kasten.hidden = true;
+  };
+
+  // Ein Ziehen AUS der App heraus (der Verkaufs-Bookmarklet an der
+  // Lesezeichenleiste) darf den Schleier nicht auslösen — sonst legt sich beim
+  // Zugriff darauf ein Ablagefeld über die halbe Seite.
+  let eigenerZug = false;
+  document.addEventListener("dragstart", () => { eigenerZug = true; }, true);
+  document.addEventListener("dragend", () => { eigenerZug = false; }, true);
+
+  // Beim Betreten JEDES Kindelements feuert dragenter erneut und beim Verlassen
+  // dragleave — gezählt statt geschaltet, sonst flackert der Schleier über
+  // jeder Zeile. Der Zähler allein reicht aber nicht: ein mit Escape
+  // abgebrochener Zug lässt ihn hängen. Deshalb zusätzlich eine Wache über
+  // dragover — das feuert während des Ziehens fortlaufend (auch im Stillstand
+  // alle ~350 ms); bleibt es aus, ist der Zug vorbei und der Schleier fällt.
+  let tiefe = 0, wache = 0;
+  const traegtKarte = e =>
+    [...(e.dataTransfer?.types || [])].some(x => ZIEH_TYPEN.includes(x));
+  // In ein Textfeld gezogener Text soll dort landen — das ist die Erwartung und
+  // obendrein nützlich (Kartenname ins Suchfeld). Dort halten wir uns heraus.
+  const imFeld = e => !!e.target?.closest?.("input,textarea,select,[contenteditable]");
+  const aus = () => { tiefe = 0; clearTimeout(wache); if (schleier) schleier.hidden = true; };
+  const wachauf = () => { clearTimeout(wache); wache = setTimeout(aus, 900); };
+
+  window.addEventListener("dragenter", e => {
+    if (eigenerZug || !traegtKarte(e)) return;
+    tiefe++;
+    wachauf();
+    if (schleier) schleier.hidden = false;
+  });
+  window.addEventListener("dragleave", () => { if (--tiefe <= 0) aus(); });
+  window.addEventListener("dragover", e => {
+    if (eigenerZug || !traegtKarte(e) || imFeld(e)) return;
+    e.preventDefault();
+    wachauf();
+  });
+  window.addEventListener("drop", e => {
+    const eigen = eigenerZug;
+    aus();
+    eigenerZug = false;   // dragend bleibt aus, wenn die Quelle woanders lag
+    if (eigen || !traegtKarte(e) || imFeld(e)) return;
+    e.preventDefault();
+    // Im Scan-Bereich abgelegt: dort steht die Warteschlange schon sichtbar,
+    // der schwebende Kasten wäre dann nur ein zweiter Ort für dieselbe Sache.
+    ziehImport(e.dataTransfer, e.target?.closest?.("#drop") ? $("#queue") : ziehKasten());
+  });
 }
 
 /* ================= Sammlung- und Wunschlisten-Ansicht =================
@@ -11005,8 +11426,9 @@ function wireApp() {
   ["dragleave", "drop"].forEach(ev => $("#drop").addEventListener(ev, e => {
     e.preventDefault(); $("#drop").classList.remove("hot");
   }));
-  $("#drop").addEventListener("drop", e =>
-    [...e.dataTransfer.files].filter(f => f.type.startsWith("image/")).forEach(scanFile));
+  // Das Ablegen selbst (Dateien wie gezogene Kartenbilder) fängt der
+  // fensterweite Zieh-Import — auch hier über dem Feld (wireZiehImport).
+  wireZiehImport();
 
   // Filterleiste von Sammlung UND Wunschliste — dieselbe Verdrahtung, einmal je
   // Bereich. Suche/Filter ändern die Treffermenge, also immer zurück auf Seite 1.
