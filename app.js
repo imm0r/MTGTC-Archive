@@ -1491,8 +1491,11 @@ function ziehKennung(adresse) {
     const m = u.pathname.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
     if (m) return { art: "sfid", quelle: "Scryfall", id: m[0].toLowerCase() };
   }
-  // Scryfall-Kartenseite: /card/<set>/<nummer>[/<sprache>]/<name>.
-  if (host("scryfall.com") && teile[0] === "card" && teile[1] && teile[2]) {
+  // Scryfall-Kartenseite: /card/<set>/<nummer>[/<sprache>]/<name>. Setcode und
+  // Nummer streng prüfen — sie wandern in einen API-Pfad und sollen nichts
+  // anderes sein können als ein Setcode und eine Sammlernummer.
+  if (host("scryfall.com") && teile[0] === "card" &&
+      /^[a-z0-9]{2,6}$/i.test(teile[1] || "") && /^[0-9a-z★†.\-]{1,10}$/i.test(teile[2] || "")) {
     const dritt = (teile[3] || "").toLowerCase();
     return { art: "druck", quelle: "Scryfall", set: teile[1], cn: teile[2],
              lang: SF_URL_LANGS.has(dritt) ? dritt : "en" };
@@ -1607,8 +1610,39 @@ async function karteAusText(text, lang) {
    welchen Typ füllt, ist verschieden (Firefox text/x-moz-url, Chromium
    text/html mit dem <img> im Original), deshalb alles einsammeln statt sich auf
    einen Typ zu verlassen. Reihenfolge der Namen ist Rangfolge: alt und title
-   eines Bildes benennen die Karte, der Fließtext des Schnipsels ist Beifang. */
+   eines Bildes benennen die Karte, ein markierter Kartenname kommt als
+   text/plain. */
 const ZIEH_TYPEN = ["text/uri-list", "text/html", "text/plain", "text/x-moz-url", "Files"];
+
+/* Die wenigen HTML-Entitäten, die in Adressen und Kartennamen vorkommen —
+   allen voran &amp; in Abfrageteilen und &#39; in Namen. &amp; zuletzt, sonst
+   würde „&amp;lt;" zweistufig zu „<". */
+const entEsc = s => String(s)
+  .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(+n))
+  .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+  .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&nbsp;/g, " ")
+  .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+
+/* Attribute aus dem HTML-Schnipsel lesen — mit Mustern statt DOMParser.
+   Bewusst KEIN echtes Parsen: der Schnipsel ist fremder, unvertrauter Inhalt,
+   und auch wenn ein per DOMParser erzeugtes Dokument träge ist (nichts lädt,
+   nichts läuft), bliebe das Parsen ein Verdachtsfall für die statische
+   Sicherheitsanalyse. Nötig ist es auch nicht: den Schnipsel serialisiert der
+   ziehende Browser selbst — wohlgeformt, Attribute stets in Anführungszeichen
+   —, dafür reicht ein Muster je Tag. `je` bekommt je Fund die gewünschten
+   Attribute als Objekt. */
+function tagAttribute(html, tag, attrs, je) {
+  const tagRx = new RegExp(`<${tag}\\b([^>]*)>`, "gi");
+  for (let m; (m = tagRx.exec(html)); ) {
+    const werte = {};
+    for (const a of attrs) {
+      const w = m[1].match(new RegExp(`\\b${a}\\s*=\\s*"([^"]*)"`, "i")) ||
+                m[1].match(new RegExp(`\\b${a}\\s*=\\s*'([^']*)'`, "i"));
+      werte[a] = w ? entEsc(w[1]) : null;
+    }
+    je(werte);
+  }
+}
 
 function ziehNutzlast(dt) {
   const urls = [], namen = [], gesehen = new Set();
@@ -1635,22 +1669,15 @@ function ziehNutzlast(dt) {
   // das <img> mit src, srcset und dem Kartennamen in alt.
   const html = daten("text/html");
   if (html) {
-    let doc = null;
-    try { doc = new DOMParser().parseFromString(html, "text/html"); } catch { /* egal */ }
-    doc?.querySelectorAll("img").forEach(im => {
-      addUrl(im.getAttribute("src"));
+    tagAttribute(html, "img", ["src", "srcset", "alt", "title"], w => {
+      addUrl(w.src);
       // srcset führt oft eine andere (größere) Fassung — und manchmal die
       // einzige, die die Kennung im Dateinamen trägt.
-      (im.getAttribute("srcset") || "").split(",")
-        .forEach(s => addUrl(s.trim().split(/\s+/)[0]));
-      addName(im.getAttribute("alt"));
-      addName(im.getAttribute("title"));
+      (w.srcset || "").split(",").forEach(s => addUrl(s.trim().split(/\s+/)[0]));
+      addName(w.alt);
+      addName(w.title);
     });
-    doc?.querySelectorAll("a").forEach(a => {
-      addUrl(a.getAttribute("href"));
-      addName(a.getAttribute("title"));
-    });
-    addName(doc?.body?.textContent);
+    tagAttribute(html, "a", ["href", "title"], w => { addUrl(w.href); addName(w.title); });
   }
   return { urls, namen };
 }
@@ -1690,19 +1717,17 @@ function ziehKasten() {
   return $("#dropbox-list") || $("#queue");
 }
 
-/* Vorschaubild ist das gezogene Bild selbst — es steht sofort, während die
-   Erkennung noch läuft, und zeigt damit, WAS abgelegt wurde. Fremde Wirte
-   sperren Hotlinks teils aus; dann bleibt die schwarze Fläche der Kachel. */
-function ziehJob(ziel, bild) {
+/* Die Kachel startet mit leerem Vorschaubild; das Kartenbild setzen erst
+   Bestätigung bzw. Übernahme aus dem Scryfall-Treffer. Das gezogene Bild
+   selbst wird bewusst NICHT eingebunden: eine fremde Adresse gehört nicht
+   ungeprüft in ein src (und viele Wirte sperren Hotlinks ohnehin aus). */
+function ziehJob(ziel) {
   const el = document.createElement("div");
   el.className = "job";
-  el.innerHTML = `<img class="thumb" alt="" referrerpolicy="no-referrer">
+  el.innerHTML = `<img class="thumb" alt="">
     <div class="body"><div class="title">${esc(t("drag.reading"))}</div>
     <div class="meta" data-step>${esc(t("drag.stepStart"))}</div>
     <div class="bar"><i style="width:35%"></i></div></div>`;
-  const im = el.querySelector(".thumb");
-  im.onerror = () => im.removeAttribute("src");
-  if (bild) im.src = bild;
   ziel.prepend(el);
   return el;
 }
@@ -1724,9 +1749,7 @@ async function ziehImport(dt, ziel) {
   }
 
   const lang = $("#d-lang").value;
-  const bild = nutzlast.urls.find(u => /\.(?:jpe?g|png|webp|gif|avif)(?:[?#]|$)/i.test(u))
-            || nutzlast.urls[0] || "";
-  const el = ziehJob(ziel, bild);
+  const el = ziehJob(ziel);
   const schritt = s => { const n = el.querySelector("[data-step]"); if (n) n.textContent = s; };
   try {
     const r = await ziehErkennen(nutzlast, lang, schritt);
