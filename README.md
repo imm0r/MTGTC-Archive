@@ -748,6 +748,14 @@ einzige Pixelangabe:
   Element selbst; genau das macht die Rechnung auflösungsunabhängig.
 * Beim Überfahren wechselt das Fenster auf `aspect-ratio: 63/88` und der
   Versatz entfällt — aus dem Balken wird die ganze Karte.
+* Die **letzte Karte** eines Stapels liegt immer offen da. Beschnitten wird ja
+  nur, weil jede Karte die nächste verdeckt — unter der letzten liegt aber
+  nichts mehr. So sieht auch ein echter Fächer aus: lauter Namensbalken und
+  obenauf eine ganze Karte. Das gilt auf jedem Gerät; mit dem Finger gibt es
+  kein Überfahren, und sonst bliebe gar keine Karte zu sehen.
+
+Eine Auflage ohne Bild klappt nicht auf (`:has(img)`) — sie würde sonst zu einem
+großen leeren Rechteck mit einem Namen darin. Ihr Balken bleibt ein Balken.
 
 Der Kopf jeder Spalte nennt **Anzahl und Wert** der Gruppe und klappt sie zu;
 der Zustand ist derselbe wie in der Tabelle. Eine fehlende Karte trägt eine rote
