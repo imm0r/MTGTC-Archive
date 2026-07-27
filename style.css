@@ -154,11 +154,18 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .coll-count b{color:var(--acc);font-weight:700;font-variant-numeric:tabular-nums}
 #tbl,#wtbl{scroll-margin-top:70px}
 /* Wunschliste: die Spalte „Geplant in" trägt je Deck einen Chip (wie in den
-   Kartendetails). Umbrechen statt die Spalte breit zu ziehen — eine Wunschkarte
-   kann in mehreren Decks eingeplant sein, die Tabelle soll darüber nicht
-   ausufern. */
+   Kartendetails). Mehrere Chips dürfen untereinander rutschen — eine Wunschkarte
+   kann in mehreren Decks eingeplant sein, und die Tabelle soll darüber nicht
+   ausufern. Der EINZELNE Chip bricht dagegen nie um: „Winter, Misanthropic
+   Guide · 1×" auf zwei Zeilen sieht aus wie zwei Angaben und zerreißt die
+   Zeilenhöhe. Ist der Name zu lang, wird er gekürzt (…), nicht umbrochen —
+   und zwar nur er: die Anzahl bleibt immer stehen, sie ist die Aussage der
+   Spalte. Der ganze Name steht im Titel. */
 .wunsch-decks{max-width:220px}
-.wunsch-decks .deck-chip{margin:1px 3px 1px 0}
+.wunsch-decks .deck-chip{margin:1px 3px 1px 0;max-width:100%;
+  display:inline-flex;align-items:baseline;gap:4px;vertical-align:top}
+.wunsch-decks .dc-nm{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.wunsch-decks .dc-n{flex:0 0 auto}
 /* Zähler am Navigationspunkt: auf dem AKTIVEN Knopf liegt Gold auf Gold —
    dort die Farben tauschen, sonst wäre die Zahl unsichtbar. Gilt auch für die
    Zähler im Benutzermenü (Nachrichten, Spielrunde). */
@@ -1123,9 +1130,12 @@ dialog::backdrop{background:#000a}
    springen. */
 .detail-decks{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:2px 0 4px}
 .detail-decks-lbl{font-size:13px;color:var(--dim);margin-right:2px}
+/* nowrap gilt für ALLE Deck-Chips, auch die in den Kartendetails: ein Chip ist
+   eine Angabe und gehört auf eine Zeile. Mehrere Chips brechen weiterhin
+   gegeneinander um, das regelt der umgebende Kasten. */
 .deck-chip{background:var(--panel2);border:1px solid var(--line);color:var(--txt);
   border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer;
-  transition:border-color .15s,color .15s}
+  white-space:nowrap;transition:border-color .15s,color .15s}
 .deck-chip:hover,.deck-chip:focus-visible{border-color:var(--acc);color:var(--acc);outline:none}
 .sec-sep{height:1px;background:var(--line);margin:14px 0}
 .dt-results-full{margin-top:14px}
