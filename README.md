@@ -701,14 +701,16 @@ Seine Breite steht fest statt mit dem Inhalt zu wachsen. Der Hinweis wechselt
 mit der Strg-Taste, der zweite Text ist kürzer — ein mitwachsender Balken zuckte
 mitten im Zug unter der Hand zusammen und nähme die Schaltflächen mit.
 
-#### Die Mülltonne
+#### Die Truhe: zurück in die Sammlung
 
-Unten rechts erscheint während eines Zuges eine **Mülltonne**. Wer eine Karte
-dort fallen lässt, löst ihren **Deckplatz** auf — die Sammlungszeile bleibt, wo
-sie ist. Dasselbe, was der Papierkorb in der Tabellenzeile tut; in der
-Kartenansicht gab es dafür bisher gar keinen Weg.
+Unten rechts erscheint während eines Zuges eine **Truhe**
+(`assets/del-card-from-deck.png`). Wer eine Karte dort fallen lässt, löst ihren
+**Deckplatz** auf — die Sammlungszeile bleibt, wo sie ist. Genau das sagt das
+Bild: Die Karte wandert nicht in den Müll, sondern zurück ins Regal. Dasselbe,
+was der Papierkorb in der Tabellenzeile tut; in der Kartenansicht gab es dafür
+bisher gar keinen Weg.
 
-Ohne Rückfrage, mit Meldung: Ein Zug in die Tonne ist eine bewusste Bewegung
+Ohne Rückfrage, mit Meldung: Ein Zug in die Truhe ist eine bewusste Bewegung
 über den halben Bildschirm, und die Karte ist mit einem Griff wieder drin. Eine
 Rückfrage bei jedem Ablegen machte gerade das Durchsortieren zäh, um das es hier
 geht.
@@ -875,7 +877,7 @@ klebten hinter ihr.
 #### Karte ins Deck: eintippen und hinüberziehen
 
 Links in der Leiste steht im Ruhezustand nur ein **Symbol**
-(`assets/karte-zum-deck.png`; fehlt die Datei, tritt die Beschriftung an seine
+(`assets/add-card-to-deck.png`; fehlt die Datei, tritt die Beschriftung an seine
 Stelle — ein Knopf ohne beides wäre eine leere Fläche, die niemand anklickt).
 Der Klick klappt das Suchfeld nach rechts aus; was man tippt, sucht in der
 **eigenen Sammlung**. Aus der Trefferliste **zieht** man die Karte in die
@@ -915,7 +917,7 @@ Karte schon als fehlender Eintrag im Deck und hat man sie inzwischen gekauft,
 wird der Eintrag umgehängt, statt einen neuen anzulegen. Das Deck wächst dabei
 nicht — und im vollen Deck ist es der einzige verbliebene Weg.
 
-Beim Ziehen aus der Liste bleibt die **Mülltonne** aus: Aus einem Deck werfen
+Beim Ziehen aus der Liste bleibt die **Truhe** aus: Aus einem Deck nehmen
 kann man nur, was darin ist.
 
 In der Trefferliste zeigt das Überfahren eines Eintrags dieselbe
