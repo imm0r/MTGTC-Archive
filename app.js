@@ -6953,7 +6953,7 @@ function stapelLeisteHtml(d) {
     <div class="stapel-zugabe">
       <button type="button" class="stapel-zugabe-knopf" data-zugabe="${d.id}"
         title="${esc(t("deck.addFloat"))}" aria-label="${esc(t("deck.addFloat"))}">
-        <img class="stapel-zugabe-bild" src="assets/karte-zum-deck.png" alt="">
+        <img class="stapel-zugabe-bild" src="assets/add-card-to-deck.png" alt="">
         <span class="stapel-zugabe-text">${esc(t("deck.addFloat"))}</span>
       </button>
       <div class="sugg stapel-zugabe-feld">
@@ -7513,10 +7513,16 @@ function katDropBox() {
       <div class="katdrop-fuss" id="katdrop-fuss"></div>
     </div>
     <button type="button" class="katdrop-muell" data-katdrop="-">
-      <span class="katdrop-muell-bild" aria-hidden="true">&#128465;</span>
+      <img class="katdrop-muell-bild" src="assets/del-card-from-deck.png" alt="">
+      <span class="katdrop-muell-zeichen" aria-hidden="true">&#128465;</span>
       <span class="katdrop-name" id="katdrop-muell-text"></span>
     </button>`;
   document.body.appendChild(el);
+  // Fehlt das Bild, tritt das Schriftzeichen an seine Stelle — dieselbe Regel
+  // wie am Zugabe-Knopf: lieber ein karges Zeichen als ein leeres Feld.
+  const muellbild = el.querySelector(".katdrop-muell-bild");
+  muellbild?.addEventListener("error",
+    () => muellbild.closest(".katdrop-muell")?.classList.add("ohne-bild"), { once: true });
   return el;
 }
 

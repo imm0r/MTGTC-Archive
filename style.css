@@ -1345,7 +1345,11 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
   max-width:170px;padding:9px 14px;border-radius:12px;cursor:copy;
   border:2px dashed rgba(226,86,86,.5);background:rgba(38,20,24,.72);color:var(--dim)}
 .katdrop-muell>*{pointer-events:none}
-.katdrop-muell-bild{font-size:19px;line-height:1}
+.katdrop-muell-bild{display:block;width:34px;height:34px;object-fit:contain}
+/* Ersatz, falls das Bild fehlt — dieselbe Regel wie am Zugabe-Knopf. */
+.katdrop-muell-zeichen{display:none;font-size:19px;line-height:1}
+.katdrop-muell.ohne-bild .katdrop-muell-bild{display:none}
+.katdrop-muell.ohne-bild .katdrop-muell-zeichen{display:block}
 .katdrop-muell.ueber{border-style:solid;border-color:var(--err);color:var(--err);
   background:linear-gradient(rgba(226,86,86,.16),rgba(226,86,86,.16)),rgba(38,20,24,.85);
   box-shadow:0 0 0 3px rgba(226,86,86,.25)}
