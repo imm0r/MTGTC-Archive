@@ -17,6 +17,16 @@
 # soll keine package.json bekommen, die etwas anderes nahelegt. Die einzige
 # Abhängigkeit (playwright-core, nur der Treiber ohne Browser) liegt unter
 # tests/.
+#
+# WARUM AUCH AUF push:main — und was das ausgleicht: Der Commit der
+# Versions-Automatik (version.yml) trägt die Sprungmarke „skip ci" im Betreff.
+# GitHub überspringt daraufhin auch das synchronize-Ereignis des Pull Requests,
+# dieser Lauf hier läuft für den Nachtrag also NICHT erneut. Geprüft ist damit
+# der Code-Commit, nicht der zusammengeführte Stand. Angefasst hat der Nachtrag
+# nur <meta name="app-version"> und die ?v=-Werte in index.html — und der
+# Squash auf main trägt die Marke nicht, löst hier also sofort einen vollen
+# Lauf aus. Diese beiden Hälften ergeben zusammen die Abdeckung; wer eine davon
+# entfernt, sollte die andere ersetzen.
 
 name: Prüfungen
 
