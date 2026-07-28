@@ -726,8 +726,7 @@ Kategorie" liegen. Das ist Absicht: Geraten wird nicht.
 oder **Karten**. In der Kartenansicht wird jede Gruppe eine **Spalte**, und die
 Karten darin liegen als Stapel — sichtbar ist von jeder nur ihr
 **Namensbalken**, also der obere Streifen des echten Kartenbildes. Beim
-Überfahren klappt die Karte in voller Größe auf und schiebt den Stapel nach
-unten.
+Überfahren **schwebt** die ganze Karte über dem Stapel.
 
 Warum der Bildausschnitt und nicht Text: Der Balken trägt Name, Manakosten und
 die Rahmenfarbe in der Gestaltung der Karte selbst. Das ist dieselbe Auskunft,
@@ -746,13 +745,31 @@ einzige Pixelangabe:
 * Das Bild wird auf volle Breite gezogen und um 3,5 % **seiner eigenen Höhe**
   nach oben geschoben. Prozentwerte in `translateY` beziehen sich auf das
   Element selbst; genau das macht die Rechnung auflösungsunabhängig.
-* Beim Überfahren wechselt das Fenster auf `aspect-ratio: 63/88` und der
-  Versatz entfällt — aus dem Balken wird die ganze Karte.
+* Beim Überfahren erscheint dieselbe Karte ungeschnitten als **schwebendes**
+  Bild über dem Stapel.
 * Die **letzte Karte** eines Stapels liegt immer offen da. Beschnitten wird ja
   nur, weil jede Karte die nächste verdeckt — unter der letzten liegt aber
   nichts mehr. So sieht auch ein echter Fächer aus: lauter Namensbalken und
   obenauf eine ganze Karte. Das gilt auf jedem Gerät; mit dem Finger gibt es
   kein Überfahren, und sonst bliebe gar keine Karte zu sehen.
+
+**Warum die Karte schwebt und den Stapel nicht auseinanderschiebt.** Das war
+zuerst anders, und der Unterschied ist kein Geschmack: Schob das Aufklappen die
+Karten darunter weg, war der Weg von unten nach oben ruhig und der von oben nach
+unten unbrauchbar. Die aufgeklappte Karte wanderte unter den Zeiger, und beim
+Verlassen sprang die Liste um ihre Höhe zurück — man landete nicht auf der
+nächsten Karte, sondern irgendwo weiter unten. Schwebend bleiben die Streifen
+fest liegen, und der Zeiger geht sie der Reihe nach ab, in beide Richtungen
+gleich. Die schwebende Karte trägt dafür `pointer-events: none`: Sie verdeckt
+die Streifen darunter, darf sie aber nicht abfangen.
+
+**Die Kartenbilder sind ausdrücklich nicht ziehbar** (`draggable="false"` plus
+`-webkit-user-drag: none`). Ein Bild ist es von Haus aus, und in der
+Kartenansicht *ist* der Streifen ein Bild: Drückte man darauf und bewegte sich,
+startete der Browser seinen eigenen Bild-Zug und meldete unseren Zeiger mit
+`pointercancel` ab — die Ablageflächen erschienen dann gar nicht. Das Attribut
+steht zusätzlich zur CSS-Eigenschaft am Element, weil Firefox auf letztere nicht
+hört.
 
 Eine Auflage ohne Bild klappt nicht auf (`:has(img)`) — sie würde sonst zu einem
 großen leeren Rechteck mit einem Namen darin. Ihr Balken bleibt ein Balken.
