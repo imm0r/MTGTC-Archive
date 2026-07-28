@@ -45,13 +45,21 @@ header{position:sticky;top:0;z-index:10;background:var(--panel);border-bottom:1p
        padding:10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 h1{font-size:17px;margin:0;letter-spacing:.5px;color:var(--acc)}
 nav{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;align-items:center}
-/* Keine Pillen mehr: derselbe Radius wie überall sonst in der App (Knöpfe 8 px,
-   Karten 12 px). Eine runde Pille um ein Bild plus Wort wirkt wie ein Etikett,
-   das man abziehen könnte — und je größer das Bild darin, desto mehr. */
+/* Kein Kasten im Ruhezustand — weder Pille noch Rahmen. Ein Bild und ein Wort
+   sind für sich schon eine Schaltfläche; die Linie darum zog vier gleich
+   aussehende Rechtecke in eine Reihe und machte aus der Navigation ein
+   Formular.
+   Das Polster bleibt (7/13 statt 6/12 — die fehlende Rahmenbreite ist
+   eingerechnet), damit die Klickfläche dieselbe bleibt: Was man nicht sieht,
+   trifft man trotzdem.
+   Der aktive Punkt trägt weiterhin die Goldtönung, den Schein und das
+   ungedämpfte Bild. Drei Zeichen für einen Zustand sind genug; der Rahmen war
+   das vierte und das schwächste. Beim Überfahren genügt eine Andeutung. */
 nav button{display:inline-flex;align-items:center;gap:8px;
-           background:transparent;border:1px solid var(--line);color:var(--dim);
-           padding:6px 12px;border-radius:8px;cursor:pointer;font-size:14px}
-nav button.on{background:var(--akt-flaeche);border-color:var(--akt-rand);color:var(--acc2);
+           background:transparent;border:0;color:var(--dim);
+           padding:7px 13px;border-radius:8px;cursor:pointer;font-size:14px}
+nav button:hover{background:rgba(255,255,255,.055);color:var(--txt)}
+nav button.on,nav button.on:hover{background:var(--akt-flaeche);color:var(--acc2);
                font-weight:600;box-shadow:var(--akt-schein)}
 /* Die Sinnbilder der obersten Navigation sind gemalte Illustrationen, keine
    flachen Piktogramme. Vier davon in voller Farbe nebeneinander machen aus
