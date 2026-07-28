@@ -6951,9 +6951,10 @@ async function autoEinordnen(deckId) {
 function stapelLeisteHtml(d) {
   return `<div class="stapel-leiste">
     <div class="stapel-zugabe">
-      <button type="button" class="stapel-zugabe-knopf" data-zugabe="${d.id}">
-        <span class="stapel-zugabe-zeichen" aria-hidden="true">&plus;</span>
-        <span>${esc(t("deck.addFloat"))}</span>
+      <button type="button" class="stapel-zugabe-knopf" data-zugabe="${d.id}"
+        title="${esc(t("deck.addFloat"))}" aria-label="${esc(t("deck.addFloat"))}">
+        <img class="stapel-zugabe-bild" src="assets/karte-zum-deck.png" alt="">
+        <span class="stapel-zugabe-text">${esc(t("deck.addFloat"))}</span>
       </button>
       <div class="sugg stapel-zugabe-feld">
         <input type="text" data-zusuch="${d.id}" tabindex="-1"
@@ -7061,19 +7062,24 @@ function schwebemasseBeobachten() {
 }
 
 function schwebemasseMessen() {
-  // Null wird NICHT geschrieben. Gezeichnet wird auch, während die Anwendung
-  // noch verborgen ist (der erste Aufbau nach der Anmeldung) — dort misst jedes
-  // Element null, und eine Null überschriebe den brauchbaren Ersatzwert im
-  // Stylesheet mit einem falschen. Lieber nichts sagen als etwas Falsches: Die
-  // nächste Messung (Größenänderung, nächstes Zeichnen) holt es nach.
+  // Gefragt wird "ist es sichtbar", nicht "ist es höher als null". Gezeichnet
+  // wird auch, während die Anwendung noch verborgen ist (der erste Aufbau nach
+  // der Anmeldung) — dort misst jedes Element null, und eine Null überschriebe
+  // den brauchbaren Ersatzwert im Stylesheet mit einem falschen.
+  //
+  // Höhe null ist dagegen ein GÜLTIGES Ergebnis: Im breiten Fenster liegt die
+  // Leiste neben dem Raster statt darüber und ist genau null hoch. Würde das
+  // nicht geschrieben, klebten die Spaltenköpfe weiter um eine Leistenhöhe zu
+  // tief — genau der Zwischenraum, der dort nicht hingehört.
+  const sichtbar = el => !!el && el.offsetParent !== null;
   const kopf = document.querySelector("header");
-  if (kopf?.offsetHeight) {
+  if (sichtbar(kopf)) {
     document.documentElement.style.setProperty("--kopf-oben", kopf.offsetHeight + "px");
   }
-  // Auf dem Deck selbst, nicht global: Zwei aufgeklappte Decks können
-  // verschieden hohe Leisten haben (ein langer Deckname bricht um).
+  // Auf dem Deck selbst, nicht global: Zwei aufgeklappte Decks könnten
+  // verschieden hohe Leisten haben.
   $$(".stapel-leiste").forEach(l => {
-    if (l.offsetHeight) l.parentElement?.style.setProperty("--leiste-hoehe", l.offsetHeight + "px");
+    if (sichtbar(l)) l.parentElement?.style.setProperty("--leiste-hoehe", l.offsetHeight + "px");
   });
 }
 addEventListener("resize", schwebemasseMessen);
@@ -7353,6 +7359,12 @@ function katZiehBewegt(e) {
     a.tr.classList.add("zieht");
     document.body.classList.add("zieht-gerade");   // nichts markieren während des Zuges
     hideHover();                     // die Vorschau schwebt höher als die Flächen
+    // Die Trefferliste hat ihren Dienst getan und läge jetzt im Weg: Seit die
+    // Deckleiste NEBEN dem Raster steht statt darüber, hängt sie genau über der
+    // ersten Spaltenreihe. Sie verschwände zwar von selbst, wenn die Eingabe
+    // den Fokus verliert — aber erst nach einer Viertelsekunde, und in der
+    // sieht man die Ziele nicht, auf die man zielt.
+    if (a.neu) zugabeListeSchliessen();
     katGeistAn(a.cardId);
     katDropAn(a.deckId, a.cardId, a.neu);
   }
@@ -8305,6 +8317,11 @@ function renderDecks() {
     const box = btn.closest(".stapel-zugabe");
     const inp = box?.querySelector("[data-zusuch]");
     if (!inp) return;
+    // Fehlt das Bild, tritt die Beschriftung an seine Stelle. Ein Knopf ohne
+    // Aufschrift UND ohne Bild wäre eine leere Fläche, die niemand anklickt;
+    // lieber wieder Worte als gar nichts.
+    const bild = btn.querySelector(".stapel-zugabe-bild");
+    if (bild) bild.addEventListener("error", () => btn.classList.add("ohne-bild"), { once: true });
     zugabeSucheVerdrahten(inp, deckId);
     const auf = () => { box.classList.add("offen"); inp.removeAttribute("tabindex"); inp.focus(); };
     const zu  = () => { box.classList.remove("offen"); inp.setAttribute("tabindex", "-1"); inp.value = ""; };
@@ -8467,6 +8484,14 @@ function zugabeMeldung(d, c, grund) {
    Sammlung zu und ist damit teurer als ein Textvergleich. Die Zahl der
    durchgesehenen Treffer ist begrenzt — bei zwei Buchstaben passen sonst
    hunderte Karten, und geprüft würde jede. */
+/* Alle offenen Trefferlisten wegräumen. Global statt am einzelnen Feld: Der
+   Zug beginnt in der Zustandsmaschine am Fenster, die keine Ahnung hat, aus
+   welcher Liste er kam — und offen sein kann ohnehin nur eine. */
+function zugabeListeSchliessen() {
+  $$(".stapel-zugabe-feld ul").forEach(u => u.remove());
+  hideHover();
+}
+
 function zugabeSucheVerdrahten(inp, deckId) {
   const box = inp.parentElement;
   let liste = null;

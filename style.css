@@ -1018,18 +1018,57 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
 .stapel-leiste{position:sticky;top:var(--kopf-oben,52px);z-index:12;
   display:flex;align-items:center;gap:8px;flex-wrap:wrap;
   margin-top:10px;padding:6px 2px}
+
+/* Ab genügend Breite steht die Leiste NEBEN dem Raster statt darüber.
+
+   Der Gewinn ist der Zwischenraum: Solange sie eine eigene Zeile belegte,
+   klebten die Spaltenköpfe um ihre Höhe tiefer, und zwischen Seitenkopf und
+   erstem Spaltentitel klaffte ein leerer Streifen. Mit height:0 belegt sie
+   keine Zeile mehr, --leiste-hoehe wird zu null, und die Köpfe rücken direkt
+   unter die Kopfzeile.
+
+   Platz bekommen Knopf und Name aus dem Raster: Es rückt links und rechts ein.
+   Die Spalten werden dadurch schmaler — genau das ist der Handel.
+
+   pointer-events:none an der nun null Pixel hohen Leiste, damit ihre leere
+   Fläche nicht über den Spalten liegt und Klicks abfängt; die beiden Kinder
+   holen es sich zurück. */
+/* Beide Maße an EINER Stelle, auf dem Deck selbst — dort liegt auch die
+   gemessene --leiste-hoehe. Der Knopf im Bild-Zustand ist rund 44 px breit;
+   fällt er auf die Beschriftung zurück (Bild fehlt), braucht er das Dreifache,
+   und das Raster rückt entsprechend weiter ein. So ragt er in keinem der
+   beiden Zustände in die erste Spalte. */
+.deck-inhalt{--zugabe-platz:56px;--name-platz:242px}
+.deck-inhalt:has(.stapel-zugabe-knopf.ohne-bild){--zugabe-platz:162px}
+@media(min-width:1000px){
+  .stapel-leiste{height:0;margin:0;padding:0;align-items:flex-start;
+    flex-wrap:nowrap;pointer-events:none}
+  .stapel-leiste>*{pointer-events:auto}
+  .deck-stapel{margin-top:10px;
+    padding-left:var(--zugabe-platz);padding-right:var(--name-platz)}
+  .stapel-deckname{max-width:calc(var(--name-platz) - 12px)}
+}
 /* Der Zugang zur Sammlung: erst nur eine Schaltfläche, das Feld klappt nach
    RECHTS aus. */
 .stapel-zugabe{display:flex;align-items:center;gap:8px;min-width:0}
 /* Eigener Grund, nicht durchsichtig: Die Schaltfläche schwebt beim Scrollen
-   über Kartenbildern, und darauf wäre eine durchsichtige nicht mehr zu lesen. */
+   über Kartenbildern, und darauf wäre eine durchsichtige nicht mehr zu lesen.
+   Eingeklappt trägt sie NUR das Bild — der Name der Sache steht im Namenszettel
+   und für Vorleseprogramme im aria-label. */
 .stapel-zugabe-knopf{display:flex;align-items:center;gap:6px;flex:none;
-  padding:6px 12px;border-radius:8px;cursor:pointer;white-space:nowrap;
+  padding:4px 6px;border-radius:10px;cursor:pointer;white-space:nowrap;
   background:rgba(27,29,39,.92);border:1px solid var(--line);color:var(--acc2);
   font:600 13px/1.2 inherit;box-shadow:0 2px 8px rgba(0,0,0,.45)}
 .stapel-zugabe-knopf:hover,.stapel-zugabe.offen .stapel-zugabe-knopf{
   border-color:var(--akt-rand);background:var(--akt-flaeche)}
-.stapel-zugabe-zeichen{font-size:16px;line-height:1}
+.stapel-zugabe-bild{display:block;width:32px;height:32px;object-fit:contain;
+  -webkit-user-drag:none;user-drag:none}
+/* Die Beschriftung ist der Ersatz, falls das Bild nicht lädt — ein Knopf ohne
+   beides wäre eine leere Fläche, die niemand anklickt. */
+.stapel-zugabe-text{display:none}
+.stapel-zugabe-knopf.ohne-bild{padding:6px 12px}
+.stapel-zugabe-knopf.ohne-bild .stapel-zugabe-bild{display:none}
+.stapel-zugabe-knopf.ohne-bild .stapel-zugabe-text{display:inline}
 .stapel-zugabe-feld{flex:none}
 /* Die Breite wandert am EINGABEFELD, nicht an seiner Hülle. Die Hülle trägt
    position:relative und darunter hängt die Trefferliste — ein overflow:hidden
