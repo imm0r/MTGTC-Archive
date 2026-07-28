@@ -839,13 +839,21 @@ Eine Kategorie mit vierzig Karten ist mehrere Bildschirme hoch. Zwei Dinge
 * Der **Spaltenkopf**. Scrollte er weg, stand man vor einer Wand aus
   Namensbalken und wusste beim Ziehen nicht mehr, welche Spalte welche ist —
   genau in dem Moment, in dem man es braucht.
-* Die **Deckleiste** darüber: links der Zugang zur Sammlung, rechts der Name des
-  Decks, an dem man gerade baut. Sie ist **keine Kachel** — kein Grund, kein
-  Rahmen. Was dort steht, sind zwei Dinge: eine Schaltfläche, die ihren eigenen
-  Rahmen mitbringt, und ein Name. Eine Fläche darum herum wäre ein Kasten um
-  nichts und verdeckte beim Schweben eine ganze Streifenreihe. Der Name trägt
-  dafür einen Schatten statt eines Grundes: Er schwebt über Kartenbildern, und
-  Gold auf hellem Rahmen ist sonst schwer zu lesen.
+* Die **Deckleiste**: links der Zugang zur Sammlung, rechts der Name des Decks,
+  an dem man gerade baut. Sie ist **keine Kachel** — kein Grund, kein Rahmen.
+  Was dort steht, sind zwei Dinge: eine Schaltfläche, die ihren eigenen Rahmen
+  mitbringt, und ein Name. Eine Fläche darum herum wäre ein Kasten um nichts.
+  Der Name trägt dafür einen Schatten statt eines Grundes: Er schwebt über
+  Kartenbildern, und Gold auf hellem Rahmen ist sonst schwer zu lesen.
+
+Ab **1000 px Fensterbreite steht die Leiste neben dem Raster**, nicht darüber:
+Sie ist dann null Pixel hoch, und Knopf und Name ragen links und rechts in
+Ränder hinein, um die das Raster einrückt. Der Gewinn ist der Zwischenraum —
+solange sie eine eigene Zeile belegte, klebten die Spaltenköpfe um ihre Höhe
+tiefer, und zwischen Seitenkopf und erstem Spaltentitel klaffte ein leerer
+Streifen. Bezahlt wird das mit schmaleren Spalten; ein sehr langer Deckname wird
+gekürzt (vollständig steht er im Deck-Kopf darüber). Unter 1000 px wäre der
+Handel zu teuer — dort steht die Leiste weiter über dem Raster.
 
 Aufgeklappt ist **immer höchstens ein Deck**. An einem Deck arbeitet man, nicht
 an dreien; zwei Kartenansichten untereinander sind zwei Spaltenlandschaften, und
@@ -866,11 +874,18 @@ klebten hinter ihr.
 
 #### Karte ins Deck: eintippen und hinüberziehen
 
-Links in der Leiste steht im Ruhezustand nur **„＋ Karte zum Deck"**. Der Klick
-klappt das Suchfeld nach rechts aus; was man tippt, sucht in der **eigenen
-Sammlung**. Aus der Trefferliste **zieht** man die Karte in die Kategorie, in
-die sie gehört — dieselbe Geste wie das Umsortieren, nur dass der Deckplatz
-dabei erst entsteht.
+Links in der Leiste steht im Ruhezustand nur ein **Symbol**
+(`assets/karte-zum-deck.png`; fehlt die Datei, tritt die Beschriftung an seine
+Stelle — ein Knopf ohne beides wäre eine leere Fläche, die niemand anklickt).
+Der Klick klappt das Suchfeld nach rechts aus; was man tippt, sucht in der
+**eigenen Sammlung**. Aus der Trefferliste **zieht** man die Karte in die
+Kategorie, in die sie gehört — dieselbe Geste wie das Umsortieren, nur dass der
+Deckplatz dabei erst entsteht.
+
+Beginnt der Zug, schließt sich die Trefferliste **sofort**. Seit die Leiste
+neben dem Raster steht, hängt die Liste genau über der ersten Spaltenreihe; von
+selbst verschwände sie erst eine Viertelsekunde später, und in der sieht man die
+Ziele nicht, auf die man zielt.
 
 Kein Mengenfeld, kein Hinzufügen-Knopf. Beides kostete Breite in einer Leiste,
 in der die Breite dem Decknamen fehlt, und der Weg über zwei Schritte („wählen",
