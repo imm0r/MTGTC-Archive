@@ -7400,12 +7400,28 @@ function katDropAn(deckId, cardId) {
   const drin = new Set((((d.entries || []).find(en => en.cardId === cardId)?.kats) || []).map(z => z.id));
   const box = katDropBox();
   $("#katdrop-kopf").textContent = t("katdrop.title", { name: karte.disp });
+  // Der Überblick FÜLLT DIE LÜCKE — er wiederholt nicht, was ohnehin dasteht.
+  // Wer nach Kategorien gruppiert, hat jedes Fach als Spalte vor sich und zieht
+  // direkt hinüber; eine zweite Reihe derselben Namen kostete nur Platz und
+  // verdeckte gerade das, worauf man zielt. Wer nach Typ gruppiert, hat KEINE
+  // Fächer auf dem Schirm — dort ist der Überblick der einzige Weg und führt
+  // sie vollständig auf.
+  //
+  // Gefragt wird der Baum, nicht die Einstellung: Was als Spalte dasteht, ist
+  // die eine Wahrheit, die zählt. Eine zweite Ableitung derselben Frage
+  // ("gruppiert dieses Deck gerade nach Kategorien?") liefe irgendwann anders.
+  const alsSpalte = new Set($$(`[data-dropdeck]`)
+    .filter(el => el.dataset.dropdeck === deckId).map(el => el.dataset.katdrop));
   $("#katdrop-felder").innerHTML = [
-    ...(d.kategorien || []).map(k =>
+    ...(d.kategorien || []).filter(k => !alsSpalte.has(k.id)).map(k =>
       `<button type="button" class="katdrop-feld${drin.has(k.id) ? " drin" : ""}" data-katdrop="${esc(k.id)}">
          <span class="katdrop-name">${esc(k.name)}</span>
          ${drin.has(k.id) ? `<span class="katdrop-marke">${esc(t("katdrop.already"))}</span>` : ""}
        </button>`),
+    // Diese beiden bleiben immer: "Ohne Kategorie" gibt es als Spalte nur,
+    // solange auch eine Karte darin liegt — räumt man die letzte heraus,
+    // verschwände mit ihr der Weg zurück. Und angelegt wird ein neues Fach
+    // ohnehin nirgends sonst im Zug.
     `<button type="button" class="katdrop-feld leer" data-katdrop="">
        <span class="katdrop-name">${esc(t("kat.none"))}</span></button>`,
     `<button type="button" class="katdrop-feld neu" data-katdrop="+">
