@@ -10,10 +10,18 @@ Commits übernehmen, die GitHub vorschlägt. Zwei Gründe: der Verlauf auf `main
 liest sich als ein Text je Änderung, und der Commit der Versions-Automatik
 trägt die Sprungmarke `[skip ci]` im Betreff (siehe
 `.github/workflows/version.yml`) — wanderte die mit nach `main`, liefe dort
-kein Workflow aus `.github/workflows` mehr an. Heute hängt keiner davon an
-`push` (`prices.yml` und `uptime-monitor.yml` laufen nach Zeitplan), der
-Schaden bliebe also klein; der nächste, den jemand hinzufügt, bliebe
-stillschweigend aus.
+kein Workflow aus `.github/workflows` mehr an. **Seit `pruefungen.yml` ist das
+kein kleiner Schaden mehr:** die Prüfungen aus `tests/` hängen an `push` auf
+`main` und blieben stillschweigend aus. (`prices.yml` und `uptime-monitor.yml`
+laufen weiter nach Zeitplan und merkten nichts davon.)
+
+Dieselbe Marke sorgt schon im Pull Request für eine Lücke: Nach dem Commit der
+Versions-Automatik laufen die Prüfungen dort **nicht erneut**. Sie haben also
+den Code-Commit gesehen, aber nicht den Stand, der zusammengeführt wird. Das
+ist hinnehmbar, weil der Nachtrag nur `<meta name="app-version">` und die
+`?v=`-Werte in `index.html` anfasst — und weil der Squash-Commit auf `main`
+(ohne Marke, siehe oben) sofort einen vollen Lauf auslöst. Wer diese Reihenfolge
+ändert, nimmt genau diese Absicherung weg.
 
 ### Die Sprungmarke nie ausschreiben
 
