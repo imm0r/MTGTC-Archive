@@ -2710,7 +2710,7 @@ function cardRow(c, o = {}) {
            lässt — das war der eigentliche Fehler des ersten Anlaufs. -->
       <td class="hide-s">${imDeck ? `<span class="zieh-griff" data-ziehgriff
              title="${esc(t("katdrop.handle"))}" aria-hidden="true">&#8942;&#8942;</span>` : ""}${
-        c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy" data-view
+        c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy" data-view draggable="false"
              style="cursor:pointer" title="${esc(t("row.viewTitle"))}">` : ""}</td>
       <td><div data-view style="cursor:pointer" title="${esc(t("row.viewTitle"))}">${esc(c.disp)}</div>
           <div style="font-size:12px;color:var(--dim)">
@@ -6920,11 +6920,13 @@ function stapelKarteHtml(d, g, { e, c }) {
        title="${esc(c.disp)}${fehlt ? " — " + esc(t("row.missing", { n: fehlt })) : ""}">
     <span class="stapel-menge" data-ziehgriff>${e.qty}</span>
     <div class="stapel-fenster">${bild
-      ? `<img src="${esc(bild)}" alt="" loading="lazy">`
+      ? `<img src="${esc(bild)}" alt="" loading="lazy" draggable="false">`
       // Ohne Bild bleibt der Balken leer — dann trägt er den Namen als Text.
       // Scryfall führt nicht zu jeder Auflage ein Foto; eine graue Fläche ohne
       // Auskunft wäre schlechter als eine schlichte Zeile.
       : `<span class="stapel-ersatz">${esc(c.disp)}</span>`}</div>
+    ${bild ? `<div class="stapel-gross"><img src="${esc(bild)}" alt="" loading="lazy"
+         draggable="false"></div>` : ""}
   </div>`;
 }
 

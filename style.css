@@ -1014,10 +1014,20 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
 .stapel-spalte.zu .stapel-karten{display:none}
 
 .stapel-karten{display:flex;flex-direction:column;gap:3px}
-.stapel-karte{display:flex;align-items:flex-start;gap:5px;cursor:pointer;min-width:0}
+.stapel-karte{position:relative;display:flex;align-items:flex-start;gap:var(--stapel-luft);
+  cursor:pointer;min-width:0}
+/* Breite der Mengenspalte und der Abstand daneben — an EINER Stelle, weil die
+   schwebende Karte sich daran ausrichtet. */
+.stapel-karten{--stapel-menge:20px;--stapel-luft:5px}
+/* Kein Browser-Zug auf den Kartenbildern. Ein Bild ist von Haus aus ziehbar:
+   Drückt man auf einen Streifen und bewegt sich, startet der Browser SEINEN
+   Bild-Zug und meldet unseren Zeiger mit pointercancel ab — die Ablageflächen
+   erschienen dann gar nicht mehr. draggable="false" steht zusätzlich am
+   Element, weil Firefox auf diese CSS-Eigenschaft nicht hört. */
+.stapel-karte img,.deck-tbl td img{-webkit-user-drag:none;user-drag:none}
 /* Die Menge steht NEBEN der Karte, nicht darauf: Auf dem Balken verdeckte sie
    den Namen, und der ist das, wonach man sucht. */
-.stapel-menge{flex:none;width:20px;text-align:right;font-size:11px;line-height:18px;
+.stapel-menge{flex:none;width:var(--stapel-menge);text-align:right;font-size:11px;line-height:18px;
   color:var(--dim);font-variant-numeric:tabular-nums;cursor:grab;touch-action:none;
   user-select:none}
 .stapel-karte:hover .stapel-menge{color:var(--acc2)}
@@ -1035,19 +1045,35 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
    obenauf eine ganze Karte.
 
    Gilt auf jedem Gerät, nicht nur mit Zeiger: Mit dem Finger gibt es kein
-   Überfahren, und dann bliebe sonst gar keine Karte zu sehen. */
-/* :has(img), weil es ohne Bild nichts aufzuklappen gibt — eine Karte, für die
+   Überfahren, und dann bliebe sonst gar keine Karte zu sehen.
+
+   :has(img), weil es ohne Bild nichts aufzuklappen gibt — eine Karte, für die
    Scryfall kein Foto führt, würde sonst zu einem großen leeren Rechteck mit
    einem Namen darin. Ihr Balken bleibt ein Balken. */
 .stapel-karte:last-child .stapel-fenster:has(img){aspect-ratio:63/88}
 .stapel-karte:last-child .stapel-fenster img{transform:none}
 
-/* Aufklappen beim Überfahren: aus dem Balken wird die ganze Karte, der Stapel
-   darunter rückt nach. Nur auf Geräten mit Zeiger — mit dem Finger führt der
-   Tipp zur Detailansicht, die mehr zeigt als das Bild. */
+/* Beim Überfahren SCHWEBT die ganze Karte über dem Stapel, statt ihn
+   auseinanderzuschieben.
+
+   Der Unterschied ist kein Geschmack. Schob das Aufklappen die Karten darunter
+   weg, war der Weg von unten nach oben ruhig und der von oben nach unten
+   unbrauchbar: Die aufgeklappte Karte wanderte unter den Zeiger, und beim
+   Verlassen sprang die Liste um ihre Höhe zurück — man landete nicht auf der
+   nächsten Karte, sondern irgendwo weiter unten.
+
+   Schwebend bleibt der Stapel stehen. Die Streifen liegen fest, der Zeiger geht
+   sie der Reihe nach ab, in beide Richtungen gleich. pointer-events:none ist
+   dabei entscheidend: Die schwebende Karte verdeckt die Streifen darunter, darf
+   sie aber nicht abfangen — sonst hinge der Zeiger an ihr fest. */
+.stapel-gross{position:absolute;left:calc(var(--stapel-menge) + var(--stapel-luft));right:0;top:0;
+  z-index:5;display:none;pointer-events:none}
+.stapel-gross img{display:block;width:100%;border-radius:5px;
+  box-shadow:0 10px 28px rgba(0,0,0,.7)}
 @media(hover:hover){
-  .stapel-karte:hover .stapel-fenster:has(img){aspect-ratio:63/88}
-  .stapel-karte:hover .stapel-fenster img{transform:none}
+  /* Nicht bei der letzten: Die liegt ohnehin offen da, ein Schweben darüber
+     wäre dasselbe Bild ein zweites Mal. */
+  .stapel-karte:hover:not(:last-child) .stapel-gross{display:block}
 }
 @media(prefers-reduced-motion:reduce){ .stapel-fenster{transition:none} }
 
