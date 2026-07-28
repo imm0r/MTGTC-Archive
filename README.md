@@ -701,6 +701,23 @@ Seine Breite steht fest statt mit dem Inhalt zu wachsen. Der Hinweis wechselt
 mit der Strg-Taste, der zweite Text ist kürzer — ein mitwachsender Balken zuckte
 mitten im Zug unter der Hand zusammen und nähme die Schaltflächen mit.
 
+#### Die Mülltonne
+
+Unten rechts erscheint während eines Zuges eine **Mülltonne**. Wer eine Karte
+dort fallen lässt, löst ihren **Deckplatz** auf — die Sammlungszeile bleibt, wo
+sie ist. Dasselbe, was der Papierkorb in der Tabellenzeile tut; in der
+Kartenansicht gab es dafür bisher gar keinen Weg.
+
+Ohne Rückfrage, mit Meldung: Ein Zug in die Tonne ist eine bewusste Bewegung
+über den halben Bildschirm, und die Karte ist mit einem Griff wieder drin. Eine
+Rückfrage bei jedem Ablegen machte gerade das Durchsortieren zäh, um das es hier
+geht.
+
+Rot statt Gold, und weit weg von den Schaltflächen in der Mitte: Die Goldtönung
+heißt in dieser App überall „ausgewählt"; was etwas *wegnimmt*, darf nicht
+dieselbe Farbe tragen wie das, was etwas zuordnet. Im schmalen Fenster wandert
+sie nach oben rechts — unten stünde sie sonst im Balken.
+
 ### Geteilte Decks: die Einteilung des Erbauers
 
 Gibt ein Freund ein Deck frei, sieht man dort jetzt **seine** Kategorien —
@@ -802,11 +819,46 @@ hört.
 Eine Auflage ohne Bild klappt nicht auf (`:has(img)`) — sie würde sonst zu einem
 großen leeren Rechteck mit einem Namen darin. Ihr Balken bleibt ein Balken.
 
+**Kein Namenszettel des Browsers.** Die Streifen tragen kein `title`. Er legte
+sich über die Karte, die gerade aufklappte, kam mit Verzögerung und ging beim
+Ziehen nicht weg — und sagte nichts, was die aufgeklappte Karte nicht besser
+zeigt. Der Fehlbestand steht damit nicht mehr in Worten da; er bleibt am roten
+Ring und an der roten Menge daneben ablesbar.
+
 Der Kopf jeder Spalte nennt **Anzahl und Wert** der Gruppe und klappt sie zu;
 der Zustand ist derselbe wie in der Tabelle. Eine fehlende Karte trägt eine rote
 Kante statt der roten Pille, der Commander eine goldene — in einem Stapel ist
 der Rand die einzige Fläche, die frei bleibt. Hat eine Auflage bei Scryfall kein
 Bild, zeigt der Balken schlicht den Namen.
+
+#### Was beim Scrollen stehen bleibt
+
+Eine Kategorie mit vierzig Karten ist mehrere Bildschirme hoch. Zwei Dinge
+**kleben** deshalb:
+
+* Der **Spaltenkopf**. Scrollte er weg, stand man vor einer Wand aus
+  Namensbalken und wusste beim Ziehen nicht mehr, welche Spalte welche ist —
+  genau in dem Moment, in dem man es braucht.
+* Die **Deckleiste** darüber: links das Feld, mit dem eine Karte aus der
+  Sammlung ins Deck kommt, rechts der Name des Decks, an dem man gerade baut.
+  In Ruhe steht sie in ihrem eigenen Platz, beim Scrollen schwebt sie
+  durchscheinend über den Karten.
+
+In der Kartenansicht ersetzt die Leiste das Suchfeld im Werkzeugkasten darüber,
+statt es zu doppeln — zwei Eingaben mit demselben Kennzeichen wären ein Fehler,
+denn der Hinzufügen-Knopf sucht sich seine Eingabe genau darüber. In der
+Tabellenansicht bleibt es, wo es war.
+
+Wie hoch Seitenkopf und Deckleiste gerade sind, wird **gemessen** und als
+`--kopf-oben` / `--leiste-hoehe` abgelegt. Feste Zahlen im Stylesheet stimmten
+für ein Fenster und eine Sprache und für keine andere: Die Navigation bricht im
+schmalen Fenster um, und wie viele Zeilen dabei entstehen, hängt an der Länge
+der Wörter.
+
+In der Trefferliste des Suchfelds zeigt das Überfahren eines Eintrags dieselbe
+**Kartenvorschau** wie in der Tabelle. Ein Name mit Set-Kürzel sagt nicht, ob es
+die richtige Karte ist — vier Auflagen derselben Karte lesen sich in dieser
+Liste fast gleich.
 
 **Ziehen funktioniert hier genauso.** Streifen anfassen, Fächer erscheinen,
 loslassen — mit der Maus überall, mit dem Finger an der Mengenangabe links.

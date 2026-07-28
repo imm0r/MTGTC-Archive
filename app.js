@@ -6913,8 +6913,32 @@ async function autoEinordnen(deckId) {
    63 × 88 mm, ihr Namensbalken sitzt zwischen etwa 4 % und 10 % der Höhe. Das
    gilt für jede Auflösung und jede Spaltenbreite. Die Werte stehen in
    style.css, damit sie nicht zwischen zwei Sprachen wandern. */
+/* Die schwebende Leiste über dem Stapel: links das Suchfeld, mit dem eine Karte
+   aus der Sammlung ins Deck kommt, rechts der Deckname.
+
+   Sie KLEBT (position:sticky) unter der Kopfzeile der Seite. Ein Deck in der
+   Kartenansicht ist mehrere Bildschirme hoch; das Suchfeld oben im Panel wäre
+   nach dem ersten Scrollen weg, und der Name des Decks, an dem man gerade baut,
+   mit ihm. In Ruhe steht die Leiste in ihrem eigenen Platz, beim Scrollen
+   schwebt sie durchscheinend über den Karten.
+
+   Sie ersetzt das Feld im Werkzeugkasten darüber, statt es zu doppeln: Zwei
+   Eingaben mit demselben data-dadd wären ein Fehler, denn der Hinzufügen-Knopf
+   sucht sich seine Eingabe über genau dieses Kennzeichen ($ liefert die erste).
+   In der Tabellenansicht bleibt es deshalb, wo es war. */
+function stapelLeisteHtml(d) {
+  return `<div class="stapel-leiste">
+    <div class="sugg stapel-suche"><input type="text" data-dadd="${d.id}"
+      placeholder="${esc(t("deck.addCardPh"))}"></div>
+    <input type="number" class="stapel-anzahl" min="1" value="1" data-dqty="${d.id}"
+      title="${esc(t("common.qtyLabel"))}" aria-label="${esc(t("common.qtyLabel"))}">
+    <button class="btn ghost sm" data-daddbtn="${d.id}">${esc(t("deck.addBtn"))}</button>
+    <span class="stapel-deckname" title="${esc(d.name)}">${esc(d.name)}</span>
+  </div>`;
+}
+
 function deckStapelHtml(d, gruppen) {
-  return `<div class="deck-stapel">${gruppen.map(g => {
+  return `${stapelLeisteHtml(d)}<div class="deck-stapel">${gruppen.map(g => {
     const anz  = g.items.reduce((s, x) => s + x.e.qty, 0);
     const wert = g.items.reduce((s, x) => s + (x.c.price || 0) * x.e.qty, 0);
     const zu   = deckCatZu.has(`${d.id}|${g.key}`);
@@ -6936,10 +6960,14 @@ function stapelKarteHtml(d, g, { e, c }) {
   // Spaltenbreite gezogen, und "small" (146 px) würde dabei matschig.
   const bild = (c.img || "").replace("/small/", "/normal/");
   const haupt = d.main_card_id === c.id || d.second_card_id === c.id;
+  // KEIN title. Der Streifen klappt beim Überfahren zur ganzen Karte auf — der
+  // Namenszettel des Browsers legte sich obendrauf, kam mit Verzögerung und ging
+  // beim Ziehen nicht weg. Er sagte auch nichts, was die aufgeklappte Karte nicht
+  // besser zeigt. Der Fehlbestand steht damit nicht mehr in Worten da; er bleibt
+  // am roten Ring um den Streifen und an der roten Menge daneben ablesbar.
   return `<div class="stapel-karte${fehlt ? " fehlt" : ""}${haupt ? " cmd" : ""}"
        data-id="${c.id}" data-deck="${esc(d.id)}"
-       data-vonkat="${esc(g.key.startsWith("k:") ? g.key.slice(2) : "")}"
-       title="${esc(c.disp)}${fehlt ? " — " + esc(t("row.missing", { n: fehlt })) : ""}">
+       data-vonkat="${esc(g.key.startsWith("k:") ? g.key.slice(2) : "")}">
     <span class="stapel-menge" data-ziehgriff>${e.qty}</span>
     <div class="stapel-fenster">${bild
       ? `<img src="${esc(bild)}" alt="" loading="lazy" draggable="false">`
@@ -6965,7 +6993,38 @@ function wireStapel(root) {
       showCardDetail(id);
     });
   });
+  schwebemasseMessen();
 }
+
+/* Woran die klebenden Sachen hängen. Zwei Höhen, beide gemessen statt geraten:
+
+   • Die Kopfzeile der Seite klebt bereits oben; darunter muss die Deckleiste
+     ansetzen. Ihre Höhe steht nicht fest — die Navigation bricht im schmalen
+     Fenster um, und wie viele Zeilen dabei entstehen, hängt an der Sprache.
+   • Die Spaltenköpfe kleben wiederum unter der Deckleiste, brauchen also auch
+     deren Höhe.
+
+   Als feste Zahlen im Stylesheet stimmte das für ein Fenster und eine Sprache
+   und für keine andere. Gemessen wird nach jedem Zeichnen und bei jeder
+   Größenänderung; das sind die einzigen beiden Gelegenheiten, bei denen sich
+   etwas daran ändern kann. */
+function schwebemasseMessen() {
+  // Null wird NICHT geschrieben. Gezeichnet wird auch, während die Anwendung
+  // noch verborgen ist (der erste Aufbau nach der Anmeldung) — dort misst jedes
+  // Element null, und eine Null überschriebe den brauchbaren Ersatzwert im
+  // Stylesheet mit einem falschen. Lieber nichts sagen als etwas Falsches: Die
+  // nächste Messung (Größenänderung, nächstes Zeichnen) holt es nach.
+  const kopf = document.querySelector("header");
+  if (kopf?.offsetHeight) {
+    document.documentElement.style.setProperty("--kopf-oben", kopf.offsetHeight + "px");
+  }
+  // Auf dem Deck selbst, nicht global: Zwei aufgeklappte Decks können
+  // verschieden hohe Leisten haben (ein langer Deckname bricht um).
+  $$(".stapel-leiste").forEach(l => {
+    if (l.offsetHeight) l.parentElement?.style.setProperty("--leiste-hoehe", l.offsetHeight + "px");
+  });
+}
+addEventListener("resize", schwebemasseMessen);
 
 /* Die Kategorien einer Karte als Marken für die Tabellenzelle. Die primäre
    steht vorn und ist hervorgehoben, der Rest folgt in der Reihenfolge des
@@ -7371,11 +7430,22 @@ function katDropBox() {
   el = document.createElement("div");
   el.id = "kat-drop";
   el.hidden = true;
+  // Die Mülltonne steht in derselben Schicht, aber nicht im Balken: Sie ordnet
+  // nicht ein, sie löst den Deckplatz auf. Unten rechts, weit weg von den
+  // Schaltflächen in der Mitte — dorthin gerät man nicht versehentlich.
+  //
+  // Sie trägt dasselbe Kennzeichen data-katdrop wie jedes andere Ziel, damit
+  // Hervorheben und Loslassen denselben Weg gehen (katFeldUnter). Ihr Wert "-"
+  // ist der einzige, der kein Fach meint; katAbgelegt fängt ihn vorweg ab.
   el.innerHTML = `<div class="katdrop-innen">
       <div class="katdrop-kopf" id="katdrop-kopf"></div>
       <div class="katdrop-felder" id="katdrop-felder"></div>
       <div class="katdrop-fuss" id="katdrop-fuss"></div>
-    </div>`;
+    </div>
+    <button type="button" class="katdrop-muell" data-katdrop="-">
+      <span class="katdrop-muell-bild" aria-hidden="true">&#128465;</span>
+      <span class="katdrop-name" id="katdrop-muell-text"></span>
+    </button>`;
   document.body.appendChild(el);
   return el;
 }
@@ -7428,6 +7498,7 @@ function katDropAn(deckId, cardId) {
        <span class="katdrop-name">&plus; ${esc(t("kat.addLabel"))}</span></button>`,
   ].join("");
   $("#katdrop-fuss").textContent = t("katdrop.hint");
+  $("#katdrop-muell-text").textContent = t("katdrop.trash");
   box.hidden = false;
   // Dieselbe Auskunft wie die Marke "liegt schon dort" auf den Kacheln — nur
   // an den Spalten, weil man beim direkten Ziehen gar nicht auf die Kacheln
@@ -7470,6 +7541,10 @@ async function katAbgelegt(zug, ziel, zusatz) {
   const { deckId, cardId, vonKat } = zug;
   const d = DECKS.find(x => x.id === deckId);
   if (!d) return;
+  // Die Mülltonne VOR der Fächer-Prüfung: Eine Karte aus dem Deck zu werfen hat
+  // mit Kategorien nichts zu tun und muss auch dann gehen, wenn deren Tabellen
+  // fehlen.
+  if (ziel === "-") return karteAusDeckWerfen(deckId, cardId);
   if (DECK_KAT_TABELLE_FEHLT) return toast(t("kat.needSchema"));
   const alt = ((d.entries || []).find(en => en.cardId === cardId)?.kats) || [];
 
@@ -7487,6 +7562,25 @@ async function katAbgelegt(zug, ziel, zusatz) {
     const { soll, prim } = katDropSoll(alt, vonKat, zielId, zusatz);
     const geschrieben = await katsSchreiben(deckId, cardId, soll, prim);
     if (geschrieben || ziel === "+") await katsFertig(deckId, cardId);
+  } catch (e) { toast(dbErr(e)); }
+}
+
+/* Den DECKPLATZ auflösen, nicht die Karte. Die Sammlungszeile bleibt, wo sie
+   ist — was hier verschwindet, ist der Eintrag "diese Karte gehört in dieses
+   Deck". Dasselbe, was der Papierkorb in der Tabellenzeile tut; in der
+   Kartenansicht gab es dafür bisher gar keinen Weg.
+
+   Ohne Rückfrage, mit Meldung: Ein Zug in die Tonne ist eine bewusste Bewegung
+   über den halben Bildschirm, und die Karte ist mit einem Griff wieder drin.
+   Eine Rückfrage bei jedem Ablegen machte gerade das Durchsortieren zäh, um das
+   es hier geht. */
+async function karteAusDeckWerfen(deckId, cardId) {
+  try {
+    const { error } = await sb.from("deck_entries").delete()
+      .eq("deck_id", deckId).eq("card_id", cardId);
+    if (error) throw error;
+    await reload(); renderAll();
+    toast(t("toast.removedFromDeck"));
   } catch (e) { toast(dbErr(e)); }
 }
 
@@ -7754,6 +7848,7 @@ function renderDecks() {
       </div>
       <div class="deck-inhalt" style="display:${offen ? "block" : "none"}">
         <div class="deck-tools">
+          ${rows && deckAnsicht.karten(d.id) ? "" : `
           <div class="tool-group">
             <span class="tool-label">${esc(t("deck.addCard"))}</span>
             <div class="tool-row">
@@ -7762,8 +7857,8 @@ function renderDecks() {
                 <input type="number" min="1" value="1" data-dqty="${d.id}"></div>
               <button class="btn ghost" data-daddbtn="${d.id}">${esc(t("deck.addBtn"))}</button>
             </div>
-          </div>
-          ${rows ? `<div class="tool-sep"></div>
+          </div>`}
+          ${rows ? `${deckAnsicht.karten(d.id) ? "" : `<div class="tool-sep"></div>`}
           <div class="tool-cols">
             <div class="tool-group">
               <span class="tool-label">${esc(t("deck.groupOverview"))}</span>
@@ -8165,7 +8260,9 @@ function renderDecks() {
 function attachLocalSuggest(inp) {
   const box = inp.parentElement;
   let list = null;
-  const close = () => { list?.remove(); list = null; };
+  // hideHover mit schließen: Sonst bliebe die Vorschau stehen, wenn die Liste
+  // unter ihr verschwindet — sie hängt an keinem Element, das dabei mit weggeht.
+  const close = () => { list?.remove(); list = null; hideHover(); };
   inp.addEventListener("input", () => {
     close();
     const v = inp.value.trim().toLowerCase();
@@ -8184,6 +8281,17 @@ function attachLocalSuggest(inp) {
         e.preventDefault(); inp.value = c.disp; close();
         inp.dispatchEvent(new CustomEvent("deck-pick", { detail: c.id }));
       };
+      // Dieselbe Vorschau wie in der Tabelle: Ein Name mit Set-Kürzel sagt nicht,
+      // ob es die richtige Karte ist — vier Auflagen derselben Karte lesen sich
+      // in dieser Liste fast gleich. Nur mit Zeiger; auf dem Handy gibt es kein
+      // Überfahren, dort bleibt die Liste, wie sie war.
+      if (HOVER_OK) {
+        li.addEventListener("mouseenter", ev => {
+          clearTimeout(hoverTimer);
+          hoverTimer = setTimeout(() => showHover(c.id, ev.clientX, ev.clientY), 250);
+        });
+        li.addEventListener("mouseleave", hideHover);
+      }
       list.appendChild(li);
     });
     box.appendChild(list);
