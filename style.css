@@ -37,10 +37,26 @@ header{position:sticky;top:0;z-index:10;background:var(--panel);border-bottom:1p
        padding:10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 h1{font-size:17px;margin:0;letter-spacing:.5px;color:var(--acc)}
 nav{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;align-items:center}
-nav button{background:transparent;border:1px solid var(--line);color:var(--dim);
+nav button{display:inline-flex;align-items:center;gap:7px;
+           background:transparent;border:1px solid var(--line);color:var(--dim);
            padding:7px 14px;border-radius:999px;cursor:pointer;font-size:14px}
 nav button.on{background:var(--akt-flaeche);border-color:var(--akt-rand);color:var(--acc2);
                font-weight:600;box-shadow:var(--akt-schein)}
+/* Die Sinnbilder der obersten Navigation sind gemalte Illustrationen, keine
+   flachen Piktogramme. Vier davon in voller Farbe nebeneinander machen aus
+   einer ruhigen Kopfzeile einen Jahrmarkt — und dann sieht auch der Text
+   daneben falsch aus.
+   Deshalb: im Ruhezustand entsättigt und abgedunkelt, in voller Farbe erst
+   beim aktiven Punkt und beim Überfahren. Das ist dieselbe Aussage, die die
+   Knöpfe ohnehin machen ("hier bin ich"), nur mit einem zweiten Mittel — und
+   es hält die Aufmerksamkeit bei dem einen Punkt, der gerade zählt.
+   Die Höhe richtet sich nach der Schrift, nicht umgekehrt: 22 px neben 14 px
+   Text. Ein größeres Bild schöbe den Text an den Rand des Knopfes. */
+.nav-sym{flex:none;width:22px;height:22px;object-fit:contain;
+  filter:saturate(.45) brightness(.85);transition:filter .15s ease-out;
+  -webkit-user-drag:none;user-drag:none}
+nav button:hover .nav-sym,nav button.on .nav-sym{filter:none}
+@media(prefers-reduced-motion:reduce){ .nav-sym{transition:none} }
 /* Neben dem Logo: Statusseite und Version, zweizeilig untereinander. */
 .header-meta{display:inline-flex;flex-direction:column;align-items:flex-start;
              gap:1px;line-height:1.25;min-width:0}
