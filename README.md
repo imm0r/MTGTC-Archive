@@ -1105,7 +1105,7 @@ Darunter — also auf einem hochkant gehaltenen Handy — steht dasselbe als
 **Akkordeon**: eine Zone auf einmal. Das ist keine Bequemlichkeit, sondern
 Notwendigkeit: von den schmalen Mattenspalten blieben bei 390 px rund 50 px
 übrig, eine Kartenminiatur ist 62 px breit. Beide Anordnungen zeigen dieselben
-Zonen, dieselben Zielknöpfe, denselben Zustand.
+Zonen, dieselben Ziele beim Ziehen, denselben Zustand.
 
 > Drehen kann die App das Gerät nicht selbst — `screen.orientation.lock()` gibt
 > es nur im Vollbild und nur auf Android, iOS Safari kennt es gar nicht. Im
@@ -1117,16 +1117,41 @@ dem Handy die zuletzt angetippte. So bleibt die Ansicht kurz, statt sechs Listen
 untereinander zu stapeln. Die zugeklappten Kopfzeilen zeigen Anzahl und ein paar
 Miniaturen, damit man auch ohne Aufklappen sieht, was drinliegt.
 
-**Karten verschieben.** Zeigen (bzw. antippen) hebt eine Karte an und blendet
-ihre Zielknöpfe ein — je erlaubter Zone einer, mit dem Zeichen aus der Tabelle
-oben. Ziehst du im Spiel eine Karte, suchst du sie unten in der Bibliothek und
-schickst sie mit ✋ auf die Hand; von dort geht sie mit ⚔️ ins Spiel, später mit
-⚰️ in den Friedhof. Jeder Weg lässt sich auch rückwärts gehen.
+**Karten verschieben: ziehen.** Mit der Maus fasst du eine Karte an und lässt
+sie über der Zielzone los — dieselbe Geste, mit der im Deckbau eine Karte in
+eine Kategorie wandert. Beim Anheben zeichnen sich die erlaubten Zonen vor, die
+unter dem Zeiger leuchtet auf, Escape bricht ab. Wohin eine Karte darf, ist
+dabei dieselbe Regel wie eh und je: die Bibliothek nur für normale Karten, die
+Kommandozone nur für Commander.
 
-**Auf dem Schlachtfeld** kann eine Karte mehr als nur daliegen. Der Knopf ↻
-tappt sie — das Bild dreht sich um 90° wie am Tisch —, ＋ und − legen +1/+1-Marken
-drauf und wieder herunter. Oben in der Zone richtet **alle enttappen** in einem
-Klick den ganzen Tisch wieder auf.
+Ziehst du im Spiel eine Karte, suchst du sie unten in der Bibliothek und ziehst
+sie auf die **Hand**; von dort aufs **Schlachtfeld**, später in den
+**Friedhof**. Jeder Weg lässt sich auch rückwärts gehen.
+
+> **Warum nicht mehr über Knöpfe.** Bis dahin trug jede Karte auf dem
+> Schlachtfeld vier davon — Friedhof, Exil, Hand, Bibliothek, bei einem
+> Commander fünf. Bei 62 px Kartenbreite war das eine Knopfleiste, breiter als
+> die Karte, die sie bedient, und man musste ihre Zeichen auseinanderhalten,
+> bevor man traf. Eine Zone dagegen ist ein großes Feld mit Namen und Zeichen
+> in der Kopfzeile: Man zieht dorthin, wo man ohnehin hinsieht.
+
+**Mit dem Finger** geht es weiter über Knöpfe: Antippen hält die Kartenansicht
+fest, und dort stehen sie alle — je erlaubter Zone ein Zielknopf mit dem Zeichen
+aus der Tabelle oben, dazu ↻ und die Marken. Zug und Tappklick sind bewusst der
+Maus vorbehalten, denn ein Kartengitter muss unter dem Finger rollen können; das
+ginge nur, wenn man jeder Karte das Rollen abgewöhnte. Ohne diesen Weg gäbe es
+auf einem Tablet überhaupt keinen mehr, eine Karte vom Schlachtfeld
+herunterzubekommen.
+
+**Auf dem Schlachtfeld** kann eine Karte mehr als nur daliegen. **Ein Klick
+tappt sie** — das Bild dreht sich um 90° wie am Tisch —, ein zweiter richtet sie
+wieder auf. Auch dafür gibt es keinen Knopf mehr: Am Tisch dreht man die Karte
+selbst, nicht eine Schaltfläche daneben. ＋ und − legen +1/+1-Marken drauf und
+wieder herunter; die bleiben Knöpfe, weil es für sie keine Geste gibt. Oben in
+der Zone richtet **alle enttappen** in einem Klick den ganzen Tisch wieder auf.
+
+> Ein Klick, der aus einem *Zug* entstand, tappt nichts — sonst drehte sich jede
+> Karte, die man nur verschieben wollte.
 
 Gleiche Exemplare fassen sich zu einem Stapel zusammen: fünf ungetappte Wälder
 sind ein Bild mit `×5`. Tappst du einen, spaltet sich `×4` und `×1 getappt` ab.
@@ -1146,18 +1171,18 @@ fest. Erst dann wird sie bedienbar und trägt die Zielknöpfe.
 Dieselbe Ansicht hat **jede** Karte in jeder Zone, auf Zeigen wie auf Klick.
 Zonenkacheln sind in den schmalen Mattenspalten nur 48 px breit — ohne Vorschau
 erkennt man dort nicht, welche Karte man vor sich hat, und müsste sich
-durchklicken. Zum *Verschieben* ist die Ansicht in diesen Spalten (Kommandozone,
-Bibliothek, Exil, Friedhof) sogar der einzige Weg: eine Knopfleiste ist rund
-113 px breit und wurde vom Spaltenrand abgeschnitten. Auf dem Schlachtfeld und
-bei den Ländern bleibt die schnelle Leiste am Kartenbild, weil Tappen und Marken
-die häufigsten Handgriffe im Spiel sind.
+durchklicken. Zum *Verschieben* ohne Maus ist sie der Weg: dort stehen die Zielknöpfe. Auf
+dem Schlachtfeld und bei den Ländern bleibt zusätzlich die schnelle Leiste am
+Kartenbild, aber nur noch mit ↻ und den Marken — Tappen und Marken sind die
+häufigsten Handgriffe im Spiel, und für sie gibt es keinen Zug.
 
 **Wo die Ansicht erscheint**, hängt vom Platz ab. Ab **1200 px** hat die Matte
 ganz rechts eine eigene Spalte dafür („Karte"): Was du anzeigst, erscheint immer
 an **derselben** Stelle, statt als Fenster über dem Spielfeld — der Tisch bleibt
 frei, und der Blick muss die Karte nicht suchen. Beim Mausaustritt bleibt die
 zuletzt gezeigte Karte stehen (nur die Zielknöpfe verschwinden), sonst flackerte
-die Fläche im Spiel dauernd. Darunter — und im Akkordeon — schwebt sie wie bisher
+die Fläche im Spiel dauernd — beim Ziehen zeigt sie damit gerade die Karte, die
+am Zeiger hängt. Darunter — und im Akkordeon — schwebt sie wie bisher
 am Zeiger; auf einem Handy gibt es für eine feste Spalte keinen Platz. Dort
 blendet sie sich außerdem erst nach kurzem Verweilen ein, damit nicht bei jedem
 Überstreichen ein Fenster aufpoppt.
