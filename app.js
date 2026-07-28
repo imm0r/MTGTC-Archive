@@ -7189,17 +7189,25 @@ function katZiehAnfassen(e, tr, deckId, cardId) {
   if (e.target?.closest?.("input, button, select, textarea, a")) return;
   ziehAnsatz = { x: e.clientX, y: e.clientY, tr, deckId, cardId,
                  vonKat: tr.dataset.vonkat || null, id: e.pointerId };
+  // KEIN setPointerCapture. Es liegt nahe, den Zeiger hier zu fangen, damit der
+  // Zug nicht abreißt — aber ein gefangener Zeiger leitet auch den folgenden
+  // click auf das fangende Element um. Das Kartenbild bekäme seinen Klick nie
+  // mehr, und die Detailansicht ginge nicht auf. Gebraucht wird das Fangen
+  // ohnehin nicht: Bewegung und Loslassen hören am Fenster zu und erreichen
+  // uns, wohin der Zeiger auch gerät.
 }
 
 function katZiehBewegt(e) {
+  // Ohne gedrückte Taste gibt es keinen Zug. Diese Prüfung fängt den Fall ab,
+  // dass ein Loslassen gar nicht bei uns ankam (außerhalb des Fensters, vom
+  // System abgefangen) — sonst bliebe der Ansatz stehen und startete bei der
+  // nächsten Bewegung einen Zug, den niemand begonnen hat und den kein
+  // Loslassen beendet.
+  if (ziehAnsatz && !ziehKat && e.buttons === 0) { ziehAnsatz = null; return; }
   if (ziehAnsatz && !ziehKat) {
     if (Math.hypot(e.clientX - ziehAnsatz.x, e.clientY - ziehAnsatz.y) < ZIEH_SCHWELLE) return;
     const a = ziehAnsatz;
     ziehKat = { deckId: a.deckId, cardId: a.cardId, vonKat: a.vonKat };
-    // Der Zeiger gehört ab jetzt der Zeile: Auch wenn er über andere Elemente
-    // fährt, kommen ihre Ereignisse weiter hier an — ohne das reißt der Zug ab,
-    // sobald man die Tabelle verlässt.
-    try { a.tr.setPointerCapture(a.id); } catch { /* Zeiger schon weg */ }
     a.tr.classList.add("zieht");
     document.body.classList.add("zieht-gerade");   // nichts markieren während des Zuges
     hideHover();                     // die Vorschau schwebt höher als die Flächen
@@ -7217,14 +7225,12 @@ function katZiehBewegt(e) {
    Zeigeereignisse durchlässig, also trifft die Prüfung die Fläche darunter. */
 function katZiehLos(e) {
   const zug = ziehKat;
-  const ansatz = ziehAnsatz;
-  ziehAnsatz = null;
+  ziehAnsatz = null;                                  // in JEDEM Fall räumen
   if (!zug) return;                                   // war doch nur ein Klick
   const feld = katFeldUnter(e.clientX, e.clientY);
   katZiehAus();
   // Ein Klick, der aus einem Zug entstand, darf die Detailansicht nicht öffnen.
   katKlickSchlucken();
-  try { ansatz?.tr.releasePointerCapture(ansatz.id); } catch { /* egal */ }
   if (feld) katAbgelegt(zug, feld.dataset.katdrop, e.ctrlKey || e.metaKey);
 }
 
@@ -7295,14 +7301,27 @@ function ziehVerdrahten(el, deckId, cardId) {
   el.addEventListener("pointerdown", e => {
     if (e.pointerType === "mouse") katZiehAnfassen(e, el, deckId, cardId);
   });
-  el.addEventListener("pointermove", katZiehBewegt);
-  el.addEventListener("pointerup", katZiehLos);
+  // Bewegung und Loslassen hängen NICHT hier, sondern am Fenster (einmal für
+  // die ganze Sitzung, weiter unten). Am Element war das ein Fehler mit Folgen:
+  // Ein Stapelstreifen ist rund 23 px hoch, und schon die sechs Pixel bis zur
+  // Zugschwelle führen den Zeiger heraus. Danach kam kein pointermove mehr an,
+  // der Zug begann nie, und das Loslassen erreichte das Element ebenso wenig —
+  // der halb gesetzte Zustand blieb stehen und startete bei der nächsten
+  // Bewegung einen Zug ohne gedrückte Taste, den nichts mehr beendete. In der
+  // Tabelle fiel das nicht auf: Eine Zeile ist 64 px hoch.
 }
 
-/* Abbruch mit Escape — und mit dem Zeiger, den das System uns wegnimmt
-   (Anruf, Fensterwechsel). Einmal für die ganze Sitzung verdrahtet. */
-addEventListener("keydown", e => { if (e.key === "Escape" && ziehKat) katZiehAus(); });
-addEventListener("pointercancel", () => { if (ziehKat) katZiehAus(); });
+/* Die Zustandsmaschine des Ziehens hängt am FENSTER, nicht an den Elementen.
+   So ist es gleichgültig, wie groß das Angefasste ist und wohin der Zeiger
+   unterwegs gerät. Beide Funktionen steigen sofort aus, wenn gerade nichts
+   gezogen wird — sie kosten also nichts.
+
+   Abbruch mit Escape und mit dem Zeiger, den das System uns wegnimmt (Anruf,
+   Fensterwechsel), gehört aus demselben Grund hierher. */
+addEventListener("pointermove", katZiehBewegt);
+addEventListener("pointerup", katZiehLos);
+addEventListener("keydown", e => { if (e.key === "Escape" && (ziehKat || ziehAnsatz)) katZiehAus(); });
+addEventListener("pointercancel", () => { if (ziehKat || ziehAnsatz) katZiehAus(); });
 
 /* Die Ablagefläche entsteht einmal und bleibt danach im Baum — sie wird nur
    neu gefüllt. Ein bei jedem Zug neu gebautes Element verlöre den Zug in dem
