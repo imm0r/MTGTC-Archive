@@ -1003,27 +1003,30 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
 .deck-stapel{display:grid;gap:12px;margin-top:12px;align-items:start;
   grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
 
-/* Die schwebende Deckleiste: links das Suchfeld, rechts der Deckname.
+/* Die schwebende Deckleiste: links der Zugang zur Sammlung, rechts der
+   Deckname. Sie klebt unter der Kopfzeile der Seite, steht also nach dem ersten
+   Scrollen ÜBER den Karten statt über ihnen.
 
-   Sie klebt unter der Kopfzeile der Seite, steht also nach dem ersten Scrollen
-   ÜBER den Karten statt über ihnen. Durchscheinend, damit man sieht, worüber
-   sie liegt — dieselbe Sprache wie der Balken am unteren Rand.
+   KEINE Kachel: kein Grund, kein Rahmen, kein Weichzeichner. Was hier steht,
+   sind zwei Dinge — eine Schaltfläche, die ihren eigenen Rahmen mitbringt, und
+   ein Name. Eine Fläche darum herum wäre ein Kasten um nichts und verdeckte
+   beim Schweben eine ganze Streifenreihe.
 
-   In Ruhe nimmt sie ihren eigenen Platz ein und verdeckt nichts; erst beim
-   Scrollen schwebt sie. Das ist der Unterschied zu position:fixed, das ihr von
-   Anfang an einen Streifen der Spalten wegnähme. */
+   Der Name bekommt dafür einen Schatten statt eines Grundes: Er schwebt über
+   Kartenbildern, und Gold auf hellem Rahmen ist sonst schwer zu lesen. Ein
+   Schatten kostet keine Fläche. */
 .stapel-leiste{position:sticky;top:var(--kopf-oben,52px);z-index:12;
   display:flex;align-items:center;gap:8px;flex-wrap:wrap;
-  margin-top:10px;padding:7px 10px;border-radius:12px;
-  background:rgba(27,29,39,.82);border:1px solid var(--line);
-  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+  margin-top:10px;padding:6px 2px}
 /* Der Zugang zur Sammlung: erst nur eine Schaltfläche, das Feld klappt nach
    RECHTS aus. */
 .stapel-zugabe{display:flex;align-items:center;gap:8px;min-width:0}
+/* Eigener Grund, nicht durchsichtig: Die Schaltfläche schwebt beim Scrollen
+   über Kartenbildern, und darauf wäre eine durchsichtige nicht mehr zu lesen. */
 .stapel-zugabe-knopf{display:flex;align-items:center;gap:6px;flex:none;
   padding:6px 12px;border-radius:8px;cursor:pointer;white-space:nowrap;
-  background:transparent;border:1px solid var(--line);color:var(--acc2);
-  font:600 13px/1.2 inherit}
+  background:rgba(27,29,39,.92);border:1px solid var(--line);color:var(--acc2);
+  font:600 13px/1.2 inherit;box-shadow:0 2px 8px rgba(0,0,0,.45)}
 .stapel-zugabe-knopf:hover,.stapel-zugabe.offen .stapel-zugabe-knopf{
   border-color:var(--akt-rand);background:var(--akt-flaeche)}
 .stapel-zugabe-zeichen{font-size:16px;line-height:1}
@@ -1051,7 +1054,8 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
    sprengen — dann bräche das Suchfeld auf eine zweite Zeile um. */
 .stapel-deckname{margin-left:auto;flex:0 1 auto;min-width:0;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  font-size:14px;font-weight:600;color:var(--acc2)}
+  font-size:14px;font-weight:600;color:var(--acc2);
+  text-shadow:0 1px 3px #000,0 0 8px #000}
 .stapel-spalte{background:var(--panel2);border:1px solid var(--line);border-radius:10px;
   padding:8px;min-width:0}
 /* Der Spaltenkopf KLEBT. Eine Kategorie mit vierzig Karten ist mehrere

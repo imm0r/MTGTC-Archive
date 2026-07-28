@@ -840,8 +840,18 @@ Eine Kategorie mit vierzig Karten ist mehrere Bildschirme hoch. Zwei Dinge
   Namensbalken und wusste beim Ziehen nicht mehr, welche Spalte welche ist —
   genau in dem Moment, in dem man es braucht.
 * Die **Deckleiste** darüber: links der Zugang zur Sammlung, rechts der Name des
-  Decks, an dem man gerade baut. In Ruhe steht sie in ihrem eigenen Platz, beim
-  Scrollen schwebt sie durchscheinend über den Karten.
+  Decks, an dem man gerade baut. Sie ist **keine Kachel** — kein Grund, kein
+  Rahmen. Was dort steht, sind zwei Dinge: eine Schaltfläche, die ihren eigenen
+  Rahmen mitbringt, und ein Name. Eine Fläche darum herum wäre ein Kasten um
+  nichts und verdeckte beim Schweben eine ganze Streifenreihe. Der Name trägt
+  dafür einen Schatten statt eines Grundes: Er schwebt über Kartenbildern, und
+  Gold auf hellem Rahmen ist sonst schwer zu lesen.
+
+Aufgeklappt ist **immer höchstens ein Deck**. An einem Deck arbeitet man, nicht
+an dreien; zwei Kartenansichten untereinander sind zwei Spaltenlandschaften, und
+welche Spalte zu welchem Deck gehört, sieht man ihr nicht an. Der gespeicherte
+Wert bleibt eine Liste, damit ältere Stände lesbar bleiben — gelesen wird davon
+nur noch das erste, und so heilt sich der Zustand beim ersten Aufruf.
 
 Wie hoch Seitenkopf und Deckleiste gerade sind, wird **gemessen** und als
 `--kopf-oben` / `--leiste-hoehe` abgelegt. Feste Zahlen im Stylesheet stimmten

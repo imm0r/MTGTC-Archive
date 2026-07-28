@@ -6170,15 +6170,28 @@ async function applyCardEdit(c, lang, cond, foil, neu) {
    Browser, nicht in der Datenbank — auf dem Handy will man andere Decks
    offen haben als am großen Bildschirm. Voreinstellung: zugeklappt, sonst
    scrollt man bei 90 Karten pro Deck ewig. */
+/* HÖCHSTENS EINS. An einem Deck arbeitet man, nicht an dreien: Zwei
+   aufgeklappte Kartenansichten sind zwei Spaltenlandschaften untereinander, und
+   welche Spalte zu welchem Deck gehört, sieht man ihr nicht an. Beim Ziehen war
+   das nicht bloß unübersichtlich, sondern eine Fehlerquelle — eine Karte gehört
+   in ein Fach IHRES Decks, und ein Fach des Nachbardecks nimmt sie zu Recht
+   nicht an.
+
+   Der gespeicherte Wert bleibt eine Liste, damit ältere Stände (mehrere offene
+   Decks) weiter lesbar sind; gelesen wird davon nur noch das erste. So heilt
+   sich der Zustand beim ersten Aufruf von selbst. */
 const deckOffen = {
-  lies() { try { return new Set(JSON.parse(localStorage.getItem("mtg-decks-offen") || "[]")); }
-           catch { return new Set(); } },
+  lies() {
+    try {
+      const a = JSON.parse(localStorage.getItem("mtg-decks-offen") || "[]");
+      return new Set(Array.isArray(a) ? a.slice(0, 1) : []);
+    } catch { return new Set(); }
+  },
   ist(id) { return this.lies().has(id); },
   schalte(id) {
-    const s = this.lies();
-    s.has(id) ? s.delete(id) : s.add(id);
-    localStorage.setItem("mtg-decks-offen", JSON.stringify([...s]));
-    return s.has(id);
+    const auf = !this.ist(id);
+    localStorage.setItem("mtg-decks-offen", JSON.stringify(auf ? [id] : []));
+    return auf;
   },
 };
 
@@ -6947,7 +6960,7 @@ function stapelLeisteHtml(d) {
           placeholder="${esc(t("deck.addCardPh"))}" aria-label="${esc(t("deck.addCard"))}">
       </div>
     </div>
-    <span class="stapel-deckname" title="${esc(d.name)}">${esc(d.name)}</span>
+    <span class="stapel-deckname">${esc(d.name)}</span>
   </div>`;
 }
 
@@ -8042,9 +8055,20 @@ function renderDecks() {
     if (ev.target.closest("button, .deck-legal-wrap")) return;
     const offen = deckOffen.schalte(k.dataset.toggle);
     const karte = k.parentElement;
-    karte.querySelector(".deck-inhalt").style.display = offen ? "block" : "none";
-    k.querySelector(".deck-pfeil").innerHTML = offen ? "&#9660;" : "&#9654;";
-    k.title = offen ? t("common.collapse") : t("common.expand");
+    // Die ANDEREN gleich mit zuklappen. deckOffen merkt sich nur noch eines;
+    // ohne diese Schleife stünde der Baum anders da als der gemerkte Zustand,
+    // bis das nächste Neuzeichnen ihn einholt. Neu gezeichnet wird hier
+    // absichtlich nicht — das verlöre die Scrollposition.
+    $$("#deck-list .deck-kopf").forEach(anderer => {
+      const auf = anderer === k && offen;
+      const inhalt = anderer.parentElement.querySelector(".deck-inhalt");
+      if (inhalt) inhalt.style.display = auf ? "block" : "none";
+      const pfeil = anderer.querySelector(".deck-pfeil");
+      if (pfeil) pfeil.innerHTML = auf ? "&#9660;" : "&#9654;";
+      anderer.title = auf ? t("common.collapse") : t("common.expand");
+    });
+    // Die klebenden Höhen hängen an einer Leiste, die eben erst sichtbar wurde.
+    schwebemasseMessen();
     // Einstellung „Combos automatisch laden": beim Aufklappen die Combo-Suche
     // anstoßen — über den Knopf, damit Busy-Zustand und Anzeige identisch zum
     // Handklick laufen. Nur wenn der Kasten noch leer ist (kein Doppel-Laden).
