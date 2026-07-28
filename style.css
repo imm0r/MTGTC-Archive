@@ -1126,8 +1126,15 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
    und man sieht beim Ziehen noch, woher die Karte kommt. Der Schleier ist
    bewusst dünn und OHNE Weichzeichner — der machte die Liste dahinter
    unleserlich und nahm damit genau die Orientierung, die er lassen sollte. */
+/* Der Schleier liegt über allem, FÄNGT aber nichts ab. Nur die Fläche in der
+   Mitte tut das. Daneben trifft die Prüfung „was liegt unter dem Zeiger" die
+   Spalte darunter — und genau daran hängt, dass sich eine Karte auch direkt in
+   eine Spalte fallen lässt, ohne den Umweg über eine Kachel. Vorher deckte der
+   Schleier das ganze Fenster ab und war für elementFromPoint immer das
+   Erste, was gefunden wurde. */
 #kat-drop{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-start;
-  justify-content:center;background:rgba(8,6,20,.38);padding:14px 20px 20px}
+  justify-content:center;background:rgba(8,6,20,.38);padding:14px 20px 20px;
+  pointer-events:none}
 #kat-drop[hidden]{display:none}
 /* Eine eigene Fläche statt frei schwebender Kacheln: Ohne sie blitzt die
    Tabelle zwischen den Kacheln durch, und das Ganze liest sich als Durcheinander
@@ -1141,7 +1148,7 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
 .katdrop-innen{width:min(900px,100%);max-height:100%;overflow-y:auto;overflow-x:hidden;
   text-align:center;padding:12px 14px 10px;border-radius:14px;
   background:rgba(27,29,39,.62);border:1px solid var(--akt-rand);
-  box-shadow:0 14px 40px rgba(0,0,0,.5)}
+  box-shadow:0 14px 40px rgba(0,0,0,.5);pointer-events:auto}
 .katdrop-kopf{font-size:14px;font-weight:600;color:var(--acc2);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .katdrop-fuss{margin-top:10px;font-size:12px;color:var(--dim)}
@@ -1167,11 +1174,41 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
    Goldtönung der Auswahl-Sprache zu schwach, um sich abzuheben. Sie liegt
    deshalb ÜBER dem eigenen Grund der Kachel, statt ihn zu ersetzen — dieselbe
    Sprache, nur nicht von der Transparenz aufgezehrt. */
+/* Die Tönung als Verlauf aus EINER Farbe, nicht als Farbe: Im
+   background-Kurzschreiber darf nur die letzte Lage eine Farbe sein. Zwei
+   Farben hintereinander sind ein Syntaxfehler, und der wirft die ganze
+   Anweisung weg — die Kachel unter dem Zeiger behielt dann ihren gewöhnlichen
+   Grund, und von den drei Zeichen wirkten nur zwei. */
 .katdrop-feld.ueber{border-color:var(--acc);border-style:solid;
-  background:var(--akt-flaeche),rgba(35,38,51,.72);
+  background:linear-gradient(var(--akt-flaeche),var(--akt-flaeche)),rgba(35,38,51,.72);
   color:var(--acc2);box-shadow:0 0 0 3px rgba(201,162,39,.22)}
 /* Die gezogene Zeile bleibt sichtbar, tritt aber zurück. */
 tr.zieht>td{opacity:.45}
+
+/* Die Gruppe SELBST als Ablagefläche — der kurze Weg neben dem Überblick.
+   Dieselbe Sprache wie die Kacheln: goldener Rahmen, goldene Tönung, Schein.
+   Wer beides sieht, soll nicht erst überlegen müssen, ob es dasselbe bedeutet.
+
+   Die Hervorhebung liegt UNTER dem Schleier des Überblicks und wird von ihm um
+   38 % abgedunkelt. Deshalb ist sie kräftiger angesetzt als die der Kacheln:
+   drei Pixel Schein statt zweier Andeutungen. Sie über den Schleier zu heben
+   wäre möglich (z-index), aber brüchig — es hinge daran, dass keiner der
+   Vorfahren je einen eigenen Stapelzusammenhang aufmacht. */
+.stapel-spalte.ueber{border-color:var(--acc);
+  background:linear-gradient(var(--akt-flaeche),var(--akt-flaeche)),var(--panel2);
+  box-shadow:0 0 0 3px rgba(201,162,39,.3)}
+.stapel-spalte.ueber .stapel-name{color:var(--acc2)}
+.deck-cat-body.ueber>tr>td{background:var(--akt-flaeche)}
+.deck-cat-body.ueber .deck-cat-name{color:var(--acc2)}
+/* Wo die Karte schon liegt. Zurückhaltender als die Hervorhebung: eine
+   Auskunft, kein Ziel — der Rahmen allein, ohne Tönung und ohne Schein. */
+.stapel-spalte.hat{border-color:var(--akt-rand)}
+.deck-cat-body.hat .deck-cat-name{color:var(--acc2);opacity:.75}
+/* Während eines Zuges klappt keine Karte mehr auf. Die schwebende Vorschau
+   liegt unter dem Schleier, wäre also ohnehin trübe — vor allem aber wandert
+   der Zeiger jetzt ÜBER die Stapel hinweg, und dabei ginge unter ihm eine
+   Vorschau nach der anderen auf. */
+body.zieht-gerade .stapel-gross{display:none}
 
 /* Der Griff. Er ist der Grund, dass man das Ziehen überhaupt findet — deshalb
    sichtbar und nicht erst beim Überfahren. touch-action:none ist hier

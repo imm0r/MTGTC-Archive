@@ -654,8 +654,8 @@ anfassen, nicht nur der Griff.
 
 Das ist nicht bloß Schauwert. Flächen, die schweben, brauchen im Layout **keinen
 Platz**: Sie verhalten sich bei jeder Auflösung gleich, funktionieren in der
-Tabelle ebenso wie später in der Spaltenansicht, und ersparen das Einordnen
-Karte für Karte über einen Dialog.
+Tabelle ebenso wie in der Kartenansicht, und ersparen das Einordnen Karte für
+Karte über einen Dialog.
 
 Die Regel dahinter, in drei Zeilen:
 
@@ -672,6 +672,26 @@ keines hatte oder wenn ausgerechnet das ersetzte Fach es trug — sonst bleibt e
 wo es war. Fächer, in denen die Karte schon liegt, sind beim Ziehen als solche
 gekennzeichnet. Eine Fläche **„+ Neue Kategorie"** legt eines an und ordnet
 gleich ein.
+
+#### Der kurze Weg: direkt in die Spalte
+
+Wer das Ziel ohnehin vor Augen hat, muss den Umweg über die Flächen nicht
+gehen: **Die Spalten und Tabellenblöcke sind selbst Ablageflächen.** Beim
+Ziehen leuchtet die Gruppe unter dem Zeiger auf, ein Rahmen zeigt an, wo die
+Karte schon liegt — loslassen, fertig. Es gilt dieselbe Regel wie oben, samt
+Strg und samt „Ohne Kategorie".
+
+Beide Wege stehen nebeneinander, weil sie verschiedene Fälle bedienen. Die
+schwebenden Flächen führen jede Kategorie an einer festen Stelle auf und sind
+damit auch dann erreichbar, wenn die Zielspalte weit weg oder gar nicht im Bild
+ist. Der direkte Weg ist der kürzere, sobald Quelle und Ziel nebeneinander
+liegen — der übliche Fall beim Durchsortieren eines Decks.
+
+Wo die Flächen liegen, gewinnen sie: Sie fangen den Zeiger ab, alles daneben
+lässt ihn zur Spalte darunter durch. Das ist kein Loch, sondern dieselbe
+Auswahl in anderer Gestalt — jede Kategorie hat dort ihre eigene Fläche. Karten
+lassen sich dabei **nur in Fächer des eigenen Decks** ablegen; sind zwei Decks
+aufgeklappt, bleiben die Spalten des anderen stumm.
 
 ### Geteilte Decks: die Einteilung des Erbauers
 

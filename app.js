@@ -6726,6 +6726,28 @@ function deckGruppen(d, eintraege) {
                   items: gruppen.get("t:" + en) }));
 }
 
+/* Eine Gruppe SELBST zur Ablagefläche machen — Stapelspalte wie Tabellenblock.
+   Der Überblick, der beim Ziehen erscheint, bleibt; das hier ist der kurze Weg
+   daneben: Wer die Zielspalte ohnehin vor Augen hat, zieht direkt hinüber,
+   statt den Umweg über eine Kachel zu nehmen.
+
+   Beides über DIESELBE Kennzeichnung `data-katdrop`, damit es beim Loslassen
+   nur einen Weg gibt (katFeldUnter). Eine zweite Art von Ziel wäre eine zweite
+   Regel, die auseinanderliefe.
+
+   Nur in der eigenen Einteilung: Ein Kartentyp ist kein Fach, in das sich
+   etwas einordnen ließe. Die Restgruppe zählt mit — ihr leerer Schlüssel
+   bedeutet dasselbe wie die Fläche "Ohne Kategorie" im Überblick.
+
+   `data-dropdeck` ist kein Beiwerk: Sind zwei Decks aufgeklappt, liegen die
+   Spalten beider auf demselben Bildschirm. Ohne die Herkunft fiele eine Karte
+   aus Deck A in ein Fach von Deck B — einen Eintrag, den es dort gar nicht
+   gibt. */
+function gruppeDropAttr(d, g) {
+  if (!g.key.startsWith("k:")) return "";
+  return ` data-katdrop="${esc(g.key.slice(2))}" data-dropdeck="${esc(d.id)}"`;
+}
+
 /* Welche Darstellung ein Deck zeigt: die Tabelle oder die Kartenansicht. Wie
    die Gruppierung eine Sache der Ansicht und damit des Geräts — am Handy will
    man anderes sehen als am breiten Bildschirm. Voreingestellt bleibt die
@@ -6896,7 +6918,7 @@ function deckStapelHtml(d, gruppen) {
     const anz  = g.items.reduce((s, x) => s + x.e.qty, 0);
     const wert = g.items.reduce((s, x) => s + (x.c.price || 0) * x.e.qty, 0);
     const zu   = deckCatZu.has(`${d.id}|${g.key}`);
-    return `<div class="stapel-spalte${zu ? " zu" : ""}">
+    return `<div class="stapel-spalte${zu ? " zu" : ""}"${gruppeDropAttr(d, g)}>
       <div class="stapel-kopf" data-cattoggle="${d.id}|${g.key}">
         <span class="deck-cat-arrow">${zu ? "&#9654;" : "&#9660;"}</span>
         <span class="stapel-name">${esc(g.label)}</span>
@@ -7182,6 +7204,7 @@ const ZIEH_SCHWELLE = 6;
 let ziehKat = null;          // {deckId, cardId, vonKat} während eines Zuges
 let ziehAnsatz = null;       // gedrückt, aber noch unter der Schwelle
 let ziehGeist = null;        // das mitwandernde Schild am Zeiger
+let ziehUeber = null;        // das Ziel unter dem Zeiger, solange es dort liegt
 
 /* Anfassen — noch kein Zug. Erst die Bewegung entscheidet, ob daraus einer
    wird; sonst wäre jeder Klick auf eine Zeile einer. */
@@ -7247,12 +7270,26 @@ function katZiehAus() {
 }
 
 function katFeldUnter(x, y) {
-  return document.elementFromPoint(x, y)?.closest?.("[data-katdrop]") || null;
+  const feld = document.elementFromPoint(x, y)?.closest?.("[data-katdrop]") || null;
+  // Eine Spalte gehört zu genau einem Deck, eine Kachel im Überblick zu keinem.
+  // Sind zwei Decks aufgeklappt, darf eine Karte aus dem einen nicht in ein Fach
+  // des anderen fallen: Dort gibt es ihren Eintrag nicht, und der zusammen-
+  // gesetzte Fremdschlüssel wiese das Schreiben ab — nach dem Loslassen, mit
+  // einer Fehlermeldung, die niemand erwartet hätte.
+  if (feld?.dataset.dropdeck && feld.dataset.dropdeck !== ziehKat?.deckId) return null;
+  return feld;
 }
 
 function katZielHervorheben(x, y, zusatz) {
   const feld = katFeldUnter(x, y);
-  $$("#kat-drop .katdrop-feld").forEach(f => f.classList.toggle("ueber", f === feld));
+  // Nur der Wechsel wird angefasst, nicht bei jeder Bewegung alle Ziele
+  // durchgezählt: Bei aufgeklapptem Deck sind die Spalten Ziele, und pointermove
+  // feuert im Dutzend je Sekunde.
+  if (feld !== ziehUeber) {
+    ziehUeber?.classList.remove("ueber");
+    feld?.classList.add("ueber");
+    ziehUeber = feld;
+  }
   const box = $("#kat-drop");
   if (!box) return;
   box.classList.toggle("zusatz", !!zusatz);
@@ -7345,6 +7382,11 @@ function katDropBox() {
 
 function katDropAus() {
   ziehKat = null;
+  ziehUeber?.classList.remove("ueber");
+  ziehUeber = null;
+  // Die Kacheln im Überblick verschwinden mitsamt ihren Klassen; die Spalten
+  // bleiben stehen und müssen deshalb ausdrücklich zurückgesetzt werden.
+  $$("[data-dropdeck].hat").forEach(el => el.classList.remove("hat"));
   const el = $("#kat-drop");
   if (el) { el.hidden = true; el.classList.remove("zusatz"); }
 }
@@ -7371,6 +7413,12 @@ function katDropAn(deckId, cardId) {
   ].join("");
   $("#katdrop-fuss").textContent = t("katdrop.hint");
   box.hidden = false;
+  // Dieselbe Auskunft wie die Marke "liegt schon dort" auf den Kacheln — nur
+  // an den Spalten, weil man beim direkten Ziehen gar nicht auf die Kacheln
+  // schaut. Nur die Spalten DIESES Decks; die eines zweiten aufgeklappten
+  // gehen die Karte nichts an.
+  $$("[data-dropdeck]").forEach(el => el.classList.toggle(
+    "hat", el.dataset.dropdeck === deckId && drin.has(el.dataset.katdrop)));
   // Die Flächen brauchen keine eigenen Ereignisse: Welche gemeint ist, ergibt
   // sich beim Loslassen aus der Zeigerposition (katFeldUnter). Ein Zug, der
   // unterwegs "verloren" geht, weil ein Element dazwischenkommt, kann es so
@@ -7646,7 +7694,7 @@ function renderDecks() {
         partnerOk: !!mainCard && c.id !== mainCard.id && d.second_card_id !== c.id &&
                    istZweitCommanderFaehig(c) && sindPartner(mainCard, c),
       })).join("");
-      return `<tbody class="deck-cat-body${zu ? " zu" : ""}">`
+      return `<tbody class="deck-cat-body${zu ? " zu" : ""}"${gruppeDropAttr(d, g)}>`
         + `<tr class="deck-cat-head" data-cattoggle="${d.id}|${g.key}"><td colspan="99">`
         + `<span class="deck-cat-arrow">${zu ? "&#9654;" : "&#9660;"}</span>`
         + `<span class="deck-cat-name">${esc(g.label)}</span>`
