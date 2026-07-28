@@ -13,6 +13,7 @@ geräteübergreifend.
 | `index.html`          | Seitengerüst, Login- und Einrichtungsbereich        |
 | `app.js`              | Logik: OCR, Scryfall, Supabase, Ansichten           |
 | `style.css`           | Gestaltung                                          |
+| `assets/fira/`        | Schrift der Oberfläche (Fira Sans Condensed), selbst gehostet |
 | `assets/keyrune/`     | Set-Symbol-Font (Keyrune), selbst gehostet          |
 | `assets/mana/`        | Mana- und Kartensymbol-Font (Mana), selbst gehostet |
 | `supabase-schema.sql` | Tabellen, Row Level Security, Funktionen            |
@@ -21,11 +22,20 @@ geräteübergreifend.
 | `.github/workflows/`  | GitHub Action, die den Preis-Job nach Plan fährt    |
 | `start.cmd`           | Nur für lokales Testen (braucht Python)             |
 
-Kein Build-Schritt: Die Seite lädt Supabase und Tesseract per CDN. Set- und
-Mana-Symbole kommen dagegen als selbst gehostete Icon-Fonts aus `assets/`
-(Keyrune, Mana) — kein Fremdanbieter, ein Font-Download statt vieler
-Einzelbilder. Ändert sich einer der Fonts, den `?v=` seiner CSS-Datei in
-`index.html` mit hochzählen (wie bei `app.js`/`style.css`).
+Kein Build-Schritt: Die Seite lädt Supabase und Tesseract per CDN. Alle
+**Schriften** kommen dagegen aus `assets/` — die Icon-Fonts Keyrune und Mana
+für Set- und Mana-Symbole, und **Fira Sans Condensed** für die Oberfläche. Kein
+Fremdanbieter: Ein Aufruf an fonts.gstatic.com verriete jedem Besucher die
+eigene Adresse an einen Dritten, und die Seite hinge an dessen Erreichbarkeit.
+
+Von Fira liegen nur **latin und latin-ext** da, in drei Schnitten (400, 600,
+700). Kyrillisch, Griechisch und Vietnamesisch lägen ungenutzt herum; die
+Oberfläche spricht fünf Sprachen, die alle mit Latein auskommen. Der Browser
+lädt ohnehin nur, was die `unicode-range` verlangt — gemessen holt eine
+deutsche Seite zwei der sechs Dateien.
+
+Ändert sich einer der Fonts, den `?v=` seiner CSS-Datei in `index.html` mit
+hochzählen (wie bei `app.js`/`style.css`).
 
 ## Einrichtung
 
@@ -1391,11 +1401,16 @@ Tagesmodus — praktisch zum Ausprobieren, weil er nur 5 MB lädt.
   keine Schätzung: Cardmarket führt pro Auflage nur **ein** Produkt, die
   Sprache filtert dort lediglich einzelne Angebote.
 * Preise stammen von Scryfall und sind Marktbeobachtungen, keine Verkaufspreise.
+* Die Oberfläche setzt [Fira Sans Condensed] der Mozilla Foundation und
+  Telefónica (SIL Open Font License 1.1, in `assets/fira/` mit Lizenz daneben).
+  Sie ist schmal, und das kommt den Tabellen zugute: In einer Kartenzeile stehen
+  Name, Set, Sprache, Zustand, Menge und Preis nebeneinander.
 * Set- und Mana-Symbole zeichnen die Icon-Fonts [Keyrune] und [Mana] von Andrew
   Gioia (in `assets/`, mit Lizenzen daneben). Set-Symbole gibt es nur zu Codes,
   die Keyrune kennt — sonst bleibt es beim reinen Setnamen, wie bei den Flaggen
   kein geratenes Symbol. Die Symbole selbst sind Marken von Wizards of the Coast.
 
+[Fira Sans Condensed]: https://mozilla.github.io/Fira/
 [Keyrune]: https://keyrune.andrewgioia.com/
 [Mana]: https://mana.andrewgioia.com/
 
