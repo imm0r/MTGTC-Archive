@@ -1002,10 +1002,52 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
      Element selbst — genau deshalb geht das ohne eine einzige Pixelangabe. */
 .deck-stapel{display:grid;gap:12px;margin-top:12px;align-items:start;
   grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+
+/* Die schwebende Deckleiste: links das Suchfeld, rechts der Deckname.
+
+   Sie klebt unter der Kopfzeile der Seite, steht also nach dem ersten Scrollen
+   ÜBER den Karten statt über ihnen. Durchscheinend, damit man sieht, worüber
+   sie liegt — dieselbe Sprache wie der Balken am unteren Rand.
+
+   In Ruhe nimmt sie ihren eigenen Platz ein und verdeckt nichts; erst beim
+   Scrollen schwebt sie. Das ist der Unterschied zu position:fixed, das ihr von
+   Anfang an einen Streifen der Spalten wegnähme. */
+.stapel-leiste{position:sticky;top:var(--kopf-oben,52px);z-index:12;
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  margin-top:10px;padding:7px 10px;border-radius:12px;
+  background:rgba(27,29,39,.82);border:1px solid var(--line);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.stapel-suche{flex:1 1 220px;min-width:150px}
+/* Zwei Klassen, nicht eine: Die Grundregel für Eingabefelder steht als
+   input[type=number] da und zieht sie auf volle Breite. Eine einzelne Klasse
+   verliert dagegen (Klasse + Typ wiegt schwerer), und das Zahlenfeld nähme die
+   ganze Leiste ein — der Rest bräche darunter um. */
+.stapel-leiste input{height:32px;padding:4px 8px;font-size:13px}
+.stapel-leiste .stapel-anzahl{flex:none;width:64px}
+/* Rechtsbündig und kürzbar: Der Name darf lang sein, aber nicht die Leiste
+   sprengen — dann bräche das Suchfeld auf eine zweite Zeile um. */
+.stapel-deckname{margin-left:auto;flex:0 1 auto;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:14px;font-weight:600;color:var(--acc2)}
 .stapel-spalte{background:var(--panel2);border:1px solid var(--line);border-radius:10px;
   padding:8px;min-width:0}
-.stapel-kopf{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;
-  padding:2px 2px 8px}
+/* Der Spaltenkopf KLEBT. Eine Kategorie mit vierzig Karten ist mehrere
+   Bildschirme hoch; scrollte ihr Kopf weg, stand man vor einer Wand aus
+   Namensbalken und wusste beim Ziehen nicht mehr, welche Spalte welche ist —
+   genau in dem Moment, in dem man es braucht.
+
+   Er klebt UNTER der Deckleiste, die wiederum unter der Kopfzeile der Seite
+   klebt; beide Höhen misst schwebemasseMessen() und legt sie als
+   --kopf-oben / --leiste-hoehe ab. Die Ersatzwerte gelten nur für den
+   Augenblick vor der ersten Messung.
+
+   Die negativen Ränder ziehen ihn über das Polster der Spalte bis an deren
+   Kanten. Ohne das blitzten die Karten links und rechts an ihm vorbei, während
+   sie darunter durchlaufen. */
+.stapel-kopf{position:sticky;top:calc(var(--kopf-oben,52px) + var(--leiste-hoehe,48px));z-index:4;
+  display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;
+  margin:-8px -8px 8px;padding:8px 10px;background:var(--panel2);
+  border-radius:9px 9px 0 0;box-shadow:0 1px 0 var(--line)}
 .stapel-kopf:hover .stapel-name{color:var(--acc)}
 .stapel-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   font-size:13px;font-weight:600;color:var(--acc2)}
@@ -1074,6 +1116,16 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
   /* Nicht bei der letzten: Die liegt ohnehin offen da, ein Schweben darüber
      wäre dasselbe Bild ein zweites Mal. */
   .stapel-karte:hover:not(:last-child) .stapel-gross{display:block}
+  /* Während eines Zuges klappt nichts auf. Der Zeiger wandert dabei über die
+     Stapel hinweg, und unter ihm ginge sonst eine Karte nach der anderen auf —
+     gerade dort, wo man das Ziel sehen will.
+
+     Die Regel MUSS die Hover-Regel überbieten, und zwar über die Spezifität:
+     Ein "body.zieht-gerade .stapel-gross" (zwei Klassen) verlor gegen die
+     Hover-Regel (vier), obwohl es später steht. Die Reihenfolge im Stylesheet
+     entscheidet erst bei gleicher Spezifität. Deshalb hier derselbe Selektor
+     mit body davor: eine Klasse mehr, und damit gewinnt er. */
+  body.zieht-gerade .stapel-karte:hover:not(:last-child) .stapel-gross{display:none}
 }
 @media(prefers-reduced-motion:reduce){ .stapel-fenster{transition:none} }
 
@@ -1213,6 +1265,32 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
 .katdrop-feld.ueber{border-color:var(--acc);border-style:solid;
   background:linear-gradient(var(--akt-flaeche),var(--akt-flaeche)),rgba(35,38,51,.72);
   color:var(--acc2);box-shadow:0 0 0 3px rgba(201,162,39,.22)}
+/* Die Mülltonne: unten rechts, weit weg von den Schaltflächen in der Mitte.
+   Sie ordnet nicht ein, sie löst den Deckplatz auf — dafür ist die Entfernung
+   die halbe Sicherung, und die zweite ist, dass ein Zug dorthin eine bewusste
+   Bewegung über den ganzen Bildschirm braucht.
+
+   Rot statt Gold: Die Goldtönung heißt in dieser App überall "ausgewählt". Was
+   etwas wegnimmt, darf nicht dieselbe Farbe tragen wie das, was etwas zuordnet.
+
+   pointer-events:auto, weil der Schleier darüber keine Ereignisse annimmt. */
+.katdrop-muell{position:absolute;right:16px;bottom:16px;pointer-events:auto;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  max-width:170px;padding:9px 14px;border-radius:12px;cursor:copy;
+  border:2px dashed rgba(226,86,86,.5);background:rgba(38,20,24,.72);color:var(--dim)}
+.katdrop-muell>*{pointer-events:none}
+.katdrop-muell-bild{font-size:19px;line-height:1}
+.katdrop-muell.ueber{border-style:solid;border-color:var(--err);color:var(--err);
+  background:linear-gradient(rgba(226,86,86,.16),rgba(226,86,86,.16)),rgba(38,20,24,.85);
+  box-shadow:0 0 0 3px rgba(226,86,86,.25)}
+/* Im schmalen Fenster nach OBEN. Unten rechts liegt sonst der Balken selbst:
+   Er ist bis zu 560 px breit und steht mittig, die Tonne bis 170 px am rechten
+   Rand. Beide frei nebeneinander gehen erst ab W - 186 > (W + 560) / 2, also
+   ab rund 930 px Fensterbreite; die Schranke liegt bei 1000, damit auch die
+   längste Übersetzung noch Luft hat. Oben ist während eines Zuges nichts, was
+   im Weg stünde. */
+@media(max-width:1000px){ .katdrop-muell{bottom:auto;top:14px;right:12px} }
+
 /* Die gezogene Zeile bleibt sichtbar, tritt aber zurück. */
 tr.zieht>td{opacity:.45}
 
@@ -1235,11 +1313,8 @@ tr.zieht>td{opacity:.45}
    Auskunft, kein Ziel — der Rahmen allein, ohne Tönung und ohne Schein. */
 .stapel-spalte.hat{border-color:var(--akt-rand)}
 .deck-cat-body.hat .deck-cat-name{color:var(--acc2);opacity:.75}
-/* Während eines Zuges klappt keine Karte mehr auf. Die schwebende Vorschau
-   liegt unter dem Schleier, wäre also ohnehin trübe — vor allem aber wandert
-   der Zeiger jetzt ÜBER die Stapel hinweg, und dabei ginge unter ihm eine
-   Vorschau nach der anderen auf. */
-body.zieht-gerade .stapel-gross{display:none}
+/* Das Aufklappen während eines Zuges steht weiter oben, bei den übrigen
+   Hover-Regeln — nur dort lässt es sich sicher überbieten. */
 
 /* Der Griff. Er ist der Grund, dass man das Ziehen überhaupt findet — deshalb
    sichtbar und nicht erst beim Überfahren. touch-action:none ist hier
