@@ -1122,18 +1122,25 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
 
    pointer-events bleibt an: Während eines Zuges braucht die Fläche die
    dragover-Ereignisse, sonst nähme sie nichts an. */
-/* Oben angesetzt statt mittig: So bleibt die untere Hälfte des Decks sichtbar,
-   und man sieht beim Ziehen noch, woher die Karte kommt. Der Schleier ist
-   bewusst dünn und OHNE Weichzeichner — der machte die Liste dahinter
-   unleserlich und nahm damit genau die Orientierung, die er lassen sollte. */
+/* UNTEN angesetzt und schmal. Der Überblick war einmal die einzige Art,
+   einzuordnen, und nahm entsprechend Raum: neun Kacheln, oben quer über den
+   Bildschirm. Seit die Spalten selbst Ablageflächen sind, führt er nur noch
+   auf, was NICHT ohnehin dasteht — meist also zwei Schaltflächen. Ein Balken
+   am unteren Rand ist dafür die richtige Form: Er verdeckt nichts, wohin man
+   zielt, und liegt am Handy dort, wo der Daumen ohnehin ist.
+
+   Der Schleier ist bewusst dünn und OHNE Weichzeichner — der machte die Liste
+   dahinter unleserlich und nahm damit genau die Orientierung, die er lassen
+   sollte. Er ist zudem heller als früher: Damals lag darunter nichts, worauf
+   man zielte, heute liegen dort die Spalten. */
 /* Der Schleier liegt über allem, FÄNGT aber nichts ab. Nur die Fläche in der
    Mitte tut das. Daneben trifft die Prüfung „was liegt unter dem Zeiger" die
    Spalte darunter — und genau daran hängt, dass sich eine Karte auch direkt in
    eine Spalte fallen lässt, ohne den Umweg über eine Kachel. Vorher deckte der
    Schleier das ganze Fenster ab und war für elementFromPoint immer das
    Erste, was gefunden wurde. */
-#kat-drop{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-start;
-  justify-content:center;background:rgba(8,6,20,.38);padding:14px 20px 20px;
+#kat-drop{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-end;
+  justify-content:center;background:rgba(8,6,20,.26);padding:20px 16px 16px;
   pointer-events:none}
 #kat-drop[hidden]{display:none}
 /* Eine eigene Fläche statt frei schwebender Kacheln: Ohne sie blitzt die
@@ -1145,24 +1152,48 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
    weg, um die es hier geht. Die Deckkraft ist so gewählt, dass die Schrift
    darauf lesbar bleibt; die Oberfläche darunter ist ohnehin dunkel, es
    konkurriert also kein Weiß mit dem Text. */
-.katdrop-innen{width:min(900px,100%);max-height:100%;overflow-y:auto;overflow-x:hidden;
-  text-align:center;padding:12px 14px 10px;border-radius:14px;
-  background:rgba(27,29,39,.62);border:1px solid var(--akt-rand);
-  box-shadow:0 14px 40px rgba(0,0,0,.5);pointer-events:auto}
-.katdrop-kopf{font-size:14px;font-weight:600;color:var(--acc2);
+/* FESTE Breite, keine mitwachsende. Naheliegend wäre width:auto — der Balken
+   wäre dann nur so breit wie sein Inhalt. Er sprang damit aber in dem Moment,
+   in dem man Strg drückt: Der Hinweis wechselt mit der Taste, der neue Text ist
+   halb so lang, und der Balken zuckte mitten im Zug unter der Hand zusammen.
+   Bei 560 px passen Name und beide Schaltflächen in eine Reihe und beide
+   Fassungen des Hinweises in eine Zeile; was darüber hinausgeht (alle Fächer
+   in der Typ-Gruppierung), bricht um. */
+/* Name und Schaltflächen stehen in EINER Reihe, der Hinweis darunter. Als drei
+   gestapelte Zeilen war der Balken 95 px hoch; nebeneinander sind es 66. Am
+   unteren Rand zählt jede Zeile doppelt — was dort steht, verdeckt die unterste
+   Karte jedes Stapels. */
+.katdrop-innen{width:min(560px,100%);max-height:60vh;
+  overflow-y:auto;overflow-x:hidden;
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:5px 10px;
+  text-align:center;padding:7px 12px;border-radius:12px;
+  background:rgba(27,29,39,.72);border:1px solid var(--akt-rand);
+  box-shadow:0 10px 30px rgba(0,0,0,.5);pointer-events:auto}
+.katdrop-kopf{max-width:min(260px,40vw);font-size:12px;font-weight:600;color:var(--acc2);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.katdrop-fuss{margin-top:10px;font-size:12px;color:var(--dim)}
+/* Volle Breite erzwingt den Umbruch: Der Hinweis gehört unter die Reihe, nicht
+   an ihr Ende — dort wanderte er mit jeder Kategorie an eine andere Stelle. */
+.katdrop-fuss{flex-basis:100%;font-size:11px;color:var(--dim)}
 #kat-drop.zusatz .katdrop-fuss{color:var(--acc)}
-/* Selbstwachsende Spalten: eine Kategorie ist so breit wie nötig, und bei
-   schmalem Fenster brechen sie um, statt zu schrumpfen. */
-.katdrop-felder{display:grid;gap:10px;margin-top:10px;
-  grid-template-columns:repeat(auto-fit,minmax(128px,1fr))}
-.katdrop-feld{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
-  min-height:74px;padding:10px 10px;border-radius:10px;cursor:copy;
+/* Im schmalen Fenster bricht der Hinweis um — und die beiden Fassungen brechen
+   verschieden oft. Der Balken sitzt unten, wächst also nach OBEN: Ohne den
+   reservierten Platz rutschten die Schaltflächen in dem Augenblick weg, in dem
+   man Strg drückt. Gemessen bei 390 px: 109 px ohne, 92 px mit. Auf breiten
+   Fenstern passt jede Fassung in eine Zeile, dort kostet das nichts.
+
+   3,1 em sind bei 11 px Schrift genau zwei Zeilen (gemessen 17 px je Zeile) —
+   so viel braucht die längste Fassung, die deutsche, im schmalsten Fenster. */
+@media(max-width:620px){ .katdrop-fuss{min-height:3.1em} }
+/* Eine Reihe, die umbricht — kein Raster mit gleich breiten Spalten mehr. Ein
+   Raster zöge zwei Schaltflächen auf halbe Balkenbreite auseinander; so ist
+   jede so breit wie ihr Wort. */
+.katdrop-felder{display:flex;flex-wrap:wrap;justify-content:center;gap:7px;min-width:0}
+.katdrop-feld{display:flex;align-items:center;justify-content:center;gap:6px;
+  padding:6px 13px;border-radius:8px;cursor:copy;
   border:2px dashed var(--line);background:rgba(35,38,51,.55);color:var(--txt)}
 .katdrop-feld>*{pointer-events:none}   /* Kinder dürfen den Zug nicht abfangen */
-.katdrop-name{font-size:13px;font-weight:600;line-height:1.3;word-break:break-word}
-.katdrop-marke{font-size:11px;color:var(--dim)}
+.katdrop-name{font-size:12px;font-weight:600;line-height:1.3;word-break:break-word}
+.katdrop-marke{font-size:10.5px;color:var(--dim)}
 .katdrop-feld.drin{border-style:solid}
 .katdrop-feld.leer{border-color:var(--line);color:var(--dim)}
 .katdrop-feld.neu{border-color:var(--akt-rand);color:var(--acc2)}

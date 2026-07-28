@@ -647,15 +647,15 @@ Karte genau einmal — nur die Zahlen an den Gruppen zählen Zuordnungen.
 ### Einordnen durch Ziehen
 
 Der schnelle Weg: **die Karte am Griff anfassen und ziehen** — das ⋮⋮ links in
-der Zeile. Sobald der Zug beginnt, legen sich die Fächer als **Ablageflächen
-über die Oberfläche**; darunter bleibt das Deck sichtbar, nur zurückgenommen.
-Fallen lassen, fertig. Mit der Maus lässt sich auch die Zeile selbst irgendwo
-anfassen, nicht nur der Griff.
+der Zeile. Sobald der Zug beginnt, werden die Fächer zu **Ablageflächen**: die
+Spalten und Tabellenblöcke selbst, dazu ein schmaler Balken am unteren Rand für
+das, was gerade nicht dasteht. Fallen lassen, fertig. Mit der Maus lässt sich
+auch die Zeile selbst irgendwo anfassen, nicht nur der Griff.
 
-Das ist nicht bloß Schauwert. Flächen, die schweben, brauchen im Layout **keinen
-Platz**: Sie verhalten sich bei jeder Auflösung gleich, funktionieren in der
-Tabelle ebenso wie in der Kartenansicht, und ersparen das Einordnen Karte für
-Karte über einen Dialog.
+Das ist nicht bloß Schauwert. Ablegen braucht im Layout **keinen Platz**: Es
+verhält sich bei jeder Auflösung gleich, funktioniert in der Tabelle ebenso wie
+in der Kartenansicht, und erspart das Einordnen Karte für Karte über einen
+Dialog.
 
 Die Regel dahinter, in drei Zeilen:
 
@@ -663,8 +663,8 @@ Die Regel dahinter, in drei Zeilen:
   aus dem sie *gezogen* wurde. Kam sie aus keinem — Typ-Ansicht oder „Ohne
   Kategorie" —, kommt das Ziel schlicht hinzu.
 * **Mit Strg** (bzw. Cmd) kommt das Ziel immer nur *hinzu*; es fällt nichts weg.
-  Der Hinweis unter den Flächen wechselt mit der Taste, damit man vor dem
-  Loslassen sieht, was passieren wird.
+  Der Hinweis im Balken wechselt mit der Taste, damit man vor dem Loslassen
+  sieht, was passieren wird.
 * Auf **„Ohne Kategorie"** abgelegt, fallen alle Zuordnungen weg.
 
 Das Kennzeichen *primär* wandert mit: Es geht ans Ziel, wenn die Karte noch
@@ -673,25 +673,33 @@ wo es war. Fächer, in denen die Karte schon liegt, sind beim Ziehen als solche
 gekennzeichnet. Eine Fläche **„+ Neue Kategorie"** legt eines an und ordnet
 gleich ein.
 
-#### Der kurze Weg: direkt in die Spalte
+#### Direkt in die Spalte — und der Balken, der die Lücke füllt
 
-Wer das Ziel ohnehin vor Augen hat, muss den Umweg über die Flächen nicht
-gehen: **Die Spalten und Tabellenblöcke sind selbst Ablageflächen.** Beim
-Ziehen leuchtet die Gruppe unter dem Zeiger auf, ein Rahmen zeigt an, wo die
-Karte schon liegt — loslassen, fertig. Es gilt dieselbe Regel wie oben, samt
-Strg und samt „Ohne Kategorie".
-
-Beide Wege stehen nebeneinander, weil sie verschiedene Fälle bedienen. Die
-schwebenden Flächen führen jede Kategorie an einer festen Stelle auf und sind
-damit auch dann erreichbar, wenn die Zielspalte weit weg oder gar nicht im Bild
-ist. Der direkte Weg ist der kürzere, sobald Quelle und Ziel nebeneinander
-liegen — der übliche Fall beim Durchsortieren eines Decks.
-
-Wo die Flächen liegen, gewinnen sie: Sie fangen den Zeiger ab, alles daneben
-lässt ihn zur Spalte darunter durch. Das ist kein Loch, sondern dieselbe
-Auswahl in anderer Gestalt — jede Kategorie hat dort ihre eigene Fläche. Karten
+Der übliche Weg ist der kürzeste: **Die Spalten und Tabellenblöcke sind selbst
+Ablageflächen.** Beim Ziehen leuchtet die Gruppe unter dem Zeiger auf, ein
+ruhigerer Rahmen zeigt an, wo die Karte schon liegt — loslassen, fertig. Karten
 lassen sich dabei **nur in Fächer des eigenen Decks** ablegen; sind zwei Decks
 aufgeklappt, bleiben die Spalten des anderen stumm.
+
+Am unteren Rand erscheint dazu ein schmaler Balken. Er **wiederholt nicht, was
+ohnehin dasteht**: Wer nach Kategorien gruppiert, hat jedes Fach als Spalte vor
+sich, und der Balken trägt nur noch „Ohne Kategorie" und „+ Neue Kategorie".
+Wer nach Typ gruppiert, hat *keine* Fächer auf dem Schirm — dort führt der
+Balken sie vollständig auf und ist der einzige Weg.
+
+Diese beiden bleiben immer stehen, und das mit Grund: „Ohne Kategorie" gibt es
+als Spalte nur, solange auch eine Karte darin liegt. Räumte man die letzte
+heraus, verschwände mit ihr der Weg zurück. Und ein neues Fach legt im Zug
+sonst nichts an.
+
+Wo der Balken liegt, gewinnt er: Er fängt den Zeiger ab, alles daneben lässt
+ihn zur Spalte darunter durch. Deshalb ist er flach und sitzt unten — dort
+verdeckt er am wenigsten von dem, worauf man zielt, und am Handy liegt er, wo
+der Daumen ohnehin ist.
+
+Seine Breite steht fest statt mit dem Inhalt zu wachsen. Der Hinweis wechselt
+mit der Strg-Taste, der zweite Text ist kürzer — ein mitwachsender Balken zuckte
+mitten im Zug unter der Hand zusammen und nähme die Schaltflächen mit.
 
 ### Geteilte Decks: die Einteilung des Erbauers
 
