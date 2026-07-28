@@ -1017,13 +1017,36 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
   margin-top:10px;padding:7px 10px;border-radius:12px;
   background:rgba(27,29,39,.82);border:1px solid var(--line);
   backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-.stapel-suche{flex:1 1 220px;min-width:150px}
-/* Zwei Klassen, nicht eine: Die Grundregel für Eingabefelder steht als
-   input[type=number] da und zieht sie auf volle Breite. Eine einzelne Klasse
-   verliert dagegen (Klasse + Typ wiegt schwerer), und das Zahlenfeld nähme die
-   ganze Leiste ein — der Rest bräche darunter um. */
-.stapel-leiste input{height:32px;padding:4px 8px;font-size:13px}
-.stapel-leiste .stapel-anzahl{flex:none;width:64px}
+/* Der Zugang zur Sammlung: erst nur eine Schaltfläche, das Feld klappt nach
+   RECHTS aus. */
+.stapel-zugabe{display:flex;align-items:center;gap:8px;min-width:0}
+.stapel-zugabe-knopf{display:flex;align-items:center;gap:6px;flex:none;
+  padding:6px 12px;border-radius:8px;cursor:pointer;white-space:nowrap;
+  background:transparent;border:1px solid var(--line);color:var(--acc2);
+  font:600 13px/1.2 inherit}
+.stapel-zugabe-knopf:hover,.stapel-zugabe.offen .stapel-zugabe-knopf{
+  border-color:var(--akt-rand);background:var(--akt-flaeche)}
+.stapel-zugabe-zeichen{font-size:16px;line-height:1}
+.stapel-zugabe-feld{flex:none}
+/* Die Breite wandert am EINGABEFELD, nicht an seiner Hülle. Die Hülle trägt
+   position:relative und darunter hängt die Trefferliste — ein overflow:hidden
+   für die Klapp-Bewegung schnitte sie ab.
+   Zwei Klassen im Selektor, weil die Grundregel als input[type=text] dasteht
+   und auf volle Breite zieht; eine einzelne Klasse verlöre dagegen. */
+.stapel-leiste .stapel-zugabe-feld input{width:0;min-width:0;height:32px;
+  padding:0;border-width:0;font-size:13px;
+  transition:width .18s ease-out,padding .18s ease-out}
+.stapel-zugabe.offen .stapel-zugabe-feld input{width:min(360px,45vw);
+  padding:4px 8px;border-width:1px}
+@media(prefers-reduced-motion:reduce){
+  .stapel-leiste .stapel-zugabe-feld input{transition:none} }
+/* Die Liste bleibt lesbar, auch wenn das Feld schmaler ausfällt. */
+.stapel-zugabe-feld ul{min-width:280px}
+/* Die Zeilen werden GEZOGEN, nicht angeklickt — der Griff sagt es an. */
+.sugg li.sugg-karte{position:relative;padding-left:24px}
+.sugg-karte .zieh-griff{left:5px}
+.sugg li.sugg-hinweis{cursor:default;font-size:12.5px;color:var(--err)}
+.sugg li.sugg-hinweis:hover{background:transparent;color:var(--err)}
 /* Rechtsbündig und kürzbar: Der Name darf lang sein, aber nicht die Leiste
    sprengen — dann bräche das Suchfeld auf eine zweite Zeile um. */
 .stapel-deckname{margin-left:auto;flex:0 1 auto;min-width:0;
@@ -1283,6 +1306,10 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
 .katdrop-muell.ueber{border-style:solid;border-color:var(--err);color:var(--err);
   background:linear-gradient(rgba(226,86,86,.16),rgba(226,86,86,.16)),rgba(38,20,24,.85);
   box-shadow:0 0 0 3px rgba(226,86,86,.25)}
+/* Keine Tonne für eine Karte, die noch gar nicht im Deck liegt: Aus einem Deck
+   werfen kann man nur, was darin ist. Abbrechen geht daneben-Loslassen oder
+   Escape. */
+#kat-drop.zugabe .katdrop-muell{display:none}
 /* Im schmalen Fenster nach OBEN. Unten rechts liegt sonst der Balken selbst:
    Er ist bis zu 560 px breit und steht mittig, die Tonne bis 170 px am rechten
    Rand. Beide frei nebeneinander gehen erst ab W - 186 > (W + 560) / 2, also

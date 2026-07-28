@@ -839,26 +839,68 @@ Eine Kategorie mit vierzig Karten ist mehrere Bildschirme hoch. Zwei Dinge
 * Der **Spaltenkopf**. Scrollte er weg, stand man vor einer Wand aus
   Namensbalken und wusste beim Ziehen nicht mehr, welche Spalte welche ist —
   genau in dem Moment, in dem man es braucht.
-* Die **Deckleiste** darüber: links das Feld, mit dem eine Karte aus der
-  Sammlung ins Deck kommt, rechts der Name des Decks, an dem man gerade baut.
-  In Ruhe steht sie in ihrem eigenen Platz, beim Scrollen schwebt sie
-  durchscheinend über den Karten.
-
-In der Kartenansicht ersetzt die Leiste das Suchfeld im Werkzeugkasten darüber,
-statt es zu doppeln — zwei Eingaben mit demselben Kennzeichen wären ein Fehler,
-denn der Hinzufügen-Knopf sucht sich seine Eingabe genau darüber. In der
-Tabellenansicht bleibt es, wo es war.
+* Die **Deckleiste** darüber: links der Zugang zur Sammlung, rechts der Name des
+  Decks, an dem man gerade baut. In Ruhe steht sie in ihrem eigenen Platz, beim
+  Scrollen schwebt sie durchscheinend über den Karten.
 
 Wie hoch Seitenkopf und Deckleiste gerade sind, wird **gemessen** und als
 `--kopf-oben` / `--leiste-hoehe` abgelegt. Feste Zahlen im Stylesheet stimmten
 für ein Fenster und eine Sprache und für keine andere: Die Navigation bricht im
 schmalen Fenster um, und wie viele Zeilen dabei entstehen, hängt an der Länge
-der Wörter.
+der Wörter. Gemessen wird nach jedem Zeichnen *und* per `ResizeObserver` — auf
+`border-box`, denn `offsetHeight` schließt Polster und Rahmen ein. Manches
+findet erst später statt: `zahlenfelderAufwerten()` hüllt Zahlenfelder im
+nächsten Bild in eine eigene Hülle, Schriften und Bilder kommen nach. Ohne die
+Nachmessung stand die Leiste höher da als gemeldet — und die Spaltenköpfe
+klebten hinter ihr.
 
-In der Trefferliste des Suchfelds zeigt das Überfahren eines Eintrags dieselbe
+#### Karte ins Deck: eintippen und hinüberziehen
+
+Links in der Leiste steht im Ruhezustand nur **„＋ Karte zum Deck"**. Der Klick
+klappt das Suchfeld nach rechts aus; was man tippt, sucht in der **eigenen
+Sammlung**. Aus der Trefferliste **zieht** man die Karte in die Kategorie, in
+die sie gehört — dieselbe Geste wie das Umsortieren, nur dass der Deckplatz
+dabei erst entsteht.
+
+Kein Mengenfeld, kein Hinzufügen-Knopf. Beides kostete Breite in einer Leiste,
+in der die Breite dem Decknamen fehlt, und der Weg über zwei Schritte („wählen",
+dann „hinzufügen", dann irgendwann einordnen) ist länger als der über einen.
+Eine zweite Kopie holt man, indem man ein zweites Mal zieht.
+
+Die Reihenfolge beim Ablegen ist zwingend: erst der Deckplatz, dann das Fach.
+Die Zuordnung hängt über einen zusammengesetzten Fremdschlüssel
+`(deck_id, card_id)` am Deckplatz — gäbe es ihn noch nicht, wiese die Datenbank
+sie ab. Nach einem Namen für eine neue Kategorie wird deshalb **vorher** gefragt:
+Bricht man dort ab, soll gar nichts geschehen sein.
+
+**Was gar nicht erst in der Liste steht.** Eine Frage, eine Antwort
+(`zugabeGrund`) — die Liste blendet aus, was nicht darf, und das Ablegen prüft
+dieselbe Regel noch einmal. Die zweite Prüfung wird gebraucht: Zwischen dem
+Tippen und dem Loslassen kann ein zweites Gerät das Deck gefüllt haben.
+
+| Fall | Warum |
+| --- | --- |
+| Karte liegt schon in diesem Deck | Der Deckplatz ist da; mehr davon regelt die Menge |
+| Alle besessenen Exemplare stecken in anderen Decks | Ein Exemplar lässt sich nicht zweimal verbauen |
+| Commander-Singleton erreicht | Der Platz ist nicht weg, er ist an genau diese Karte vergeben |
+| Deck hat 100 Karten | Erst muss eine heraus — die Liste sagt es als Zeile, nicht als Leere |
+
+Das **Einlösen eines Wunsches** steht vor allen diesen Prüfungen: Steht dieselbe
+Karte schon als fehlender Eintrag im Deck und hat man sie inzwischen gekauft,
+wird der Eintrag umgehängt, statt einen neuen anzulegen. Das Deck wächst dabei
+nicht — und im vollen Deck ist es der einzige verbliebene Weg.
+
+Beim Ziehen aus der Liste bleibt die **Mülltonne** aus: Aus einem Deck werfen
+kann man nur, was darin ist.
+
+In der Trefferliste zeigt das Überfahren eines Eintrags dieselbe
 **Kartenvorschau** wie in der Tabelle. Ein Name mit Set-Kürzel sagt nicht, ob es
 die richtige Karte ist — vier Auflagen derselben Karte lesen sich in dieser
 Liste fast gleich.
+
+In der **Tabellenansicht** bleibt der Werkzeugkasten mit Feld, Menge und Knopf,
+wie er war. Dort ist das Ziehen in einen Block zwar auch möglich, aber das
+Hinzufügen mehrerer Kopien auf einmal („vier Wälder") der häufigere Fall.
 
 **Ziehen funktioniert hier genauso.** Streifen anfassen, Fächer erscheinen,
 loslassen — mit der Maus überall, mit dem Finger an der Mengenangabe links.

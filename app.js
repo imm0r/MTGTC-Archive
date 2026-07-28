@@ -6913,8 +6913,8 @@ async function autoEinordnen(deckId) {
    63 × 88 mm, ihr Namensbalken sitzt zwischen etwa 4 % und 10 % der Höhe. Das
    gilt für jede Auflösung und jede Spaltenbreite. Die Werte stehen in
    style.css, damit sie nicht zwischen zwei Sprachen wandern. */
-/* Die schwebende Leiste über dem Stapel: links das Suchfeld, mit dem eine Karte
-   aus der Sammlung ins Deck kommt, rechts der Deckname.
+/* Die schwebende Leiste über dem Stapel: links der Zugang zur Sammlung, rechts
+   der Deckname.
 
    Sie KLEBT (position:sticky) unter der Kopfzeile der Seite. Ein Deck in der
    Kartenansicht ist mehrere Bildschirme hoch; das Suchfeld oben im Panel wäre
@@ -6922,17 +6922,31 @@ async function autoEinordnen(deckId) {
    mit ihm. In Ruhe steht die Leiste in ihrem eigenen Platz, beim Scrollen
    schwebt sie durchscheinend über den Karten.
 
-   Sie ersetzt das Feld im Werkzeugkasten darüber, statt es zu doppeln: Zwei
-   Eingaben mit demselben data-dadd wären ein Fehler, denn der Hinzufügen-Knopf
-   sucht sich seine Eingabe über genau dieses Kennzeichen ($ liefert die erste).
-   In der Tabellenansicht bleibt es deshalb, wo es war. */
+   Im Ruhezustand ist links nur EINE Schaltfläche. Erst der Klick klappt das
+   Suchfeld nach rechts aus. Eine dauerhaft offene Eingabe kostete Breite für
+   etwas, das man selten braucht — und in der Leiste ist Breite das, was dem
+   Decknamen fehlt.
+
+   Kein Mengenfeld und kein Hinzufügen-Knopf mehr: Aus der Trefferliste ZIEHT
+   man die Karte in die Kategorie, in die sie gehört. Damit ist das Hinzufügen
+   dieselbe Geste wie das Umsortieren, und die Kategorie steht sofort fest,
+   statt in einem zweiten Schritt nachgereicht zu werden.
+
+   In der Tabellenansicht bleibt der Werkzeugkasten mit Feld, Menge und Knopf,
+   wie er war — dort ist das Ziehen in einen Block zwar möglich, aber das
+   Mehrfach-Hinzufügen ("vier Wälder") der häufigere Fall. */
 function stapelLeisteHtml(d) {
   return `<div class="stapel-leiste">
-    <div class="sugg stapel-suche"><input type="text" data-dadd="${d.id}"
-      placeholder="${esc(t("deck.addCardPh"))}"></div>
-    <input type="number" class="stapel-anzahl" min="1" value="1" data-dqty="${d.id}"
-      title="${esc(t("common.qtyLabel"))}" aria-label="${esc(t("common.qtyLabel"))}">
-    <button class="btn ghost sm" data-daddbtn="${d.id}">${esc(t("deck.addBtn"))}</button>
+    <div class="stapel-zugabe">
+      <button type="button" class="stapel-zugabe-knopf" data-zugabe="${d.id}">
+        <span class="stapel-zugabe-zeichen" aria-hidden="true">&plus;</span>
+        <span>${esc(t("deck.addFloat"))}</span>
+      </button>
+      <div class="sugg stapel-zugabe-feld">
+        <input type="text" data-zusuch="${d.id}" tabindex="-1"
+          placeholder="${esc(t("deck.addCardPh"))}" aria-label="${esc(t("deck.addCard"))}">
+      </div>
+    </div>
     <span class="stapel-deckname" title="${esc(d.name)}">${esc(d.name)}</span>
   </div>`;
 }
@@ -6994,6 +7008,7 @@ function wireStapel(root) {
     });
   });
   schwebemasseMessen();
+  schwebemasseBeobachten();
 }
 
 /* Woran die klebenden Sachen hängen. Zwei Höhen, beide gemessen statt geraten:
@@ -7008,6 +7023,30 @@ function wireStapel(root) {
    und für keine andere. Gemessen wird nach jedem Zeichnen und bei jeder
    Größenänderung; das sind die einzigen beiden Gelegenheiten, bei denen sich
    etwas daran ändern kann. */
+/* Ein einziger Beobachter für alle klebenden Maße, nicht einer je Zeichnen.
+   Ohne ihn stand einmal Gemessenes fest, und das war zu früh gemessen:
+   zahlenfelderAufwerten() hüllt Zahlenfelder erst im nächsten Bild in .num-wrap,
+   Schriften kommen nach, Bilder auch. Die Leiste wuchs danach, die Spaltenköpfe
+   klebten aber weiter auf der alten Höhe — und verschwanden hinter ihr.
+
+   Die Rückmeldung schreibt nur CSS-Variablen; die ändern die Größe der
+   beobachteten Elemente nicht, also kann sie sich nicht selbst auslösen. */
+const leisteBeobachter = typeof ResizeObserver === "function"
+  ? new ResizeObserver(() => schwebemasseMessen()) : null;
+
+function schwebemasseBeobachten() {
+  if (!leisteBeobachter) return;
+  leisteBeobachter.disconnect();          // die Elemente des letzten Zeichnens
+  // border-box, nicht der voreingestellte content-box: Gemessen wird
+  // offsetHeight, also einschließlich Polster und Rahmen. Wächst nur das
+  // Polster, bliebe der Inhaltskasten gleich groß und die Rückmeldung aus —
+  // gemessen: echte Höhe 86 px, gemeldeter Wert weiterhin 53.
+  const wie = { box: "border-box" };
+  const kopf = document.querySelector("header");
+  if (kopf) leisteBeobachter.observe(kopf, wie);
+  $$(".stapel-leiste").forEach(l => leisteBeobachter.observe(l, wie));
+}
+
 function schwebemasseMessen() {
   // Null wird NICHT geschrieben. Gezeichnet wird auch, während die Anwendung
   // noch verborgen ist (der erste Aufbau nach der Anmeldung) — dort misst jedes
@@ -7201,8 +7240,12 @@ async function katsSchreiben(deckId, cardId, zielIds, primaerId) {
 /* Nachbereitung beider Wege: neu laden, zeichnen, auf die Zeile zeigen und den
    Stand melden — den NACH dem Neuladen, nicht die Absicht davor. Bei genau
    einem Fach ist sein Name die klarere Auskunft als die Zahl 1. */
-async function katsFertig(deckId, cardId) {
-  await reload(); renderDecks();
+/* `alles`: Kam eine Karte ins Deck, ändert sich mehr als das Deck — in der
+   Sammlung verschiebt sich, was noch frei ist. Beim bloßen Umsortieren
+   zwischen Fächern ändert sich außerhalb des Decks nichts. */
+async function katsFertig(deckId, cardId, alles) {
+  await reload();
+  if (alles) renderAll(); else renderDecks();
   zeigeDeckZeile(deckId, cardId);
   const d = DECKS.find(x => x.id === deckId);
   const jetzt = (d?.entries || []).find(en => en.cardId === cardId)?.kats || [];
@@ -7267,11 +7310,13 @@ let ziehUeber = null;        // das Ziel unter dem Zeiger, solange es dort liegt
 
 /* Anfassen — noch kein Zug. Erst die Bewegung entscheidet, ob daraus einer
    wird; sonst wäre jeder Klick auf eine Zeile einer. */
-function katZiehAnfassen(e, tr, deckId, cardId) {
+function katZiehAnfassen(e, tr, deckId, cardId, neu) {
   if (e.button != null && e.button !== 0) return;      // nur die Haupttaste
-  if (DECK_KAT_TABELLE_FEHLT) return;
+  // Eine Karte ins Deck zu ziehen geht auch ohne Kategorientabellen — sie
+  // landet dann eben in keinem Fach. Nur das Umsortieren braucht sie.
+  if (DECK_KAT_TABELLE_FEHLT && !neu) return;
   if (e.target?.closest?.("input, button, select, textarea, a")) return;
-  ziehAnsatz = { x: e.clientX, y: e.clientY, tr, deckId, cardId,
+  ziehAnsatz = { x: e.clientX, y: e.clientY, tr, deckId, cardId, neu: !!neu,
                  vonKat: tr.dataset.vonkat || null, id: e.pointerId };
   // KEIN setPointerCapture. Es liegt nahe, den Zeiger hier zu fangen, damit der
   // Zug nicht abreißt — aber ein gefangener Zeiger leitet auch den folgenden
@@ -7291,12 +7336,12 @@ function katZiehBewegt(e) {
   if (ziehAnsatz && !ziehKat) {
     if (Math.hypot(e.clientX - ziehAnsatz.x, e.clientY - ziehAnsatz.y) < ZIEH_SCHWELLE) return;
     const a = ziehAnsatz;
-    ziehKat = { deckId: a.deckId, cardId: a.cardId, vonKat: a.vonKat };
+    ziehKat = { deckId: a.deckId, cardId: a.cardId, vonKat: a.vonKat, neu: a.neu };
     a.tr.classList.add("zieht");
     document.body.classList.add("zieht-gerade");   // nichts markieren während des Zuges
     hideHover();                     // die Vorschau schwebt höher als die Flächen
     katGeistAn(a.cardId);
-    katDropAn(a.deckId, a.cardId);
+    katDropAn(a.deckId, a.cardId, a.neu);
   }
   if (!ziehKat) return;
   e.preventDefault();                // kein Textmarkieren, kein Wegrollen
@@ -7393,11 +7438,11 @@ function katKlickSchlucken() {
    die Seite unter dem Finger nicht weg, während man zieht. Mit der Maus darf
    man auch irgendwo sonst anfassen — dort ist Rollen keine konkurrierende
    Geste. */
-function ziehVerdrahten(el, deckId, cardId) {
+function ziehVerdrahten(el, deckId, cardId, neu) {
   el.querySelector("[data-ziehgriff]")
-    ?.addEventListener("pointerdown", e => katZiehAnfassen(e, el, deckId, cardId));
+    ?.addEventListener("pointerdown", e => katZiehAnfassen(e, el, deckId, cardId, neu));
   el.addEventListener("pointerdown", e => {
-    if (e.pointerType === "mouse") katZiehAnfassen(e, el, deckId, cardId);
+    if (e.pointerType === "mouse") katZiehAnfassen(e, el, deckId, cardId, neu);
   });
   // Bewegung und Loslassen hängen NICHT hier, sondern am Fenster (einmal für
   // die ganze Sitzung, weiter unten). Am Element war das ein Fehler mit Folgen:
@@ -7458,12 +7503,12 @@ function katDropAus() {
   // bleiben stehen und müssen deshalb ausdrücklich zurückgesetzt werden.
   $$("[data-dropdeck].hat").forEach(el => el.classList.remove("hat"));
   const el = $("#kat-drop");
-  if (el) { el.hidden = true; el.classList.remove("zusatz"); }
+  if (el) { el.hidden = true; el.classList.remove("zusatz", "zugabe"); }
 }
 
 /* Die Flächen aufbauen und einblenden. Schon belegte Fächer sind erkennbar —
    sonst zöge man eine Karte dorthin, wo sie längst liegt. */
-function katDropAn(deckId, cardId) {
+function katDropAn(deckId, cardId, neu) {
   const d = DECKS.find(x => x.id === deckId);
   const karte = CARDS.find(x => x.id === cardId);
   if (!d || !karte) return;
@@ -7499,6 +7544,10 @@ function katDropAn(deckId, cardId) {
   ].join("");
   $("#katdrop-fuss").textContent = t("katdrop.hint");
   $("#katdrop-muell-text").textContent = t("katdrop.trash");
+  // Keine Mülltonne für eine Karte, die noch gar nicht im Deck liegt: Aus einem
+  // Deck werfen kann man nur, was darin ist. Wer den Zug abbrechen will, lässt
+  // daneben los oder drückt Escape.
+  box.classList.toggle("zugabe", !!neu);
   box.hidden = false;
   // Dieselbe Auskunft wie die Marke "liegt schon dort" auf den Kacheln — nur
   // an den Spalten, weil man beim direkten Ziehen gar nicht auf die Kacheln
@@ -7541,6 +7590,9 @@ async function katAbgelegt(zug, ziel, zusatz) {
   const { deckId, cardId, vonKat } = zug;
   const d = DECKS.find(x => x.id === deckId);
   if (!d) return;
+  // Eine Karte, die es im Deck noch nicht gibt, geht einen eigenen Weg: Erst
+  // muss der Deckplatz entstehen, an dem die Zuordnung überhaupt hängen kann.
+  if (zug.neu) return zugabeAbgelegt(zug, ziel);
   // Die Mülltonne VOR der Fächer-Prüfung: Eine Karte aus dem Deck zu werfen hat
   // mit Kategorien nichts zu tun und muss auch dann gehen, wenn deren Tabellen
   // fehlen.
@@ -7563,6 +7615,69 @@ async function katAbgelegt(zug, ziel, zusatz) {
     const geschrieben = await katsSchreiben(deckId, cardId, soll, prim);
     if (geschrieben || ziel === "+") await katsFertig(deckId, cardId);
   } catch (e) { toast(dbErr(e)); }
+}
+
+/* Eine Karte aus der Sammlung ins Deck ziehen. Zwei Schritte in einer Geste:
+   der Deckplatz entsteht, und die Kategorie steht sofort fest.
+
+   Die Reihenfolge ist zwingend. Die Zuordnung hängt über einen
+   zusammengesetzten Fremdschlüssel (deck_id, card_id) am Deckplatz — gäbe es
+   ihn noch nicht, wiese die Datenbank sie ab. Deshalb erst der Eintrag, dann
+   das Neuladen (katsSchreiben liest den bisherigen Stand aus DECKS), dann das
+   Fach.
+
+   Nach einem Namen gefragt wird VOR dem Schreiben: Bricht man den Dialog ab,
+   soll gar nichts geschehen sein — nicht eine Karte im Deck ohne die Kategorie,
+   für die man sie geholt hat. */
+async function zugabeAbgelegt(zug, ziel) {
+  const { deckId, cardId } = zug;
+  const d = DECKS.find(x => x.id === deckId);
+  const c = CARDS.find(x => x.id === cardId);
+  if (!d || !c) return;
+  if (ziel === "-") return;                  // in die Tonne: dann eben doch nicht
+  const grund = zugabeGrund(d, c);
+  if (grund) return toast(zugabeMeldung(d, c, grund));
+
+  try {
+    let zielId = ziel;
+    if (ziel === "+") {
+      const name = await katNameFragen();
+      if (!name) return;
+      const { data, error } = await sb.from("deck_categories")
+        .insert({ deck_id: deckId, name, pos: (d.kategorien || []).length })
+        .select("id").single();
+      if (error) throw error;
+      zielId = data.id;
+    }
+
+    // Wunsch einlösen statt hinzufügen: Steht dieselbe Karte als fehlender
+    // Eintrag im Deck, wird er umgehängt — das Deck bleibt gleich groß, und die
+    // Wunschzeile verschwindet von der Wunschliste.
+    const wunsch = deckWunschEintrag(d, c);
+    if (wunsch) {
+      const { error } = await sb.rpc("fulfil_wish_in_deck", {
+        p_deck: deckId, p_from_card: wunsch.karte.id, p_to_card: cardId, p_n: 1 });
+      if (error) throw error;
+      await reloadMitWunschAbgleich();
+    } else {
+      const { error } = await sb.from("deck_entries")
+        .insert({ deck_id: deckId, card_id: cardId, qty: 1 });
+      if (error) throw error;
+      await reload();
+    }
+
+    if (zielId && !DECK_KAT_TABELLE_FEHLT) await katsSchreiben(deckId, cardId, [zielId], zielId);
+    await katsFertig(deckId, cardId, true);
+  } catch (e) {
+    // Der Trigger ist die letzte Instanz — etwa wenn ein zweites Gerät
+    // inzwischen aufgefüllt hat.
+    if (istDeckVollFehler(e)) { await reload(); renderAll(); deckVollMelden(DECKS.find(x => x.id === deckId)); }
+    else if (istSingletonFehler(e)) {
+      await reload(); renderAll();
+      toast(t("deck.singleton", { name: c.disp || c.name, max: commanderMaxKopien(c),
+        n: deckKopien(DECKS.find(x => x.id === deckId), c) }));
+    } else toast(dbErr(e));
+  }
 }
 
 /* Den DECKPLATZ auflösen, nicht die Karte. Die Sammlungszeile bleibt, wo sie
@@ -8156,6 +8271,29 @@ function renderDecks() {
       await reload(); renderAll();
     } catch (e) { toast(dbErr(e)); }
   });
+  /* Der Auslöser in der schwebenden Leiste. Zu bleibt zu, bis jemand darauf
+     klickt — und geht von selbst wieder zu, wenn das Feld leer verlassen wird.
+     Mit Inhalt bleibt es offen: Sonst verschwände die Trefferliste in dem
+     Augenblick, in dem man daraus zu ziehen beginnt (der Druck auf eine Zeile
+     nimmt der Eingabe den Fokus). */
+  $$("[data-zugabe]").forEach(btn => {
+    const deckId = btn.dataset.zugabe;
+    const box = btn.closest(".stapel-zugabe");
+    const inp = box?.querySelector("[data-zusuch]");
+    if (!inp) return;
+    zugabeSucheVerdrahten(inp, deckId);
+    const auf = () => { box.classList.add("offen"); inp.removeAttribute("tabindex"); inp.focus(); };
+    const zu  = () => { box.classList.remove("offen"); inp.setAttribute("tabindex", "-1"); inp.value = ""; };
+    btn.onclick = () => box.classList.contains("offen") ? zu() : auf();
+    // Escape schließt nur, wenn gerade KEIN Zug läuft — sonst gehörte die Taste
+    // dem Abbruch des Zuges, und der Fokus liegt dabei oft noch im Feld.
+    inp.addEventListener("keydown", e => {
+      if (e.key === "Escape" && !ziehKat && !ziehAnsatz) { zu(); btn.focus(); }
+    });
+    inp.addEventListener("blur", () => setTimeout(() => {
+      if (!inp.value.trim() && document.activeElement !== inp) zu();
+    }, 300));
+  });
   $$("[data-dadd]").forEach(inp => {
     attachLocalSuggest(inp);
     // Auswahl nur merken; ins Deck gelegt wird erst per „Hinzufügen"-Knopf.
@@ -8254,6 +8392,112 @@ function renderDecks() {
       else { toast(dbErr(e)); btn.disabled = false; }
     }
   });
+}
+
+/* ---------------------------------------------- Karte ins Deck ziehen
+   Darf diese Karte in dieses Deck? EINE Frage, EINE Antwort — die Trefferliste
+   blendet aus, was nicht darf, und das Ablegen prüft dieselbe Regel noch
+   einmal. Zwei getrennte Prüfungen liefen auseinander, und die zweite wird
+   gebraucht: Zwischen dem Tippen und dem Loslassen kann ein zweites Gerät das
+   Deck gefüllt oder das letzte Exemplar anderswo verbaut haben.
+
+   Die Reihenfolge ist nicht beliebig. Das Einlösen eines Wunsches steht VORN,
+   weil es das Deck nicht wachsen lässt: Steht dieselbe Karte schon als
+   fehlender Eintrag darin und hat man sie inzwischen gekauft, wird der Eintrag
+   umgehängt. Im vollen Deck ist das der einzige verbliebene Weg, und eine
+   Voll-Prüfung davor nähme ihn weg. */
+function zugabeGrund(d, c) {
+  if (!d || !c) return "unbekannt";
+  if (deckWunschEintrag(d, c)) return null;
+  if ((d.entries || []).some(e => e.cardId === c.id)) return "drin";
+  if (singletonFrei(d, c) < 1) return "singleton";
+  if (deckFrei(d) < 1) return "voll";
+  // Kontingent: Ein Exemplar, das schon in anderen Decks steckt, lässt sich
+  // nicht ein zweites Mal verbauen. Nur besessene Karten sind betroffen; reine
+  // Wunschkarten (Bestand 0) dürfen in beliebig viele Decks.
+  const bestand = bestandVon(c);
+  if (bestand >= 1) {
+    const andere = deckVorkommen(c, d.id);
+    if (andere.reduce((s, x) => s + x.qty, 0) >= bestand) return "vergeben";
+  }
+  return null;
+}
+
+/* Dieselben Worte wie an den bisherigen Stellen — eine Absage soll nicht davon
+   abhängen, auf welchem Weg jemand sie ausgelöst hat. */
+function zugabeMeldung(d, c, grund) {
+  const name = c.disp || c.name;
+  if (grund === "voll")      return t("deck.fullToast", { n: deckGroesse(d), max: DECK_MAX });
+  if (grund === "singleton") return t("deck.singleton",
+    { name, max: commanderMaxKopien(c), n: deckKopien(d, c) });
+  if (grund === "vergeben")  return t("deck.allocFull",
+    { n: bestandVon(c), decks: deckVorkommen(c, d.id).map(x => x.name).join(", ") });
+  return t("deck.addAlready", { name });
+}
+
+/* Die Trefferliste der schwebenden Leiste. Anders als die im Werkzeugkasten
+   führt sie nur auf, was auch wirklich ins Deck kann, und ihre Zeilen sind
+   ZIEHBAR statt anklickbar.
+
+   Erst nach Namen sieben, dann nach Regel: zugabeGrund() greift auf Deck und
+   Sammlung zu und ist damit teurer als ein Textvergleich. Die Zahl der
+   durchgesehenen Treffer ist begrenzt — bei zwei Buchstaben passen sonst
+   hunderte Karten, und geprüft würde jede. */
+function zugabeSucheVerdrahten(inp, deckId) {
+  const box = inp.parentElement;
+  let liste = null;
+  const zu = () => { liste?.remove(); liste = null; hideHover(); };
+  inp.addEventListener("input", () => {
+    zu();
+    const v = inp.value.trim().toLowerCase();
+    if (v.length < 2) return;
+    const d = DECKS.find(x => x.id === deckId);
+    if (!d) return;
+
+    const treffer = [];
+    let gesehen = 0;
+    for (const c of CARDS) {
+      if (treffer.length >= 8 || gesehen >= 200) break;
+      if (!(c.name || "").toLowerCase().includes(v) &&
+          !(c.disp || "").toLowerCase().includes(v)) continue;
+      gesehen++;
+      if (!zugabeGrund(d, c)) treffer.push(c);
+    }
+
+    liste = document.createElement("ul");
+    // Im vollen Deck bleibt die Liste bis auf Wunsch-Einlösungen leer. Das ohne
+    // Wort zu tun sähe wie ein Fehler aus — hier steht, woran es liegt.
+    if (deckFrei(d) < 1) {
+      const hin = document.createElement("li");
+      hin.className = "sugg-hinweis";
+      hin.textContent = t("deck.addFull", { n: deckGroesse(d), max: DECK_MAX });
+      liste.appendChild(hin);
+    }
+    treffer.forEach(c => {
+      const li = document.createElement("li");
+      li.className = "sugg-karte";
+      li.innerHTML = `<span class="zieh-griff" data-ziehgriff aria-hidden="true"
+           title="${esc(t("katdrop.handle"))}">&#8942;&#8942;</span>` +
+        `<span class="sugg-name">${esc(c.disp)} &middot; ${esc(c.set)}${c.foil ? " &middot; Foil" : ""}</span>`;
+      // Ziehen wie eine Tabellenzeile, nur mit dem Vermerk "gibt es hier noch
+      // nicht" — daran erkennt das Ablegen, dass zuerst der Deckplatz entstehen
+      // muss.
+      ziehVerdrahten(li, deckId, c.id, true);
+      if (HOVER_OK) {
+        li.addEventListener("mouseenter", ev => {
+          clearTimeout(hoverTimer);
+          hoverTimer = setTimeout(() => showHover(c.id, ev.clientX, ev.clientY), 250);
+        });
+        li.addEventListener("mouseleave", hideHover);
+      }
+      liste.appendChild(li);
+    });
+    if (!liste.children.length) { liste = null; return; }
+    box.appendChild(liste);
+  });
+  // Länger als beim Anklicken: Aus der Liste wird gezogen, und der Zug beginnt
+  // erst nach sechs Pixeln Bewegung.
+  inp.addEventListener("blur", () => setTimeout(zu, 250));
 }
 
 /* Vorschläge aus der eigenen Sammlung (nicht aus Scryfall). */
