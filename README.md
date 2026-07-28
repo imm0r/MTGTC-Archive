@@ -788,9 +788,25 @@ dieselben, sie liefern die Bewegung selbst, und sie hängen an einem sichtbaren
 Griff. Der trägt `touch-action: none` — ohne das rollt die Seite unter dem
 Finger weg, statt die Karte mitzunehmen.
 
+**Bewegung und Loslassen hören am Fenster zu, nicht am angefassten Element.**
+Das klingt nach einer Kleinigkeit und ist die entscheidende Stelle: Ein
+Stapelstreifen ist rund 23 px hoch, und schon die sechs Pixel bis zur
+Zugschwelle führen den Zeiger heraus. Hingen die Ereignisse am Streifen, käme
+danach keines mehr an — der Zug begänne nie, das Loslassen erreichte ihn
+ebenso wenig, und der halb gesetzte Zustand bliebe stehen. In der Tabelle fiel
+das nicht auf, weil eine Zeile 64 px hoch ist.
+
+Der naheliegende Ausweg — den Zeiger mit `setPointerCapture` einfangen — ist
+hier **falsch**: Ein gefangener Zeiger leitet auch den folgenden `click` auf das
+fangende Element um. Das Kartenbild bekäme seinen Klick nie mehr, und die
+Detailansicht ginge nicht auf. Am Fenster zuzuhören löst dasselbe Problem, ohne
+dieses zu schaffen.
+
 Ein Zug beginnt erst nach **sechs Pixeln** Bewegung: genug, um ein Zittern der
 Hand nicht als Zug zu lesen, wenig genug, dass er sofort einsetzt, wenn er
-gemeint war. Darunter bleibt es ein Klick, der wie bisher die Detailansicht
+gemeint war. Kommt eine Bewegung ohne gedrückte Taste an, wird ein angefangener
+Ansatz verworfen — das fängt den Fall ab, dass ein Loslassen gar nicht bei uns
+ankam (außerhalb des Fensters, vom System abgefangen). Darunter bleibt es ein Klick, der wie bisher die Detailansicht
 öffnet. Umgekehrt wird der Klick, der einem Zug folgt, verschluckt — sonst ginge
 nach jedem Ziehen vom Kartenbild aus die Detailansicht auf.
 
