@@ -7322,10 +7322,51 @@ function zeigeDeckZeile(deckId, cardId) {
    um ein Zittern der Hand nicht als Zug zu lesen, und wenig genug, dass der Zug
    sofort einsetzt, wenn er gemeint war. */
 const ZIEH_SCHWELLE = 6;
-let ziehKat = null;          // {deckId, cardId, vonKat} während eines Zuges
+let ziehKat = null;          // {art, …} während eines Zuges
 let ziehAnsatz = null;       // gedrückt, aber noch unter der Schwelle
 let ziehGeist = null;        // das mitwandernde Schild am Zeiger
 let ziehUeber = null;        // das Ziel unter dem Zeiger, solange es dort liegt
+
+/* ZWEI ARTEN VON ZUG, EINE MASCHINE.
+
+   Im Deck wandert eine Karte in ein FACH, in der Spielrunde von einer ZONE in
+   die andere. Verschieden ist daran nur viererlei: woran ein Ziel zu erkennen
+   ist, was beim Anheben eingeblendet wird, welche Ziele überhaupt in Frage
+   kommen und was beim Loslassen geschieht. Alles andere — die Schwelle von
+   sechs Pixeln, das Schild am Zeiger, das Hervorheben, der Abbruch mit Escape,
+   der geschluckte Klick danach — ist dasselbe und stünde sonst zweimal da.
+
+   Zweimal dastehen hieße: auseinanderlaufen. Genau davor warnt schon der
+   Kommentar an ziehVerdrahten, und er galt damals nur für zwei ANSICHTEN
+   desselben Zuges.
+
+   Die Rückrufe sind bewusst Pfeile um den Aufruf herum und nicht die Funktion
+   selbst (`ab: katAbgelegt`): So wird der Name erst beim Loslassen aufgelöst.
+   Die Prüfungen unter tests/ hängen sich genau dort ein und fingen eine früh
+   eingefrorene Referenz nicht mehr ab. */
+const ZUG_ARTEN = {
+  kat: {
+    ziel: "katdrop",
+    an:   z => katDropAn(z.deckId, z.cardId, z.neu),
+    // Eine Spalte gehört zu genau einem Deck, eine Kachel im Überblick zu
+    // keinem. Sind zwei Decks aufgeklappt, darf eine Karte aus dem einen nicht
+    // in ein Fach des anderen fallen: Dort gibt es ihren Eintrag nicht, und
+    // der zusammengesetzte Fremdschlüssel wiese das Schreiben ab — nach dem
+    // Loslassen, mit einer Fehlermeldung, die niemand erwartet hätte.
+    passt: (z, el) => !el.dataset.dropdeck || el.dataset.dropdeck === z.deckId,
+    ab:   (z, ziel, zusatz) => katAbgelegt(z, ziel, zusatz),
+  },
+  zone: {
+    ziel: "zonedrop",
+    an:   z => zoneDropAn(z),
+    // Dieselbe Regel, die auch die Zielknöpfe aufstellt: die Bibliothek nur für
+    // normale Karten, die Kommandozone nur für Commander, die eigene Zone nie.
+    // Eine zweite Formulierung derselben Frage liefe irgendwann anders.
+    passt: (z, el) => zieleFuer(z.cardId, z.von).includes(el.dataset.zonedrop),
+    ab:   (z, ziel) => zoneMove(z.cardId, z.von, ziel, z.idx),
+  },
+};
+const zugArtVon = z => ZUG_ARTEN[z?.art] || null;
 
 /* Anfassen — noch kein Zug. Erst die Bewegung entscheidet, ob daraus einer
    wird; sonst wäre jeder Klick auf eine Zeile einer. */
@@ -7335,7 +7376,7 @@ function katZiehAnfassen(e, tr, deckId, cardId, neu) {
   // landet dann eben in keinem Fach. Nur das Umsortieren braucht sie.
   if (DECK_KAT_TABELLE_FEHLT && !neu) return;
   if (e.target?.closest?.("input, button, select, textarea, a")) return;
-  ziehAnsatz = { x: e.clientX, y: e.clientY, tr, deckId, cardId, neu: !!neu,
+  ziehAnsatz = { x: e.clientX, y: e.clientY, tr, art: "kat", deckId, cardId, neu: !!neu,
                  vonKat: tr.dataset.vonkat || null, id: e.pointerId };
   // KEIN setPointerCapture. Es liegt nahe, den Zeiger hier zu fangen, damit der
   // Zug nicht abreißt — aber ein gefangener Zeiger leitet auch den folgenden
@@ -7355,18 +7396,26 @@ function katZiehBewegt(e) {
   if (ziehAnsatz && !ziehKat) {
     if (Math.hypot(e.clientX - ziehAnsatz.x, e.clientY - ziehAnsatz.y) < ZIEH_SCHWELLE) return;
     const a = ziehAnsatz;
-    ziehKat = { deckId: a.deckId, cardId: a.cardId, vonKat: a.vonKat, neu: a.neu };
+    ziehKat = a.art === "zone"
+      ? { art: "zone", cardId: a.cardId, von: a.von, idx: a.idx }
+      : { art: "kat", deckId: a.deckId, cardId: a.cardId, vonKat: a.vonKat, neu: a.neu };
     a.tr.classList.add("zieht");
     document.body.classList.add("zieht-gerade");   // nichts markieren während des Zuges
     hideHover();                     // die Vorschau schwebt höher als die Flächen
+    // Dasselbe für die Kartenansicht der Spielrunde. `true` löst auch eine
+    // angeheftete — die bliebe sonst bis zum nächsten Klick über dem Feld
+    // stehen. Hat die Matte ihre feste Spalte, behält die absichtlich das
+    // zuletzt gezeigte Bild (sonst flackerte die Fläche im Spiel dauernd);
+    // dort verdeckt sie nichts und zeigt gerade die Karte, die man trägt.
+    if (a.art === "zone") versteckeSpielKarte(true);
     // Die Trefferliste hat ihren Dienst getan und läge jetzt im Weg: Seit die
     // Deckleiste NEBEN dem Raster steht statt darüber, hängt sie genau über der
     // ersten Spaltenreihe. Sie verschwände zwar von selbst, wenn die Eingabe
     // den Fokus verliert — aber erst nach einer Viertelsekunde, und in der
     // sieht man die Ziele nicht, auf die man zielt.
-    if (a.neu) zugabeListeSchliessen();
+    if (a.art === "kat" && a.neu) zugabeListeSchliessen();
     katGeistAn(a.cardId);
-    katDropAn(a.deckId, a.cardId, a.neu);
+    zugArtVon(ziehKat).an(ziehKat);
   }
   if (!ziehKat) return;
   e.preventDefault();                // kein Textmarkieren, kein Wegrollen
@@ -7382,10 +7431,11 @@ function katZiehLos(e) {
   ziehAnsatz = null;                                  // in JEDEM Fall räumen
   if (!zug) return;                                   // war doch nur ein Klick
   const feld = katFeldUnter(e.clientX, e.clientY);
+  const art = zugArtVon(zug);        // VOR dem Aufräumen — danach ist ziehKat leer
   katZiehAus();
   // Ein Klick, der aus einem Zug entstand, darf die Detailansicht nicht öffnen.
   katKlickSchlucken();
-  if (feld) katAbgelegt(zug, feld.dataset.katdrop, e.ctrlKey || e.metaKey);
+  if (feld && art) art.ab(zug, feld.dataset[art.ziel], e.ctrlKey || e.metaKey);
 }
 
 function katZiehAus() {
@@ -7395,18 +7445,20 @@ function katZiehAus() {
   // Nicht nur Tabellenzeilen: In der Kartenansicht zieht man einen Stapelstreifen.
   $$(".zieht").forEach(el => el.classList.remove("zieht"));
   katGeistAus();
+  // Beide Aufräumer, ohne nach der Art zu fragen: Jeder von ihnen ist wirkungslos,
+  // wenn seine Art gar nicht lief, und ein Abbruch (Escape, pointercancel) kommt
+  // an Stellen an, die den Zug nicht mehr kennen.
   katDropAus();
+  zoneDropAus();
 }
 
 function katFeldUnter(x, y) {
-  const feld = document.elementFromPoint(x, y)?.closest?.("[data-katdrop]") || null;
-  // Eine Spalte gehört zu genau einem Deck, eine Kachel im Überblick zu keinem.
-  // Sind zwei Decks aufgeklappt, darf eine Karte aus dem einen nicht in ein Fach
-  // des anderen fallen: Dort gibt es ihren Eintrag nicht, und der zusammen-
-  // gesetzte Fremdschlüssel wiese das Schreiben ab — nach dem Loslassen, mit
-  // einer Fehlermeldung, die niemand erwartet hätte.
-  if (feld?.dataset.dropdeck && feld.dataset.dropdeck !== ziehKat?.deckId) return null;
-  return feld;
+  const art = zugArtVon(ziehKat);
+  if (!art) return null;
+  const feld = document.elementFromPoint(x, y)?.closest?.(`[data-${art.ziel}]`) || null;
+  // Was nicht angenommen werden DARF, leuchtet auch nicht auf: Die Prüfung sitzt
+  // hier und nicht erst beim Loslassen, damit man vorher sieht, was geht.
+  return feld && art.passt(ziehKat, feld) ? feld : null;
 }
 
 function katZielHervorheben(x, y, zusatz) {
@@ -7419,6 +7471,9 @@ function katZielHervorheben(x, y, zusatz) {
     feld?.classList.add("ueber");
     ziehUeber = feld;
   }
+  // Der Fußtext gehört zum Fächer-Balken des Decks. Ein Zonenzug hat keinen —
+  // dort sind die Zonen selbst die Ziele, und ein Balken läge über ihnen.
+  if (ziehKat?.art !== "kat") return;
   const box = $("#kat-drop");
   if (!box) return;
   box.classList.toggle("zusatz", !!zusatz);
@@ -11841,6 +11896,7 @@ const ZONEN = [
 const zoneDef = k => ZONEN.find(z => z.key === k);
 
 let ZONE_OFFEN = "hand";        // welche Zone gerade aufgeklappt ist
+let zoneZeigerArt = "mouse";    // womit zuletzt in den Zonen angefasst wurde
 let zoneHoverT = null;          // entprellt das Aufklappen per Maus
 let zoneSperre = 0;             // bis wann Hover ignoriert wird (Layout beruhigen)
 let libAlle = false;            // „ganze Bibliothek anzeigen" ein/aus
@@ -11980,6 +12036,44 @@ function zoneMove(cardId, von, nach, idx) {
   zoneSchreiben(cardId);
 }
 
+/* ---- Ziehen zwischen den Zonen --------------------------------------
+   Dieselbe Geste wie im Deck, wo eine Karte in ein Fach wandert: anfassen,
+   ziehen, über der Zielzone loslassen. Die Maschine dahinter ist dieselbe
+   (ZUG_ARTEN, weiter oben); hier steht nur, was an den Zonen eigen ist.
+
+   WARUM DAS DIE ZIELKNÖPFE ERSETZT: Auf dem Schlachtfeld trug jede Karte vier
+   davon — Friedhof, Exil, Hand, Bibliothek —, bei einem Commander fünf. Bei
+   62 px Kartenbreite ist das eine Knopfleiste, die breiter ist als die Karte,
+   die sie bedient, und deren Zeichen man auseinanderhalten muss, bevor man
+   trifft. Die Zone dagegen ist ein großes Feld mit Namen und Zeichen in der
+   Kopfzeile: Man zieht dorthin, wo man ohnehin hinsieht.
+
+   Die Knöpfe verschwinden nicht ganz — in der angehefteten Kartenansicht
+   stehen sie weiter. Das ist der Weg für Finger und Tastatur, denn ein Zug per
+   Zeigereignis ist hier bewusst der MAUS vorbehalten: Ein Kartengitter rollt
+   unter dem Finger, und touch-action:none auf jeder Karte nähme das weg. */
+function zoneZiehAnfassen(e, el, cardId, von, idx) {
+  if (e.button != null && e.button !== 0) return;      // nur die Haupttaste
+  if (e.target?.closest?.("input, button, select, textarea, a")) return;
+  // Nichts anfassen, was ohnehin nirgends hin darf oder gar nicht da ist.
+  if (!zieleFuer(cardId, von).length || zAnzahl(cardId, von) < 1) return;
+  ziehAnsatz = { x: e.clientX, y: e.clientY, tr: el, art: "zone",
+                 cardId, von, idx: idx || 0, id: e.pointerId };
+}
+
+/* Beim Anheben zeigen, wohin die Karte überhaupt darf. Ohne das zöge man
+   versuchsweise irgendwohin und merkte erst am ausbleibenden Aufleuchten, dass
+   diese Zone nicht in Frage kommt — eine Kreatur gehört nicht in die
+   Kommandozone, ein Commander nicht in die Bibliothek. */
+function zoneDropAn(zug) {
+  const erlaubt = new Set(zieleFuer(zug.cardId, zug.von));
+  $$("#zonen [data-zonedrop]").forEach(el =>
+    el.classList.toggle("zieh-ziel", erlaubt.has(el.dataset.zonedrop)));
+}
+function zoneDropAus() {
+  $$("[data-zonedrop]").forEach(el => el.classList.remove("zieh-ziel", "ueber"));
+}
+
 /* Commander-Steuer von Hand nachstellen (verzählt, Regeländerung am Tisch). */
 function cmdSteuer(cardId, delta) {
   const st = { hand: 0, field: 0, grave: 0, exile: 0, cast: 0, ...(SESSION_ZONEN[cardId] || {}) };
@@ -12080,7 +12174,7 @@ function querHinweisHtml() {
    Kopfzeile zum Aufklappen — hier ist alles gleichzeitig offen. */
 function matInnerHtml() {
   const feld = (key, titel, inhalt, extra = "") => `
-    <section class="mat-feld${extra}" data-zone="${esc(key)}">
+    <section class="mat-feld${extra}" data-zone="${esc(key)}" data-zonedrop="${esc(key)}">
       <div class="mat-titel">${zoneDef(key)?.icon || ""} ${esc(titel)}
         <span class="mat-n">${inhalt.n}</span></div>
       <div class="mat-korb">${inhalt.html}</div>
@@ -12137,7 +12231,8 @@ function matInnerHtml() {
 function zonenInnerHtml() {
   if (MAT_AN) return matInnerHtml();
   return sichtbareZonen().map(z => `
-    <section class="zone${z.key === ZONE_OFFEN ? " offen" : ""}" data-zone="${z.key}">
+    <section class="zone${z.key === ZONE_OFFEN ? " offen" : ""}" data-zone="${z.key}"
+             data-zonedrop="${z.key}">
       ${zoneKopfHtml(z)}
       <div class="zone-korb">${zoneKorbHtml(z.key)}</div>
     </section>`).join("");
@@ -12198,27 +12293,31 @@ function zoneKarteHtml(c, zone, n, st) {
   const idx = st ? st.idx : 0;
   return `<div class="zk${st?.t ? " getappt" : ""}" tabindex="0" data-id="${esc(c.id)}" data-zone="${esc(zone)}"
        data-idx="${idx}" data-spk="${esc(c.id)}" data-spk-zone="${esc(zone)}"
-       title="${esc(nm)}${st?.t ? " · " + t("zone.tapped") : ""}">
-    ${c.img ? `<img src="${esc(c.img)}" alt="${esc(nm)}" loading="lazy">`
+       title="${esc(nm)}${st?.t ? " · " + t("zone.tapped") : ""}${
+         zone === "field" ? " · " + t(st?.t ? "zone.untapTitle" : "zone.tapTitle") : ""}">
+    ${c.img ? `<img src="${esc(c.img)}" alt="${esc(nm)}" loading="lazy" draggable="false">`
             : `<div class="zk-ohnebild">${esc(nm)}</div>`}
     ${n > 1 ? `<span class="zk-n">&times;${n}</span>` : ""}
     ${st?.c ? `<span class="zk-marke" title="${esc(t("zone.counters", { n: st.c }))}">+${st.c}/+${st.c}</span>` : ""}
     ${zone === "cmd" && !MAT_AN ? `<button class="zk-steuer" data-steuer="${esc(c.id)}" data-d="-1"
          title="${esc(t("sess.cmdTaxTitle", { mana: steuer * 2, n: steuer }))}">+${steuer * 2}</button>` : ""}
     ${zone === "field" ? `<div class="zk-akt"><div class="zk-akt-reihe">
-        <button class="btn ghost sm" data-tap="${esc(c.id)}" data-idx="${idx}"
-          title="${esc(st?.t ? t("zone.untapTitle") : t("zone.tapTitle"))}">&#8635;</button>
         <button class="btn ghost sm" data-marke="${esc(c.id)}" data-idx="${idx}" data-d="1"
           title="${esc(t("zone.counterAdd"))}">&plus;</button>
         ${st?.c ? `<button class="btn ghost sm" data-marke="${esc(c.id)}" data-idx="${idx}" data-d="-1"
           title="${esc(t("zone.counterRemove"))}">&minus;</button>` : ""}
-      </div><div class="zk-akt-reihe">${zoneAktHtml(c.id, zone, idx)}</div></div>` : ""}
+      </div></div>` : ""}
   </div>`;
 }
 
 /* Die Zielknöpfe einer Karte: für jede erlaubte Zone einer, mit ihrem Zeichen.
    Der Name steht im Tooltip — sechs beschriftete Knöpfe passten unter keine
-   Karte, und die Zeichen stehen daneben in jeder Kopfzeile. */
+   Karte, und die Zeichen stehen daneben in jeder Kopfzeile.
+
+   Sie stehen nur noch in der ANGEHEFTETEN Kartenansicht, nicht mehr auf den
+   Karten selbst: dort ersetzt sie der Zug in die Zielzone. Als Weg für Finger
+   und Tastatur bleiben sie unverzichtbar — ein Zeigerzug ist hier der Maus
+   vorbehalten, siehe zoneZiehAnfassen. */
 function zoneAktHtml(id, von, idx) {
   return zieleFuer(id, von).map(k => `<button class="btn ghost sm" data-move="${esc(id)}"
     data-von="${esc(von)}" data-nach="${esc(k)}" data-idx="${idx || 0}"
@@ -12252,9 +12351,8 @@ function zoneHandHtml() {
     return `<div class="hand-karte" tabindex="0" style="--rot:${rot}deg;--dy:${dy}px;--z:${i + 1};${
       i ? `margin-left:calc(var(--hk-b,104px) * ${(anteil - 1).toFixed(3)})` : ""}"
          data-spk="${esc(c.id)}" data-spk-zone="hand" title="${esc(nm)}">
-      ${c.img ? `<img src="${esc(c.img)}" alt="${esc(nm)}" loading="lazy">`
+      ${c.img ? `<img src="${esc(c.img)}" alt="${esc(nm)}" loading="lazy" draggable="false">`
               : `<div class="hand-ohnebild">${esc(nm)}</div>`}
-      <div class="hand-akt">${zoneAktHtml(c.id, "hand")}</div>
     </div>`;
   }).join("");
   return `<div class="hand-fan">${fan}</div>`;
@@ -12437,6 +12535,11 @@ function renderZonen() {
    Layout unter dem Zeiger — deshalb eine kurze Sperre, sonst klappt die Zone
    weiter, über der der Zeiger dann zufällig landet. */
 function zoneOeffnen(key, sofort) {
+  // Nicht während eines Zuges. Sonst klappt die Zone auf, über der man gerade
+  // schwebt, alles darunter rutscht weg — und losgelassen wird über etwas
+  // anderem als dem, worauf man gezielt hat. Gilt für Hover UND Klick: ein
+  // Klick, der aus einem Zug entstand, ist ohnehin keiner.
+  if (ziehKat) return;
   if (!sofort && Date.now() < zoneSperre) return;
   if (ZONE_OFFEN === key) return;
   ZONE_OFFEN = key;
@@ -12471,7 +12574,9 @@ function wireZonenHover() {
     // jedem Überstreichen ein Fenster aufpoppt. In der Spalte stört nichts.
     const zoegern = spkFeldEl() ? 0 : 250;
     el.addEventListener("mouseenter", e => {
-      if (spkFest) return;
+      // Während eines Zuges nicht: Die Ansicht legte sich über die Zonen, auf
+      // die man zielt — und beim Ziehen sieht man die Karte ohnehin am Zeiger.
+      if (spkFest || ziehKat || ziehAnsatz) return;
       clearTimeout(spkTimer);
       const x = e.clientX, y = e.clientY;
       spkTimer = setTimeout(() => zeigeSpielKarte(id, x, y, zone, false, idx), zoegern);
@@ -12515,8 +12620,42 @@ function wireZonen() {
     if (st) return cmdSteuer(st.dataset.steuer, parseInt(st.dataset.d, 10));
     const alle = e.target.closest("#lib-alle");
     if (alle) { libAlle = !libAlle; return renderZonen(); }
+    /* Ein Klick auf eine Karte des Schlachtfelds TAPPT sie. Das war der
+       häufigste Handgriff im Spiel und kostete bisher einen eigenen Knopf am
+       Kartenrand; jetzt ist die Karte selbst der Knopf, so wie am Tisch die
+       Karte selbst gedreht wird.
+
+       Nur mit der Maus. Auf dem Finger bleibt der Tipp das, was er war — er
+       öffnet die Kartenansicht, und die trägt ↻, die Marken und die
+       Zielknöpfe. Nähme man ihm das, gäbe es auf einem Tablet überhaupt keinen
+       Weg mehr, eine Karte vom Schlachtfeld herunterzubekommen: Der Zug ist
+       aus gutem Grund der Maus vorbehalten (siehe zoneZiehAnfassen).
+
+       Ein Klick, der aus einem Zug entstand, kommt hier nie an — den schluckt
+       katKlickSchlucken. Sonst tappte jede Karte, die man verschiebt. */
+    const zk = e.target.closest('.zk[data-zone="field"]');
+    if (zk && zoneZeigerArt === "mouse") return feldTap(zk.dataset.id, +zk.dataset.idx || 0);
     const spk = e.target.closest("[data-spk]");
     if (spk) return spkAusElement(spk);
+  };
+  /* Anfassen zum Ziehen — delegiert wie das Klicken, denn die Körbe entstehen
+     bei jedem Zug neu. Angefasst wird an [data-spk]: Dieses Merkmal tragen
+     ohnehin alle Karten, die eine Zone kennen — die Kacheln in Feld, Friedhof,
+     Exil und Kommandozone, der Fächer der Hand und die Zeilen der Bibliothek.
+     Ein zweites Merkmal nur fürs Ziehen liefe irgendwann daneben.
+
+     Nur mit der Maus: Unter dem Finger muss ein Kartengitter rollen können, und
+     das ginge nur mit touch-action:none auf jeder Karte. Dort führt der Weg
+     über die angeheftete Kartenansicht und ihre Zielknöpfe. */
+  zonen.onpointerdown = e => {
+    // Womit angefasst wurde, entscheidet weiter oben, ob ein Klick tappt oder
+    // die Kartenansicht öffnet. Ein click-Ereignis verrät das nicht mehr —
+    // pointerType gibt es nur am Zeigereignis, deshalb hier gemerkt.
+    zoneZeigerArt = e.pointerType;
+    if (e.pointerType !== "mouse") return;
+    const el = e.target.closest("[data-spk]");
+    if (!el) return;
+    zoneZiehAnfassen(e, el, el.dataset.spk, el.dataset.spkZone || "lib", +el.dataset.idx || 0);
   };
   zonen.onkeydown = e => {
     const spk = e.target.closest?.("[data-spk]");

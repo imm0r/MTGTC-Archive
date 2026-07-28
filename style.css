@@ -696,16 +696,18 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .feld-trenner::after{content:"";flex:1;height:1px;background:var(--line);order:3}
 .feld-trenner-n{order:2;min-width:16px;height:15px;padding:0 5px;border-radius:8px;display:inline-flex;
   align-items:center;justify-content:center;background:var(--line);color:var(--dim);font-size:10px}
-/* Feldkarten haben zwei Knopfreihen: erst der Zustand (tappen, Marken), dann
-   die Zielzonen. Nebeneinander wären es bis zu sieben Knöpfe unter einer Karte. */
+/* Auf der Feldkarte stehen nur noch die MARKEN. Zwei Knopfreihen sind es nicht
+   mehr: Die Zielzonen sind dem Zug gewichen, das Tappen dem Klick auf die Karte
+   selbst — so wie am Tisch die Karte selbst gedreht wird. Damit fällt auch der
+   tiefere Versatz weg, den die zweite Reihe brauchte.
+   Beides steht weiter in der angehefteten Kartenansicht (.spk-akt): Sie ist der
+   Weg für Finger und Tastatur, wo weder Zug noch Klick zur Verfügung stehen. */
 .zk-akt-reihe{display:flex;gap:3px;justify-content:center}
-.zk-akt,.hand-akt{position:absolute;left:50%;bottom:-9px;display:flex;flex-direction:column;gap:3px;
+.zk-akt{position:absolute;left:50%;bottom:-9px;display:flex;flex-direction:column;gap:3px;
   align-items:center;opacity:0;pointer-events:none;
   transform:translateX(-50%);transition:opacity .12s;z-index:2}
-[data-zone="field"] .zk-akt{bottom:-22px}
-.zk:hover .zk-akt,.zk:focus-within .zk-akt,
-.hand-karte:hover .hand-akt,.hand-karte:focus-within .hand-akt{opacity:1;pointer-events:auto}
-.zk-akt .btn,.hand-akt .btn{padding:2px 6px;font-size:14px;line-height:1.3;background:var(--panel)}
+.zk:hover .zk-akt,.zk:focus-within .zk-akt{opacity:1;pointer-events:auto}
+.zk-akt .btn{padding:2px 6px;font-size:14px;line-height:1.3;background:var(--panel)}
 
 /* ---- Hand: aufgefächert wie in der echten Hand ----
    Winkel (--rot), Tiefe (--dy) und Überlappung rechnet app.js je Karte aus,
@@ -797,6 +799,34 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 /* overflow:hidden an den Spalten, damit nie ein Feld ueber den Mattenrand
    quillt; erreichbar bleibt alles, weil jeder Korb innen rollt. */
 .mat-links,.mat-mitte,.mat-rechts{min-height:0;overflow:hidden}
+/* ===== Karten zwischen den Zonen ziehen =====
+   Dieselbe Geste wie im Deck, und deshalb dieselben zwei Zustände: „hierhin
+   dürfte sie" und „hier liegt sie gerade". Sie ersetzt die Zielknöpfe, die
+   früher auf jeder Karte des Schlachtfelds standen.
+
+   Die Ziele sind die Zonen selbst — im Akkordeon der ganze Abschnitt (bei
+   zugeklappter Zone also ihre Kopfzeile), auf der Matte das Feld. Ein
+   schwebender Balken wie beim Deck wäre hier verkehrt: Dort braucht er es,
+   weil bei Gruppierung nach Typ gar keine Fächer auf dem Schirm stehen. Eine
+   Zone dagegen ist IMMER sichtbar, und ein Balken läge über ihr. */
+[data-zonedrop]{transition:background .12s,box-shadow .12s,border-color .12s}
+/* Erlaubtes Ziel: eine Andeutung, kein Aufruf. Zu kräftig angesetzt flackerte
+   beim Anheben die halbe Matte auf. */
+[data-zonedrop].zieh-ziel{box-shadow:inset 0 0 0 1px var(--acc)}
+.zone[data-zonedrop].zieh-ziel>.zone-kopf{background:var(--panel)}
+/* Darüber. Kräftig genug, um es aus dem Augenwinkel zu sehen — beim Ziehen
+   sieht man auf die Karte am Zeiger, nicht auf den Rand des Feldes. */
+[data-zonedrop].ueber{border-color:var(--acc);
+  background:linear-gradient(var(--akt-flaeche),var(--akt-flaeche)),var(--panel2);
+  box-shadow:0 0 0 2px rgba(201,162,39,.45)}
+.zone[data-zonedrop].ueber>.zone-kopf{background:var(--panel)}
+[data-zonedrop].ueber .zone-name,[data-zonedrop].ueber .mat-titel{color:var(--acc2)}
+/* Die angehobene Karte bleibt an ihrem Platz sichtbar, aber blass — wie der
+   Stapelstreifen im Deck, damit man sieht, was gerade unterwegs ist. */
+.zk.zieht,.hand-karte.zieht,.lib-zeile.zieht{opacity:.4}
+/* Kein Anheben unter dem Zeiger, solange ein Zug läuft: Die Karte, über der
+   man schwebt, ist gerade Ziel und nicht Gegenstand. */
+body.zieht-gerade .zk:hover,body.zieht-gerade .zk:focus-within{transform:none}
 .mat-feld{overflow:hidden}
 .mat-links .zone-gitter,.mat-hand .zone-gitter{gap:10px}
 .mat-hand .mat-korb{overflow:visible;padding:0}
@@ -1175,7 +1205,12 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
    Bild-Zug und meldet unseren Zeiger mit pointercancel ab — die Ablageflächen
    erschienen dann gar nicht mehr. draggable="false" steht zusätzlich am
    Element, weil Firefox auf diese CSS-Eigenschaft nicht hört. */
-.stapel-karte img,.deck-tbl td img{-webkit-user-drag:none;user-drag:none}
+.stapel-karte img,.deck-tbl td img,
+/* Dieselbe Sperre für die Zonen der Spielrunde, seit man auch dort zieht. Ohne
+   sie startete der Browser über dem Kartenbild seinen eigenen Zug und meldete
+   unseren Zeiger mit pointercancel ab — der Zug begann, wurde nach dem ersten
+   pointermove abgeräumt, und nichts geschah. */
+.zk img,.hand-karte img{-webkit-user-drag:none;user-drag:none}
 /* Die Menge steht NEBEN der Karte, nicht darauf: Auf dem Balken verdeckte sie
    den Namen, und der ist das, wonach man sucht. */
 .stapel-menge{flex:none;width:var(--stapel-menge);text-align:right;font-size:11px;line-height:18px;
