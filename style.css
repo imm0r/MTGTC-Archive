@@ -31,15 +31,26 @@
   --akt-schein:0 0 0 1px rgba(201,162,39,.18),0 3px 14px -6px rgba(201,162,39,.85);
 }
 *{box-sizing:border-box}
+/* Fira Sans Condensed für die ganze Oberfläche, nicht nur für die Kopfzeile:
+   Zwei Schriften in einem Programm lesen sich als zwei Programme. Sie ist
+   schmal, und das kommt gerade den Tabellen zugute — in einer Kartenzeile
+   stehen Name, Set, Sprache, Zustand, Menge und Preis nebeneinander, und jede
+   gesparte Breite ist eine Spalte, die nicht umbricht.
+   Die Systemschriften bleiben als Rückfall stehen, für den Augenblick vor dem
+   Laden und für den Fall, dass die Datei einmal fehlt. */
 body{margin:0;background:var(--bg);color:var(--txt);
-     font:15px/1.5 system-ui,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+     font:15px/1.5 "Fira Sans Condensed",system-ui,"Segoe UI",Roboto,sans-serif;
+     -webkit-text-size-adjust:100%}
 header{position:sticky;top:0;z-index:10;background:var(--panel);border-bottom:1px solid var(--line);
        padding:10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 h1{font-size:17px;margin:0;letter-spacing:.5px;color:var(--acc)}
 nav{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;align-items:center}
-nav button{display:inline-flex;align-items:center;gap:7px;
+/* Keine Pillen mehr: derselbe Radius wie überall sonst in der App (Knöpfe 8 px,
+   Karten 12 px). Eine runde Pille um ein Bild plus Wort wirkt wie ein Etikett,
+   das man abziehen könnte — und je größer das Bild darin, desto mehr. */
+nav button{display:inline-flex;align-items:center;gap:8px;
            background:transparent;border:1px solid var(--line);color:var(--dim);
-           padding:7px 14px;border-radius:999px;cursor:pointer;font-size:14px}
+           padding:6px 12px;border-radius:8px;cursor:pointer;font-size:14px}
 nav button.on{background:var(--akt-flaeche);border-color:var(--akt-rand);color:var(--acc2);
                font-weight:600;box-shadow:var(--akt-schein)}
 /* Die Sinnbilder der obersten Navigation sind gemalte Illustrationen, keine
@@ -50,9 +61,12 @@ nav button.on{background:var(--akt-flaeche);border-color:var(--akt-rand);color:v
    beim aktiven Punkt und beim Überfahren. Das ist dieselbe Aussage, die die
    Knöpfe ohnehin machen ("hier bin ich"), nur mit einem zweiten Mittel — und
    es hält die Aufmerksamkeit bei dem einen Punkt, der gerade zählt.
-   Die Höhe richtet sich nach der Schrift, nicht umgekehrt: 22 px neben 14 px
-   Text. Ein größeres Bild schöbe den Text an den Rand des Knopfes. */
-.nav-sym{flex:none;width:22px;height:22px;object-fit:contain;
+   32 px, nicht 22: Bei zweiundzwanzig war von einer gemalten Illustration
+   nichts mehr zu erkennen — ein brauner Fleck, der auch ein Kaffeefleck sein
+   könnte. Der Knopf wird dadurch höher als der Text ihn machen würde, und das
+   ist der Preis: Die Kopfzeile wächst um rund zehn Pixel. Dafür sieht man,
+   was da abgebildet ist. */
+.nav-sym{flex:none;width:32px;height:32px;object-fit:contain;
   filter:saturate(.45) brightness(.85);transition:filter .15s ease-out;
   -webkit-user-drag:none;user-drag:none}
 nav button:hover .nav-sym,nav button.on .nav-sym{filter:none}
@@ -1074,7 +1088,12 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
 .stapel-zugabe-knopf{display:flex;align-items:center;gap:6px;flex:none;
   padding:4px 6px;border-radius:10px;cursor:pointer;white-space:nowrap;
   background:rgba(27,29,39,.92);border:1px solid var(--line);color:var(--acc2);
-  font:600 13px/1.2 inherit;box-shadow:0 2px 8px rgba(0,0,0,.45)}
+  /* Einzeln, nicht als Kurzschreiber: "font: 600 13px/1.2 inherit" ist
+     ungültig — im Kurzschreiber muss zuletzt ein Schriftname stehen, und
+     inherit ist dort keiner. Die ganze Anweisung fiel damit weg, samt Gewicht
+     und Größe. Die Familie erbt der Knopf ohnehin (button{font:inherit}). */
+  font-weight:600;font-size:13px;line-height:1.2;
+  box-shadow:0 2px 8px rgba(0,0,0,.45)}
 .stapel-zugabe-knopf:hover,.stapel-zugabe.offen .stapel-zugabe-knopf{
   border-color:var(--akt-rand);background:var(--akt-flaeche)}
 .stapel-zugabe-bild{display:block;width:32px;height:32px;object-fit:contain;
