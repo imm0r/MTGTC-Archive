@@ -19,6 +19,7 @@ geräteübergreifend.
 | `supabase-schema.sql` | Tabellen, Row Level Security, Funktionen            |
 | `supabase/functions/` | Edge Functions (Scan, Regelfrage, Terminmail …)     |
 | `scripts/price-backfill/` | Node-Job: MTGJSON-Preisverlauf → Supabase       |
+| `tests/`              | Prüfungen im echten Browser (siehe „Prüfungen“)     |
 | `.github/workflows/`  | GitHub Action, die den Preis-Job nach Plan fährt    |
 | `start.cmd`           | Nur für lokales Testen (braucht Python)             |
 
@@ -1384,6 +1385,66 @@ rechnet, schreibt aber nichts). `node backfill.mjs --only-gaps` fährt den
 stündlichen Modus von Hand: er meldet, wie viele Karten ohne Verlauf dastehen,
 und endet sofort, wenn es keine gibt. `node backfill.mjs --today` fährt den
 Tagesmodus — praktisch zum Ausprobieren, weil er nur 5 MB lädt.
+
+## Prüfungen
+
+```bash
+cd tests
+npm ci
+npm test                 # alles
+npm test -- ziehen css   # nur Fälle, deren Name das enthält
+```
+
+Läuft bei jedem Pull Request (`.github/workflows/pruefungen.yml`).
+
+### Warum es sie gibt
+
+In dieser App scheitert das meiste **still**. Ein ungültiger CSS-Kurzschreiber
+wirft die ganze Anweisung weg. Eine Regel mit zwei Klassen verliert gegen eine
+mit vier, unabhängig von der Reihenfolge im Stylesheet. Eine Höhe, die eine
+Bildaufbauphase zu früh gemessen wird, bleibt für den Rest der Sitzung falsch.
+Ein Übersetzungsschlüssel, den nur Deutsch kennt, zeigt in vier Sprachen seinen
+eigenen Namen. Nichts davon wird rot; es sieht nur falsch aus, und auffallen
+tut es dem, der die App benutzt.
+
+Jede Datei in `tests/faelle/` trägt deshalb im Kopf die Panne, aus der sie
+entstanden ist — nicht als Anekdote, sondern damit beim nächsten Umbau
+nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
+
+| Fall             | Worauf er aufpasst                                           |
+|------------------|--------------------------------------------------------------|
+| `css-gueltig`    | Jede Anweisung aus `style.css` einem echten `CSSStyleDeclaration` angeboten: Was dort nicht ankommt, hat der Browser verworfen |
+| `i18n`           | Fünf Sprachen ohne Lücken, jeder `t()`-Aufruf und jedes `data-i18n` hat einen Schlüssel |
+| `ziehen`         | Karten zwischen Kategorien ziehen: Fächer, Schild, Ziel, fremde Decks, Klick, Escape |
+| `kartenansicht`  | Klebende Spaltenköpfe (auch im schmalen Fenster), Aufklappen beim Überfahren, kein Aufklappen beim Ziehen |
+| `zugabe`         | „Karte zum Deck“: Ausklappen, gefilterte Trefferliste, Zug in eine Kategorie, volles Deck |
+| `decks`          | Höchstens ein Deck aufgeklappt, Speicher und Baum stimmen überein, Truhe wirft die richtige Karte |
+
+### Zwei Regeln, die dabei gelernt wurden
+
+**Eine grüne Prüfung ist erst dann etwas wert, wenn sie auch rot werden kann.**
+Der erste Anlauf beim Aufklappen las das erste `.stapel-gross` im Dokument —
+über dem gar kein Zeiger war — und meldete zufrieden „none“: richtig aus dem
+falschen Grund. Geprüft wird deshalb immer **beides**, der Zustand und sein
+Gegenteil. Und wer einen Punkt hinzufügt, sollte ihn einmal absichtlich
+kaputtmachen und zusehen, ob er das merkt.
+
+**Nicht auf Nummern zielen, sondern suchen.** Die Spalten sind nach Namen
+sortiert: „Karte 0-11“ steht dort weit vor „Karte 0-8“. Wer eine bestimmte
+`data-id` anfasst, drückt womöglich weit außerhalb des Fensters. `GREIFBAR`
+und `PUNKT` in `tests/hilfen.mjs` suchen deshalb eine Stelle, an der
+`elementFromPoint` auch wirklich landet — sonst prüft man gegen den klebenden
+Kopf oder den Balken am unteren Rand statt gegen das gemeinte Element.
+
+Es gibt keine Datenbank dabei: `AUFBAU` in `tests/hilfen.mjs` setzt `CARDS` und
+`DECKS` selbst und zeichnet dann. Die Kartenbilder sind maßstabsgetreue SVGs
+(63:88, Namensbalken zwischen 4 % und 10 % der Höhe) — dieselbe Geometrie, mit
+der die Kartenansicht rechnet.
+
+Als Browser dient Chrome/Chromium in dieser Reihenfolge: `CHROMIUM_PFAD`,
+`PLAYWRIGHT_BROWSERS_PATH`, System-Chrome. Auf den GitHub-Läufern ist Chrome
+vorinstalliert; `playwright install` braucht es dadurch nicht, und die einzige
+Abhängigkeit ist `playwright-core` — der Treiber ohne Browser.
 
 ## Hinweise
 

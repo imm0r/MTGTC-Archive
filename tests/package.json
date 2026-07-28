@@ -1,0 +1,12 @@
+{
+  "name": "arcanum-archive-pruefungen",
+  "private": true,
+  "type": "module",
+  "description": "Prüfungen für Arcanum Archive. Liegt bewusst NICHT im Wurzelverzeichnis: Die App selbst hat keinen Build-Schritt und soll keine package.json bekommen, die etwas anderes nahelegt.",
+  "scripts": {
+    "test": "node lauf.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.49.1"
+  }
+}
