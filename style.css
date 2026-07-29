@@ -804,19 +804,35 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
    Drei Stellen im Selektor schlagen die zwei der Grundregel. */
 .hand-lade[data-zonedrop].zieh-ziel,.hand-lade[data-zonedrop].ueber{
   background:none;box-shadow:none;border-color:transparent}
-/* Dieselbe Schaltfläche wie „Karte zum Deck": eigener Grund statt
-   Durchsichtigkeit, denn sie schwebt über Kartenbildern. */
-.hand-lade-knopf{display:flex;align-items:center;gap:8px;flex:none;
-  padding:6px 12px;border-radius:12px;cursor:pointer;white-space:nowrap;
-  background:rgba(27,29,39,.92);border:1px solid var(--line);color:var(--acc2);
-  font-weight:600;font-size:13px;line-height:1.2;
-  box-shadow:0 2px 10px rgba(0,0,0,.5)}
-.hand-lade-knopf:hover,.hand-lade.offen .hand-lade-knopf{
-  border-color:var(--akt-rand);background:var(--akt-flaeche)}
-.hand-lade-zeichen{font-size:17px;line-height:1}
-.hand-lade-n{min-width:20px;height:18px;padding:0 6px;border-radius:9px;
+/* Das Emblem TRÄGT die Schaltfläche — kein Kasten darum, kein Beiwort daneben.
+   Es bringt seinen eigenen Ring mit; eine Pille darum wäre ein zweiter Rahmen
+   um einen Rahmen. Lesbar über hellen wie dunklen Kartenbildern bleibt es durch
+   den Schlagschatten, nicht durch einen Grund. */
+.hand-lade-knopf{display:block;flex:none;padding:0;border:0;background:none;
+  cursor:pointer;line-height:0;
+  filter:drop-shadow(0 3px 8px rgba(0,0,0,.75));
+  transition:transform .12s ease-out,filter .12s ease-out}
+.hand-lade-knopf:hover,.hand-lade.offen .hand-lade-knopf{transform:translateY(-2px);
+  filter:drop-shadow(0 4px 12px rgba(0,0,0,.8)) brightness(1.12)}
+.hand-lade-knopf:focus-visible{outline:2px solid var(--acc);outline-offset:4px;border-radius:50%}
+/* Bezugsrahmen der Zahl: Sie steht AUF dem Symbol, nicht daneben. */
+.hand-lade-sym{position:relative;display:block;width:60px;height:60px}
+.hand-lade-bild{display:block;width:100%;height:100%;object-fit:contain;
+  -webkit-user-drag:none;user-drag:none}
+/* Der Ersatz, falls das Bild nicht lädt — sonst bliebe eine leere Fläche, die
+   niemand anklickt. Dieselbe Regel wie am Zugabe-Knopf und an der Truhe. */
+.hand-lade-ersatz{display:none;align-items:center;justify-content:center;
+  width:100%;height:100%;font-size:30px;line-height:1}
+.hand-lade.ohne-bild .hand-lade-bild{display:none}
+.hand-lade.ohne-bild .hand-lade-ersatz{display:flex}
+/* Unten rechts auf dem Symbol, leicht darüber hinaus: So bleibt sie lesbar,
+   ohne das Bild in der Mitte zu verdecken. Der dunkle Ring hebt sie von den
+   hellen Kartenrändern des Emblems ab. */
+.hand-lade-n{position:absolute;right:-1px;bottom:1px;
+  min-width:20px;height:20px;padding:0 5px;border-radius:10px;
   display:inline-flex;align-items:center;justify-content:center;
-  background:var(--acc);color:#1a1400;font-size:11px;font-weight:700}
+  background:var(--acc);color:#1a1400;font-size:11px;font-weight:700;line-height:1;
+  border:2px solid rgba(12,13,18,.92);box-shadow:0 1px 4px rgba(0,0,0,.6)}
 .hand-lade-n.null{background:var(--line);color:var(--dim)}
 /* Geschlossen wird der Korb WEGGENOMMEN, nicht nur durchsichtig gemacht:
    visibility:hidden nimmt ihn auch aus der Tabulatorreihenfolge. Sonst
@@ -840,10 +856,14 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
    der Schaltfläche besteht. Etwas auf die Hand zurückzunehmen, ohne sie
    vorher aufzuklappen, ist der häufigere Weg. */
 body.zieht-gerade .hand-lade{pointer-events:auto}
-.hand-lade.ueber .hand-lade-knopf{border-color:var(--acc);
-  background:linear-gradient(var(--akt-flaeche),var(--akt-flaeche)),var(--panel2);
-  box-shadow:0 0 0 2px rgba(201,162,39,.45)}
-.hand-lade.zieh-ziel .hand-lade-knopf{border-color:var(--acc2)}
+/* Ohne Kasten kann die Hervorhebung kein Rahmen sein: Sie leuchtet das Emblem
+   selbst an. drop-shadow folgt der Silhouette, box-shadow läge als Rechteck
+   dahinter. */
+.hand-lade.zieh-ziel .hand-lade-knopf{
+  filter:drop-shadow(0 3px 8px rgba(0,0,0,.75)) drop-shadow(0 0 3px var(--acc2))}
+.hand-lade.ueber .hand-lade-knopf{transform:translateY(-2px);
+  filter:drop-shadow(0 0 6px var(--acc)) drop-shadow(0 0 14px rgba(201,162,39,.6))
+         brightness(1.15)}
 
 
 
