@@ -559,7 +559,6 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
   letter-spacing:.4px;text-transform:uppercase;color:var(--err);margin:1px 0 0}
 .sp-card.besiegt .sp-besiegt{display:flex}
 .sp-host{color:var(--acc)}
-.dice-result{font-size:24px;font-weight:800}
 .sess-log{margin-top:10px;display:flex;flex-direction:column;gap:3px;max-height:150px;overflow-y:auto}
 .log-zeile{font-size:13px;color:var(--dim)}
 .sp-deckname{font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
@@ -770,54 +769,63 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
    rechten Rand des Schlachtfelds sitzt statt an dem der ganzen Matte. Sie steht
    hier und nicht dort, weil sie aus DIESEN Zahlen folgt: ändert sich eine
    Spaltenbreite, muss die Variable mitgehen. */
+/* DIE LEBENSPUNKTE stehen unter den Ländern über deren volle Breite, mit bis zu
+   vier Kacheln nebeneinander — so wie die Mitspieler am Tisch nebeneinander
+   sitzen. Damit entfällt die dritte Spalte: rechts stand nichts anderes darin.
+   --sp-leben ist ihre Höhe, und die Emblemleiste rechnet daraus, damit sie
+   darüber und nicht darauf steht. */
 .mat{display:grid;gap:8px;margin-top:10px;
-  --sp-luecke:8px; --sp-mitte:154px; --sp-rechts:190px;
-  /* Platz RECHTS der Spalte „rechts" — unter 1200 px keiner. */
+  --sp-luecke:8px; --sp-mitte:154px; --sp-leben:120px;
+  /* Platz RECHTS der schmalen Spalte — unter 1200 px keiner. */
   --sp-danach:0px;
-  grid-template-columns:minmax(0,1fr) var(--sp-mitte) var(--sp-rechts);
-  grid-template-rows:clamp(390px,58vh,640px);
-  grid-template-areas:"links mitte rechts";
-  --rechte-spalten:calc(var(--sp-mitte) + var(--sp-rechts) + var(--sp-luecke) * 2
-                        + var(--sp-danach));
-  /* Bezugsrahmen der schwebenden Zonen. */
+  grid-template-columns:minmax(0,1fr) var(--sp-mitte);
+  /* Höher als früher (390–640): Die linke Spalte trägt jetzt drei Blöcke statt
+     zwei, und die 120 px der Lebensreihe dürfen nicht vom Schlachtfeld kommen. */
+  grid-template-rows:clamp(500px,64vh,720px);
+  grid-template-areas:"links mitte";
+  --rechte-spalten:calc(var(--sp-mitte) + var(--sp-luecke) + var(--sp-danach));
+  /* Bezugsrahmen der schwebenden Laden. */
   position:relative}
-/* Ab 1200 px eine vierte Spalte ueber die volle Hoehe: die angezeigte Karte
+/* Ab 1200 px eine dritte Spalte ueber die volle Hoehe: die angezeigte Karte
    erscheint immer DORT, statt als Fenster ueber dem Spielfeld. Darunter fehlt
    der Platz — dann schwebt sie wie bisher am Zeiger (app.js: SPK_SPALTE). */
 @media (min-width:1200px){
-  .mat{--sp-mitte:172px; --sp-rechts:208px; --sp-vorschau:268px;
+  .mat{--sp-mitte:172px; --sp-vorschau:268px;
        --sp-danach:calc(var(--sp-vorschau) + var(--sp-luecke));
-       grid-template-columns:minmax(0,1fr) var(--sp-mitte) var(--sp-rechts) var(--sp-vorschau);
-       grid-template-areas:"links mitte rechts vorschau"}
+       grid-template-columns:minmax(0,1fr) var(--sp-mitte) var(--sp-vorschau);
+       grid-template-areas:"links mitte vorschau"}
 }
 .mat-vorschau{grid-area:vorschau}
 .mat-links{grid-area:links;display:flex;flex-direction:column;gap:8px;min-width:0}
 .mat-mitte{grid-area:mitte;display:flex;flex-direction:column;gap:8px}
-.mat-rechts{grid-area:rechts;display:flex;flex-direction:column;gap:8px}
-/* ===== Schwebende Zonen: Exil, Friedhof, Hand (nur auf der Matte) =====
-   Alle drei sitzen am FUSS DER LINKEN SPALTE, also am rechten unteren Rand des
-   Schlachtfelds. Nicht am Rand der ganzen Matte: Dort lägen sie unter den
-   schmalen Spalten, zu denen sie nicht gehören.
+/* Das Akkordeon ist Bezugsrahmen der Würfelbühne — dort gibt es keine Matte,
+   und die Bühne muss sich trotzdem an etwas aufhängen können. */
+.zonen{position:relative}
+/* ===== Schwebende Laden: Würfel, Hand, Exil, Friedhof =====
+   Eine Leiste aus vier Emblemen am rechten unteren Rand des Schlachtfelds,
+   ÜBER den Lebenspunkten. Nicht am Rand der ganzen Matte: Dort lägen sie unter
+   der schmalen Spalte, zu der sie nicht gehören — und nicht am Mattenboden,
+   denn dort stehen jetzt die Lebenspunkte.
 
    Sie klappen nach OBEN aus, nicht zur Seite wie der Zugang zur Sammlung im
    Deckbau: Am Tisch liegen sie vor einem, und das Bild bleibt erhalten, wenn
-   sie von dort aufgehen. */
-/* JEDES Symbol steht am Fuß der Spalte, aus der seine Zone kommt: das Exil
-   unter der mittleren, der Friedhof unter der rechten (also rechts neben dem
-   alten Exil-Feld), die Hand am Schlachtfeld. So bleibt der Ort, an dem man
-   eine Zone sucht, derselbe wie vorher — nur die Fläche ist frei geworden.
-   Gerechnet wird aus den Spaltenbreiten oben; ändert sich eine, gehen die
-   Symbole mit. */
-.schwebe-zone{position:absolute;bottom:10px;z-index:40;pointer-events:none}
-.sz-grave{right:calc(var(--sp-danach) + 12px)}
-.sz-exile{right:calc(var(--sp-danach) + var(--sp-rechts) + var(--sp-luecke) + 12px)}
-/* Die Hand spannt sich über die GANZE Matte: Ihre Schaltfläche sitzt am rechten
-   Rand des Schlachtfelds, ihr Fächer aber mittig darüber. Beides braucht die
+   sie von dort aufgehen.
+
+   Gerechnet wird aus den Spaltenbreiten und --sp-leben oben; ändert sich eine
+   davon, geht die Leiste mit. Zwei Zahlen an zwei Stellen liefen auseinander. */
+.mat{--sz-schritt:70px;                       /* 60 px Emblem + 10 px Luft */
+     --sz-rand:calc(var(--rechte-spalten) + 18px);
+     --sz-boden:calc(var(--sp-leben) + 12px)}
+.schwebe-zone{position:absolute;bottom:var(--sz-boden);z-index:40;pointer-events:none}
+.sz-grave{right:var(--sz-rand)}
+.sz-exile{right:calc(var(--sz-rand) + var(--sz-schritt))}
+/* Hand und Würfel spannen sich über die GANZE Matte: Ihre Schaltflächen stehen
+   in der Leiste, ihr Inhalt liegt mittig bzw. über allem. Beides braucht die
    Matte als Bezugsrahmen — an der 60 px breiten Schaltfläche gemessen ließe
    sich „mittig über dem Schlachtfeld" nicht ausdrücken. */
 .sz-hand{inset:0;bottom:0}
-.sz-hand .schwebe-knopf{position:absolute;bottom:10px;
-  right:calc(var(--rechte-spalten) + 18px)}
+.sz-hand .schwebe-knopf{position:absolute;bottom:var(--sz-boden);
+  right:calc(var(--sz-rand) + var(--sz-schritt) * 2)}
 /* Die Lade ist nur die Klammer um Korb und Schaltfläche und bleibt für
    Zeigereignisse durchlässig: Sonst läge ein unsichtbares Rechteck über der
    Matte und finge Klicks ab, die dem Schlachtfeld gelten. Bei der Hand wäre
@@ -878,13 +886,55 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
    will ohnehin niemand. Der Fächer wird bei vielen Karten von selbst schmaler
    (app.js rechnet den sichtbaren Anteil je Karte aus), er läuft also nicht
    davon. */
-.sz-hand .schwebe-korb{right:auto;bottom:12px;
+.sz-hand .schwebe-korb{right:auto;bottom:calc(var(--sp-leben) + 14px);
   left:calc((100% - var(--rechte-spalten)) / 2);
   transform:translate(-50%,14px);
   max-height:none;overflow:visible}
 .sz-hand.offen .schwebe-korb{transform:translate(-50%,0)}
 .sz-hand .hand-fan{overflow:visible}
 @media(prefers-reduced-motion:reduce){ .schwebe-korb{transition:none} }
+
+/* ===== Die Würfelbühne =====
+   Die vierte Lade, und die einzige, die keine Zone ist. Sie nimmt die GANZE
+   Matte ein: Der W20 soll quer darüber rollen, nicht in einem Kasten von
+   340 × 150 px wackeln, wie er es unter der Matte tat.
+
+   Sie hängt sich an die Matte, wenn es eine gibt. Sonst — im Akkordeon und in
+   einer Runde ohne gewähltes Deck — gibt es keine Fläche, an die sie sich
+   hängen könnte; dort ist der Würfel ein fester Knopf unten rechts und seine
+   Bühne ein Fenster über dem Schirm. Das ist der Standard hier, weil er ohne
+   jede Voraussetzung auskommt; die Matte ist der Sonderfall. */
+.sz-wuerfel{position:fixed;inset:auto;z-index:70}
+.sz-wuerfel .schwebe-knopf{position:fixed;right:14px;bottom:14px}
+.sz-wuerfel .schwebe-korb{position:fixed;inset:12px;right:12px;bottom:12px}
+/* UNTER den anderen drei Laden (z-index 40): Die Bühne deckt die ganze Matte
+   ab, aber die Emblemleiste muss darauf sichtbar und anklickbar bleiben —
+   sonst käme man aus der offenen Bühne nur noch mit Escape heraus. Der eigene
+   Knopf steht im DOM hinter der Bühne und liegt damit ohnehin darüber. */
+.mat .sz-wuerfel{position:absolute;inset:0;bottom:0;z-index:30}
+.mat .sz-wuerfel .schwebe-knopf{position:absolute;right:calc(var(--sz-rand) + var(--sz-schritt) * 3);
+  bottom:var(--sz-boden);top:auto}
+.mat .sz-wuerfel .schwebe-korb{position:absolute;inset:0;right:0;bottom:0}
+/* Sie klappt nicht nach oben auf wie die Zonenkörbe — sie liegt ja schon
+   überall. Nur ein kurzes Aufblenden aus der Fläche heraus. */
+.wuerfel-buehne{transform:scale(.98);max-height:none;overflow:hidden;
+  border:1px solid var(--line);border-radius:14px;
+  background:rgba(11,13,19,.94);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+  box-shadow:0 14px 44px rgba(0,0,0,.65)}
+.schwebe-zone.offen .wuerfel-buehne{transform:none}
+/* Das Spielfeld des Würfels: die volle Bühne, und für Zeiger durchlässig —
+   sonst finge der Würfel Klicks ab, die dem Werfen-Knopf darunter gelten. */
+.wuerfel-feld{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.wuerfel-feld .d20{width:clamp(84px,14vw,132px);height:auto}
+.wuerfel-feld canvas.dice-gl{position:absolute;left:0;top:0;display:block}
+.wuerfel-kopf{position:absolute;top:12px;left:16px;font-size:13px;color:var(--dim);
+  display:flex;align-items:center;gap:10px}
+.wuerfel-erg{font-size:30px;font-weight:800;color:var(--acc);line-height:1;
+  font-variant-numeric:tabular-nums}
+.wuerfel-leer{font-style:italic}
+.wuerfel-buehne .sess-log{position:absolute;top:10px;right:12px;margin:0;
+  width:min(240px,38%);max-height:calc(100% - 76px)}
+.wuerfel-werfen{position:absolute;left:50%;bottom:14px;transform:translateX(-50%)}
 /* FRIEDHOF UND EXIL bekommen Rahmen und Grund. Ihre Gitter sind lose Reihen
    kleiner Bilder und bräuchten sonst eine Fläche, um nicht über dem
    Schlachtfeld zu schwimmen. Der Handfächer trägt seine Form selbst: Seine
@@ -948,7 +998,7 @@ body.zieht-gerade .schwebe-knopf{pointer-events:auto}
 .mat-lib{flex:1;min-height:0}
 /* overflow:hidden an den Spalten, damit nie ein Feld ueber den Mattenrand
    quillt; erreichbar bleibt alles, weil jeder Korb innen rollt. */
-.mat-links,.mat-mitte,.mat-rechts{min-height:0;overflow:hidden}
+.mat-links,.mat-mitte{min-height:0;overflow:hidden}
 /* ===== Karten zwischen den Zonen ziehen =====
    Dieselbe Geste wie im Deck, und deshalb dieselben zwei Zustände: „hierhin
    dürfte sie" und „hier liegt sie gerade". Sie ersetzt die Zielknöpfe, die
@@ -984,8 +1034,8 @@ body.zieht-gerade .zk:hover,body.zieht-gerade .zk:focus-within{transform:none}
    einer mit Rand. */
 /* In den schmalen Spalten kleinere Karten: vier Felder uebereinander muessen
    in die Mattenhoehe passen, ohne dass eines auf ein paar Pixel zusammenfaellt. */
-.mat-mitte .zone-gitter,.mat-rechts .zone-gitter{--zk-b:48px;--zk-h:67px;gap:5px}
-.mat-mitte .zone-leer,.mat-rechts .zone-leer{font-size:11px;padding:6px 2px}
+.mat-mitte .zone-gitter{--zk-b:48px;--zk-h:67px;gap:5px}
+.mat-mitte .zone-leer{font-size:11px;padding:6px 2px}
 .mat-mitte .lib-liste{max-height:none;margin-top:6px}
 .mat-mitte .lib-nm{font-size:12px}
 /* Commander-Steuer: was das naechste Wirken aus der Kommandozone extra kostet.
@@ -997,21 +1047,36 @@ body.zieht-gerade .zk:hover,body.zieht-gerade .zk:focus-within{transform:none}
 .mat-steuer .mat-titel{margin-bottom:4px}
 .mat-steuerwert:hover{background:var(--acc);color:#1a1400}
 .mat-steuerwert.leer{border-color:var(--line);color:var(--dim);cursor:default}
-/* Lebenspunkte aller Mitspieler: die gewohnten Kacheln, nur schmal gestapelt. */
-/* Bei vier Mitspielern rollt die Lebensliste innen, statt den Friedhof aus der
-   Matte zu schieben — der braucht seinen festen Platz unten rechts. */
-.mat-leben{flex:1;min-height:96px}
-.mat-rechts [data-zone="grave"]{flex:none;min-height:128px}
-.sp-grid.schmal{grid-template-columns:1fr;gap:6px;margin-top:0}
-.sp-grid.schmal .sp-card{gap:1px 7px;padding:6px 7px}
-.sp-grid.schmal .sp-life{font-size:19px}
-.sp-grid.schmal .sp-ctrl{flex-wrap:wrap;justify-content:flex-end;max-width:74px}
-.sp-grid.schmal .sp-ctrl .btn{padding:2px 4px;font-size:10px}
-.sp-grid.schmal .sp-name{font-size:11px}
-/* In der schmalen Spalte bleibt vom Deck nur das Commanderbild — der Name
-   waere auf 190 px ohnehin nach zwei Buchstaben abgeschnitten. Der volle Name
-   steht weiterhin im Tooltip und in der grossen Vorschau. */
-.sp-grid.schmal .sp-deckname{display:none}
+/* Lebenspunkte aller Mitspieler: die gewohnten Kacheln, NEBENeinander unter den
+   Ländern — bis zu vier, so wie die Mitspieler am Tisch sitzen. Die Reihe hat
+   eine feste Höhe (--sp-leben), weil die Emblemleiste darüber daraus rechnet;
+   eine mitwachsende Reihe schöbe die Embleme bei jedem Beitritt woandershin. */
+.mat-leben{flex:none;height:var(--sp-leben)}
+.mat-leben .mat-korb{overflow:hidden;padding:0}
+/* Eine Spalte je Kachel, alle gleich breit: grid-auto-flow legt sie in EINE
+   Zeile, ohne dass die Zahl der Mitspieler im Stylesheet stehen muss.
+   (auto-fill/auto-fit ginge nicht — die brauchen eine feste Mindestbreite und
+   fielen bei vier Kacheln auf 300 px je Spalte in zwei Zeilen um.) */
+.sp-grid.reihe{grid-template-columns:none;grid-auto-flow:column;
+  grid-auto-columns:minmax(0,1fr);gap:6px;margin-top:0;height:100%}
+.sp-grid.reihe .sp-card{gap:1px 7px;padding:6px 8px;align-content:center}
+.sp-grid.reihe .sp-life{font-size:21px}
+.sp-grid.reihe .sp-ctrl .btn{padding:2px 5px;font-size:10px}
+.sp-grid.reihe .sp-name{font-size:12px}
+/* Die vier Knöpfe stehen UNTER Name und Zahl, quer über die Kachel, statt
+   rechts neben ihnen. Nebeneinander ringen sie mit dem Namen um dieselbe
+   Breite, und der verliert: Bei vier Mitspielern auf einer 820-px-Matte sind
+   das 141 px je Kachel, und für den Namen blieben davon gemessen NULL (28 px
+   abgeschnitten). Untereinander bekommt er 50 px, bei 1000 px sogar 95. */
+.sp-grid.reihe .sp-card>:first-child{grid-row:1}
+.sp-grid.reihe .sp-mitte{grid-row:1}
+/* Über die volle Kachelbreite, aber höchstens 200 px: Auf einer breiten Matte
+   trieben vier Knöpfe über 263 px auseinander und ihre Paare (−5/−1, +1/+5)
+   wären nicht mehr als solche zu erkennen. */
+.sp-grid.reihe .sp-ctrl{grid-column:1/4;grid-row:2;justify-content:space-between;
+  max-width:200px;margin-left:auto}
+.sp-grid.reihe .sp-wait{grid-column:1/4;grid-row:2;justify-self:end}
+.sp-grid.reihe .sp-deck{display:none}
 /* Hinweis im Hochformat auf Geraeten, die quer breit genug waeren. */
 .quer-hinweis{margin-top:10px;padding:7px 10px;border:1px dashed var(--line);border-radius:8px;
   font-size:12px;color:var(--dim)}
@@ -1113,50 +1178,14 @@ body.zieht-gerade .zk:hover,body.zieht-gerade .zk:focus-within{transform:none}
   .hand-fan{padding:24px 2px 16px}
   .zone-thumbs{display:none}
 }
-/* Würfel-Bühne mit Animation */
-.dice-stage{display:flex;flex-direction:column;align-items:center;gap:8px;min-height:104px;justify-content:center;margin:12px 0 14px;perspective:800px}
-.dice-die{width:74px;height:74px;border-radius:16px;display:grid;place-items:center;font-size:36px;font-weight:800;
-  color:#231a00;background:linear-gradient(145deg,#ecc65f,#c9962b);
-  box-shadow:0 6px 16px rgba(0,0,0,.45),inset 0 2px 0 rgba(255,255,255,.4)}
-.dice-die.idle{opacity:.55;background:var(--panel2);color:var(--dim);box-shadow:none}
-.dice-cap{font-size:13px;color:var(--dim)}
-@keyframes dice-roll{0%{transform:rotate(-16deg) scale(1)}25%{transform:rotate(13deg) scale(1.06)}
-  50%{transform:rotate(-9deg) scale(.96)}75%{transform:rotate(15deg) scale(1.05)}100%{transform:rotate(-16deg) scale(1)}}
-.dice-die.rolling{animation:dice-roll .24s ease-in-out infinite}
-@keyframes dice-pop{0%{transform:scale(.6) rotate(-8deg)}55%{transform:scale(1.2) rotate(5deg)}100%{transform:scale(1) rotate(0)}}
-.dice-die.landed{animation:dice-pop .4s cubic-bezier(.2,1.3,.4,1)}
-/* W20 als SVG-Icosaeder, taumelt beim Wurf in 3D. */
-.d20{width:88px;height:88px;filter:drop-shadow(0 6px 12px rgba(0,0,0,.5))}
+/* Der W20 als SVG — Ruhezustand der Bühne und Rückfall ohne three.js.
+   W4, W6, W8, W10 und W12 sind weg: gewürfelt wird nur noch mit dem
+   Zwanzigseiter, und damit auch der CSS-Würfel samt Augen und Taumel-Kehren. */
+.d20{filter:drop-shadow(0 8px 18px rgba(0,0,0,.6))}
 .d20 .d20-body{fill:#c9962b}
 .d20 .d20-front{fill:#ecc65f}
 .d20 .d20-facet line{stroke:#87661c;stroke-width:1.3;stroke-linecap:round}
 .d20 .dice-val{fill:#231a00;font-size:23px;font-weight:800}
-@keyframes d20-roll{0%{transform:rotateX(0) rotateY(0) rotateZ(0)}
-  25%{transform:rotateX(140deg) rotateY(80deg) rotateZ(70deg)}
-  50%{transform:rotateX(250deg) rotateY(210deg) rotateZ(150deg)}
-  75%{transform:rotateX(400deg) rotateY(300deg) rotateZ(240deg)}
-  100%{transform:rotateX(540deg) rotateY(430deg) rotateZ(360deg)}}
-.d20.rolling{animation:d20-roll .5s linear infinite}
-@keyframes d20-pop{0%{transform:scale(.55) rotate(-14deg)}55%{transform:scale(1.16) rotate(5deg)}100%{transform:scale(1) rotate(0)}}
-.d20.landed{animation:d20-pop .42s cubic-bezier(.2,1.3,.4,1)}
-/* W6 als echter 3D-Würfel: sechs goldene Flächen mit Pips, taumelt im Raum. */
-.cube{width:76px;height:76px;position:relative;transform-style:preserve-3d;transform:rotateX(-18deg) rotateY(22deg)}
-.cf{position:absolute;inset:0;border-radius:12px;background:linear-gradient(145deg,#ecc65f,#c9962b);
-  box-shadow:inset 0 0 0 1.5px rgba(120,90,20,.55);backface-visibility:hidden}
-.cf1{transform:translateZ(38px)}
-.cf6{transform:rotateY(180deg) translateZ(38px)}
-.cf3{transform:rotateY(90deg) translateZ(38px)}
-.cf4{transform:rotateY(-90deg) translateZ(38px)}
-.cf2{transform:rotateX(90deg) translateZ(38px)}
-.cf5{transform:rotateX(-90deg) translateZ(38px)}
-.pip{position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:#2a1f00;
-  box-shadow:inset 0 -1px 1px rgba(255,255,255,.15)}
-@keyframes cube-tumble{0%{transform:rotateX(0) rotateY(0)}100%{transform:rotateX(720deg) rotateY(1080deg)}}
-.cube.rolling{animation:cube-tumble .85s linear infinite}
-@media (prefers-reduced-motion:reduce){.dice-die.rolling,.dice-die.landed,.d20.rolling,.d20.landed,.cube.rolling{animation:none}}
-/* three.js-Würfel-Canvas (W6/W20, wenn geladen) — breit, damit der Würfel quer
-   durchrollt; Seitenverhältnis bleibt über height:auto erhalten. */
-canvas.dice-gl{width:100%;max-width:340px;height:auto;display:block;margin:0 auto}
 /* Synergie-Modus (persönliche Einstellung): welche Synergie-Knöpfe erscheinen. */
 html[data-syn-mode="ki"] .syn-std-btn{display:none}
 html[data-syn-mode="standard"] .syn-ai-btn{display:none}

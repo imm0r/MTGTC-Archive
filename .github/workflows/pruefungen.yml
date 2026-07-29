@@ -14,9 +14,12 @@
 # dieser Reihenfolge: CHROMIUM_PFAD, PLAYWRIGHT_BROWSERS_PATH, System-Chrome.
 #
 # WARUM KEIN NPM CI IM WURZELVERZEICHNIS: Die App hat keinen Build-Schritt und
-# soll keine package.json bekommen, die etwas anderes nahelegt. Die einzige
-# Abhängigkeit (playwright-core, nur der Treiber ohne Browser) liegt unter
-# tests/.
+# soll keine package.json bekommen, die etwas anderes nahelegt. Die
+# Abhängigkeiten liegen unter tests/: playwright-core (nur der Treiber ohne
+# Browser) und three in genau der Fassung, die die App vom CDN lädt. Ein
+# Prüfrechner ohne Netz bekäme die Bibliothek sonst nie, und der echte
+# 3D-Würfel — den fast alle sehen — bliebe ungeprüft; der Fall spielrunde
+# leitet die CDN-Anfrage deshalb auf node_modules um.
 #
 # WARUM AUCH AUF push:main — und was das ausgleicht: Der Commit der
 # Versions-Automatik (version.yml) trägt die Sprungmarke „skip ci" im Betreff.
