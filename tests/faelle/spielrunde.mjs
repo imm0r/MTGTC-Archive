@@ -209,11 +209,108 @@ export default async function ({ seite, adresse, stand }) {
       await seite.evaluate(() => document.querySelectorAll(".zk.getappt").length) + " getappt");
   }
 
+  /* --- Die Hand als schwebende Lade ------------------------------------- */
+  /* Auf der Matte steht die Hand nicht mehr in der Reihe, sondern klappt unten
+     links aus. Drei Dinge können daran still schiefgehen, und alle drei sind
+     hier festgehalten. */
+  const lade = await seite.evaluate(() => {
+    const l = document.querySelector("#zonen .hand-lade");
+    const korb = l?.querySelector(".hand-lade-korb");
+    return {
+      da: !!l,
+      alteReihe: document.querySelectorAll(".mat-hand").length,
+      ziel: l?.dataset.zonedrop ?? null,
+      korbSichtbar: korb ? getComputedStyle(korb).visibility : null,
+      // Die Klammer muss durchlässig sein, sonst finge sie Klicks ab, die dem
+      // Schlachtfeld darunter gelten — ein unsichtbares Rechteck über der Matte.
+      klammer: l ? getComputedStyle(l).pointerEvents : null,
+      knopf: l ? getComputedStyle(l.querySelector(".hand-lade-knopf")).pointerEvents : null,
+      zahl: l?.querySelector(".hand-lade-n")?.textContent ?? null,
+    };
+  });
+  stand.ist("die Hand steht als Lade da, nicht mehr als Mattenzeile",
+    lade.da && lade.alteReihe === 0);
+  stand.ist("sie ist selbst das Ablageziel", lade.ziel === "hand", lade.ziel);
+  stand.ist("zugeklappt ist der Korb weggenommen", lade.korbSichtbar === "hidden", lade.korbSichtbar);
+  stand.gleich("die Klammer lässt Klicks durch, die Schaltfläche nicht",
+    [lade.klammer, lade.knopf], ["none", "auto"]);
+  stand.ist("die Schaltfläche nennt die Anzahl", lade.zahl === "2", lade.zahl);
+
+  await seite.locator("[data-handlade]").click();
+  await seite.waitForTimeout(400);
+  const offen = await seite.evaluate(() => {
+    const korb = document.querySelector(".hand-lade-korb");
+    const kr = korb.getBoundingClientRect();
+    const karten = [...document.querySelectorAll(".hand-lade .hand-karte")].map(e => e.getBoundingClientRect());
+    return {
+      sichtbar: getComputedStyle(korb).visibility,
+      anzahl: karten.length,
+      knopfSagt: document.querySelector(".hand-lade-knopf").getAttribute("aria-expanded"),
+      // Der Fächer dreht seine äußeren Karten; sie schwenken über ihre Spalte
+      // hinaus. Reicht das Polster nicht, schneidet der Korb sie ab — das sieht
+      // man erst hin, wenn man misst.
+      linksRaus:  Math.round(kr.left - Math.min(...karten.map(r => r.left))),
+      rechtsRaus: Math.round(Math.max(...karten.map(r => r.right)) - kr.right),
+      untenRaus:  Math.round(Math.max(...karten.map(r => r.bottom)) - kr.bottom),
+      // Sie klappt nach OBEN aus: der Korb liegt über der Schaltfläche.
+      ueberDemKnopf: Math.round(document.querySelector(".hand-lade-knopf").getBoundingClientRect().top
+                                - kr.bottom) >= 0,
+    };
+  });
+  stand.ist("ein Klick klappt sie auf", offen.sichtbar === "visible" && offen.knopfSagt === "true");
+  stand.ist("die Handkarten liegen darin", offen.anzahl === 2, offen.anzahl);
+  stand.ist("und zwar nach oben ausgeklappt", offen.ueberDemKnopf);
+  stand.gleich("keine Karte wird vom Rand abgeschnitten",
+    [offen.linksRaus <= 0, offen.rechtsRaus <= 0, offen.untenRaus <= 0], [true, true, true],
+    `links ${offen.linksRaus}, rechts ${offen.rechtsRaus}, unten ${offen.untenRaus}`);
+
+  // Aus der Hand aufs Schlachtfeld: Die Lade muss dabei zugehen, sonst läge sie
+  // über genau den Zonen, auf die man zielt.
+  const hk = await seite.evaluate(PUNKT, ".hand-lade .hand-karte");
+  stand.ist("eine Handkarte ist greifbar", !!hk);
+  if (hk) {
+    await seite.mouse.move(hk.x, hk.y);
+    await seite.mouse.down();
+    await seite.mouse.move(hk.x + 30, hk.y - 70, { steps: 8 });
+    await seite.waitForTimeout(150);
+    stand.ist("beim Ziehen geht die Lade zu",
+      await seite.evaluate(() => !document.querySelector(".hand-lade").classList.contains("offen")));
+    const feld = await seite.evaluate(PUNKT, '.mat-gross[data-zonedrop="field"]');
+    stand.ist("das Schlachtfeld ist dahinter erreichbar", !!feld);
+    if (feld) {
+      await seite.mouse.move(feld.x, feld.y, { steps: 8 });
+      await seite.mouse.up();
+      await seite.waitForTimeout(200);
+      stand.gleich("die Karte liegt jetzt auf dem Schlachtfeld",
+        await seite.evaluate(([id]) => { const s = { hand: 0, field: 0, ...(SESSION_ZONEN[id] || {}) };
+          return { hand: s.hand, field: s.field }; }, [k.hand[0]]),
+        { hand: 0, field: 1 });
+      stand.ist("und die Schaltfläche zählt herunter",
+        await seite.evaluate(() => document.querySelector(".hand-lade-n").textContent) === "1");
+    }
+  }
+
+  // Escape schließt sie — der schnelle Weg an das darunter.
+  await seite.locator("[data-handlade]").click();
+  await seite.waitForTimeout(300);
+  await seite.keyboard.press("Escape");
+  await seite.waitForTimeout(300);
+  stand.ist("Escape klappt sie wieder zu",
+    await seite.evaluate(() => !document.querySelector(".hand-lade").classList.contains("offen")));
+
   /* --- Im Akkordeon: die Zone klappt während des Zuges nicht um --------- */
   await seite.setViewportSize({ width: 800, height: 900 });
   await seite.waitForTimeout(450);
   stand.ist("im schmalen Fenster steht das Akkordeon",
     await seite.evaluate(() => !MAT_AN && !!document.querySelector("#zonen.zonen")));
+  // Dort gibt es keine Lade: Das Akkordeon zeigt ohnehin nur eine Zone auf
+  // einmal, eine schwebende obendrauf wäre eine zweite Antwort auf dieselbe
+  // Frage. Die Hand bleibt eine Zone unter sechs.
+  stand.gleich("dort bleibt die Hand eine gewöhnliche Zone",
+    await seite.evaluate(() => ({
+      lade: document.querySelectorAll(".hand-lade").length,
+      zone: document.querySelectorAll('#zonen .zone[data-zone="hand"]').length })),
+    { lade: 0, zone: 1 });
 
   await seite.evaluate(() => { zoneOeffnen("field", true); });
   await seite.waitForTimeout(250);

@@ -758,22 +758,93 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
    echter Spielteppich, der auch nicht waechst. Ohne das bestimmte die hoechste
    Spalte (vier gestapelte Felder in der Mitte) die Zeilenhoehe, und das
    Schlachtfeld stand mit fuenf Karten in 400 px Leere. */
+/* Die Hand steht NICHT mehr in der Reihe — sie schwebt als Lade unten links
+   (siehe .hand-lade). Der Fächer ist gut 230 px hoch und kostete diese Höhe
+   dauernd, obwohl man ihn nur ansieht, wenn man etwas daraus spielen will.
+   Die Zeile bekommt jetzt das Schlachtfeld, das man ständig ansieht. */
 .mat{display:grid;gap:8px;margin-top:10px;
   grid-template-columns:minmax(0,1fr) 154px 190px;
-  grid-template-rows:clamp(390px,50vh,560px) auto;
-  grid-template-areas:"links mitte rechts" "hand hand hand"}
+  grid-template-rows:clamp(390px,58vh,640px);
+  grid-template-areas:"links mitte rechts";
+  /* Bezugsrahmen der schwebenden Handlade. */
+  position:relative}
 /* Ab 1200 px eine vierte Spalte ueber die volle Hoehe: die angezeigte Karte
    erscheint immer DORT, statt als Fenster ueber dem Spielfeld. Darunter fehlt
    der Platz — dann schwebt sie wie bisher am Zeiger (app.js: SPK_SPALTE). */
 @media (min-width:1200px){
   .mat{grid-template-columns:minmax(0,1fr) 172px 208px 268px;
-       grid-template-areas:"links mitte rechts vorschau" "hand hand hand vorschau"}
+       grid-template-areas:"links mitte rechts vorschau"}
 }
 .mat-vorschau{grid-area:vorschau}
 .mat-links{grid-area:links;display:flex;flex-direction:column;gap:8px;min-width:0}
 .mat-mitte{grid-area:mitte;display:flex;flex-direction:column;gap:8px}
 .mat-rechts{grid-area:rechts;display:flex;flex-direction:column;gap:8px}
-.mat-hand{grid-area:hand}
+/* ===== Die Hand als schwebende Lade (nur auf der Matte) =====
+   Unten links, weil dort am Tisch die eigene Hand liegt — und weil unten
+   RECHTS beim Ziehen die Truhe steht. Sie klappt nach oben aus, nicht nach
+   rechts wie der Zugang zur Sammlung im Deckbau: Eine Hand, die zur Seite
+   ausfährt, verliert das Bild vom Tisch. */
+/* Die Lade selbst ist nur die Klammer um Korb und Schaltfläche und bleibt für
+   Zeigereignisse durchlässig: Sonst läge ein unsichtbares Rechteck über der
+   Matte und finge Klicks ab, die dem Schlachtfeld gelten. Angenommen werden
+   sie nur vom KORB und der Schaltfläche — und beim Ziehen von der ganzen Lade,
+   damit sie als Ziel erreichbar ist (weiter unten). */
+/* Verankert an der MATTE, nicht am Fenster. Am Fenster festgemacht schwebte die
+   Schaltfläche über allem, was unter der Matte steht — beim Öffnen der Ansicht
+   lag sie auf dem Würfelkasten, und kein Scrollen brachte ihn darunter hervor.
+   An der Matte gehört sie zu dem, was sie bedient, und kollidiert mit nichts.
+   Die Matte hat eine feste Höhe, der Fächer passt also immer hinein. */
+.hand-lade{position:absolute;left:10px;bottom:10px;z-index:40;pointer-events:none;
+  display:flex;flex-direction:column;align-items:flex-start;gap:8px;
+  max-width:calc(100% - 20px)}
+.hand-lade-knopf,.hand-lade.offen .hand-lade-korb{pointer-events:auto}
+/* Die allgemeinen Ziel-Anzeigen gelten für Zonen, die eine FLÄCHE sind. Hier
+   ist die Klammer unsichtbar; tönte man sie ein, schwebte ein Rechteck über
+   der Matte. Angezeigt wird stattdessen an der Schaltfläche (ganz unten).
+   Drei Stellen im Selektor schlagen die zwei der Grundregel. */
+.hand-lade[data-zonedrop].zieh-ziel,.hand-lade[data-zonedrop].ueber{
+  background:none;box-shadow:none;border-color:transparent}
+/* Dieselbe Schaltfläche wie „Karte zum Deck": eigener Grund statt
+   Durchsichtigkeit, denn sie schwebt über Kartenbildern. */
+.hand-lade-knopf{display:flex;align-items:center;gap:8px;flex:none;
+  padding:6px 12px;border-radius:12px;cursor:pointer;white-space:nowrap;
+  background:rgba(27,29,39,.92);border:1px solid var(--line);color:var(--acc2);
+  font-weight:600;font-size:13px;line-height:1.2;
+  box-shadow:0 2px 10px rgba(0,0,0,.5)}
+.hand-lade-knopf:hover,.hand-lade.offen .hand-lade-knopf{
+  border-color:var(--akt-rand);background:var(--akt-flaeche)}
+.hand-lade-zeichen{font-size:17px;line-height:1}
+.hand-lade-n{min-width:20px;height:18px;padding:0 6px;border-radius:9px;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:var(--acc);color:#1a1400;font-size:11px;font-weight:700}
+.hand-lade-n.null{background:var(--line);color:var(--dim)}
+/* Geschlossen wird der Korb WEGGENOMMEN, nicht nur durchsichtig gemacht:
+   visibility:hidden nimmt ihn auch aus der Tabulatorreihenfolge. Sonst
+   tabbte man durch einen Fächer, den niemand sieht. */
+.hand-lade-korb{order:-1;visibility:hidden;opacity:0;transform:translateY(14px);
+  transition:opacity .18s ease-out,transform .18s ease-out,visibility .18s;
+  max-width:100%;max-height:min(64vh,340px);overflow:auto;
+  border:1px solid var(--line);border-radius:14px;
+  background:rgba(20,22,30,.94);backdrop-filter:blur(3px);
+  -webkit-backdrop-filter:blur(3px);
+  box-shadow:0 10px 34px rgba(0,0,0,.6)}
+.hand-lade.offen .hand-lade-korb{visibility:visible;opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){ .hand-lade-korb{transition:none} }
+/* Seitlich MEHR Luft als quer über die Matte, nicht weniger: Die äußeren Karten
+   des Fächers sind gedreht und schwenken über ihre Spalte hinaus. Quer über die
+   Matte war ringsum Platz; im Kasten schnitt der Rand sie ab. Oben Platz fürs
+   Anheben beim Zeigen, unten reicht wenig. */
+.hand-lade .hand-fan{padding:30px 72px 46px;min-height:0}
+.hand-lade .zone-leer{padding:14px 22px}
+/* Beim Ziehen ist die ganze Lade ein Ziel — auch zugeklappt, wo sie nur aus
+   der Schaltfläche besteht. Etwas auf die Hand zurückzunehmen, ohne sie
+   vorher aufzuklappen, ist der häufigere Weg. */
+body.zieht-gerade .hand-lade{pointer-events:auto}
+.hand-lade.ueber .hand-lade-knopf{border-color:var(--acc);
+  background:linear-gradient(var(--akt-flaeche),var(--akt-flaeche)),var(--panel2);
+  box-shadow:0 0 0 2px rgba(201,162,39,.45)}
+.hand-lade.zieh-ziel .hand-lade-knopf{border-color:var(--acc2)}
+
 
 
 .mat-feld{display:flex;flex-direction:column;min-width:0;
