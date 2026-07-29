@@ -758,110 +758,130 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
    echter Spielteppich, der auch nicht waechst. Ohne das bestimmte die hoechste
    Spalte (vier gestapelte Felder in der Mitte) die Zeilenhoehe, und das
    Schlachtfeld stand mit fuenf Karten in 400 px Leere. */
-/* Die Hand steht NICHT mehr in der Reihe — sie schwebt als Lade unten links
-   (siehe .hand-lade). Der Fächer ist gut 230 px hoch und kostete diese Höhe
-   dauernd, obwohl man ihn nur ansieht, wenn man etwas daraus spielen will.
-   Die Zeile bekommt jetzt das Schlachtfeld, das man ständig ansieht. */
+/* Hand UND Friedhof stehen nicht mehr in der Reihe — sie schweben als Laden am
+   Fuß des Schlachtfelds (siehe .zonen-leiste). Der Handfächer ist gut 230 px
+   hoch und kostete diese Höhe dauernd, obwohl man ihn nur ansieht, wenn man
+   etwas daraus spielen will; der Friedhof wächst über die Partie, wird aber
+   fast nur nachgeschlagen. Den Platz bekommt das Schlachtfeld, das man ständig
+   ansieht.
+
+   --rechte-spalten ist die Breite ALLES RECHTS von der linken Spalte, Lücken
+   eingerechnet. Die schwebende Leiste hängt sich daran auf, damit sie am
+   rechten Rand des Schlachtfelds sitzt statt an dem der ganzen Matte. Sie steht
+   hier und nicht dort, weil sie aus DIESEN Zahlen folgt: ändert sich eine
+   Spaltenbreite, muss die Variable mitgehen. */
 .mat{display:grid;gap:8px;margin-top:10px;
   grid-template-columns:minmax(0,1fr) 154px 190px;
   grid-template-rows:clamp(390px,58vh,640px);
   grid-template-areas:"links mitte rechts";
-  /* Bezugsrahmen der schwebenden Handlade. */
+  --rechte-spalten:calc(154px + 190px + 8px * 2);
+  /* Bezugsrahmen der schwebenden Zonen. */
   position:relative}
 /* Ab 1200 px eine vierte Spalte ueber die volle Hoehe: die angezeigte Karte
    erscheint immer DORT, statt als Fenster ueber dem Spielfeld. Darunter fehlt
    der Platz — dann schwebt sie wie bisher am Zeiger (app.js: SPK_SPALTE). */
 @media (min-width:1200px){
   .mat{grid-template-columns:minmax(0,1fr) 172px 208px 268px;
-       grid-template-areas:"links mitte rechts vorschau"}
+       grid-template-areas:"links mitte rechts vorschau";
+       --rechte-spalten:calc(172px + 208px + 268px + 8px * 3)}
 }
 .mat-vorschau{grid-area:vorschau}
 .mat-links{grid-area:links;display:flex;flex-direction:column;gap:8px;min-width:0}
 .mat-mitte{grid-area:mitte;display:flex;flex-direction:column;gap:8px}
 .mat-rechts{grid-area:rechts;display:flex;flex-direction:column;gap:8px}
-/* ===== Die Hand als schwebende Lade (nur auf der Matte) =====
-   Unten links, weil dort am Tisch die eigene Hand liegt — und weil unten
-   RECHTS beim Ziehen die Truhe steht. Sie klappt nach oben aus, nicht nach
-   rechts wie der Zugang zur Sammlung im Deckbau: Eine Hand, die zur Seite
-   ausfährt, verliert das Bild vom Tisch. */
-/* Die Lade selbst ist nur die Klammer um Korb und Schaltfläche und bleibt für
+/* ===== Schwebende Zonen: Hand und Friedhof (nur auf der Matte) =====
+   Beide sitzen am FUSS DER LINKEN SPALTE, also am rechten unteren Rand des
+   Schlachtfelds, gleich links neben Exil. Nicht am Rand der ganzen Matte: Dort
+   lägen sie unter den schmalen Spalten, zu denen sie nicht gehören.
+
+   Sie klappen nach OBEN aus, nicht zur Seite wie der Zugang zur Sammlung im
+   Deckbau: Am Tisch liegen Hand und Friedhof vor einem, und das Bild bleibt
+   erhalten, wenn sie von dort aufgehen. */
+.zonen-leiste{position:absolute;bottom:10px;z-index:40;pointer-events:none;
+  right:calc(var(--rechte-spalten) + 18px);
+  display:flex;align-items:flex-end;gap:10px}
+/* Die Lade ist nur die Klammer um Korb und Schaltfläche und bleibt für
    Zeigereignisse durchlässig: Sonst läge ein unsichtbares Rechteck über der
    Matte und finge Klicks ab, die dem Schlachtfeld gelten. Angenommen werden
    sie nur vom KORB und der Schaltfläche — und beim Ziehen von der ganzen Lade,
    damit sie als Ziel erreichbar ist (weiter unten). */
-/* Verankert an der MATTE, nicht am Fenster. Am Fenster festgemacht schwebte die
-   Schaltfläche über allem, was unter der Matte steht — beim Öffnen der Ansicht
-   lag sie auf dem Würfelkasten, und kein Scrollen brachte ihn darunter hervor.
-   An der Matte gehört sie zu dem, was sie bedient, und kollidiert mit nichts.
-   Die Matte hat eine feste Höhe, der Fächer passt also immer hinein. */
-.hand-lade{position:absolute;left:10px;bottom:10px;z-index:40;pointer-events:none;
-  display:flex;flex-direction:column;align-items:flex-start;gap:8px;
-  max-width:calc(100% - 20px)}
-.hand-lade-knopf,.hand-lade.offen .hand-lade-korb{pointer-events:auto}
+.schwebe-zone{position:relative;flex:none}
+.schwebe-knopf,.schwebe-zone.offen .schwebe-korb{pointer-events:auto}
 /* Die allgemeinen Ziel-Anzeigen gelten für Zonen, die eine FLÄCHE sind. Hier
    ist die Klammer unsichtbar; tönte man sie ein, schwebte ein Rechteck über
-   der Matte. Angezeigt wird stattdessen an der Schaltfläche (ganz unten).
+   der Matte. Angezeigt wird stattdessen am Symbol (ganz unten).
    Drei Stellen im Selektor schlagen die zwei der Grundregel. */
-.hand-lade[data-zonedrop].zieh-ziel,.hand-lade[data-zonedrop].ueber{
+.schwebe-zone[data-zonedrop].zieh-ziel,.schwebe-zone[data-zonedrop].ueber{
   background:none;box-shadow:none;border-color:transparent}
 /* Das Emblem TRÄGT die Schaltfläche — kein Kasten darum, kein Beiwort daneben.
-   Es bringt seinen eigenen Ring mit; eine Pille darum wäre ein zweiter Rahmen
-   um einen Rahmen. Lesbar über hellen wie dunklen Kartenbildern bleibt es durch
-   den Schlagschatten, nicht durch einen Grund. */
-.hand-lade-knopf{display:block;flex:none;padding:0;border:0;background:none;
+   Lesbar über hellen wie dunklen Kartenbildern bleibt es durch den
+   Schlagschatten, nicht durch einen eigenen Grund. */
+.schwebe-knopf{display:block;padding:0;border:0;background:none;
   cursor:pointer;line-height:0;
   filter:drop-shadow(0 3px 8px rgba(0,0,0,.75));
   transition:transform .12s ease-out,filter .12s ease-out}
-.hand-lade-knopf:hover,.hand-lade.offen .hand-lade-knopf{transform:translateY(-2px);
+.schwebe-knopf:hover,.schwebe-zone.offen .schwebe-knopf{transform:translateY(-2px);
   filter:drop-shadow(0 4px 12px rgba(0,0,0,.8)) brightness(1.12)}
-.hand-lade-knopf:focus-visible{outline:2px solid var(--acc);outline-offset:4px;border-radius:50%}
+.schwebe-knopf:focus-visible{outline:2px solid var(--acc);outline-offset:4px;border-radius:50%}
 /* Bezugsrahmen der Zahl: Sie steht AUF dem Symbol, nicht daneben. */
-.hand-lade-sym{position:relative;display:block;width:60px;height:60px}
-.hand-lade-bild{display:block;width:100%;height:100%;object-fit:contain;
+.schwebe-sym{position:relative;display:block;width:60px;height:60px}
+.schwebe-bild{display:block;width:100%;height:100%;object-fit:contain;
   -webkit-user-drag:none;user-drag:none}
-/* Der Ersatz, falls das Bild nicht lädt — sonst bliebe eine leere Fläche, die
+/* Der Ersatz, falls ein Bild nicht lädt — sonst bliebe eine leere Fläche, die
    niemand anklickt. Dieselbe Regel wie am Zugabe-Knopf und an der Truhe. */
-.hand-lade-ersatz{display:none;align-items:center;justify-content:center;
+.schwebe-ersatz{display:none;align-items:center;justify-content:center;
   width:100%;height:100%;font-size:30px;line-height:1}
-.hand-lade.ohne-bild .hand-lade-bild{display:none}
-.hand-lade.ohne-bild .hand-lade-ersatz{display:flex}
+.schwebe-zone.ohne-bild .schwebe-bild{display:none}
+.schwebe-zone.ohne-bild .schwebe-ersatz{display:flex}
 /* Unten rechts auf dem Symbol, leicht darüber hinaus: So bleibt sie lesbar,
    ohne das Bild in der Mitte zu verdecken. Der dunkle Ring hebt sie von den
-   hellen Kartenrändern des Emblems ab. */
-.hand-lade-n{position:absolute;right:-1px;bottom:1px;
+   hellen Rändern der Embleme ab. */
+.schwebe-n{position:absolute;right:-1px;bottom:1px;
   min-width:20px;height:20px;padding:0 5px;border-radius:10px;
   display:inline-flex;align-items:center;justify-content:center;
   background:var(--acc);color:#1a1400;font-size:11px;font-weight:700;line-height:1;
   border:2px solid rgba(12,13,18,.92);box-shadow:0 1px 4px rgba(0,0,0,.6)}
-.hand-lade-n.null{background:var(--line);color:var(--dim)}
-/* Geschlossen wird der Korb WEGGENOMMEN, nicht nur durchsichtig gemacht:
-   visibility:hidden nimmt ihn auch aus der Tabulatorreihenfolge. Sonst
-   tabbte man durch einen Fächer, den niemand sieht. */
-.hand-lade-korb{order:-1;visibility:hidden;opacity:0;transform:translateY(14px);
+.schwebe-n.null{background:var(--line);color:var(--dim)}
+/* Der Korb steht ÜBER seiner Schaltfläche und wächst nach links: rechts am
+   Knopf verankert, damit er nicht über die schmalen Spalten hinausläuft.
+   Geschlossen wird er WEGGENOMMEN, nicht nur durchsichtig gemacht:
+   visibility:hidden nimmt ihn auch aus der Tabulatorreihenfolge. Sonst tabbte
+   man durch einen Fächer, den niemand sieht. */
+.schwebe-korb{position:absolute;right:0;bottom:calc(100% + 10px);
+  visibility:hidden;opacity:0;transform:translateY(14px);
   transition:opacity .18s ease-out,transform .18s ease-out,visibility .18s;
-  max-width:100%;max-height:min(64vh,340px);overflow:auto;
-  border:1px solid var(--line);border-radius:14px;
+  max-height:min(60vh,330px);overflow:auto}
+.schwebe-zone.offen .schwebe-korb{visibility:visible;opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){ .schwebe-korb{transition:none} }
+/* NUR DER FRIEDHOF bekommt Rahmen und Grund. Sein Gitter ist eine lose Reihe
+   kleiner Bilder und bräuchte sonst eine Fläche, um nicht über dem
+   Schlachtfeld zu schwimmen. Der Handfächer trägt seine Form selbst: Seine
+   Karten liegen gestaffelt und werfen Schatten — ein Kasten darum wäre ein
+   Rahmen um etwas, das schon eine Gestalt hat. */
+.schwebe-zone.mit-rahmen .schwebe-korb{border:1px solid var(--line);border-radius:14px;
   background:rgba(20,22,30,.94);backdrop-filter:blur(3px);
   -webkit-backdrop-filter:blur(3px);
-  box-shadow:0 10px 34px rgba(0,0,0,.6)}
-.hand-lade.offen .hand-lade-korb{visibility:visible;opacity:1;transform:none}
-@media(prefers-reduced-motion:reduce){ .hand-lade-korb{transition:none} }
-/* Seitlich MEHR Luft als quer über die Matte, nicht weniger: Die äußeren Karten
-   des Fächers sind gedreht und schwenken über ihre Spalte hinaus. Quer über die
-   Matte war ringsum Platz; im Kasten schnitt der Rand sie ab. Oben Platz fürs
-   Anheben beim Zeigen, unten reicht wenig. */
-.hand-lade .hand-fan{padding:30px 72px 46px;min-height:0}
-.hand-lade .zone-leer{padding:14px 22px}
+  box-shadow:0 10px 34px rgba(0,0,0,.6);padding:10px 12px}
+/* Der Kasten bekommt eine feste Breite, damit das Gitter UMBRICHT. Ohne sie
+   (width:max-content) legte es alle Karten in eine Reihe — gemessen 684 px bei
+   sechs Karten, und der Kasten schob sich über den linken Mattenrand hinaus.
+   Fünf Karten je Reihe: 5 × (103 px + 8 px Lücke) plus Polster. */
+.schwebe-zone.mit-rahmen .schwebe-korb{width:min(579px,46vw)}
+/* Seitlich Luft für den Fächer: Seine äußeren Karten sind gedreht und schwenken
+   über ihre Spalte hinaus. Ohne Kasten schneidet zwar kein Rand mehr ab, aber
+   der Korb rollt bei Überlänge — und ein Rollbereich schneidet ebenso. */
+.schwebe-zone .hand-fan{padding:30px 60px 40px;min-height:0}
+.schwebe-zone .zone-leer{padding:14px 22px}
 /* Beim Ziehen ist die ganze Lade ein Ziel — auch zugeklappt, wo sie nur aus
-   der Schaltfläche besteht. Etwas auf die Hand zurückzunehmen, ohne sie
-   vorher aufzuklappen, ist der häufigere Weg. */
-body.zieht-gerade .hand-lade{pointer-events:auto}
+   der Schaltfläche besteht. Etwas auf die Hand zurückzunehmen oder auf den
+   Friedhof zu legen, ohne vorher aufzuklappen, ist der häufigere Weg. */
+body.zieht-gerade .zonen-leiste{pointer-events:auto}
 /* Ohne Kasten kann die Hervorhebung kein Rahmen sein: Sie leuchtet das Emblem
    selbst an. drop-shadow folgt der Silhouette, box-shadow läge als Rechteck
    dahinter. */
-.hand-lade.zieh-ziel .hand-lade-knopf{
+.schwebe-zone.zieh-ziel .schwebe-knopf{
   filter:drop-shadow(0 3px 8px rgba(0,0,0,.75)) drop-shadow(0 0 3px var(--acc2))}
-.hand-lade.ueber .hand-lade-knopf{transform:translateY(-2px);
+.schwebe-zone.ueber .schwebe-knopf{transform:translateY(-2px);
   filter:drop-shadow(0 0 6px var(--acc)) drop-shadow(0 0 14px rgba(201,162,39,.6))
          brightness(1.15)}
 

@@ -209,98 +209,134 @@ export default async function ({ seite, adresse, stand }) {
       await seite.evaluate(() => document.querySelectorAll(".zk.getappt").length) + " getappt");
   }
 
-  /* --- Die Hand als schwebende Lade ------------------------------------- */
-  /* Auf der Matte steht die Hand nicht mehr in der Reihe, sondern klappt unten
-     links aus. Drei Dinge können daran still schiefgehen, und alle drei sind
-     hier festgehalten. */
-  const lade = await seite.evaluate(() => {
-    const l = document.querySelector("#zonen .hand-lade");
-    const korb = l?.querySelector(".hand-lade-korb");
+  /* --- Hand und Friedhof als schwebende Zonen --------------------------- */
+  /* Beide stehen auf der Matte nicht mehr in der Reihe, sondern klappen am Fuß
+     des Schlachtfelds aus — gleich links neben Exil. Fünf Dinge können daran
+     still schiefgehen, und alle fünf sind hier festgehalten. */
+  const leiste = await seite.evaluate(() => {
+    const l = document.querySelector("#zonen .zonen-leiste");
+    const zonen = [...document.querySelectorAll("#zonen .schwebe-zone")];
+    const links = document.querySelector(".mat-links").getBoundingClientRect();
+    const exil = document.querySelector('.mat-mitte [data-zone="exile"]').getBoundingClientRect();
+    const lr = l?.getBoundingClientRect();
     return {
-      da: !!l,
-      alteReihe: document.querySelectorAll(".mat-hand").length,
-      ziel: l?.dataset.zonedrop ?? null,
-      korbSichtbar: korb ? getComputedStyle(korb).visibility : null,
+      reihenfolge: zonen.map(z => z.dataset.zone),
+      ziele: zonen.map(z => z.dataset.zonedrop),
+      alteReihen: document.querySelectorAll('.mat-hand, .mat-rechts [data-zone="grave"]').length,
+      // Am Fuß der LINKEN Spalte, links neben Exil — nicht am Rand der ganzen
+      // Matte, wo sie unter den schmalen Spalten lägen.
+      imSchlachtfeld: lr ? Math.round(links.right - lr.right) >= 0 : false,
+      vorExil: lr ? Math.round(exil.left - lr.right) >= 0 : false,
       // Die Klammer muss durchlässig sein, sonst finge sie Klicks ab, die dem
       // Schlachtfeld darunter gelten — ein unsichtbares Rechteck über der Matte.
       klammer: l ? getComputedStyle(l).pointerEvents : null,
-      knopf: l ? getComputedStyle(l.querySelector(".hand-lade-knopf")).pointerEvents : null,
-      zahl: l?.querySelector(".hand-lade-n")?.textContent ?? null,
+      knopf: getComputedStyle(zonen[0].querySelector(".schwebe-knopf")).pointerEvents,
+      koerbeZu: zonen.every(z => getComputedStyle(z.querySelector(".schwebe-korb")).visibility === "hidden"),
+      zahlen: zonen.map(z => z.querySelector(".schwebe-n").textContent),
     };
   });
-  stand.ist("die Hand steht als Lade da, nicht mehr als Mattenzeile",
-    lade.da && lade.alteReihe === 0);
-  stand.ist("sie ist selbst das Ablageziel", lade.ziel === "hand", lade.ziel);
-  stand.ist("zugeklappt ist der Korb weggenommen", lade.korbSichtbar === "hidden", lade.korbSichtbar);
-  stand.gleich("die Klammer lässt Klicks durch, die Schaltfläche nicht",
-    [lade.klammer, lade.knopf], ["none", "auto"]);
-  stand.ist("die Schaltfläche nennt die Anzahl", lade.zahl === "2", lade.zahl);
+  stand.gleich("Friedhof und Hand stehen als Laden da, nicht mehr in der Reihe",
+    [leiste.reihenfolge, leiste.alteReihen], [["grave", "hand"], 0]);
+  stand.gleich("beide sind selbst Ablageziel", leiste.ziele, ["grave", "hand"]);
+  stand.gleich("sie sitzen am Fuß des Schlachtfelds, links neben Exil",
+    [leiste.imSchlachtfeld, leiste.vorExil], [true, true]);
+  stand.ist("zugeklappt sind beide Körbe weggenommen", leiste.koerbeZu);
+  stand.gleich("die Klammer lässt Klicks durch, die Schaltflächen nicht",
+    [leiste.klammer, leiste.knopf], ["none", "auto"]);
+  stand.gleich("beide nennen ihre Anzahl", leiste.zahlen, ["1", "2"]);
 
-  /* Die Schaltfläche IST das Emblem: kein Beiwort daneben, und die Zahl steht
-     unten rechts darauf statt daneben. Zwei Dinge daran können still
-     schiefgehen — das Bild lädt nicht (dann bliebe eine leere Fläche, die
-     niemand anklickt), oder die Zahl rutscht neben das Symbol statt darauf. */
-  const sym = await seite.evaluate(() => {
-    const knopf = document.querySelector(".hand-lade-knopf");
-    const bild = knopf.querySelector(".hand-lade-bild");
-    const s = knopf.querySelector(".hand-lade-sym").getBoundingClientRect();
-    const n = knopf.querySelector(".hand-lade-n").getBoundingClientRect();
+  /* Jede Schaltfläche IST ihr Emblem: kein Beiwort daneben, und die Zahl steht
+     unten rechts darauf statt daneben. */
+  const sym = await seite.evaluate(() => [...document.querySelectorAll(".schwebe-zone")].map(z => {
+    const bild = z.querySelector(".schwebe-bild");
+    const s = z.querySelector(".schwebe-sym").getBoundingClientRect();
+    const n = z.querySelector(".schwebe-n").getBoundingClientRect();
     return {
+      zone: z.dataset.zone,
       quelle: bild?.getAttribute("src") ?? null,
       geladen: !!bild && bild.complete && bild.naturalWidth > 0,
-      ersatzVersteckt: getComputedStyle(knopf.querySelector(".hand-lade-ersatz")).display === "none",
-      // Auf dem Symbol: der Mittelpunkt der Zahl liegt innerhalb des Symbols …
-      draufX: n.left + n.width / 2 > s.left && n.left + n.width / 2 < s.right,
-      draufY: n.top + n.height / 2 > s.top && n.top + n.height / 2 < s.bottom,
-      // … und zwar in dessen unterem rechten Viertel.
+      ersatzVersteckt: getComputedStyle(z.querySelector(".schwebe-ersatz")).display === "none",
+      // Mittelpunkt der Zahl im unteren rechten Viertel des Symbols.
       untenRechts: n.left + n.width / 2 > s.left + s.width / 2 &&
-                   n.top + n.height / 2 > s.top + s.height / 2,
-      // Die Zahl darf das Symbol nicht erschlagen.
+                   n.top + n.height / 2 > s.top + s.height / 2 &&
+                   n.left + n.width / 2 < s.right && n.top + n.height / 2 < s.bottom,
       anteil: Math.round(n.width / s.width * 100),
-      beschriftung: knopf.getAttribute("aria-label"),
+      beschriftung: z.querySelector(".schwebe-knopf").getAttribute("aria-label"),
     };
-  });
-  stand.ist("die Schaltfläche trägt das Emblem", sym.geladen, sym.quelle);
-  stand.ist("das Ersatzzeichen bleibt dabei versteckt", sym.ersatzVersteckt);
-  stand.gleich("die Zahl steht auf dem Symbol, unten rechts",
-    [sym.draufX, sym.draufY, sym.untenRechts], [true, true, true]);
-  stand.ist("und erschlägt es nicht", sym.anteil <= 40, sym.anteil + " % der Symbolbreite");
+  }));
+  stand.ist("beide Schaltflächen tragen ihr Emblem", sym.every(x => x.geladen),
+    sym.map(x => x.quelle).join(" · "));
+  stand.ist("die Ersatzzeichen bleiben dabei versteckt", sym.every(x => x.ersatzVersteckt));
+  stand.ist("die Zahl steht jeweils unten rechts auf dem Symbol", sym.every(x => x.untenRechts));
+  stand.ist("und erschlägt es nicht", sym.every(x => x.anteil <= 40),
+    sym.map(x => x.zone + ": " + x.anteil + " %").join(", "));
   // Der sichtbare Text ist weg — für Vorleseprogramme muss die Anzahl deshalb
   // in die Beschriftung, sonst wäre sie dort gar nicht mehr vorhanden.
-  stand.ist("die Beschriftung nennt die Anzahl mit",
-    /\b2\b/.test(sym.beschriftung || ""), sym.beschriftung);
+  stand.ist("die Beschriftungen nennen Zone und Anzahl",
+    sym.every(x => /\d/.test(x.beschriftung || "")),
+    sym.map(x => x.beschriftung).join(" | "));
 
-  await seite.locator("[data-handlade]").click();
+  /* Nur EINE auf einmal: Die Körbe sind breiter als ihre Schaltflächen und
+     lägen offen übereinander. */
+  await seite.locator('[data-schwebe="grave"]').click();
   await seite.waitForTimeout(400);
-  const offen = await seite.evaluate(() => {
-    const korb = document.querySelector(".hand-lade-korb");
+  const friedhof = await seite.evaluate(() => {
+    const z = document.querySelector('.schwebe-zone[data-zone="grave"]');
+    const korb = z.querySelector(".schwebe-korb");
     const kr = korb.getBoundingClientRect();
-    const karten = [...document.querySelectorAll(".hand-lade .hand-karte")].map(e => e.getBoundingClientRect());
+    const mat = document.querySelector(".mat").getBoundingClientRect();
+    const knopf = z.querySelector(".schwebe-knopf").getBoundingClientRect();
     return {
-      sichtbar: getComputedStyle(korb).visibility,
+      offen: [...document.querySelectorAll(".schwebe-zone.offen")].map(e => e.dataset.zone),
+      karten: korb.querySelectorAll(".zk").length,
+      // Der Friedhof bekommt Rahmen UND Grund — anders als die Hand.
+      rahmen: getComputedStyle(korb).borderTopWidth,
+      grund: getComputedStyle(korb).backgroundColor,
+      // Er klappt nach oben aus und bleibt dabei in der Matte.
+      ueberDemKnopf: Math.round(knopf.top - kr.bottom) >= 0,
+      inDerMatte: Math.round(kr.left - mat.left) >= 0 && Math.round(mat.bottom - kr.bottom) >= 0
+                  && Math.round(kr.top - mat.top) >= 0,
+    };
+  });
+  stand.gleich("ein Klick klappt den Friedhof auf", friedhof.offen, ["grave"]);
+  stand.ist("die Friedhofskarten liegen darin", friedhof.karten === 1, friedhof.karten);
+  stand.ist("er trägt Rahmen und Grund", friedhof.rahmen !== "0px" && friedhof.grund !== "rgba(0, 0, 0, 0)",
+    `${friedhof.rahmen} / ${friedhof.grund}`);
+  stand.ist("und klappt nach oben aus", friedhof.ueberDemKnopf);
+  stand.ist("dabei bleibt er innerhalb der Matte", friedhof.inDerMatte);
+
+  await seite.locator('[data-schwebe="hand"]').click();
+  await seite.waitForTimeout(400);
+  const hand = await seite.evaluate(() => {
+    const z = document.querySelector('.schwebe-zone[data-zone="hand"]');
+    const korb = z.querySelector(".schwebe-korb");
+    const kr = korb.getBoundingClientRect();
+    const karten = [...korb.querySelectorAll(".hand-karte")].map(e => e.getBoundingClientRect());
+    return {
+      offen: [...document.querySelectorAll(".schwebe-zone.offen")].map(e => e.dataset.zone),
       anzahl: karten.length,
-      knopfSagt: document.querySelector(".hand-lade-knopf").getAttribute("aria-expanded"),
-      // Der Fächer dreht seine äußeren Karten; sie schwenken über ihre Spalte
-      // hinaus. Reicht das Polster nicht, schneidet der Korb sie ab — das sieht
-      // man erst hin, wenn man misst.
+      // Die Hand bekommt WEDER Rahmen NOCH Grund — der Fächer trägt seine Form
+      // selbst. Genau das war die Bitte, und genau das kann beim nächsten
+      // Umbau der gemeinsamen Regeln still zurückkommen.
+      rahmen: getComputedStyle(korb).borderTopWidth,
+      grund: getComputedStyle(korb).backgroundColor,
+      // Der Fächer dreht seine äußeren Karten; ein Rollbereich schnitte sie ab.
       linksRaus:  Math.round(kr.left - Math.min(...karten.map(r => r.left))),
       rechtsRaus: Math.round(Math.max(...karten.map(r => r.right)) - kr.right),
       untenRaus:  Math.round(Math.max(...karten.map(r => r.bottom)) - kr.bottom),
-      // Sie klappt nach OBEN aus: der Korb liegt über der Schaltfläche.
-      ueberDemKnopf: Math.round(document.querySelector(".hand-lade-knopf").getBoundingClientRect().top
-                                - kr.bottom) >= 0,
     };
   });
-  stand.ist("ein Klick klappt sie auf", offen.sichtbar === "visible" && offen.knopfSagt === "true");
-  stand.ist("die Handkarten liegen darin", offen.anzahl === 2, offen.anzahl);
-  stand.ist("und zwar nach oben ausgeklappt", offen.ueberDemKnopf);
+  stand.gleich("ein Klick auf die Hand schließt den Friedhof", hand.offen, ["hand"]);
+  stand.ist("die Handkarten liegen darin", hand.anzahl === 2, hand.anzahl);
+  stand.gleich("die Hand hat WEDER Rahmen NOCH Grund",
+    [hand.rahmen, hand.grund], ["0px", "rgba(0, 0, 0, 0)"]);
   stand.gleich("keine Karte wird vom Rand abgeschnitten",
-    [offen.linksRaus <= 0, offen.rechtsRaus <= 0, offen.untenRaus <= 0], [true, true, true],
-    `links ${offen.linksRaus}, rechts ${offen.rechtsRaus}, unten ${offen.untenRaus}`);
+    [hand.linksRaus <= 0, hand.rechtsRaus <= 0, hand.untenRaus <= 0], [true, true, true],
+    `links ${hand.linksRaus}, rechts ${hand.rechtsRaus}, unten ${hand.untenRaus}`);
 
   // Aus der Hand aufs Schlachtfeld: Die Lade muss dabei zugehen, sonst läge sie
   // über genau den Zonen, auf die man zielt.
-  const hk = await seite.evaluate(PUNKT, ".hand-lade .hand-karte");
+  const hk = await seite.evaluate(PUNKT, ".schwebe-zone .hand-karte");
   stand.ist("eine Handkarte ist greifbar", !!hk);
   if (hk) {
     await seite.mouse.move(hk.x, hk.y);
@@ -308,7 +344,7 @@ export default async function ({ seite, adresse, stand }) {
     await seite.mouse.move(hk.x + 30, hk.y - 70, { steps: 8 });
     await seite.waitForTimeout(150);
     stand.ist("beim Ziehen geht die Lade zu",
-      await seite.evaluate(() => !document.querySelector(".hand-lade").classList.contains("offen")));
+      await seite.evaluate(() => document.querySelectorAll(".schwebe-zone.offen").length === 0));
     const feld = await seite.evaluate(PUNKT, '.mat-gross[data-zonedrop="field"]');
     stand.ist("das Schlachtfeld ist dahinter erreichbar", !!feld);
     if (feld) {
@@ -320,17 +356,40 @@ export default async function ({ seite, adresse, stand }) {
           return { hand: s.hand, field: s.field }; }, [k.hand[0]]),
         { hand: 0, field: 1 });
       stand.ist("und die Schaltfläche zählt herunter",
-        await seite.evaluate(() => document.querySelector(".hand-lade-n").textContent) === "1");
+        await seite.evaluate(() => document.querySelector('.schwebe-zone[data-zone="hand"] .schwebe-n')
+          .textContent) === "1");
     }
   }
 
-  // Escape schließt sie — der schnelle Weg an das darunter.
-  await seite.locator("[data-handlade]").click();
+  // Zugeklappt nimmt die Schaltfläche trotzdem an: eine Karte vom Schlachtfeld
+  // auf den Friedhof ziehen, ohne ihn vorher aufzuklappen.
+  const fq = await seite.evaluate(PUNKT, '.zk[data-zone="field"]');
+  if (fq) {
+    await seite.mouse.move(fq.x, fq.y);
+    await seite.mouse.down();
+    await seite.mouse.move(fq.x, fq.y + 40, { steps: 8 });
+    const fz = await seite.evaluate(PUNKT, '.schwebe-zone[data-zone="grave"] .schwebe-knopf');
+    stand.ist("die zugeklappte Friedhofs-Schaltfläche ist erreichbar", !!fz);
+    if (fz) {
+      await seite.mouse.move(fz.x, fz.y, { steps: 6 });
+      stand.gleich("sie leuchtet als Ziel auf",
+        await seite.evaluate(() => [...document.querySelectorAll("[data-zonedrop].ueber")]
+          .map(e => e.dataset.zonedrop)), ["grave"]);
+      await seite.mouse.up();
+      await seite.waitForTimeout(200);
+      stand.ist("und nimmt die Karte an",
+        await seite.evaluate(() => document.querySelector('.schwebe-zone[data-zone="grave"] .schwebe-n')
+          .textContent) === "2");
+    }
+  }
+
+  // Escape schließt — der schnelle Weg an das darunter.
+  await seite.locator('[data-schwebe="hand"]').click();
   await seite.waitForTimeout(300);
   await seite.keyboard.press("Escape");
   await seite.waitForTimeout(300);
   stand.ist("Escape klappt sie wieder zu",
-    await seite.evaluate(() => !document.querySelector(".hand-lade").classList.contains("offen")));
+    await seite.evaluate(() => document.querySelectorAll(".schwebe-zone.offen").length === 0));
 
   /* --- Im Akkordeon: die Zone klappt während des Zuges nicht um --------- */
   await seite.setViewportSize({ width: 800, height: 900 });
@@ -340,11 +399,12 @@ export default async function ({ seite, adresse, stand }) {
   // Dort gibt es keine Lade: Das Akkordeon zeigt ohnehin nur eine Zone auf
   // einmal, eine schwebende obendrauf wäre eine zweite Antwort auf dieselbe
   // Frage. Die Hand bleibt eine Zone unter sechs.
-  stand.gleich("dort bleibt die Hand eine gewöhnliche Zone",
+  stand.gleich("dort bleiben Hand und Friedhof gewöhnliche Zonen",
     await seite.evaluate(() => ({
-      lade: document.querySelectorAll(".hand-lade").length,
-      zone: document.querySelectorAll('#zonen .zone[data-zone="hand"]').length })),
-    { lade: 0, zone: 1 });
+      leiste: document.querySelectorAll(".zonen-leiste").length,
+      hand: document.querySelectorAll('#zonen .zone[data-zone="hand"]').length,
+      grave: document.querySelectorAll('#zonen .zone[data-zone="grave"]').length })),
+    { leiste: 0, hand: 1, grave: 1 });
 
   await seite.evaluate(() => { zoneOeffnen("field", true); });
   await seite.waitForTimeout(250);
@@ -357,6 +417,7 @@ export default async function ({ seite, adresse, stand }) {
 
     // Über die KOPFZEILE einer zugeklappten Zone fahren. Ohne die Sperre klappte
     // sie nach 140 ms auf, und alles darunter sprang weg.
+    const exilVorher = await seite.evaluate(() => zoneSumme("exile"));
     const kopf = await seite.evaluate(PUNKT, '.zone[data-zonedrop="exile"] .zone-kopf');
     stand.ist("die Kopfzeile einer zugeklappten Zone ist erreichbar", !!kopf);
     if (kopf) {
@@ -369,10 +430,13 @@ export default async function ({ seite, adresse, stand }) {
 
       await seite.mouse.up();
       await seite.waitForTimeout(200);
+      /* Gezählt wird die ZONE, nicht eine feste Kartenkennung. Welche Karte
+         hier gerade obenauf liegt, hängt von allem ab, was vorher verschoben
+         wurde — eine verdrahtete Kennung bricht, sobald oben ein Zug
+         dazukommt. Genau das ist beim Bauen passiert. */
       stand.gleich("und nimmt die Karte trotzdem an",
-        await seite.evaluate(([id]) => { const s = { field: 0, exile: 0, ...(SESSION_ZONEN[id] || {}) };
-          return { field: s.field, exile: s.exile }; }, [k.feld[1]]),
-        { field: 0, exile: 1 });
+        await seite.evaluate(([vorher]) => ({ exil: zoneSumme("exile") - vorher }), [exilVorher]),
+        { exil: 1 });
     }
   }
 
