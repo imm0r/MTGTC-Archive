@@ -1104,13 +1104,16 @@ stehen deshalb unter Name und Zahl statt daneben. Nebeneinander rangen sie mit
 dem Namen um dieselbe Breite, und der verlor: Bei vier Mitspielern auf einer
 820-px-Matte blieben für ihn gemessen **null Pixel**.
 
-**Hand, Friedhof, Exil und Würfel sind Laden**, als Emblemleiste am rechten
-unteren Rand des Schlachtfelds, gleich über den Lebenspunkten: von links nach
-rechts `assets/roll-the-dice.PNG`, `assets/cards-on-hand.PNG`,
-`assets/cards-at-exil.PNG` und `assets/cards-on-graveyard.PNG`, die drei Zonen
-mit der Kartenzahl unten rechts darauf. Ein Klick klappt nach oben aus, Escape
-oder ein zweiter Klick wieder zu. Nach oben, weil am Tisch alles davon vor einem
-liegt — zur Seite auszufahren löste dieses Bild auf.
+**Vier Embleme** stehen als Leiste am rechten unteren Rand des Schlachtfelds,
+gleich über den Lebenspunkten: von links nach rechts `assets/roll-the-dice.PNG`,
+`assets/cards-on-hand.PNG`, `assets/cards-at-exil.PNG` und
+`assets/cards-on-graveyard.PNG`. Jedes trägt unten rechts eine Zahl — bei den
+drei Zonen die Kartenzahl, beim Würfel den letzten Wurf.
+
+**Hand, Friedhof und Exil sind Laden.** Ein Klick klappt nach oben aus, Escape
+oder ein zweiter Klick wieder zu. Nach oben, weil am Tisch alle drei vor einem
+liegen — zur Seite auszufahren löste dieses Bild auf. Der **Würfel** ist keine:
+Ein Klick würfelt sofort (siehe „Der Würfel").
 
 Die Abstände der Leiste rechnen aus den Spaltenbreiten und der Höhe der
 Lebensreihe, damit sie mitgehen, wenn sich eine davon ändert.
@@ -1133,11 +1136,9 @@ nicht, denn der Fächer wird bei vielen Karten von selbst schmaler — der sicht
 Anteil je Karte schrumpft mit ihrer Zahl, gemessen in Kartenbreiten statt in
 Pixeln, damit er auf schmalen Schirmen mitschrumpft.
 
-**Der Würfel nimmt die ganze Matte ein** und ist die einzige Lade, die keine
-Zone ist — auf einen Würfel legt man keine Karte, sie trägt deshalb kein
-Ablageziel. Sie liegt außerdem *unter* den drei anderen Emblemen: Die Leiste
-muss auf der offenen Bühne sichtbar und anklickbar bleiben, sonst käme man aus
-ihr nur noch mit Escape heraus. Mehr dazu unter „Der Würfel" weiter unten.
+**Der Würfel rollt über die ganze Matte** — er ist keine Zone und trägt deshalb
+kein Ablageziel. Seine Fläche liegt *unter* den drei anderen Emblemen: Man
+würfelt oft, während eine Lade offen steht, und die gehört dann davor.
 
 Das Emblem trägt die Schaltfläche jeweils allein: kein Kasten darum, kein
 Beiwort daneben; lesbar über hellen wie dunklen Kartenbildern bleibt es durch
@@ -1290,11 +1291,19 @@ Seitenzahl sind weg. Gewürfelt wird in einer Partie um Anspiel, als Münzwurf-
 Ersatz und für die Effekte, die einen Zwanzigseiter verlangen; die übrigen
 Größen standen als Knopfreihe da und wurden nie angefasst.
 
-**Die Bühne ist die ganze Matte.** Ein Klick auf `assets/roll-the-dice.PNG`
-legt sie über das ganze Feld: der Würfel rollt quer darüber, das Ergebnis steht
-oben links, die letzten Würfe der Runde rechts, „Würfeln" unten in der Mitte.
-Vorher lag sie in einem einklappbaren Kasten *unter* der Matte und war
-340 × 150 px groß — der Würfel rollte durch einen Briefschlitz.
+**Ein Klick auf das Emblem würfelt** — es gibt keine Bühne, die erst aufgehen
+müsste. Der W20 rollt **direkt über die Matte**, ohne Rahmen und ohne Grund;
+wer geworfen hat und was, steht für den Moment links neben der Emblemleiste.
+Vorher lag der Würfel in einem einklappbaren Kasten *unter* der Matte und war
+340 × 150 px groß — er rollte durch einen Briefschlitz.
+
+**Die Zahl bleibt, der Würfel geht.** Auf dem Emblem steht immer der letzte Wurf
+der Runde (vor dem ersten ein matter Gedankenstrich). Der Würfel selbst rollt,
+bleibt gut zwei Sekunden liegen und blendet dann aus — läge er dauerhaft da,
+verdeckte er genau die Karten, für die man gewürfelt hat.
+
+Die **Wurfliste der Runde** steht im Tooltip des Emblems. Als Liste auf der
+Matte bräuchte sie einen Grund, um lesbar zu sein — und genau der sollte weg.
 
 **Jeder Wurf sieht anders aus.** Das Ergebnis steht vorher fest (ein
 `Math.random()`, einmal); die Schau darum wird jedes Mal neu ausgelost —
@@ -1310,11 +1319,12 @@ sieht man einem taumelnden Körper nicht an.
 > Zwei getrennte Wege liefen auseinander, sobald man einen davon ändert — und
 > die Abwechslung ginge am anderen vorbei.
 
-Ein Wurf **zeigt sich selbst**: Die Lade fährt auf, auch beim Wurf eines
-Mitspielers — sonst würfelte man ins Verborgene.
+Ein Wurf **zeigt sich selbst**: Der Würfel erscheint auch beim Wurf eines
+Mitspielers, und dessen Zahl landet ebenso auf dem Emblem.
 
 Wo es keine Matte gibt — im Akkordeon und in einer Runde ohne gewähltes Deck —
-hängt der Würfel fest am Schirm: Knopf unten rechts, Bühne als Fenster darüber.
+hängt der Würfel fest am Schirm: Knopf unten rechts, und er rollt über den
+Schirm statt über die Matte.
 Die drei Zonen-Laden gibt es dort nicht (das Akkordeon zeigt ohnehin eine Zone
 auf einmal), der Würfel schon: Er ist keine Zone, und ohne ihn gäbe es auf einem
 hochkant gehaltenen Handy gar keinen Wurf mehr.
@@ -1545,7 +1555,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `kartenansicht`  | Klebende Spaltenköpfe (auch im schmalen Fenster), Aufklappen beim Überfahren, kein Aufklappen beim Ziehen |
 | `zugabe`         | „Karte zum Deck“: Ausklappen, gefilterte Trefferliste, Zug in eine Kategorie, volles Deck |
 | `decks`          | Höchstens ein Deck aufgeklappt, Speicher und Baum stimmen überein, Truhe wirft die richtige Karte |
-| `spielrunde`     | Die Matte: Ziehen zwischen den Zonen, Tappen per Klick, die Lebensreihe (vier Kacheln nebeneinander, kein Rollbalken), die vier Laden (Ort, Rahmen, Zahl, immer nur eine offen, auch zugeklappt Ablageziel) und der Würfel (nur W20, Bühne über der ganzen Matte, jeder Wurf anders) |
+| `spielrunde`     | Die Matte: Ziehen zwischen den Zonen, Tappen per Klick, die Lebensreihe (vier Kacheln nebeneinander, kein Rollbalken), die drei Laden (Ort, Rahmen, Zahl, immer nur eine offen, auch zugeklappt Ablageziel) und der Würfel (nur W20, blanke Fläche über der ganzen Matte, Zahl aufs Emblem, jeder Wurf anders) |
 
 ### Zwei Regeln, die dabei gelernt wurden
 

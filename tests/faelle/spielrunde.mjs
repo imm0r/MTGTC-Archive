@@ -277,7 +277,7 @@ export default async function ({ seite, adresse, stand }) {
     const lebenOben = document.querySelector(".mat-leben").getBoundingClientRect().top;
     const reihe = ["wuerfel", "hand", "exile", "grave"];
     return {
-      reihenfolge: zonen.map(z => z.dataset.schwebeFach),
+      reihenfolge: zonen.map(z => [...z.classList].find(c => c.startsWith("sz-"))?.slice(3)),
       ziele: zonen.map(z => z.dataset.zonedrop ?? null),
       alteReihen: document.querySelectorAll(
         '.mat-hand, .mat-rechts [data-zone="grave"], .mat-mitte [data-zone="exile"], #dice-box').length,
@@ -291,10 +291,14 @@ export default async function ({ seite, adresse, stand }) {
       // Schlachtfeld darunter gelten. Bei Hand und Würfel wäre das die GANZE Matte.
       klammer: zonen.map(z => getComputedStyle(z).pointerEvents),
       knopf: getComputedStyle(zonen[0].querySelector(".schwebe-knopf")).pointerEvents,
-      koerbeZu: zonen.every(z => getComputedStyle(z.querySelector(".schwebe-korb")).visibility === "hidden"),
+      // Körbe haben nur die drei Zonen — der Würfel ist keine Lade.
+      koerbeZu: zonen.filter(z => z.dataset.zonedrop)
+        .every(z => getComputedStyle(z.querySelector(".schwebe-korb")).visibility === "hidden"),
       zahlen: zonen.filter(z => z.dataset.zonedrop).map(z => z.querySelector(".schwebe-n").textContent),
-      // Der Würfel trägt KEINE Zahl — er zählt nichts.
-      wuerfelOhneZahl: !document.querySelector(".sz-wuerfel .schwebe-n"),
+      // Der Würfel trägt statt einer Anzahl den letzten Wurf — vor dem ersten
+      // einen matten Gedankenstrich, damit der Platz erkennbar bleibt.
+      wuerfelZahl: document.querySelector(".sz-wuerfel .schwebe-n")?.textContent,
+      wuerfelMatt: document.querySelector(".sz-wuerfel .schwebe-n")?.classList.contains("null"),
     };
   });
   stand.gleich("vier Laden statt Reihen auf der Matte",
@@ -310,8 +314,9 @@ export default async function ({ seite, adresse, stand }) {
   stand.ist("zugeklappt sind alle Körbe weggenommen", leiste.koerbeZu);
   stand.gleich("die Klammern lassen Klicks durch, die Schaltflächen nicht",
     [leiste.klammer, leiste.knopf], [["none", "none", "none", "none"], "auto"]);
-  stand.gleich("die Zonen nennen ihre Anzahl, der Würfel nicht",
-    [leiste.zahlen, leiste.wuerfelOhneZahl], [["2", "0", "1"], true]);
+  stand.gleich("die Zonen nennen ihre Anzahl, der Würfel den letzten Wurf",
+    [leiste.zahlen, leiste.wuerfelZahl, leiste.wuerfelMatt],
+    [["2", "0", "1"], "–", true]);
 
   /* Jede Schaltfläche IST ihr Emblem: kein Beiwort daneben, und die Zahl steht
      unten rechts darauf statt daneben. */
@@ -490,49 +495,75 @@ export default async function ({ seite, adresse, stand }) {
   stand.ist("Escape klappt sie wieder zu",
     await seite.evaluate(() => document.querySelectorAll(".schwebe-zone.offen").length === 0));
 
-  /* --- Der Würfel: nur noch W20, Bühne über der ganzen Matte ------------ */
+  /* --- Der Würfel: nur noch W20, direkt auf der Matte -------------------- */
   /* Der Kasten unter der Matte ist weg, und mit ihm das Eingabefeld für eine
-     freie Seitenzahl und die Knopfreihe W4…W12. Was bleibt, ist eine Lade wie
-     die anderen — nur ohne Zone dahinter. */
+     freie Seitenzahl und die Knopfreihe W4…W12. Was bleibt, ist ein Emblem in
+     der Leiste: Ein Klick darauf WÜRFELT — keine Lade, die erst aufgeht. */
   stand.gleich("kein Würfelkasten, keine anderen Würfel mehr",
     await seite.evaluate(() => ({
       kasten: document.querySelectorAll("#dice-box").length,
       seiten: document.querySelectorAll("#dice-sides").length,
       knoepfe: document.querySelectorAll("[data-dice]").length,
-      werfen: document.querySelectorAll("#dice-roll").length })),
-    { kasten: 0, seiten: 0, knoepfe: 0, werfen: 1 });
+      // Das Emblem IST der Werfen-Knopf, und es ist keine Lade mehr.
+      werfen: document.querySelectorAll(".sz-wuerfel .schwebe-knopf#dice-roll").length,
+      lade: document.querySelectorAll('.sz-wuerfel [data-schwebe]').length })),
+    { kasten: 0, seiten: 0, knoepfe: 0, werfen: 1, lade: 0 });
 
-  await seite.locator('[data-schwebe="wuerfel"]').click();
-  await seite.waitForTimeout(1200);          // three.js kommt über die Umleitung
-  const buehne = await seite.evaluate(() => {
-    const b = document.querySelector("#wuerfel-buehne").getBoundingClientRect();
-    const m = document.querySelector(".mat").getBoundingClientRect();
-    return {
-      offen: [...document.querySelectorAll(".schwebe-zone.offen")].map(z => z.dataset.schwebeFach),
-      sichtbar: getComputedStyle(document.querySelector("#wuerfel-buehne")).visibility,
-      // Die ganze Matte, nicht ein Kasten darin — das war die Bitte.
-      deckt: [Math.round(b.left - m.left), Math.round(b.top - m.top),
-              Math.round(m.right - b.right), Math.round(m.bottom - b.bottom)],
-      dreiD: DiceGL.ready,
-    };
-  });
-  stand.gleich("ein Klick klappt die Würfelbühne auf", [buehne.offen, buehne.sichtbar],
-    [["wuerfel"], "visible"]);
-  stand.gleich("sie deckt die ganze Matte ab", buehne.deckt, [0, 0, 0, 0]);
-  stand.ist("der echte 3D-Würfel steht bereit", buehne.dreiD);
+  // Vor dem Wurf liegt nichts auf der Matte — und die Fläche trägt weder
+  // Rahmen noch Grund: Der Würfel rollt direkt über das Spielfeld.
+  stand.gleich("die Würfelfläche ist blank und liegt nicht dauerhaft da",
+    await seite.evaluate(() => {
+      const s = getComputedStyle(document.querySelector("#wuerfel-buehne"));
+      return { sichtbar: s.visibility, rahmen: s.borderTopWidth, grund: s.backgroundColor };
+    }),
+    { sichtbar: "hidden", rahmen: "0px", grund: "rgba(0, 0, 0, 0)" });
 
-  // Ein Wurf: Ergebnis im Kopf der Bühne, zwischen 1 und 20.
+  // Ein Wurf: Ergebnis im Kopf der Fläche und auf dem Emblem, zwischen 1 und 20.
   const wuerfe = [];
   for (let i = 0; i < 3; i++) {
     await seite.locator("#dice-roll").click();
     await seite.waitForTimeout(1500);
-    wuerfe.push(await seite.evaluate(() => ({
-      kopf: document.querySelector("#wuerfel-kopf").textContent.trim(),
-      erg: parseInt(document.querySelector(".wuerfel-erg")?.textContent || "", 10),
-      // Ruhelage des Würfels — bei jedem Wurf eine andere.
-      ort: DiceGL.ico ? [Math.round(DiceGL.ico.position.x * 100), Math.round(DiceGL.ico.position.y * 100)] : null,
-    })));
+    wuerfe.push(await seite.evaluate(() => {
+      const b = document.querySelector("#wuerfel-buehne").getBoundingClientRect();
+      const m = document.querySelector(".mat").getBoundingClientRect();
+      return {
+        kopf: document.querySelector("#wuerfel-kopf").textContent.trim(),
+        erg: parseInt(document.querySelector(".wuerfel-erg")?.textContent || "", 10),
+        // Die Zahl steht AUF dem Emblem, nicht mehr matt.
+        aufSymbol: document.querySelector(".sz-wuerfel .schwebe-n").textContent,
+        symbolMatt: document.querySelector(".sz-wuerfel .schwebe-n").classList.contains("null"),
+        sichtbar: getComputedStyle(document.querySelector("#wuerfel-buehne")).visibility,
+        // Die ganze Matte, nicht ein Kasten darin — das war die Bitte.
+        deckt: [Math.round(b.left - m.left), Math.round(b.top - m.top),
+                Math.round(m.right - b.right), Math.round(m.bottom - b.bottom)],
+        dreiD: DiceGL.ready,
+        // Ruhelage des Würfels — bei jedem Wurf eine andere.
+        ort: DiceGL.ico ? [Math.round(DiceGL.ico.position.x * 100), Math.round(DiceGL.ico.position.y * 100)] : null,
+      };
+    }));
   }
+  stand.ist("ein Klick auf das Emblem würfelt sofort",
+    wuerfe.every(w => w.sichtbar === "visible" && w.erg >= 1 && w.erg <= 20),
+    wuerfe.map(w => w.sichtbar + "/" + w.erg).join(" "));
+  stand.ist("der Würfel rollt über die ganze Matte",
+    wuerfe.every(w => JSON.stringify(w.deckt) === "[0,0,0,0]"),
+    JSON.stringify(wuerfe[0].deckt));
+  stand.ist("der echte 3D-Würfel steht bereit", wuerfe.every(w => w.dreiD));
+  stand.ist("die gewürfelte Zahl steht auf dem Symbol",
+    wuerfe.every(w => w.aufSymbol === String(w.erg) && !w.symbolMatt),
+    wuerfe.map(w => w.aufSymbol).join(", "));
+
+  /* Die Wurfliste der Runde ist mit dem Kasten nicht verschwunden, sie steht im
+     Tooltip des Emblems. Ohne Rahmen und Grund lag sie als blanker Text über
+     den Kartenbildern und war dort nicht zu lesen. */
+  stand.gleich("die Wurfliste der Runde steht im Tooltip des Emblems",
+    await seite.evaluate(() => {
+      // Der Weg, den auch das Echo der Datenbank nimmt.
+      logHinzu({ id: 1, user_id: "u1", kind: "dice", data: { sides: 20, result: 13 } });
+      logHinzu({ id: 2, user_id: "u0", kind: "dice", data: { sides: 20, result: 7 } });
+      return document.querySelector("#dice-roll").title.split("\n");
+    }),
+    ["Würfeln", "Ich: 7", "Mira: 13"]);
   stand.ist("jeder Wurf nennt Werfer und Ergebnis",
     wuerfe.every(w => /^Ich /.test(w.kopf) && w.erg >= 1 && w.erg <= 20),
     wuerfe.map(w => w.kopf).join(" | "));
@@ -545,13 +576,13 @@ export default async function ({ seite, adresse, stand }) {
     new Set(wuerfe.map(w => JSON.stringify(w.ort))).size === 3,
     wuerfe.map(w => JSON.stringify(w.ort)).join(" "));
 
-  /* Die Leinwand muss der Bühne folgen. Fest gesetzt (früher 340 × 150) wäre
+  /* Die Leinwand muss der Fläche folgen. Fest gesetzt (früher 340 × 150) wäre
      der Würfel verzerrt und liefe quer aus dem Bild. Sie entsteht erst beim
      ersten Wurf — vorher steht dort das ruhende SVG.
      Geprüft wird BEIDES: die CSS-Größe (wie groß sie im Bild ist) und der
      Zeichenpuffer (wie fein gerechnet wird). Nur die CSS-Größe zu prüfen
      bemerkte ein festes setSize() nicht — die Fläche stimmte dann trotzdem. */
-  stand.gleich("die Leinwand hat die Größe der Bühne, im Bild wie im Puffer",
+  stand.gleich("die Leinwand hat die Größe der Fläche, im Bild wie im Puffer",
     await seite.evaluate(() => {
       const c = document.querySelector("#wuerfel-feld canvas");
       const f = document.querySelector("#wuerfel-feld").getBoundingClientRect();
@@ -589,8 +620,14 @@ export default async function ({ seite, adresse, stand }) {
     streuung.tempo > 30 && streuung.taumeln > 25 && streuung.legen > 25 && streuung.mitte > 30,
     JSON.stringify(streuung));
 
-  await seite.keyboard.press("Escape");
-  await seite.waitForTimeout(300);
+  /* Danach räumt er sich selbst weg. Bliebe er liegen, verdeckte er genau die
+     Karten, für die man gewürfelt hat — die Zahl bleibt am Emblem stehen. */
+  await seite.waitForTimeout(6000);          // taumeln + legen + 2600 ms Halten + Ausblenden
+  stand.gleich("danach blendet der Würfel aus, die Zahl bleibt am Emblem",
+    await seite.evaluate(() => ({
+      sichtbar: getComputedStyle(document.querySelector("#wuerfel-buehne")).visibility,
+      aufSymbol: document.querySelector(".sz-wuerfel .schwebe-n").textContent })),
+    { sichtbar: "hidden", aufSymbol: String(wuerfe[2].erg) });
 
   /* --- Im Akkordeon: die Zone klappt während des Zuges nicht um --------- */
   await seite.setViewportSize({ width: 800, height: 900 });
