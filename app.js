@@ -12224,7 +12224,6 @@ function matInnerHtml() {
       </section>
       ${feld("cmd", t("zone.cmd"), { n: zoneSumme("cmd"), html: zoneKorbHtml("cmd") })}
       ${feld("lib", t("zone.lib"), { n: zoneSumme("lib"), html: zoneKorbHtml("lib") }, " mat-lib")}
-      ${feld("exile", t("zone.exile"), { n: zoneSumme("exile"), html: zoneKorbHtml("exile") })}
     </div>
     <div class="mat-rechts">
       <section class="mat-feld mat-leben">
@@ -12239,15 +12238,16 @@ function matInnerHtml() {
     </section>` : ""}`;
 }
 
-/* ---- Schwebende Zonen: Hand und Friedhof ----------------------------
-   Nur auf der Matte. Beide standen dort in der Reihe und kosteten Platz, den
-   man selten braucht:
+/* ---- Schwebende Zonen: Exil, Friedhof und Hand -----------------------
+   Nur auf der Matte. Alle drei standen dort in der Reihe und kosteten Platz,
+   den man selten braucht:
 
    * Der HANDFÄCHER ist hoch — eine Karte ist 104 px breit und damit 145 px
      hoch, dazu Luft für die gedrehten Ränder und das Anheben beim Zeigen, gut
      230 px. Quer über die ganze Matte kostete er diese Höhe DAUERND, obwohl
      man die Hand nur ansieht, wenn man etwas daraus spielen will.
-   * Der FRIEDHOF wächst über die Partie, wird aber fast nur nachgeschlagen.
+   * FRIEDHOF und EXIL wachsen über die Partie, werden aber fast nur
+     nachgeschlagen. Das Exil bleibt in den meisten Partien sogar leer.
 
    Angesehen wird stattdessen das Schlachtfeld, und das bekommt den Platz.
 
@@ -12265,14 +12265,16 @@ function matInnerHtml() {
 
    Die Lade trägt data-zonedrop selbst, nicht erst ihr Korb: So nimmt schon die
    geschlossene Schaltfläche eine Karte an. Etwas auf die Hand zurückzunehmen
-   oder auf den Friedhof zu legen, ohne vorher aufzuklappen, ist der häufigere
-   Weg.
+   oder auf Friedhof und Exil zu legen, ohne vorher aufzuklappen, ist der
+   häufigere Weg.
 
-   RAHMEN NUR BEIM FRIEDHOF. Sein Gitter braucht eine Fläche, damit die Karten
-   nicht über dem Schlachtfeld zu schwimmen scheinen. Der Handfächer trägt
-   seine Form selbst — seine Karten liegen gestaffelt und werfen Schatten, ein
-   Kasten darum wäre ein zweiter Rahmen um etwas, das schon eine Gestalt hat. */
+   RAHMEN BEI FRIEDHOF UND EXIL. Ihre Gitter brauchen eine Fläche, damit die
+   Karten nicht über dem Schlachtfeld zu schwimmen scheinen. Der Handfächer
+   trägt seine Form selbst — seine Karten liegen gestaffelt und werfen Schatten,
+   ein Kasten darum wäre ein zweiter Rahmen um etwas, das schon eine Gestalt
+   hat. */
 const SCHWEBEZONEN = [
+  { key: "exile", bild: "assets/cards-at-exil.PNG",      rahmen: true },
   { key: "grave", bild: "assets/cards-on-graveyard.PNG", rahmen: true },
   { key: "hand",  bild: "assets/cards-on-hand.PNG",      rahmen: false },
 ];
@@ -12281,9 +12283,9 @@ const schwebeBeschriftung = (key, n) =>
   + " · " + t("zone.floatN", { n });
 
 function schwebeLeisteHtml() {
-  return `<div class="zonen-leiste">${SCHWEBEZONEN.map(z => {
+  return `${SCHWEBEZONEN.map(z => {
     const n = zoneSumme(z.key), offen = schwebeOffen === z.key;
-    return `<div class="schwebe-zone${offen ? " offen" : ""}${z.rahmen ? " mit-rahmen" : ""}"
+    return `<div class="schwebe-zone sz-${esc(z.key)}${offen ? " offen" : ""}${z.rahmen ? " mit-rahmen" : ""}"
          data-zone="${esc(z.key)}" data-zonedrop="${esc(z.key)}">
       <div class="schwebe-korb">${zoneKorbHtml(z.key)}</div>
       <button type="button" class="schwebe-knopf" data-schwebe="${esc(z.key)}"
@@ -12296,7 +12298,7 @@ function schwebeLeisteHtml() {
         </span>
       </button>
     </div>`;
-  }).join("")}</div>`;
+  }).join("")}`;
 }
 
 /* Auf- und zuklappen ohne Neuzeichnen: Der Fächer rechnet seine Winkel je Karte
@@ -12434,7 +12436,9 @@ function zoneHandHtml() {
   if (!karten.length) return `<div class="zone-leer">${esc(t("zone.emptyHand"))}</div>`;
 
   const n = karten.length;
-  const spanne = n > 1 ? Math.min(44, n * 7) : 0;          // Gesamtwinkel des Fächers
+  // Gesamtwinkel des Fächers. Runde 12° mehr als früher (44°): Der flache Bogen
+  // sah aus wie ein leicht verrutschter Stapel, nicht wie eine gehaltene Hand.
+  const spanne = n > 1 ? Math.min(56, n * 9) : 0;
   const schritt = n > 1 ? spanne / (n - 1) : 0;
   // Sichtbarer Anteil je Karte, gemessen in KARTENBREITEN statt in Pixeln: die
   // Breite steckt als --hk-b im CSS und schrumpft auf schmalen Schirmen mit,

@@ -214,36 +214,48 @@ export default async function ({ seite, adresse, stand }) {
      des Schlachtfelds aus — gleich links neben Exil. Fünf Dinge können daran
      still schiefgehen, und alle fünf sind hier festgehalten. */
   const leiste = await seite.evaluate(() => {
-    const l = document.querySelector("#zonen .zonen-leiste");
     const zonen = [...document.querySelectorAll("#zonen .schwebe-zone")];
-    const links = document.querySelector(".mat-links").getBoundingClientRect();
-    const exil = document.querySelector('.mat-mitte [data-zone="exile"]').getBoundingClientRect();
-    const lr = l?.getBoundingClientRect();
+    const sp = n => document.querySelector("." + n).getBoundingClientRect();
+    const kn = z => document.querySelector(`.sz-${z} .schwebe-knopf`).getBoundingClientRect();
+    // Jedes Symbol am Fuß DER Spalte, aus der seine Zone kommt: die Mitte des
+    // Knopfes muss waagerecht in dieser Spalte liegen.
+    const inSpalte = (z, spalte) => {
+      const k = kn(z), r = sp(spalte), m = k.left + k.width / 2;
+      return m > r.left && m < r.right;
+    };
+    const amBoden = z => Math.round(document.querySelector(".mat").getBoundingClientRect().bottom
+                                    - kn(z).bottom);
     return {
       reihenfolge: zonen.map(z => z.dataset.zone),
       ziele: zonen.map(z => z.dataset.zonedrop),
-      alteReihen: document.querySelectorAll('.mat-hand, .mat-rechts [data-zone="grave"]').length,
-      // Am Fuß der LINKEN Spalte, links neben Exil — nicht am Rand der ganzen
-      // Matte, wo sie unter den schmalen Spalten lägen.
-      imSchlachtfeld: lr ? Math.round(links.right - lr.right) >= 0 : false,
-      vorExil: lr ? Math.round(exil.left - lr.right) >= 0 : false,
+      alteReihen: document.querySelectorAll(
+        '.mat-hand, .mat-rechts [data-zone="grave"], .mat-mitte [data-zone="exile"]').length,
+      hand:  inSpalte("hand", "mat-links"),
+      exil:  inSpalte("exile", "mat-mitte"),
+      grave: inSpalte("grave", "mat-rechts"),
+      // Der Friedhof steht RECHTS neben dem Exil — die Bitte war genau die.
+      graveRechtsVonExil: Math.round(kn("grave").left - kn("exile").right) > 0,
+      amBoden: zonen.map(z => amBoden(z.dataset.zone)),
       // Die Klammer muss durchlässig sein, sonst finge sie Klicks ab, die dem
-      // Schlachtfeld darunter gelten — ein unsichtbares Rechteck über der Matte.
-      klammer: l ? getComputedStyle(l).pointerEvents : null,
+      // Schlachtfeld darunter gelten. Bei der Hand wäre das die GANZE Matte.
+      klammer: zonen.map(z => getComputedStyle(z).pointerEvents),
       knopf: getComputedStyle(zonen[0].querySelector(".schwebe-knopf")).pointerEvents,
       koerbeZu: zonen.every(z => getComputedStyle(z.querySelector(".schwebe-korb")).visibility === "hidden"),
       zahlen: zonen.map(z => z.querySelector(".schwebe-n").textContent),
     };
   });
-  stand.gleich("Friedhof und Hand stehen als Laden da, nicht mehr in der Reihe",
-    [leiste.reihenfolge, leiste.alteReihen], [["grave", "hand"], 0]);
-  stand.gleich("beide sind selbst Ablageziel", leiste.ziele, ["grave", "hand"]);
-  stand.gleich("sie sitzen am Fuß des Schlachtfelds, links neben Exil",
-    [leiste.imSchlachtfeld, leiste.vorExil], [true, true]);
-  stand.ist("zugeklappt sind beide Körbe weggenommen", leiste.koerbeZu);
-  stand.gleich("die Klammer lässt Klicks durch, die Schaltflächen nicht",
-    [leiste.klammer, leiste.knopf], ["none", "auto"]);
-  stand.gleich("beide nennen ihre Anzahl", leiste.zahlen, ["1", "2"]);
+  stand.gleich("Exil, Friedhof und Hand stehen als Laden da, nicht mehr in der Reihe",
+    [leiste.reihenfolge, leiste.alteReihen], [["exile", "grave", "hand"], 0]);
+  stand.gleich("alle drei sind selbst Ablageziel", leiste.ziele, ["exile", "grave", "hand"]);
+  stand.gleich("jedes Symbol steht am Fuß seiner alten Spalte",
+    [leiste.hand, leiste.exil, leiste.grave], [true, true, true]);
+  stand.ist("der Friedhof rechts neben dem Exil", leiste.graveRechtsVonExil);
+  stand.ist("alle stehen am unteren Mattenrand", leiste.amBoden.every(a => a >= 0 && a <= 24),
+    leiste.amBoden.join(", ") + " px über dem Boden");
+  stand.ist("zugeklappt sind alle Körbe weggenommen", leiste.koerbeZu);
+  stand.gleich("die Klammern lassen Klicks durch, die Schaltflächen nicht",
+    [leiste.klammer, leiste.knopf], [["none", "none", "none"], "auto"]);
+  stand.gleich("alle nennen ihre Anzahl", leiste.zahlen, ["0", "1", "2"]);
 
   /* Jede Schaltfläche IST ihr Emblem: kein Beiwort daneben, und die Zahl steht
      unten rechts darauf statt daneben. */
@@ -264,7 +276,7 @@ export default async function ({ seite, adresse, stand }) {
       beschriftung: z.querySelector(".schwebe-knopf").getAttribute("aria-label"),
     };
   }));
-  stand.ist("beide Schaltflächen tragen ihr Emblem", sym.every(x => x.geladen),
+  stand.ist("alle Schaltflächen tragen ihr Emblem", sym.every(x => x.geladen),
     sym.map(x => x.quelle).join(" · "));
   stand.ist("die Ersatzzeichen bleiben dabei versteckt", sym.every(x => x.ersatzVersteckt));
   stand.ist("die Zahl steht jeweils unten rechts auf dem Symbol", sym.every(x => x.untenRechts));
@@ -305,6 +317,33 @@ export default async function ({ seite, adresse, stand }) {
   stand.ist("und klappt nach oben aus", friedhof.ueberDemKnopf);
   stand.ist("dabei bleibt er innerhalb der Matte", friedhof.inDerMatte);
 
+  /* Das Exil teilt sich die Mechanik mit dem Friedhof — geprüft wird deshalb
+     nur, was an ihm eigen ist: dass es dieselbe Fläche bekommt und sich beim
+     Öffnen an seinen Inhalt schmiegt statt auf feste Breite zu gehen. Genau
+     das ging beim Bauen zweimal daneben (alle Karten in eine Reihe, dann alle
+     untereinander). */
+  await seite.locator('[data-schwebe="exile"]').click();
+  await seite.waitForTimeout(400);
+  const exil = await seite.evaluate(() => {
+    const z = document.querySelector('.schwebe-zone[data-zone="exile"]');
+    const korb = z.querySelector(".schwebe-korb");
+    const kr = korb.getBoundingClientRect();
+    const mat = document.querySelector(".mat").getBoundingClientRect();
+    return {
+      offen: [...document.querySelectorAll(".schwebe-zone.offen")].map(e => e.dataset.zone),
+      rahmen: getComputedStyle(korb).borderTopWidth,
+      grund: getComputedStyle(korb).backgroundColor,
+      breite: Math.round(kr.width),
+      inDerMatte: Math.round(kr.left - mat.left) >= 0 && Math.round(kr.top - mat.top) >= 0
+                  && Math.round(mat.bottom - kr.bottom) >= 0,
+    };
+  });
+  stand.gleich("ein Klick klappt das Exil auf und schließt den Friedhof", exil.offen, ["exile"]);
+  stand.ist("es trägt dieselbe Fläche wie der Friedhof",
+    exil.rahmen === friedhof.rahmen && exil.grund === friedhof.grund,
+    `${exil.rahmen} / ${exil.grund}`);
+  stand.ist("und bleibt innerhalb der Matte", exil.inDerMatte, exil.breite + " px breit");
+
   await seite.locator('[data-schwebe="hand"]').click();
   await seite.waitForTimeout(400);
   const hand = await seite.evaluate(() => {
@@ -326,7 +365,7 @@ export default async function ({ seite, adresse, stand }) {
       untenRaus:  Math.round(Math.max(...karten.map(r => r.bottom)) - kr.bottom),
     };
   });
-  stand.gleich("ein Klick auf die Hand schließt den Friedhof", hand.offen, ["hand"]);
+  stand.gleich("ein Klick auf die Hand schließt das Exil", hand.offen, ["hand"]);
   stand.ist("die Handkarten liegen darin", hand.anzahl === 2, hand.anzahl);
   stand.gleich("die Hand hat WEDER Rahmen NOCH Grund",
     [hand.rahmen, hand.grund], ["0px", "rgba(0, 0, 0, 0)"]);
@@ -399,12 +438,13 @@ export default async function ({ seite, adresse, stand }) {
   // Dort gibt es keine Lade: Das Akkordeon zeigt ohnehin nur eine Zone auf
   // einmal, eine schwebende obendrauf wäre eine zweite Antwort auf dieselbe
   // Frage. Die Hand bleibt eine Zone unter sechs.
-  stand.gleich("dort bleiben Hand und Friedhof gewöhnliche Zonen",
+  stand.gleich("dort bleiben alle drei gewöhnliche Zonen",
     await seite.evaluate(() => ({
       leiste: document.querySelectorAll(".zonen-leiste").length,
       hand: document.querySelectorAll('#zonen .zone[data-zone="hand"]').length,
-      grave: document.querySelectorAll('#zonen .zone[data-zone="grave"]').length })),
-    { leiste: 0, hand: 1, grave: 1 });
+      grave: document.querySelectorAll('#zonen .zone[data-zone="grave"]').length,
+      exile: document.querySelectorAll('#zonen .zone[data-zone="exile"]').length })),
+    { leiste: 0, hand: 1, grave: 1, exile: 1 });
 
   await seite.evaluate(() => { zoneOeffnen("field", true); });
   await seite.waitForTimeout(250);

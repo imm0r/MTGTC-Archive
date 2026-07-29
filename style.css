@@ -758,12 +758,12 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
    echter Spielteppich, der auch nicht waechst. Ohne das bestimmte die hoechste
    Spalte (vier gestapelte Felder in der Mitte) die Zeilenhoehe, und das
    Schlachtfeld stand mit fuenf Karten in 400 px Leere. */
-/* Hand UND Friedhof stehen nicht mehr in der Reihe — sie schweben als Laden am
-   Fuß des Schlachtfelds (siehe .zonen-leiste). Der Handfächer ist gut 230 px
-   hoch und kostete diese Höhe dauernd, obwohl man ihn nur ansieht, wenn man
-   etwas daraus spielen will; der Friedhof wächst über die Partie, wird aber
-   fast nur nachgeschlagen. Den Platz bekommt das Schlachtfeld, das man ständig
-   ansieht.
+/* Exil, Friedhof und Hand stehen nicht mehr in der Reihe — sie schweben als
+   Laden am Fuß ihrer alten Spalte (siehe .schwebe-zone). Der Handfächer ist gut
+   230 px hoch und kostete diese Höhe dauernd, obwohl man ihn nur ansieht, wenn
+   man etwas daraus spielen will; Friedhof und Exil wachsen über die Partie,
+   werden aber fast nur nachgeschlagen. Den Platz bekommt das Schlachtfeld, das
+   man ständig ansieht.
 
    --rechte-spalten ist die Breite ALLES RECHTS von der linken Spalte, Lücken
    eingerechnet. Die schwebende Leiste hängt sich daran auf, damit sie am
@@ -771,41 +771,58 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
    hier und nicht dort, weil sie aus DIESEN Zahlen folgt: ändert sich eine
    Spaltenbreite, muss die Variable mitgehen. */
 .mat{display:grid;gap:8px;margin-top:10px;
-  grid-template-columns:minmax(0,1fr) 154px 190px;
+  --sp-luecke:8px; --sp-mitte:154px; --sp-rechts:190px;
+  /* Platz RECHTS der Spalte „rechts" — unter 1200 px keiner. */
+  --sp-danach:0px;
+  grid-template-columns:minmax(0,1fr) var(--sp-mitte) var(--sp-rechts);
   grid-template-rows:clamp(390px,58vh,640px);
   grid-template-areas:"links mitte rechts";
-  --rechte-spalten:calc(154px + 190px + 8px * 2);
+  --rechte-spalten:calc(var(--sp-mitte) + var(--sp-rechts) + var(--sp-luecke) * 2
+                        + var(--sp-danach));
   /* Bezugsrahmen der schwebenden Zonen. */
   position:relative}
 /* Ab 1200 px eine vierte Spalte ueber die volle Hoehe: die angezeigte Karte
    erscheint immer DORT, statt als Fenster ueber dem Spielfeld. Darunter fehlt
    der Platz — dann schwebt sie wie bisher am Zeiger (app.js: SPK_SPALTE). */
 @media (min-width:1200px){
-  .mat{grid-template-columns:minmax(0,1fr) 172px 208px 268px;
-       grid-template-areas:"links mitte rechts vorschau";
-       --rechte-spalten:calc(172px + 208px + 268px + 8px * 3)}
+  .mat{--sp-mitte:172px; --sp-rechts:208px; --sp-vorschau:268px;
+       --sp-danach:calc(var(--sp-vorschau) + var(--sp-luecke));
+       grid-template-columns:minmax(0,1fr) var(--sp-mitte) var(--sp-rechts) var(--sp-vorschau);
+       grid-template-areas:"links mitte rechts vorschau"}
 }
 .mat-vorschau{grid-area:vorschau}
 .mat-links{grid-area:links;display:flex;flex-direction:column;gap:8px;min-width:0}
 .mat-mitte{grid-area:mitte;display:flex;flex-direction:column;gap:8px}
 .mat-rechts{grid-area:rechts;display:flex;flex-direction:column;gap:8px}
-/* ===== Schwebende Zonen: Hand und Friedhof (nur auf der Matte) =====
-   Beide sitzen am FUSS DER LINKEN SPALTE, also am rechten unteren Rand des
-   Schlachtfelds, gleich links neben Exil. Nicht am Rand der ganzen Matte: Dort
-   lägen sie unter den schmalen Spalten, zu denen sie nicht gehören.
+/* ===== Schwebende Zonen: Exil, Friedhof, Hand (nur auf der Matte) =====
+   Alle drei sitzen am FUSS DER LINKEN SPALTE, also am rechten unteren Rand des
+   Schlachtfelds. Nicht am Rand der ganzen Matte: Dort lägen sie unter den
+   schmalen Spalten, zu denen sie nicht gehören.
 
    Sie klappen nach OBEN aus, nicht zur Seite wie der Zugang zur Sammlung im
-   Deckbau: Am Tisch liegen Hand und Friedhof vor einem, und das Bild bleibt
-   erhalten, wenn sie von dort aufgehen. */
-.zonen-leiste{position:absolute;bottom:10px;z-index:40;pointer-events:none;
-  right:calc(var(--rechte-spalten) + 18px);
-  display:flex;align-items:flex-end;gap:10px}
+   Deckbau: Am Tisch liegen sie vor einem, und das Bild bleibt erhalten, wenn
+   sie von dort aufgehen. */
+/* JEDES Symbol steht am Fuß der Spalte, aus der seine Zone kommt: das Exil
+   unter der mittleren, der Friedhof unter der rechten (also rechts neben dem
+   alten Exil-Feld), die Hand am Schlachtfeld. So bleibt der Ort, an dem man
+   eine Zone sucht, derselbe wie vorher — nur die Fläche ist frei geworden.
+   Gerechnet wird aus den Spaltenbreiten oben; ändert sich eine, gehen die
+   Symbole mit. */
+.schwebe-zone{position:absolute;bottom:10px;z-index:40;pointer-events:none}
+.sz-grave{right:calc(var(--sp-danach) + 12px)}
+.sz-exile{right:calc(var(--sp-danach) + var(--sp-rechts) + var(--sp-luecke) + 12px)}
+/* Die Hand spannt sich über die GANZE Matte: Ihre Schaltfläche sitzt am rechten
+   Rand des Schlachtfelds, ihr Fächer aber mittig darüber. Beides braucht die
+   Matte als Bezugsrahmen — an der 60 px breiten Schaltfläche gemessen ließe
+   sich „mittig über dem Schlachtfeld" nicht ausdrücken. */
+.sz-hand{inset:0;bottom:0}
+.sz-hand .schwebe-knopf{position:absolute;bottom:10px;
+  right:calc(var(--rechte-spalten) + 18px)}
 /* Die Lade ist nur die Klammer um Korb und Schaltfläche und bleibt für
    Zeigereignisse durchlässig: Sonst läge ein unsichtbares Rechteck über der
-   Matte und finge Klicks ab, die dem Schlachtfeld gelten. Angenommen werden
-   sie nur vom KORB und der Schaltfläche — und beim Ziehen von der ganzen Lade,
-   damit sie als Ziel erreichbar ist (weiter unten). */
-.schwebe-zone{position:relative;flex:none}
+   Matte und finge Klicks ab, die dem Schlachtfeld gelten. Bei der Hand wäre
+   das die GANZE Matte. Angenommen werden sie nur vom Korb und der
+   Schaltfläche. */
 .schwebe-knopf,.schwebe-zone.offen .schwebe-korb{pointer-events:auto}
 /* Die allgemeinen Ziel-Anzeigen gelten für Zonen, die eine FLÄCHE sind. Hier
    ist die Klammer unsichtbar; tönte man sie ein, schwebte ein Rechteck über
@@ -852,9 +869,24 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
   transition:opacity .18s ease-out,transform .18s ease-out,visibility .18s;
   max-height:min(60vh,330px);overflow:auto}
 .schwebe-zone.offen .schwebe-korb{visibility:visible;opacity:1;transform:none}
+/* Der Handfächer liegt MITTIG über dem Schlachtfeld und TIEF, dicht über dem
+   unteren Mattenrand — nicht rechts oben über seiner Schaltfläche, wo er die
+   halbe Matte verdeckte. Die Mitte des Schlachtfelds ist die halbe Mattenbreite
+   ohne die schmalen Spalten.
+   Er ROLLT NICHT: Ein Rollbereich schnitte die gedrehten Ränder ab und die
+   beim Zeigen angehobene Karte gleich mit — und einen Rollbalken unter der Hand
+   will ohnehin niemand. Der Fächer wird bei vielen Karten von selbst schmaler
+   (app.js rechnet den sichtbaren Anteil je Karte aus), er läuft also nicht
+   davon. */
+.sz-hand .schwebe-korb{right:auto;bottom:12px;
+  left:calc((100% - var(--rechte-spalten)) / 2);
+  transform:translate(-50%,14px);
+  max-height:none;overflow:visible}
+.sz-hand.offen .schwebe-korb{transform:translate(-50%,0)}
+.sz-hand .hand-fan{overflow:visible}
 @media(prefers-reduced-motion:reduce){ .schwebe-korb{transition:none} }
-/* NUR DER FRIEDHOF bekommt Rahmen und Grund. Sein Gitter ist eine lose Reihe
-   kleiner Bilder und bräuchte sonst eine Fläche, um nicht über dem
+/* FRIEDHOF UND EXIL bekommen Rahmen und Grund. Ihre Gitter sind lose Reihen
+   kleiner Bilder und bräuchten sonst eine Fläche, um nicht über dem
    Schlachtfeld zu schwimmen. Der Handfächer trägt seine Form selbst: Seine
    Karten liegen gestaffelt und werfen Schatten — ein Kasten darum wäre ein
    Rahmen um etwas, das schon eine Gestalt hat. */
@@ -862,20 +894,27 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
   background:rgba(20,22,30,.94);backdrop-filter:blur(3px);
   -webkit-backdrop-filter:blur(3px);
   box-shadow:0 10px 34px rgba(0,0,0,.6);padding:10px 12px}
-/* Der Kasten bekommt eine feste Breite, damit das Gitter UMBRICHT. Ohne sie
-   (width:max-content) legte es alle Karten in eine Reihe — gemessen 684 px bei
+/* max-content PLUS Höchstbreite — beides zusammen, keins allein.
+   Ohne Schranke legte das Gitter alle Karten in eine Reihe: gemessen 684 px bei
    sechs Karten, und der Kasten schob sich über den linken Mattenrand hinaus.
-   Fünf Karten je Reihe: 5 × (103 px + 8 px Lücke) plus Polster. */
-.schwebe-zone.mit-rahmen .schwebe-korb{width:min(579px,46vw)}
+   Eine feste Breite wiederum ließ ihn bei drei Karten halb leer stehen.
+   Und die Schranke ALLEIN half nicht: Der Kasten hängt absolut an der 60 px
+   breiten Schaltfläche, und für „so breit wie möglich" gilt dann deren Breite —
+   er fiel auf Mindestbreite zusammen und stapelte die Karten untereinander.
+   width:max-content sagt „so breit wie der Inhalt", die Schranke bricht um:
+   fünf Karten je Reihe, 5 × (103 px + 8 px Lücke) plus Polster. */
+.schwebe-zone.mit-rahmen .schwebe-korb{width:max-content;max-width:min(579px,46vw)}
 /* Seitlich Luft für den Fächer: Seine äußeren Karten sind gedreht und schwenken
    über ihre Spalte hinaus. Ohne Kasten schneidet zwar kein Rand mehr ab, aber
    der Korb rollt bei Überlänge — und ein Rollbereich schneidet ebenso. */
 .schwebe-zone .hand-fan{padding:30px 60px 40px;min-height:0}
 .schwebe-zone .zone-leer{padding:14px 22px}
-/* Beim Ziehen ist die ganze Lade ein Ziel — auch zugeklappt, wo sie nur aus
-   der Schaltfläche besteht. Etwas auf die Hand zurückzunehmen oder auf den
-   Friedhof zu legen, ohne vorher aufzuklappen, ist der häufigere Weg. */
-body.zieht-gerade .zonen-leiste{pointer-events:auto}
+/* Beim Ziehen ist auch die ZUGEKLAPPTE Schaltfläche ein Ziel: Etwas auf die
+   Hand zurückzunehmen oder auf Friedhof und Exil zu legen, ohne vorher
+   aufzuklappen, ist der häufigere Weg. Freigegeben wird dafür nur die
+   SCHALTFLÄCHE, nicht die Klammer — die der Hand deckt die ganze Matte, und
+   damit wäre jeder Punkt des Schlachtfelds ein Handziel. */
+body.zieht-gerade .schwebe-knopf{pointer-events:auto}
 /* Ohne Kasten kann die Hervorhebung kein Rahmen sein: Sie leuchtet das Emblem
    selbst an. drop-shadow folgt der Silhouette, box-shadow läge als Rechteck
    dahinter. */
