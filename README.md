@@ -1078,7 +1078,7 @@ Bibliothek zuunterst.
 | ⚔️ | Schlachtfeld | alles, was ausgespielt auf dem Tisch liegt — mit getappt/ungetappt und +1/+1-Marken |
 | ⚰️ | Friedhof | Gestorbenes, Abgehandeltes, Abgeworfenes |
 | 🚫 | Exil | ins Exil geschickte Karten |
-| ✋ | Hand | aufgefächert, jedes Exemplar eine eigene Karte |
+| ✋ | Hand | aufgefächert, jedes Exemplar eine eigene Karte; auf der Matte eine Lade (siehe unten) |
 | 📚 | Bibliothek | was noch im Deck steckt |
 
 Die **Länder** stehen dabei getrennt vom übrigen Schlachtfeld — in der Matte als
@@ -1091,15 +1091,32 @@ und ob sie ein Land ist, weiß die App aus der Typzeile.
 Ab **820 px Breite** liegen die Felder wie auf der offiziellen Spielmatte:
 Schlachtfeld groß links, Länder als Streifen darunter, rechts die schmalen
 Spalten (Commander-Steuer, Kommandozone, Bibliothek, Exil) und ganz rechts die
-Lebenspunkte aller Mitspieler samt Friedhof. Die Hand liegt als Fächer darunter
-— da, wo man sie am Tisch hält. Ein quer gehaltenes Handy erreicht diese Breite
-und bekommt die Matte automatisch. Ab **1200 px** kommt rechts eine vierte
-Spalte über die volle Höhe dazu: die Kartenansicht (siehe unten).
+Lebenspunkte aller Mitspieler samt Friedhof. Ein quer gehaltenes Handy erreicht
+diese Breite und bekommt die Matte automatisch. Ab **1200 px** kommt rechts eine
+vierte Spalte über die volle Höhe dazu: die Kartenansicht (siehe unten).
+
+**Die Hand ist eine Lade**, unten links an der Matte: eine Schaltfläche mit
+Handzeichen und Anzahl, ein Klick klappt den Fächer nach oben aus, Escape oder
+ein zweiter Klick wieder zu. Nach oben, weil am Tisch die Hand vor einem liegt —
+zur Seite auszufahren löste dieses Bild auf.
+
+> **Warum sie nicht mehr in der Reihe steht.** Der Fächer ist gut 230 px hoch.
+> Quer über die Matte kostete er diese Höhe *dauernd*, obwohl man die Hand nur
+> ansieht, wenn man etwas daraus spielen will. Das Schlachtfeld, das man ständig
+> ansieht, bekommt sie jetzt.
+>
+> Zieht man eine Karte heraus, **geht die Lade zu** — sie schwebt über der
+> Matte und läge sonst über genau den Zonen, auf die man zielt. Gesehen hat man
+> die Karte trotzdem: sie hängt am Zeiger. Dieselbe Überlegung wie bei der
+> Trefferliste im Deckbau.
+>
+> Die Schaltfläche ist auch **zugeklappt ein Ablageziel**. Etwas auf die Hand
+> zurückzunehmen, ohne sie vorher aufzuklappen, ist der häufigere Weg.
 
 Die Spielrunde darf dabei **breiter werden als der Rest der App** (1800 statt
-1100 px): die Mattenspalten sind fest, alles Zusätzliche geht ans Schlachtfeld,
-an die Länder und an den Handfächer. Auf einem 3440-px-Monitor wächst das
-Schlachtfeld damit von 628 auf 1328 px.
+1100 px): die Mattenspalten sind fest, alles Zusätzliche geht ans Schlachtfeld
+und an die Länder. Auf einem 3440-px-Monitor wächst das Schlachtfeld damit von
+628 auf 1328 px.
 
 Darunter — also auf einem hochkant gehaltenen Handy — steht dasselbe als
 **Akkordeon**: eine Zone auf einmal. Das ist keine Bequemlichkeit, sondern

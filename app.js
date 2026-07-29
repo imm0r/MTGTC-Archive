@@ -7408,6 +7408,9 @@ function katZiehBewegt(e) {
     // zuletzt gezeigte Bild (sonst flackerte die Fläche im Spiel dauernd);
     // dort verdeckt sie nichts und zeigt gerade die Karte, die man trägt.
     if (a.art === "zone") versteckeSpielKarte(true);
+    // Die Handlade schwebt über der Matte und läge über den Zonen, auf die man
+    // zielt. Die Karte hängt am Zeiger, gesehen hat man sie also weiterhin.
+    if (a.art === "zone" && a.von === "hand") handLadeSchliessen();
     // Die Trefferliste hat ihren Dienst getan und läge jetzt im Weg: Seit die
     // Deckleiste NEBEN dem Raster steht statt darüber, hängt sie genau über der
     // ersten Spaltenreihe. Sie verschwände zwar von selbst, wenn die Eingabe
@@ -7544,6 +7547,14 @@ function ziehVerdrahten(el, deckId, cardId, neu) {
 addEventListener("pointermove", katZiehBewegt);
 addEventListener("pointerup", katZiehLos);
 addEventListener("keydown", e => { if (e.key === "Escape" && (ziehKat || ziehAnsatz)) katZiehAus(); });
+/* Escape schließt die schwebende Handlade. Am FENSTER und nicht an #zonen: Sie
+   schwebt über der Matte, der Fokus kann längst woanders liegen, und der
+   schnellste Weg zurück an das darunter ist keine zweite Zeigerreise zur
+   Schaltfläche. Läuft gerade ein Zug, hat der Vorrang — die Zeile oben räumt
+   ihn ab, und die Lade ist dann ohnehin schon zu. */
+addEventListener("keydown", e => {
+  if (e.key === "Escape" && handOffen && !ziehKat && !ziehAnsatz) handLadeUmschalten(false);
+});
 addEventListener("pointercancel", () => { if (ziehKat || ziehAnsatz) katZiehAus(); });
 
 /* Die Ablagefläche entsteht einmal und bleibt danach im Baum — sie wird nur
@@ -11896,6 +11907,7 @@ const ZONEN = [
 const zoneDef = k => ZONEN.find(z => z.key === k);
 
 let ZONE_OFFEN = "hand";        // welche Zone gerade aufgeklappt ist
+let handOffen = false;          // die Handlade der Matte (überlebt Neuzeichnen)
 let zoneZeigerArt = "mouse";    // womit zuletzt in den Zonen angefasst wurde
 let zoneHoverT = null;          // entprellt das Aufklappen per Maus
 let zoneSperre = 0;             // bis wann Hover ignoriert wird (Layout beruhigen)
@@ -12221,12 +12233,63 @@ function matInnerHtml() {
       </section>
       ${feld("grave", t("zone.grave"), { n: zoneSumme("grave"), html: zoneKorbHtml("grave") })}
     </div>
-    ${feld("hand", t("zone.hand"), { n: zoneSumme("hand"), html: zoneKorbHtml("hand") }, " mat-hand")}
+    ${handLadeHtml()}
     ${SPK_SPALTE ? `<section class="mat-feld mat-vorschau">
       <div class="mat-titel">${esc(t("spk.slot"))}</div>
       <div class="spk" id="spk-feld"><div class="spk-leer">${esc(t("spk.slotEmpty"))}</div></div>
     </section>` : ""}`;
 }
+
+/* Die Hand als schwebende Lade — nur auf der Matte.
+
+   WARUM SIE NICHT MEHR IN DER REIHE STEHT: Der Fächer ist hoch (eine Karte ist
+   104 px breit und damit 145 px hoch, dazu Luft für die gedrehten Ränder und
+   das Anheben beim Zeigen — gut 230 px). Quer über die ganze Matte kostete er
+   diese Höhe DAUERND, obwohl man die Hand nur ansieht, wenn man etwas daraus
+   spielen will. Das Schlachtfeld, das man ständig ansieht, bekommt sie jetzt.
+
+   WARUM NACH OBEN UND NICHT NACH RECHTS wie beim Deck: Am Tisch liegt die Hand
+   vor einem, unten. Sie von dort aufzuklappen behält dieses Bild; nach rechts
+   auszufahren löste es auf.
+
+   WARUM SIE BEIM ZIEHEN ZUGEHT: Sie schwebt über der Matte. Zöge man eine Karte
+   heraus und die Lade bliebe offen, läge sie über genau den Zonen, auf die man
+   zielt. Dieselbe Überlegung wie bei der Trefferliste im Deckbau, und dieselbe
+   Lösung — die Karte hängt ohnehin sichtbar am Zeiger.
+
+   Die Lade trägt data-zonedrop selbst, nicht erst ihr Korb: So nimmt schon die
+   geschlossene Schaltfläche eine Karte an. Etwas auf die Hand zurückzunehmen,
+   ohne sie vorher aufzuklappen, ist der häufigere Weg. */
+function handLadeHtml() {
+  const n = zoneSumme("hand");
+  const auf = t(handOffen ? "hand.close" : "hand.open");
+  return `<div class="hand-lade${handOffen ? " offen" : ""}" data-zone="hand" data-zonedrop="hand">
+    <div class="hand-lade-korb">${zoneKorbHtml("hand")}</div>
+    <button type="button" class="hand-lade-knopf" data-handlade
+      aria-expanded="${handOffen}" title="${esc(auf)}" aria-label="${esc(auf)}">
+      <span class="hand-lade-zeichen" aria-hidden="true">${zoneDef("hand").icon}</span>
+      <span class="hand-lade-name">${esc(t("zone.hand"))}</span>
+      <span class="hand-lade-n${n ? "" : " null"}">${n}</span>
+    </button>
+  </div>`;
+}
+
+/* Auf- und zuklappen ohne Neuzeichnen: Der Fächer rechnet seine Winkel je Karte
+   aus, und ein Neuaufbau setzte nebenbei den seitlichen Rollstand zurück. */
+function handLadeUmschalten(auf) {
+  const lade = $("#zonen .hand-lade");
+  if (!lade) return;
+  handOffen = auf === undefined ? !handOffen : !!auf;
+  lade.classList.toggle("offen", handOffen);
+  const knopf = lade.querySelector(".hand-lade-knopf");
+  if (knopf) {
+    const txt = t(handOffen ? "hand.close" : "hand.open");
+    knopf.setAttribute("aria-expanded", String(handOffen));
+    knopf.setAttribute("aria-label", txt);
+    knopf.title = txt;
+  }
+}
+const handLadeSchliessen = () => { if (handOffen) handLadeUmschalten(false); };
 
 function zonenInnerHtml() {
   if (MAT_AN) return matInnerHtml();
@@ -12620,6 +12683,7 @@ function wireZonen() {
     if (st) return cmdSteuer(st.dataset.steuer, parseInt(st.dataset.d, 10));
     const alle = e.target.closest("#lib-alle");
     if (alle) { libAlle = !libAlle; return renderZonen(); }
+    if (e.target.closest("[data-handlade]")) return handLadeUmschalten();
     /* Ein Klick auf eine Karte des Schlachtfelds TAPPT sie. Das war der
        häufigste Handgriff im Spiel und kostete bisher einen eigenen Knopf am
        Kartenrand; jetzt ist die Karte selbst der Knopf, so wie am Tisch die
