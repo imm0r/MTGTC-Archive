@@ -11280,7 +11280,6 @@ let sessionChannel = null, inviteChannel = null;
 // keiner dieser Zonen liegt, ist der Rest: Bibliothek bzw. Kommandozone.
 let SESSION_ZONEN = {};
 let ZONEN_SPALTEN = true;       // false, sobald die DB die Zonen-Spalten nicht kennt
-let wuerfelOffen = false;       // Würfelkasten auf-/zugeklappt (überlebt Neuzeichnen)
 let einladenOffen = false;      // Einladeliste auf-/zugeklappt
 const lifeTimers = {}, playedTimers = {};   // entprellt das Schreiben je Spieler/Karte
 const meinSpieler = () => SESSION_PLAYERS.find(p => p.user_id === USER?.id);
@@ -11796,6 +11795,7 @@ function spielerKachelHtml(p) {
 function sessionBoardHtml() {
   const istHost = SESSION.host === USER.id;
   const spieler = SESSION_PLAYERS.map(spielerKachelHtml).join("");
+  const tracker = deckTrackerHtml();
 
   const drin = new Set(SESSION_PLAYERS.map(p => p.user_id));
   const einladbar = (FRIENDS?.accepted || []).map(f => f.other).filter(o => o && !drin.has(o.id));
@@ -11828,24 +11828,16 @@ function sessionBoardHtml() {
       </div>
     </div>
 
-    ${deckTrackerHtml()}
+    ${tracker}
 
-    <!-- Würfel und Einladeliste sind Zubehör: die Bühne braucht man beim Wurf,
-         die Freundeliste einmal zu Beginn. Zugeklappt bleibt von beiden nur
-         eine Zeile, statt dauerhaft ein paar hundert Pixel zu belegen. Beim
-         Wurf (auch dem eines Mitspielers) klappt der Kasten von selbst auf. -->
-    <details class="card sess-klapp" id="dice-box"${wuerfelOffen ? " open" : ""}>
-      <summary><span>${esc(t("sess.dice"))}</span>${
-        SESSION_LOG.length ? `<span class="klapp-n">${SESSION_LOG.length}</span>` : ""}</summary>
-      <div class="row" style="align-items:center;margin-top:10px">
-        <div style="flex:none"><input type="number" id="dice-sides" min="2" max="1000" value="20" style="width:90px"></div>
-        <div style="flex:none">${[4, 6, 8, 10, 12, 20].map(s => `<button class="btn ghost sm" data-dice="${s}">W${s}</button>`).join(" ")}</div>
-        <div style="flex:none"><button class="btn" id="dice-roll">${esc(t("sess.roll"))}</button></div>
-      </div>
-      <div class="dice-stage" id="dice-stage">${diceStageHtml()}</div>
-      <div class="sess-log" id="sess-log">${SESSION_LOG.slice(0, 30).map(logZeile).join("")}</div>
-    </details>
+    <!-- Der Würfel steht sonst in der Matte bzw. im Akkordeon (beides in
+         #zonen). Ohne gewähltes Deck gibt es beides nicht — dann steht er für
+         sich, sonst könnte in einer Runde ohne Deck niemand würfeln. Er trägt
+         dort keine eigene Fläche: Knopf und Bühne hängen fest am Schirm. -->
+    ${tracker ? "" : wuerfelBuehneHtml()}
 
+    <!-- Die Einladeliste ist Zubehör: gebraucht einmal zu Beginn. Zugeklappt
+         bleibt eine Zeile, statt dauerhaft ein paar hundert Pixel zu belegen. -->
     ${(FRIENDS?.accepted?.length) ? `<details class="card sess-klapp" id="invite-box"${einladenOffen ? " open" : ""}>
       <summary><span>${esc(t("sess.inviteTitle"))}</span>${
         einladbar.length ? `<span class="klapp-n">${einladbar.length}</span>` : ""}</summary>
@@ -11857,7 +11849,9 @@ function logZeile(ev) {
   const p = SESSION_PLAYERS.find(x => x.user_id === ev.user_id);
   const name = p?.profile?.display_name || (ev.user_id === USER?.id ? t("sess.you") : "?");
   if (ev.kind === "dice")
-    return `<div class="log-zeile">&#127922; <b>${esc(name)}</b>: W${esc(String(ev.data?.sides))} &rarr; <b>${esc(String(ev.data?.result))}</b></div>`;
+    // Die Seitenzahl kommt aus dem Event, nicht aus einer 20: Ältere Würfe
+    // einer laufenden Runde können noch W6 oder W12 gewesen sein.
+    return `<div class="log-zeile">&#127922; <b>${esc(name)}</b>: W${esc(String(ev.data?.sides || 20))} &rarr; <b>${esc(String(ev.data?.result))}</b></div>`;
   return "";
 }
 
@@ -12213,6 +12207,14 @@ function matInnerHtml() {
             title="${esc(t("zone.untapAllTitle"))}">&#8635; ${esc(t("zone.untapAll"))}</button></div>` : ""}
          ${stapelHtml(bleibend)}` }, " mat-gross")}
       ${feld("field", t("mat.lands"), { n: summe(laender), html: stapelHtml(laender) }, " mat-laender")}
+      <!-- Die Lebenspunkte laufen unter den Ländern über deren volle Breite:
+           bis zu vier Kacheln NEBENeinander, so wie die Mitspieler am Tisch
+           nebeneinander sitzen. In der schmalen Spalte rechts standen sie
+           untereinander und mussten bei vier Mitspielern innen rollen. -->
+      <section class="mat-feld mat-leben">
+        <div class="mat-titel">${esc(t("mat.life"))}</div>
+        <div class="mat-korb"><div class="sp-grid reihe">${SESSION_PLAYERS.map(spielerKachelHtml).join("")}</div></div>
+      </section>
     </div>
     <div class="mat-mitte">
       <section class="mat-feld mat-steuer">
@@ -12225,12 +12227,6 @@ function matInnerHtml() {
       ${feld("cmd", t("zone.cmd"), { n: zoneSumme("cmd"), html: zoneKorbHtml("cmd") })}
       ${feld("lib", t("zone.lib"), { n: zoneSumme("lib"), html: zoneKorbHtml("lib") }, " mat-lib")}
     </div>
-    <div class="mat-rechts">
-      <section class="mat-feld mat-leben">
-        <div class="mat-titel">${esc(t("mat.life"))}</div>
-        <div class="mat-korb"><div class="sp-grid schmal">${SESSION_PLAYERS.map(spielerKachelHtml).join("")}</div></div>
-      </section>
-    </div>
     ${schwebeLeisteHtml()}
     ${SPK_SPALTE ? `<section class="mat-feld mat-vorschau">
       <div class="mat-titel">${esc(t("spk.slot"))}</div>
@@ -12238,9 +12234,10 @@ function matInnerHtml() {
     </section>` : ""}`;
 }
 
-/* ---- Schwebende Zonen: Exil, Friedhof und Hand -----------------------
-   Nur auf der Matte. Alle drei standen dort in der Reihe und kosteten Platz,
-   den man selten braucht:
+/* ---- Schwebende Laden: Würfel, Hand, Exil, Friedhof ------------------
+   Vier Embleme in einer Leiste über den Lebenspunkten, jedes klappt etwas
+   Großes über die Matte auf. Drei davon sind Zonen; sie standen früher in der
+   Reihe und kosteten Platz, den man selten braucht:
 
    * Der HANDFÄCHER ist hoch — eine Karte ist 104 px breit und damit 145 px
      hoch, dazu Luft für die gedrehten Ränder und das Anheben beim Zeigen, gut
@@ -12272,31 +12269,42 @@ function matInnerHtml() {
    Karten nicht über dem Schlachtfeld zu schwimmen scheinen. Der Handfächer
    trägt seine Form selbst — seine Karten liegen gestaffelt und werfen Schatten,
    ein Kasten darum wäre ein zweiter Rahmen um etwas, das schon eine Gestalt
-   hat. */
+   hat.
+
+   DER WÜRFEL IST DIE VIERTE LADE, und die einzige, die keine Zone ist: Er nimmt
+   beim Aufklappen die GANZE Matte ein, weil der W20 quer darüber rollen soll.
+   Er trägt deshalb kein data-zonedrop — auf einen Würfel legt man keine Karte. */
 const SCHWEBEZONEN = [
-  { key: "exile", bild: "assets/cards-at-exil.PNG",      rahmen: true },
-  { key: "grave", bild: "assets/cards-on-graveyard.PNG", rahmen: true },
-  { key: "hand",  bild: "assets/cards-on-hand.PNG",      rahmen: false },
+  { key: "hand",  bild: "assets/cards-on-hand.PNG",       rahmen: false },
+  { key: "exile", bild: "assets/cards-at-exil.PNG",       rahmen: true },
+  { key: "grave", bild: "assets/cards-on-graveyard.PNG",  rahmen: true },
 ];
 const schwebeBeschriftung = (key, n) =>
   t(schwebeOffen === key ? "zone.floatClose" : "zone.floatOpen", { zone: t("zone." + key) })
   + " · " + t("zone.floatN", { n });
 
+/* Die Schaltfläche IST ihr Emblem: kein Kasten darum, kein Beiwort daneben.
+   Eine Funktion für alle vier — der Würfel sieht aus wie die drei Zonen, weil
+   er an derselben Leiste steht und dasselbe tut (etwas Großes aufklappen). */
+function schwebeKnopfHtml(fach, bild, zeichen, titel, label, n) {
+  return `<button type="button" class="schwebe-knopf" data-schwebe="${esc(fach)}"
+      aria-expanded="${schwebeOffen === fach}" title="${esc(titel)}" aria-label="${esc(label)}">
+      <span class="schwebe-sym">
+        <img class="schwebe-bild" src="${esc(bild)}" alt="" draggable="false">
+        <span class="schwebe-ersatz" aria-hidden="true">${zeichen}</span>
+        ${n == null ? "" : `<span class="schwebe-n${n ? "" : " null"}">${n}</span>`}
+      </span>
+    </button>`;
+}
+
 function schwebeLeisteHtml() {
-  return `${SCHWEBEZONEN.map(z => {
+  return `${wuerfelBuehneHtml()}${SCHWEBEZONEN.map(z => {
     const n = zoneSumme(z.key), offen = schwebeOffen === z.key;
     return `<div class="schwebe-zone sz-${esc(z.key)}${offen ? " offen" : ""}${z.rahmen ? " mit-rahmen" : ""}"
-         data-zone="${esc(z.key)}" data-zonedrop="${esc(z.key)}">
+         data-schwebe-fach="${esc(z.key)}" data-zone="${esc(z.key)}" data-zonedrop="${esc(z.key)}">
       <div class="schwebe-korb">${zoneKorbHtml(z.key)}</div>
-      <button type="button" class="schwebe-knopf" data-schwebe="${esc(z.key)}"
-        aria-expanded="${offen}" title="${esc(t("zone." + z.key))}"
-        aria-label="${esc(schwebeBeschriftung(z.key, n))}">
-        <span class="schwebe-sym">
-          <img class="schwebe-bild" src="${esc(z.bild)}" alt="" draggable="false">
-          <span class="schwebe-ersatz" aria-hidden="true">${zoneDef(z.key).icon}</span>
-          <span class="schwebe-n${n ? "" : " null"}">${n}</span>
-        </span>
-      </button>
+      ${schwebeKnopfHtml(z.key, z.bild, zoneDef(z.key).icon, t("zone." + z.key),
+                         schwebeBeschriftung(z.key, n), n)}
     </div>`;
   }).join("")}`;
 }
@@ -12305,14 +12313,23 @@ function schwebeLeisteHtml() {
    aus, und ein Neuaufbau setzte nebenbei den seitlichen Rollstand zurück. */
 function schwebeUmschalten(key) {
   schwebeOffen = schwebeOffen === key ? null : key;
-  $$("#zonen .schwebe-zone").forEach(z => {
-    const offen = z.dataset.zone === schwebeOffen;
+  $$(".schwebe-zone").forEach(z => {
+    const fach = z.dataset.schwebeFach;
+    const offen = fach === schwebeOffen;
     z.classList.toggle("offen", offen);
     const knopf = z.querySelector(".schwebe-knopf");
     if (!knopf) return;
     knopf.setAttribute("aria-expanded", String(offen));
-    knopf.setAttribute("aria-label", schwebeBeschriftung(z.dataset.zone, zoneSumme(z.dataset.zone)));
+    if (fach !== "wuerfel")
+      knopf.setAttribute("aria-label", schwebeBeschriftung(fach, zoneSumme(fach)));
   });
+  // Die Bühne ist so breit wie die Matte; ihre Größe steht erst fest, wenn sie
+  // sichtbar ist. Zugeklappt gemessen käme 0 × 0 heraus.
+  // Und three.js wird hier ein zweites Mal angestoßen: oeffneSession() holt es
+  // beim Betreten der Runde, aber die Bühne soll auch dann einen echten Würfel
+  // zeigen, wenn sie auf anderem Weg aufgeht. load() ist gegen Mehrfachaufrufe
+  // gesichert und kostet dann nichts.
+  if (schwebeOffen === "wuerfel") { buehneMessen(); DiceGL.load().then(buehneMessen); }
 }
 const schwebeSchliessen = () => { if (schwebeOffen) schwebeUmschalten(schwebeOffen); };
 
@@ -12330,12 +12347,15 @@ function schwebeBilderWachen() {
 
 function zonenInnerHtml() {
   if (MAT_AN) return matInnerHtml();
+  // Die Laden der Matte gibt es hier nicht — das Akkordeon zeigt ohnehin eine
+  // Zone auf einmal. Der WÜRFEL kommt trotzdem mit: Er ist keine Zone, und
+  // ohne ihn gäbe es auf einem hochkant gehaltenen Handy gar keinen Wurf mehr.
   return sichtbareZonen().map(z => `
     <section class="zone${z.key === ZONE_OFFEN ? " offen" : ""}" data-zone="${z.key}"
              data-zonedrop="${z.key}">
       ${zoneKopfHtml(z)}
       <div class="zone-korb">${zoneKorbHtml(z.key)}</div>
-    </section>`).join("");
+    </section>`).join("") + wuerfelBuehneHtml();
 }
 
 /* Kopfzeile: immer sichtbar, auch zugeklappt. Die Miniaturen verraten auf einen
@@ -12631,6 +12651,7 @@ function renderZonen() {
   const suche = $("#lib-suche");
   if (suche) { suche.value = suchtext; if (fokus) { suche.focus(); suche.selectionStart = suche.selectionEnd = suchtext.length; } }
   schwebeBilderWachen();
+  wireWuerfel();
   wireZonenHover();
 }
 
@@ -12799,17 +12820,12 @@ function wireSession() {
   const reset = $("#sess-reset"); if (reset) reset.onclick = lebenReset;
   const end = $("#sess-end"); if (end) end.onclick = sessionBeenden;
   const leave = $("#sess-leave"); if (leave) leave.onclick = sessionVerlassen;
-  const roll = $("#dice-roll");
-  if (roll) {
-    $$("[data-dice]").forEach(b => b.onclick = () => { $("#dice-sides").value = b.dataset.dice; wuerfeln(parseInt(b.dataset.dice)); });
-    roll.onclick = () => wuerfeln(parseInt($("#dice-sides").value) || 20);
-  }
+  wireWuerfel();
   const deckSel = $("#sess-deck"); if (deckSel) deckSel.onchange = () => sessDeckWaehlen(deckSel.value);
   const trkReset = $("#trk-reset"); if (trkReset) trkReset.onclick = trackerReset;
   wireZonen();
   schwebeBilderWachen();
   // Auf-/Zugeklappt merken, damit ein Neuzeichnen (Realtime) es nicht aufreißt.
-  const dbox = $("#dice-box"); if (dbox) dbox.ontoggle = () => wuerfelOffen = dbox.open;
   const ibox = $("#invite-box"); if (ibox) ibox.ontoggle = () => einladenOffen = ibox.open;
   wireSpielerKacheln();
 }
@@ -12890,18 +12906,76 @@ function lebenAendern(userId, delta) {
   }, 400);
 }
 
-/* Würfelanzeige: bei W6 die Augen-Glyphen, sonst die Zahl. */
-const DICE_PIPS = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];   // ⚀⚁⚂⚃⚄⚅
-const diceFace = (sides, v) => (sides === 6 && DICE_PIPS[v]) ? DICE_PIPS[v] : String(v);
+/* ========================= Würfeln: ein W20 =============================
+   NUR NOCH DER ZWANZIGSEITER. W4, W6, W8, W10 und W12 samt Eingabefeld für
+   eine freie Seitenzahl sind weg: Gewürfelt wird in einer Partie um Anspiel,
+   Münzwurf-Ersatz und die Effekte, die einen W20 verlangen. Die übrigen
+   Größen standen als Knopfreihe da und wurden nie angefasst.
+
+   DIE BÜHNE IST DIE GANZE MATTE. Vorher lag sie in einem einklappbaren Kasten
+   UNTER der Matte und war 340 × 150 px groß — der Würfel rollte durch einen
+   Briefschlitz. Jetzt ist sie eine schwebende Lade wie Hand, Exil und
+   Friedhof: ein Klick auf das Emblem legt sie über das ganze Feld, und der
+   Würfel rollt quer darüber.
+
+   JEDER WURF SIEHT ANDERS AUS. Das Ergebnis steht vorher fest (Math.random,
+   einmal) — die Schau darum wird jedes Mal neu ausgelost. Vorher lief sie
+   IMMER gleich: von links bei x = −3 herein, flacher Bogen, 800 ms taumeln,
+   650 ms einrasten. Nur die Drehachse war zufällig, und die sieht man einem
+   taumelnden Körper nicht an. */
+
+/* Die Ecke, aus der er hereinkommt — in Anteilen der Bühne, Mitte = 0,0,
+   y nach UNTEN positiv (Bildschirmrichtung). Alle liegen außerhalb des
+   sichtbaren Bereichs, damit er wirklich hereinfliegt statt aufzupoppen. */
+const WURF_START = {
+  links:      [-0.78,  0.10],
+  rechts:     [ 0.78,  0.10],
+  obenLinks:  [-0.70, -0.55],
+  obenRechts: [ 0.70, -0.55],
+  unten:      [ 0.05,  0.72],
+};
+const WURF_SEITEN = Object.keys(WURF_START);
+
+/* Ein Wurfplan: alles, was diesen einen Wurf von den anderen unterscheidet.
+   Eine Quelle für BEIDE Darsteller (three.js und der SVG-Rückfall) — sonst
+   sähe der eine abwechslungsreich aus und der andere nicht. */
+function wurfPlan() {
+  const z = (a, b) => a + Math.random() * (b - a);
+  return {
+    seite:    WURF_SEITEN[Math.floor(Math.random() * WURF_SEITEN.length)],
+    spruenge: 1 + Math.floor(Math.random() * 3),           // 1–3 Bögen
+    bogen:    z(0.16, 0.42),                               // Höhe des ersten
+    achse:    [z(-1, 1), z(-1, 1), z(-1, 1)],
+    tempo:    z(0.20, 0.44),                               // Bogenmaß je Bild
+    taumeln:  Math.round(z(620, 1150)),                    // ms freies Taumeln
+    legen:    Math.round(z(420, 780)),                     // ms bis zur Ruhelage
+    // Ruhefleck: waagerecht weit, senkrecht in der oberen Hälfte — unten stehen
+    // die Emblemleiste und der Werfen-Knopf, hinter denen er verschwände.
+    ziel:     [z(-0.24, 0.24), z(-0.22, 0.06)],
+    kippen:   z(-26, 26),                                  // Endneigung (Grad)
+  };
+}
+
+/* Der Weg zum Zeitpunkt t (0…1), in Anteilen der Bühne. Die Sprünge klingen
+   über (1 − t) aus, damit der letzte flach ausläuft statt abzureißen. */
+function wurfPunkt(plan, t) {
+  const e = 1 - Math.pow(1 - t, 2);                        // schnell herein, sanft aus
+  const [sx, sy] = WURF_START[plan.seite] || WURF_START.links;
+  const [zx, zy] = plan.ziel;
+  const hoch = plan.bogen * Math.abs(Math.sin(Math.PI * t * plan.spruenge)) * (1 - t);
+  return { x: sx + (zx - sx) * e, y: sy + (zy - sy) * e - hoch };
+}
+
+const wenigerBewegung = () => matchMedia("(prefers-reduced-motion:reduce)").matches;
 
 /* ============================ 3D-Würfel (three.js) ====================
-   Echte 3D-Würfel für W6 & W20: three.js wird beim Öffnen der Spielrunde per
-   dynamischem import() nachgeladen (nur dann, ~1× je Sitzung). Der Würfel taumelt
-   und dreht dann auf die ERGEBNIS-Fläche. Nicht geladen / andere Seitenzahl →
-   2D-Rückfall (CSS-Würfel / SVG-W20). */
+   Der echte W20: three.js wird beim Öffnen der Spielrunde per dynamischem
+   import() nachgeladen (nur dann, ~1× je Sitzung). Der Würfel fliegt herein,
+   taumelt und dreht dann auf die ERGEBNIS-Fläche. Nicht geladen → der
+   SVG-Rückfall weiter unten, der denselben Wurfplan abfliegt. */
 const DiceGL = {
   ready: false, THREE: null, renderer: null, scene: null, cam: null,
-  cube: null, ico: null, canvas: null, _raf: null, _loading: null,
+  ico: null, canvas: null, _raf: null, _loading: null, _w: 0, _h: 0,
 
   load() {
     if (this._loading) return this._loading;
@@ -12911,39 +12985,36 @@ const DiceGL = {
         this.THREE = T;
         this.renderer = new T.WebGLRenderer({ alpha: true, antialias: true });
         this.renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1));
-        this.renderer.setSize(340, 150);   // breite Bühne: der Würfel rollt quer durch
         this.canvas = this.renderer.domElement; this.canvas.className = "dice-gl";
         this.scene = new T.Scene();
-        this.cam = new T.PerspectiveCamera(32, 340 / 150, 0.1, 100); this.cam.position.set(0, 0, 6.6);
+        this.cam = new T.PerspectiveCamera(32, 1.6, 0.1, 100); this.cam.position.set(0, 0, 6.6);
         this.scene.add(new T.AmbientLight(0xffffff, 0.85));
         const d1 = new T.DirectionalLight(0xffffff, 1.2); d1.position.set(3, 5, 6); this.scene.add(d1);
         const d2 = new T.DirectionalLight(0xffe9c0, 0.5); d2.position.set(-4, -2, 3); this.scene.add(d2);
-        this.cube = this._buildCube(); this.cube.visible = false; this.scene.add(this.cube);
         this.ico = this._buildIco(); this.ico.visible = false; this.scene.add(this.ico);
         this.ready = true;
       } catch { this.ready = false; }
     })();
     return this._loading;
   },
-  supports(sides) { return this.ready && (sides === 6 || sides === 20); },
 
-  _faceTex(draw) {
-    const c = document.createElement("canvas"); c.width = c.height = 160;
-    const x = c.getContext("2d"); x.fillStyle = "#d9a52e"; x.fillRect(0, 0, 160, 160); draw(x);
-    return new this.THREE.CanvasTexture(c);
+  /* Die Bühne ist so groß wie die Matte und ändert sich mit ihr (Fenster
+     gezogen, Gerät gedreht). Ohne Nachführen bliebe das Bild verzerrt. */
+  resize(w, h) {
+    if (!this.ready || w < 2 || h < 2 || (w === this._w && h === this._h)) return;
+    this._w = w; this._h = h;
+    this.renderer.setSize(w, h, false);
+    this.canvas.style.width = w + "px"; this.canvas.style.height = h + "px";
+    this.cam.aspect = w / h; this.cam.updateProjectionMatrix();
+    this.renderer.render(this.scene, this.cam);
   },
-  _buildCube() {
-    const T = this.THREE;
-    const pip = v => this._faceTex(x => { x.fillStyle = "#241a00";
-      const P = { TL: [45, 45], TR: [115, 45], ML: [45, 80], C: [80, 80], MR: [115, 80], BL: [45, 115], BR: [115, 115] };
-      const L = { 1: ["C"], 2: ["TL", "BR"], 3: ["TL", "C", "BR"], 4: ["TL", "TR", "BL", "BR"], 5: ["TL", "TR", "C", "BL", "BR"], 6: ["TL", "TR", "ML", "MR", "BL", "BR"] };
-      (L[v] || []).forEach(k => { x.beginPath(); x.arc(P[k][0], P[k][1], 15, 0, 7); x.fill(); }); });
-    const mats = [3, 4, 2, 5, 1, 6].map(v => new T.MeshStandardMaterial({ map: pip(v), metalness: 0.25, roughness: 0.55 }));
-    const m = new T.Mesh(new T.BoxGeometry(2.1, 2.1, 2.1), mats);
-    m.scale.setScalar(0.62);   // klein genug, um mit Rand quer durchzurollen
-    m.userData.norm = { 1: [0, 0, 1], 6: [0, 0, -1], 3: [1, 0, 0], 4: [-1, 0, 0], 2: [0, 1, 0], 5: [0, -1, 0] };
-    return m;
+  /* Sichtbare Weltgröße auf der Ebene z = 0 — daraus werden die Anteile des
+     Wurfplans zu Weltkoordinaten. */
+  _sicht() {
+    const h = 2 * Math.tan((this.cam.fov * Math.PI / 180) / 2) * this.cam.position.z;
+    return { w: h * this.cam.aspect, h };
   },
+
   _buildIco() {
     const T = this.THREE;
     // Zahlen auf TRANSPARENTEM Grund (kein goldenes Quadrat) → sie sitzen direkt
@@ -12968,7 +13039,7 @@ const DiceGL = {
       const pl = new T.Mesh(new T.PlaneGeometry(0.9, 0.9), new T.MeshBasicMaterial({ map: numTex(num), transparent: true }));
       pl.position.copy(cen.clone().multiplyScalar(1.03)); pl.lookAt(cen.clone().multiplyScalar(3)); grp.add(pl);
     }
-    grp.scale.setScalar(0.62);   // klein genug, um mit Rand quer durchzurollen
+    grp.scale.setScalar(0.30);   // rund ein Viertel der Bühnenhöhe
     grp.userData.norm = norm;
     return grp;
   },
@@ -12978,30 +13049,36 @@ const DiceGL = {
     return new T.Quaternion().setFromUnitVectors(n, view);
   },
 
-  /* Taumeln → auf die Ergebnis-Fläche einrasten. */
-  roll(sides, result) {
-    if (!this.supports(sides)) return;
-    const T = this.THREE;
-    this.cube.visible = sides === 6; this.ico.visible = sides === 20;
-    const die = sides === 6 ? this.cube : this.ico;
+  /* Hereinfliegen und taumeln → auf die Ergebnis-Fläche einrasten. Weg, Dauer,
+     Achse und Ruhefleck kommen aus dem PLAN, nicht aus festen Zahlen. */
+  roll(result, plan) {
+    if (!this.ready) return;
+    const T = this.THREE, die = this.ico;
+    die.visible = true;
     const target = this._targetQuat(die, result);
+    const sicht = this._sicht();
+    const ort = t => { const p = wurfPunkt(plan, t); return [p.x * sicht.w, -p.y * sicht.h]; };
     cancelAnimationFrame(this._raf); clearTimeout(this._safety);
-    const t0 = performance.now(), tumble = 800, settle = 650, total = tumble + settle;
-    const axis = new T.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
-    // Quer durchrollen: von links herein (startX) nach rechts (endX), flacher Bogen.
-    const startX = -3.0, endX = 0.9, arcH = 0.35;
-    die.position.set(startX, 0, 0);
-    let q0 = null, settling = false;
+
+    const ende = ort(1);
+    if (wenigerBewegung()) {
+      die.position.set(ende[0], ende[1], 0); die.quaternion.copy(target);
+      this.renderer.render(this.scene, this.cam);
+      return;
+    }
+
+    const t0 = performance.now(), total = plan.taumeln + plan.legen;
+    const axis = new T.Vector3(...plan.achse).normalize();
+    let q0 = null, legt = false;
     const step = now => {
-      const el = now - t0;
-      const tp = Math.min(1, el / total), ez = 1 - Math.pow(1 - tp, 2);   // easeOut
-      die.position.set(startX + (endX - startX) * ez, arcH * Math.sin(Math.PI * Math.min(1, tp * 1.1)), 0);
-      if (el < tumble) { die.rotateOnWorldAxis(axis, 0.32); }
+      const el = now - t0, tp = Math.min(1, el / total), p = ort(tp);
+      die.position.set(p[0], p[1], 0);
+      if (el < plan.taumeln) { die.rotateOnWorldAxis(axis, plan.tempo); }
       else {
-        if (!settling) { settling = true; q0 = die.quaternion.clone(); }
-        const p = Math.min(1, (el - tumble) / settle), e = 1 - Math.pow(1 - p, 3);
+        if (!legt) { legt = true; q0 = die.quaternion.clone(); }
+        const f = Math.min(1, (el - plan.taumeln) / plan.legen), e = 1 - Math.pow(1 - f, 3);
         die.quaternion.copy(q0).slerp(target, e);
-        if (p >= 1) { clearTimeout(this._safety); die.position.set(endX, 0, 0); this.renderer.render(this.scene, this.cam); this._raf = null; return; }
+        if (f >= 1) { clearTimeout(this._safety); die.position.set(ende[0], ende[1], 0); this.renderer.render(this.scene, this.cam); this._raf = null; return; }
       }
       this.renderer.render(this.scene, this.cam);
       this._raf = requestAnimationFrame(step);
@@ -13011,41 +13088,18 @@ const DiceGL = {
     // Hintergrund), sitzen Ergebnis-Fläche UND Endposition trotzdem garantiert.
     this._safety = setTimeout(() => {
       cancelAnimationFrame(this._raf); this._raf = null;
-      die.position.set(endX, 0, 0); die.quaternion.copy(target); this.renderer.render(this.scene, this.cam);
+      die.position.set(ende[0], ende[1], 0); die.quaternion.copy(target);
+      this.renderer.render(this.scene, this.cam);
     }, total + 350);
   },
 };
 
-/* Pips einer W6-Fläche als Punkte im 3×3-Raster. */
-function pipDots(v) {
-  const P = { TL: [27, 27], TR: [73, 27], ML: [27, 50], C: [50, 50], MR: [73, 50], BL: [27, 73], BR: [73, 73] };
-  const L = { 1: ["C"], 2: ["TL", "BR"], 3: ["TL", "C", "BR"], 4: ["TL", "TR", "BL", "BR"],
-              5: ["TL", "TR", "C", "BL", "BR"], 6: ["TL", "TR", "ML", "MR", "BL", "BR"] };
-  return (L[v] || []).map(k => `<i class="pip" style="left:${P[k][0]}%;top:${P[k][1]}%"></i>`).join("");
-}
-/* Drehung, die die Augenzahl V nach vorne bringt (Flächenlage: 1 vorn, 6 hinten,
-   3 rechts, 4 links, 2 oben, 5 unten). */
-const CUBE_ROT = {
-  1: "rotateX(0deg) rotateY(0deg)", 6: "rotateX(0deg) rotateY(180deg)",
-  3: "rotateX(0deg) rotateY(-90deg)", 4: "rotateX(0deg) rotateY(90deg)",
-  2: "rotateX(-90deg) rotateY(0deg)", 5: "rotateX(90deg) rotateY(0deg)",
-};
-/* Ergebnis-Fläche vorn, aber leicht gekippt — so bleibt der Würfel auch im
-   Ruhezustand als 3D-Körper erkennbar (man sieht einen Streifen der Nachbarflächen). */
-const cubeLand = v => `rotateX(-11deg) rotateY(-15deg) ${CUBE_ROT[v]}`;
-function cubeHtml(faceVal) {
-  const start = CUBE_ROT[faceVal] ? cubeLand(faceVal) : "rotateX(-18deg) rotateY(22deg)";
-  return `<div class="dice-obj cube" style="transform:${start}">${
-    [1, 2, 3, 4, 5, 6].map(v => `<div class="cf cf${v}">${pipDots(v)}</div>`).join("")}</div>`;
-}
-
-/* Der Würfelkörper: W6 als echter 3D-Würfel, W20 als SVG-Icosaeder (echte
-   W20-Silhouette mit Facetten, Zahl in der Frontfläche), sonst der goldene
-   Würfel mit Zahl. */
-function diceObjHtml(sides, faceVal) {
-  if (sides === 6) return cubeHtml(faceVal);
-  if (sides === 20)
-    return `<svg class="dice-obj d20" viewBox="0 0 100 100" aria-hidden="true">
+/* Der W20 als SVG: echte Ikosaeder-Silhouette mit Facetten, Zahl in der
+   Frontfläche. Er ist zweierlei — der Ruhezustand der Bühne (dort liegt der
+   letzte Wurf) und der Rückfall, wenn three.js nicht geladen hat (kein Netz,
+   kein WebGL). */
+function d20Html(faceVal) {
+  return `<svg class="dice-obj d20" viewBox="0 0 100 100" aria-hidden="true">
       <polygon class="d20-body" points="50,3 90.7,26.5 90.7,73.5 50,97 9.3,73.5 9.3,26.5"/>
       <g class="d20-facet">
         <line x1="50" y1="32" x2="50" y2="3"/><line x1="50" y1="32" x2="9.3" y2="26.5"/>
@@ -13056,85 +13110,114 @@ function diceObjHtml(sides, faceVal) {
       <polygon class="d20-front" points="50,32 69,63 31,63"/>
       <text class="dice-val" x="50" y="53" text-anchor="middle" dominant-baseline="middle">${esc(String(faceVal ?? ""))}</text>
     </svg>`;
-  return `<div class="dice-obj dice-die"><span class="dice-val">${esc(diceFace(sides, faceVal))}</span></div>`;
 }
 
-/* Statischer Bühnen-Zustand beim Rendern: letzter Wurf aus dem Log, sonst ruhend. */
-function diceStageHtml() {
-  const last = (SESSION_LOG || []).find(e => e.kind === "dice");
-  if (!last) return `<div class="dice-obj dice-die idle"><span class="dice-val">&#127922;</span></div>`;
-  const sides = last.data?.sides || 20;
-  const p = SESSION_PLAYERS.find(x => x.user_id === last.user_id);
-  const name = p?.profile?.display_name || (last.user_id === USER?.id ? t("sess.you") : "?");
-  return `${diceObjHtml(sides, last.data?.result)}
-    <div class="dice-cap"><b>${esc(name)}</b> · W${sides}</div>`;
+/* Die Würfelbühne: vierte schwebende Lade, aber keine Zone — sie deckt die
+   GANZE Matte ab, damit der Würfel quer darüber rollen kann. Kein
+   data-zonedrop: Auf einen Würfel legt man keine Karte. */
+function wuerfelBuehneHtml() {
+  const offen = schwebeOffen === "wuerfel";
+  const letzter = (SESSION_LOG || []).find(e => e.kind === "dice");
+  return `<div class="schwebe-zone sz-wuerfel${offen ? " offen" : ""}" data-schwebe-fach="wuerfel">
+    <div class="schwebe-korb wuerfel-buehne" id="wuerfel-buehne">
+      <div class="wuerfel-feld" id="wuerfel-feld">${d20Html(letzter?.data?.result)}</div>
+      <div class="wuerfel-kopf" id="wuerfel-kopf">${wurfKopfHtml(letzter)}</div>
+      <div class="sess-log" id="sess-log">${(SESSION_LOG || []).slice(0, 30).map(logZeile).join("")}</div>
+      <button type="button" class="btn wuerfel-werfen" id="dice-roll">${esc(t("sess.roll"))}</button>
+    </div>
+    ${schwebeKnopfHtml("wuerfel", "assets/roll-the-dice.PNG", "&#127922;", t("sess.dice"),
+                       t(offen ? "sess.diceClose" : "sess.diceOpen"), null)}
+  </div>`;
+}
+function wurfKopfHtml(ev) {
+  if (!ev) return `<span class="wuerfel-leer">${esc(t("sess.diceNone"))}</span>`;
+  const p = SESSION_PLAYERS.find(x => x.user_id === ev.user_id);
+  const name = p?.profile?.display_name || (ev.user_id === USER?.id ? t("sess.you") : "?");
+  return `<b>${esc(name)}</b> <span class="wuerfel-erg">${esc(String(ev.data?.result ?? ""))}</span>`;
 }
 
-let diceAnim = null;
-/* Landerotation für echte 3D-Körper (W6-Würfel; W20-Icosaeder folgt): bringt die
-   Ergebnis-Fläche nach vorn. null → Zahl-Flacker-Würfel. */
-function landRot(sides, v) { return sides === 6 ? cubeLand(v) : null; }
+/* Die Bühne ist so groß wie die Matte — und deren Größe steht erst fest, wenn
+   sie sichtbar ist. Zugeklappt gemessen käme 0 × 0 heraus. */
+function buehneMessen() {
+  const f = $("#wuerfel-feld");
+  if (!f || !DiceGL.ready) return;
+  const r = f.getBoundingClientRect();
+  DiceGL.resize(Math.round(r.width), Math.round(r.height));
+}
 
-/* Wurf animieren. Echter 3D-Körper: taumelt frei, friert kurz ein und dreht dann
-   sanft auf die ERGEBNIS-Fläche. Sonst: Würfel wackelt, Zahl flackert, rastet mit
-   „Plopp" ein. Das Ergebnis steht vorher fest — nur Show. */
-function zeigeWurf(sides, result, name) {
-  // Der Würfelkasten ist normalerweise zugeklappt — ein Wurf (auch der eines
-  // Mitspielers) fährt ihn auf, sonst würfelte man ins Verborgene.
-  const box = $("#dice-box");
-  if (box && !box.open) { box.open = true; wuerfelOffen = true; }
-  const stage = $("#dice-stage");
-  if (!stage) return;
-  const s = Math.max(2, sides | 0);
-  if (diceAnim) { clearInterval(diceAnim.iv); clearTimeout(diceAnim.to); diceAnim = null; }
+/* Steht für sich, weil die Bühne im Zonenbehälter sitzt und dort bei jedem Zug
+   neu entsteht — renderZonen() ruft das deshalb ebenfalls auf. Dieselbe
+   Überlegung wie bei wireSpielerKacheln(). Ohne das ließ sich nach dem ersten
+   verschobenen Karte nicht mehr würfeln: Der Knopf war ein anderer geworden. */
+function wireWuerfel() {
+  const roll = $("#dice-roll");
+  if (roll) roll.onclick = () => wuerfeln();
+}
+addEventListener("resize", () => { if (schwebeOffen === "wuerfel") buehneMessen(); });
 
-  // Echte 3D-Würfel (three.js) für W6 & W20, sobald geladen — sonst 2D-Rückfall.
-  if (DiceGL.supports(s)) {
-    stage.innerHTML = "";
-    stage.appendChild(DiceGL.canvas);
-    const cap = document.createElement("div"); cap.className = "dice-cap";
-    cap.innerHTML = `<b>${esc(name || "?")}</b> · W${s}`;
-    stage.appendChild(cap);
-    DiceGL.roll(s, result);
+/* Ohne three.js fliegt derselbe Wurfplan flach ab, gebaut mit der
+   Web-Animations-API. Keyframes statt einer CSS-Animation, weil der Weg bei
+   jedem Wurf ein anderer ist — als Regel im Stylesheet stünde er fest. */
+let wurfTakt = null;
+function wurfRueckfall(feld, result, plan) {
+  feld.innerHTML = d20Html("");
+  const el = feld.firstElementChild, zahl = el.querySelector(".dice-val");
+  const r = feld.getBoundingClientRect();
+  const lage = t => {
+    const p = wurfPunkt(plan, t);
+    return `translate(${(p.x * r.width).toFixed(1)}px,${(p.y * r.height).toFixed(1)}px)`;
+  };
+  if (wenigerBewegung()) { el.style.transform = lage(1); zahl.textContent = String(result); return; }
+
+  // 3–6 Umdrehungen, aus dem Tempo des Plans — schnell an, sanft aus.
+  const runden = 2 + Math.round(plan.tempo * 8), endWinkel = runden * 360 + plan.kippen;
+  const dauer = plan.taumeln + plan.legen, n = 30, bilder = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, e = 1 - Math.pow(1 - t, 3);
+    bilder.push({ transform: `${lage(t)} rotate(${(e * endWinkel).toFixed(1)}deg)` });
+  }
+  el.animate(bilder, { duration: dauer, easing: "linear", fill: "forwards" });
+  // Die Zahl flackert, solange er taumelt — sie vorher hinzuschreiben verriete
+  // das Ergebnis, bevor der Würfel liegt.
+  wurfTakt = setInterval(() => { zahl.textContent = String(1 + Math.floor(Math.random() * 20)); }, 70);
+  setTimeout(() => { clearInterval(wurfTakt); wurfTakt = null; zahl.textContent = String(result); }, plan.taumeln);
+}
+
+/* Wurf zeigen. Das Ergebnis steht vorher fest — alles hier ist Schau, und die
+   sieht dank wurfPlan() jedes Mal anders aus. */
+function zeigeWurf(result, name) {
+  // Ein Wurf zeigt sich selbst: Die Lade fährt auf, auch beim Wurf eines
+  // Mitspielers — sonst würfelte man ins Verborgene.
+  if (schwebeOffen !== "wuerfel") schwebeUmschalten("wuerfel");
+  if (wurfTakt) { clearInterval(wurfTakt); wurfTakt = null; }
+  const kopf = $("#wuerfel-kopf");
+  if (kopf) kopf.innerHTML = `<b>${esc(name || "?")}</b> <span class="wuerfel-erg">${esc(String(result))}</span>`;
+  const feld = $("#wuerfel-feld");
+  if (!feld) return;
+  const plan = wurfPlan();
+  buehneMessen();
+  if (DiceGL.ready) {
+    if (DiceGL.canvas.parentNode !== feld) { feld.innerHTML = ""; feld.appendChild(DiceGL.canvas); }
+    DiceGL.roll(result, plan);
     return;
   }
-
-  stage.innerHTML = `${diceObjHtml(s, 1)}<div class="dice-cap"><b>${esc(name || "?")}</b> · W${s}</div>`;
-  const dieEl = stage.querySelector(".dice-obj");
-
-  const rot = landRot(s, result);
-  if (rot) {                       // echter 3D-Würfel: taumeln → auf Fläche einrasten
-    dieEl.classList.add("rolling");
-    const to = setTimeout(() => {
-      const jetzt = getComputedStyle(dieEl).transform;   // aktuelle Taumel-Lage einfrieren
-      dieEl.style.transform = jetzt; dieEl.classList.remove("rolling"); void dieEl.offsetWidth;
-      dieEl.style.transition = "transform .6s cubic-bezier(.2,.8,.25,1.25)";
-      dieEl.style.transform = rot;
-      diceAnim = null;
-    }, 850);
-    diceAnim = { iv: null, to };
-    return;
-  }
-
-  const valEl = stage.querySelector(".dice-val");
-  dieEl.classList.add("rolling");
-  const iv = setInterval(() => { valEl.textContent = diceFace(s, 1 + Math.floor(Math.random() * s)); }, 60);
-  const to = setTimeout(() => {
-    clearInterval(iv);
-    valEl.textContent = diceFace(s, result);
-    dieEl.classList.remove("rolling"); dieEl.classList.add("landed");
-    diceAnim = null;
-  }, 900);
-  diceAnim = { iv, to };
+  wurfRueckfall(feld, result, plan);
 }
 
 /* Würfel: Ergebnis lokal (Math.random) festlegen und animiert zeigen, als Event
    einfügen — die Runde sieht den Wurf (samt Animation) über Realtime. */
-function wuerfeln(sides) {
+function wuerfeln() {
   if (!SESSION) return;
-  const s = Math.max(2, Math.min(1000, sides | 0));
+  const s = 20;
   const result = 1 + Math.floor(Math.random() * s);
-  zeigeWurf(s, result, meinSpieler()?.profile?.display_name || t("sess.you"));
+  zeigeWurf(result, meinSpieler()?.profile?.display_name || t("sess.you"));
+  wurfSpeichern(s, result);
+}
+
+/* Steht für sich, damit die Schau vom Schreiben getrennt bleibt: zeigeWurf()
+   braucht keine Datenbank, und die Prüfungen können hier eine Attrappe
+   einhängen — dieselbe Aufteilung wie bei zoneSchreiben(). */
+function wurfSpeichern(s, result) {
   // Ergebnis als Event festhalten UND das Log SOFORT lokal ergänzen — NICHT auf
   // den Realtime-Echo warten: der kann bei wackliger Verbindung ausbleiben, dann
   // erschiene der eigene Wurf nie im Log. onEvent entprellt den Echo über die id.
@@ -13201,7 +13284,7 @@ function onEvent(payload) {
   // Wurf eines MITSPIELERS animieren (den eigenen habe ich lokal schon gezeigt).
   if (ev.kind === "dice" && ev.user_id !== USER?.id && $(".view.on")?.id === "v-session") {
     const p = SESSION_PLAYERS.find(x => x.user_id === ev.user_id);
-    zeigeWurf(ev.data?.sides, ev.data?.result, p?.profile?.display_name || "?");
+    zeigeWurf(ev.data?.result, p?.profile?.display_name || "?");
   }
 }
 function onSessionChange(payload) {

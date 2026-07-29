@@ -13,11 +13,23 @@
    * Im Akkordeon ist immer nur eine Zone offen, und die Kopfzeilen klappen beim
      Überfahren auf. Während eines Zuges darf das NICHT geschehen: Sonst
      verschiebt sich das Layout unter dem Zeiger, und losgelassen wird über
-     etwas anderem als dem, worauf man gezielt hat. */
+     etwas anderem als dem, worauf man gezielt hat.
+
+   Dazu die Anordnung der Matte, die sich mehrfach still verschieben kann:
+   die Lebensreihe unter den Ländern, die vier Embleme darüber, und die
+   Würfelbühne über allem. */
 
 import { AUFBAU, PUNKT } from "../hilfen.mjs";
 
 export const name = "spielrunde";
+
+/* three.js kommt in der App von einem CDN. Auf dem Prüfrechner gibt es keins,
+   und ohne Bibliothek liefe hier IMMER der SVG-Rückfall — der echte Würfel,
+   den fast alle sehen, bliebe ungeprüft. Deshalb wird die Anfrage aus
+   node_modules bedient, mit derselben Fassung, die auch die App lädt. */
+const dreiDBereitstellen = (seite) => seite.route("https://cdn.jsdelivr.net/npm/three@**", r =>
+  r.fulfill({ path: new URL("../node_modules/three/build/three.module.js", import.meta.url).pathname,
+              headers: { "content-type": "text/javascript" } }));
 
 /* Eine Partie ohne Datenbank: Sitzung, Spieler und Zonenstand von Hand
    gesetzt, das Schreiben abgefangen. Läuft IM BROWSER. */
@@ -29,11 +41,13 @@ const PARTIE = () => {
   USER = { id: "u0" };
   PROFILE = { display_name: "Ich" };
   SESSION = { id: "s0", host: "u0", start_life: 40, status: "open" };
-  SESSION_PLAYERS = [{
-    user_id: "u0", life: 40, status: "joined", seat: 0,
+  // Vier Mitspieler: die Zahl, für die die Lebensreihe ausgelegt ist. Mit
+  // einem einzigen fiele nicht auf, wenn sie bei vieren umbräche oder rollte.
+  SESSION_PLAYERS = ["Ich", "Mira", "Jonas", "Ada"].map((n, i) => ({
+    user_id: "u" + i, life: 40 - i, status: "joined", seat: i,
     deck_id: d.id, deck_name: d.name, commander: null, commander_img: null,
-    profile: { id: "u0", display_name: "Ich" },
-  }];
+    profile: { id: "u" + i, display_name: n },
+  }));
 
   SESSION_ZONEN = {};
   const leer = { hand: 0, field: 0, grave: 0, exile: 0, cast: 0 };
@@ -45,6 +59,10 @@ const PARTIE = () => {
   // würde — daran hängt, dass ein Zug überhaupt gespeichert wird.
   window.GESCHRIEBEN = [];
   window.zoneSchreiben = id => window.GESCHRIEBEN.push(id);
+  // Ebenso der Wurf: Gemerkt wird, WAS in die Runde ginge — daran hängt, dass
+  // die Mitspieler den Wurf überhaupt zu sehen bekommen.
+  window.WUERFE = [];
+  window.wurfSpeichern = (sides, result) => window.WUERFE.push({ sides, result });
 
   document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === "v-session"));
   renderSession();
@@ -52,6 +70,7 @@ const PARTIE = () => {
 };
 
 export default async function ({ seite, adresse, stand }) {
+  await dreiDBereitstellen(seite);
   await seite.goto(adresse, { waitUntil: "domcontentloaded" });
   await seite.evaluate(AUFBAU, { karten: 10, kategorien: 2, decks: 1 });
   await seite.waitForTimeout(250);
@@ -209,57 +228,94 @@ export default async function ({ seite, adresse, stand }) {
       await seite.evaluate(() => document.querySelectorAll(".zk.getappt").length) + " getappt");
   }
 
-  /* --- Hand und Friedhof als schwebende Zonen --------------------------- */
-  /* Beide stehen auf der Matte nicht mehr in der Reihe, sondern klappen am Fuß
-     des Schlachtfelds aus — gleich links neben Exil. Fünf Dinge können daran
-     still schiefgehen, und alle fünf sind hier festgehalten. */
+  /* --- Die Lebenspunkte unter den Ländern ------------------------------- */
+  /* Sie standen früher als schmale Spalte ganz rechts, eine Kachel über der
+     anderen, und rollten bei vier Mitspielern innen. Jetzt laufen sie unter
+     den Ländern über deren volle Breite, alle vier nebeneinander. */
+  const leben = await seite.evaluate(() => {
+    const B = s => document.querySelector(s).getBoundingClientRect();
+    const feld = B(".mat-leben"), laender = B(".mat-laender");
+    const korb = document.querySelector(".mat-leben .mat-korb");
+    const k = [...document.querySelectorAll(".mat-leben .sp-card")].map(e => e.getBoundingClientRect());
+    return {
+      inLinks: document.querySelectorAll(".mat-links .mat-leben").length,
+      alteSpalte: document.querySelectorAll(".mat-rechts").length,
+      // Unter den Ländern und genau so breit wie sie.
+      unterDenLaendern: Math.round(feld.top - laender.bottom),
+      gleichBreit: [Math.round(feld.left - laender.left), Math.round(feld.right - laender.right)],
+      anzahl: k.length,
+      // Nebeneinander: gleiche Oberkante, aufsteigende linke Kanten.
+      eineReihe: k.every(r => Math.abs(r.top - k[0].top) < 1),
+      aufsteigend: k.every((r, i) => i === 0 || r.left > k[i - 1].left),
+      gleichWeit: new Set(k.map(r => Math.round(r.width))).size === 1,
+      // Kein Rollbalken: Bei vier Kacheln passte die Reihe zweimal knapp nicht.
+      rollt: [korb.scrollHeight - korb.clientHeight, korb.scrollWidth - korb.clientWidth],
+      // Und die Namen sind lesbar, statt auf null Pixel zusammenzufallen.
+      namen: [...document.querySelectorAll(".mat-leben .sp-name")]
+        .map(n => [Math.round(n.getBoundingClientRect().width), n.scrollWidth - n.clientWidth]),
+    };
+  });
+  stand.gleich("die Lebenspunkte stehen in der linken Spalte, die alte rechte ist weg",
+    [leben.inLinks, leben.alteSpalte], [1, 0]);
+  stand.ist("unmittelbar unter den Ländern", leben.unterDenLaendern >= 0 && leben.unterDenLaendern <= 12,
+    leben.unterDenLaendern + " px darunter");
+  stand.gleich("und über deren volle Breite", leben.gleichBreit, [0, 0]);
+  stand.gleich("alle vier Kacheln stehen nebeneinander und gleich breit",
+    [leben.anzahl, leben.eineReihe, leben.aufsteigend, leben.gleichWeit], [4, true, true, true]);
+  stand.gleich("die Reihe rollt nicht", leben.rollt, [0, 0]);
+  stand.ist("und die Namen sind nicht auf null zusammengefallen",
+    leben.namen.every(([b, ab]) => b >= 40 && ab === 0), JSON.stringify(leben.namen));
+
+  /* --- Die vier Laden über den Lebenspunkten ---------------------------- */
+  /* Würfel, Hand, Exil und Friedhof stehen als Embleme in einer Leiste am
+     rechten unteren Rand des Schlachtfelds. Sieben Dinge können daran still
+     schiefgehen, und alle sieben sind hier festgehalten. */
   const leiste = await seite.evaluate(() => {
     const zonen = [...document.querySelectorAll("#zonen .schwebe-zone")];
-    const sp = n => document.querySelector("." + n).getBoundingClientRect();
     const kn = z => document.querySelector(`.sz-${z} .schwebe-knopf`).getBoundingClientRect();
-    // Jedes Symbol am Fuß DER Spalte, aus der seine Zone kommt: die Mitte des
-    // Knopfes muss waagerecht in dieser Spalte liegen.
-    const inSpalte = (z, spalte) => {
-      const k = kn(z), r = sp(spalte), m = k.left + k.width / 2;
-      return m > r.left && m < r.right;
-    };
-    const amBoden = z => Math.round(document.querySelector(".mat").getBoundingClientRect().bottom
-                                    - kn(z).bottom);
+    const links = document.querySelector(".mat-links").getBoundingClientRect();
+    const lebenOben = document.querySelector(".mat-leben").getBoundingClientRect().top;
+    const reihe = ["wuerfel", "hand", "exile", "grave"];
     return {
-      reihenfolge: zonen.map(z => z.dataset.zone),
-      ziele: zonen.map(z => z.dataset.zonedrop),
+      reihenfolge: zonen.map(z => z.dataset.schwebeFach),
+      ziele: zonen.map(z => z.dataset.zonedrop ?? null),
       alteReihen: document.querySelectorAll(
-        '.mat-hand, .mat-rechts [data-zone="grave"], .mat-mitte [data-zone="exile"]').length,
-      hand:  inSpalte("hand", "mat-links"),
-      exil:  inSpalte("exile", "mat-mitte"),
-      grave: inSpalte("grave", "mat-rechts"),
-      // Der Friedhof steht RECHTS neben dem Exil — die Bitte war genau die.
-      graveRechtsVonExil: Math.round(kn("grave").left - kn("exile").right) > 0,
-      amBoden: zonen.map(z => amBoden(z.dataset.zone)),
+        '.mat-hand, .mat-rechts [data-zone="grave"], .mat-mitte [data-zone="exile"], #dice-box').length,
+      // Alle vier im Streifen des Schlachtfelds, keiner unter der schmalen Spalte.
+      inLinks: reihe.every(z => kn(z).left > links.left && kn(z).right < links.right),
+      // Von links nach rechts: Würfel, Hand, Exil, Friedhof.
+      vonLinks: reihe.every((z, i) => i === 0 || kn(z).left > kn(reihe[i - 1]).right),
+      // ÜBER den Lebenspunkten, nicht darauf.
+      ueberLeben: reihe.map(z => Math.round(lebenOben - kn(z).bottom)),
       // Die Klammer muss durchlässig sein, sonst finge sie Klicks ab, die dem
-      // Schlachtfeld darunter gelten. Bei der Hand wäre das die GANZE Matte.
+      // Schlachtfeld darunter gelten. Bei Hand und Würfel wäre das die GANZE Matte.
       klammer: zonen.map(z => getComputedStyle(z).pointerEvents),
       knopf: getComputedStyle(zonen[0].querySelector(".schwebe-knopf")).pointerEvents,
       koerbeZu: zonen.every(z => getComputedStyle(z.querySelector(".schwebe-korb")).visibility === "hidden"),
-      zahlen: zonen.map(z => z.querySelector(".schwebe-n").textContent),
+      zahlen: zonen.filter(z => z.dataset.zonedrop).map(z => z.querySelector(".schwebe-n").textContent),
+      // Der Würfel trägt KEINE Zahl — er zählt nichts.
+      wuerfelOhneZahl: !document.querySelector(".sz-wuerfel .schwebe-n"),
     };
   });
-  stand.gleich("Exil, Friedhof und Hand stehen als Laden da, nicht mehr in der Reihe",
-    [leiste.reihenfolge, leiste.alteReihen], [["exile", "grave", "hand"], 0]);
-  stand.gleich("alle drei sind selbst Ablageziel", leiste.ziele, ["exile", "grave", "hand"]);
-  stand.gleich("jedes Symbol steht am Fuß seiner alten Spalte",
-    [leiste.hand, leiste.exil, leiste.grave], [true, true, true]);
-  stand.ist("der Friedhof rechts neben dem Exil", leiste.graveRechtsVonExil);
-  stand.ist("alle stehen am unteren Mattenrand", leiste.amBoden.every(a => a >= 0 && a <= 24),
-    leiste.amBoden.join(", ") + " px über dem Boden");
+  stand.gleich("vier Laden statt Reihen auf der Matte",
+    [leiste.reihenfolge, leiste.alteReihen],
+    [["wuerfel", "hand", "exile", "grave"], 0]);
+  stand.gleich("die drei Zonen sind Ablageziel, der Würfel nicht",
+    leiste.ziele, [null, "hand", "exile", "grave"]);
+  stand.ist("alle vier stehen im Streifen des Schlachtfelds", leiste.inLinks);
+  stand.ist("von links nach rechts: Würfel, Hand, Exil, Friedhof", leiste.vonLinks);
+  stand.ist("und alle über den Lebenspunkten",
+    leiste.ueberLeben.every(a => a >= 0 && a <= 24),
+    leiste.ueberLeben.join(", ") + " px darüber");
   stand.ist("zugeklappt sind alle Körbe weggenommen", leiste.koerbeZu);
   stand.gleich("die Klammern lassen Klicks durch, die Schaltflächen nicht",
-    [leiste.klammer, leiste.knopf], [["none", "none", "none"], "auto"]);
-  stand.gleich("alle nennen ihre Anzahl", leiste.zahlen, ["0", "1", "2"]);
+    [leiste.klammer, leiste.knopf], [["none", "none", "none", "none"], "auto"]);
+  stand.gleich("die Zonen nennen ihre Anzahl, der Würfel nicht",
+    [leiste.zahlen, leiste.wuerfelOhneZahl], [["2", "0", "1"], true]);
 
   /* Jede Schaltfläche IST ihr Emblem: kein Beiwort daneben, und die Zahl steht
      unten rechts darauf statt daneben. */
-  const sym = await seite.evaluate(() => [...document.querySelectorAll(".schwebe-zone")].map(z => {
+  const sym = await seite.evaluate(() => [...document.querySelectorAll(".schwebe-zone[data-zonedrop]")].map(z => {
     const bild = z.querySelector(".schwebe-bild");
     const s = z.querySelector(".schwebe-sym").getBoundingClientRect();
     const n = z.querySelector(".schwebe-n").getBoundingClientRect();
@@ -278,6 +334,10 @@ export default async function ({ seite, adresse, stand }) {
   }));
   stand.ist("alle Schaltflächen tragen ihr Emblem", sym.every(x => x.geladen),
     sym.map(x => x.quelle).join(" · "));
+  stand.ist("auch der Würfel, mit eigenem Bild",
+    await seite.evaluate(() => { const b = document.querySelector(".sz-wuerfel .schwebe-bild");
+      return !!b && b.complete && b.naturalWidth > 0 && /roll-the-dice/i.test(b.getAttribute("src")); }),
+    await seite.evaluate(() => document.querySelector(".sz-wuerfel .schwebe-bild")?.getAttribute("src")));
   stand.ist("die Ersatzzeichen bleiben dabei versteckt", sym.every(x => x.ersatzVersteckt));
   stand.ist("die Zahl steht jeweils unten rechts auf dem Symbol", sym.every(x => x.untenRechts));
   stand.ist("und erschlägt es nicht", sym.every(x => x.anteil <= 40),
@@ -430,21 +490,133 @@ export default async function ({ seite, adresse, stand }) {
   stand.ist("Escape klappt sie wieder zu",
     await seite.evaluate(() => document.querySelectorAll(".schwebe-zone.offen").length === 0));
 
+  /* --- Der Würfel: nur noch W20, Bühne über der ganzen Matte ------------ */
+  /* Der Kasten unter der Matte ist weg, und mit ihm das Eingabefeld für eine
+     freie Seitenzahl und die Knopfreihe W4…W12. Was bleibt, ist eine Lade wie
+     die anderen — nur ohne Zone dahinter. */
+  stand.gleich("kein Würfelkasten, keine anderen Würfel mehr",
+    await seite.evaluate(() => ({
+      kasten: document.querySelectorAll("#dice-box").length,
+      seiten: document.querySelectorAll("#dice-sides").length,
+      knoepfe: document.querySelectorAll("[data-dice]").length,
+      werfen: document.querySelectorAll("#dice-roll").length })),
+    { kasten: 0, seiten: 0, knoepfe: 0, werfen: 1 });
+
+  await seite.locator('[data-schwebe="wuerfel"]').click();
+  await seite.waitForTimeout(1200);          // three.js kommt über die Umleitung
+  const buehne = await seite.evaluate(() => {
+    const b = document.querySelector("#wuerfel-buehne").getBoundingClientRect();
+    const m = document.querySelector(".mat").getBoundingClientRect();
+    return {
+      offen: [...document.querySelectorAll(".schwebe-zone.offen")].map(z => z.dataset.schwebeFach),
+      sichtbar: getComputedStyle(document.querySelector("#wuerfel-buehne")).visibility,
+      // Die ganze Matte, nicht ein Kasten darin — das war die Bitte.
+      deckt: [Math.round(b.left - m.left), Math.round(b.top - m.top),
+              Math.round(m.right - b.right), Math.round(m.bottom - b.bottom)],
+      dreiD: DiceGL.ready,
+    };
+  });
+  stand.gleich("ein Klick klappt die Würfelbühne auf", [buehne.offen, buehne.sichtbar],
+    [["wuerfel"], "visible"]);
+  stand.gleich("sie deckt die ganze Matte ab", buehne.deckt, [0, 0, 0, 0]);
+  stand.ist("der echte 3D-Würfel steht bereit", buehne.dreiD);
+
+  // Ein Wurf: Ergebnis im Kopf der Bühne, zwischen 1 und 20.
+  const wuerfe = [];
+  for (let i = 0; i < 3; i++) {
+    await seite.locator("#dice-roll").click();
+    await seite.waitForTimeout(1500);
+    wuerfe.push(await seite.evaluate(() => ({
+      kopf: document.querySelector("#wuerfel-kopf").textContent.trim(),
+      erg: parseInt(document.querySelector(".wuerfel-erg")?.textContent || "", 10),
+      // Ruhelage des Würfels — bei jedem Wurf eine andere.
+      ort: DiceGL.ico ? [Math.round(DiceGL.ico.position.x * 100), Math.round(DiceGL.ico.position.y * 100)] : null,
+    })));
+  }
+  stand.ist("jeder Wurf nennt Werfer und Ergebnis",
+    wuerfe.every(w => /^Ich /.test(w.kopf) && w.erg >= 1 && w.erg <= 20),
+    wuerfe.map(w => w.kopf).join(" | "));
+  // Und jeder geht als Ereignis in die Runde — sonst sähe ihn nur der Werfer.
+  stand.gleich("jeder Wurf geht als W20-Ereignis an die Mitspieler",
+    await seite.evaluate(() => window.WUERFE.map(w => w.sides)), [20, 20, 20]);
+  stand.gleich("und das gemeldete Ergebnis ist das gezeigte",
+    await seite.evaluate(() => window.WUERFE.map(w => w.result)), wuerfe.map(w => w.erg));
+  stand.ist("und keine zwei Würfe kommen an derselben Stelle zur Ruhe",
+    new Set(wuerfe.map(w => JSON.stringify(w.ort))).size === 3,
+    wuerfe.map(w => JSON.stringify(w.ort)).join(" "));
+
+  /* Die Leinwand muss der Bühne folgen. Fest gesetzt (früher 340 × 150) wäre
+     der Würfel verzerrt und liefe quer aus dem Bild. Sie entsteht erst beim
+     ersten Wurf — vorher steht dort das ruhende SVG.
+     Geprüft wird BEIDES: die CSS-Größe (wie groß sie im Bild ist) und der
+     Zeichenpuffer (wie fein gerechnet wird). Nur die CSS-Größe zu prüfen
+     bemerkte ein festes setSize() nicht — die Fläche stimmte dann trotzdem. */
+  stand.gleich("die Leinwand hat die Größe der Bühne, im Bild wie im Puffer",
+    await seite.evaluate(() => {
+      const c = document.querySelector("#wuerfel-feld canvas");
+      const f = document.querySelector("#wuerfel-feld").getBoundingClientRect();
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      return {
+        bild: [c?.style.width ?? null, c?.style.height ?? null],
+        puffer: [c?.width ?? null, c?.height ?? null],
+        sollBild: [Math.round(f.width) + "px", Math.round(f.height) + "px"],
+        sollPuffer: [Math.round(Math.round(f.width) * dpr), Math.round(Math.round(f.height) * dpr)],
+      };
+    }).then(x => [x.bild, x.puffer]),
+    await seite.evaluate(() => {
+      const f = document.querySelector("#wuerfel-feld").getBoundingClientRect();
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      return [[Math.round(f.width) + "px", Math.round(f.height) + "px"],
+              [Math.round(Math.round(f.width) * dpr), Math.round(Math.round(f.height) * dpr)]];
+    }));
+
+  /* Und der Plan selbst streut. Ohne diese Prüfung könnte wurfPlan() ein
+     einziges Feld auslosen und den Rest festhalten — die Ruhelagen oben wären
+     trotzdem verschieden, und der Wurf sähe doch jedes Mal gleich aus. */
+  const streuung = await seite.evaluate(() => {
+    const p = Array.from({ length: 40 }, () => wurfPlan());
+    const zaehle = f => new Set(p.map(f)).size;
+    return {
+      seiten: zaehle(x => x.seite), spruenge: zaehle(x => x.spruenge),
+      bogen: zaehle(x => x.bogen), tempo: zaehle(x => x.tempo),
+      taumeln: zaehle(x => x.taumeln), legen: zaehle(x => x.legen),
+      // Der Weg muss auch WÄHREND des Fluges auseinanderlaufen, nicht nur am Ende.
+      mitte: zaehle(x => JSON.stringify(wurfPunkt(x, 0.5))),
+    };
+  });
+  stand.ist("der Wurfplan streut in jeder Größe",
+    streuung.seiten >= 4 && streuung.spruenge === 3 && streuung.bogen > 30 &&
+    streuung.tempo > 30 && streuung.taumeln > 25 && streuung.legen > 25 && streuung.mitte > 30,
+    JSON.stringify(streuung));
+
+  await seite.keyboard.press("Escape");
+  await seite.waitForTimeout(300);
+
   /* --- Im Akkordeon: die Zone klappt während des Zuges nicht um --------- */
   await seite.setViewportSize({ width: 800, height: 900 });
   await seite.waitForTimeout(450);
   stand.ist("im schmalen Fenster steht das Akkordeon",
     await seite.evaluate(() => !MAT_AN && !!document.querySelector("#zonen.zonen")));
-  // Dort gibt es keine Lade: Das Akkordeon zeigt ohnehin nur eine Zone auf
-  // einmal, eine schwebende obendrauf wäre eine zweite Antwort auf dieselbe
-  // Frage. Die Hand bleibt eine Zone unter sechs.
-  stand.gleich("dort bleiben alle drei gewöhnliche Zonen",
+  // Dort gibt es keine Zonen-Laden: Das Akkordeon zeigt ohnehin nur eine Zone
+  // auf einmal, eine schwebende obendrauf wäre eine zweite Antwort auf dieselbe
+  // Frage. Der WÜRFEL kommt trotzdem mit — er ist keine Zone, und ohne ihn
+  // gäbe es auf einem hochkant gehaltenen Handy gar keinen Wurf mehr.
+  stand.gleich("dort bleiben die drei gewöhnliche Zonen, der Würfel bleibt",
     await seite.evaluate(() => ({
-      leiste: document.querySelectorAll(".zonen-leiste").length,
+      laden: document.querySelectorAll("#zonen .schwebe-zone[data-zonedrop]").length,
       hand: document.querySelectorAll('#zonen .zone[data-zone="hand"]').length,
       grave: document.querySelectorAll('#zonen .zone[data-zone="grave"]').length,
-      exile: document.querySelectorAll('#zonen .zone[data-zone="exile"]').length })),
-    { leiste: 0, hand: 1, grave: 1, exile: 1 });
+      exile: document.querySelectorAll('#zonen .zone[data-zone="exile"]').length,
+      wuerfel: document.querySelectorAll("#zonen .sz-wuerfel #dice-roll").length })),
+    { laden: 0, hand: 1, grave: 1, exile: 1, wuerfel: 1 });
+  // Dort hängt er am Schirm statt an der Matte — die gibt es hier nicht.
+  stand.ist("und hängt dort fest am unteren rechten Schirmrand",
+    await seite.evaluate(() => {
+      const k = document.querySelector(".sz-wuerfel .schwebe-knopf");
+      const b = k.getBoundingClientRect();
+      return getComputedStyle(k).position === "fixed" &&
+             innerWidth - b.right < 30 && innerHeight - b.bottom < 30;
+    }));
 
   await seite.evaluate(() => { zoneOeffnen("field", true); });
   await seite.waitForTimeout(250);

@@ -1089,25 +1089,31 @@ und ob sie ein Land ist, weiß die App aus der Typzeile.
 ### Zwei Anordnungen
 
 Ab **820 px Breite** liegen die Felder wie auf der offiziellen Spielmatte:
-Schlachtfeld groß links, Länder als Streifen darunter, rechts die schmalen
-Spalten (Commander-Steuer, Kommandozone, Bibliothek) und ganz rechts die
-Lebenspunkte aller Mitspieler. Ein quer gehaltenes Handy erreicht
-diese Breite und bekommt die Matte automatisch. Ab **1200 px** kommt rechts eine
-vierte Spalte über die volle Höhe dazu: die Kartenansicht (siehe unten).
+Schlachtfeld groß links, Länder als Streifen darunter, die Lebenspunkte als
+Reihe unter beiden, und rechts eine schmale Spalte (Commander-Steuer,
+Kommandozone, Bibliothek). Ein quer gehaltenes Handy erreicht diese Breite und
+bekommt die Matte automatisch. Ab **1200 px** kommt rechts eine dritte Spalte
+über die volle Höhe dazu: die Kartenansicht (siehe unten).
 
-**Hand, Friedhof und Exil sind Laden** am unteren Mattenrand: die Embleme
-`assets/cards-on-hand.PNG`, `assets/cards-on-graveyard.PNG` und
-`assets/cards-at-exil.PNG` mit der Kartenzahl unten rechts darauf. Ein Klick
-klappt nach oben aus, Escape oder ein zweiter Klick wieder zu. Nach oben, weil
-am Tisch alle drei vor einem liegen — zur Seite auszufahren löste dieses Bild
-auf.
+**Die Lebenspunkte laufen unter den Ländern über deren volle Breite**, bis zu
+vier Kacheln nebeneinander — so wie die Mitspieler am Tisch nebeneinander
+sitzen. Vorher standen sie als schmale Spalte ganz rechts, eine Kachel über der
+anderen, und rollten bei vier Mitspielern innen. Die Reihe hat eine feste Höhe,
+weil die Emblemleiste darüber daraus rechnet; die vier Knöpfe (−5/−1/+1/+5)
+stehen deshalb unter Name und Zahl statt daneben. Nebeneinander rangen sie mit
+dem Namen um dieselbe Breite, und der verlor: Bei vier Mitspielern auf einer
+820-px-Matte blieben für ihn gemessen **null Pixel**.
 
-**Jedes Emblem steht am Fuß seiner alten Spalte**: das Exil unter der mittleren,
-der Friedhof unter der rechten — also rechts neben dem alten Exil-Feld —, die
-Hand am rechten Rand des Schlachtfelds. So bleibt der Ort, an dem man eine Zone
-sucht, derselbe wie vorher; frei geworden ist nur die Fläche. Gerechnet werden
-die Abstände aus den Spaltenbreiten selbst, damit sie mitgehen, wenn sich eine
-ändert.
+**Hand, Friedhof, Exil und Würfel sind Laden**, als Emblemleiste am rechten
+unteren Rand des Schlachtfelds, gleich über den Lebenspunkten: von links nach
+rechts `assets/roll-the-dice.PNG`, `assets/cards-on-hand.PNG`,
+`assets/cards-at-exil.PNG` und `assets/cards-on-graveyard.PNG`, die drei Zonen
+mit der Kartenzahl unten rechts darauf. Ein Klick klappt nach oben aus, Escape
+oder ein zweiter Klick wieder zu. Nach oben, weil am Tisch alles davon vor einem
+liegt — zur Seite auszufahren löste dieses Bild auf.
+
+Die Abstände der Leiste rechnen aus den Spaltenbreiten und der Höhe der
+Lebensreihe, damit sie mitgehen, wenn sich eine davon ändert.
 
 **Immer nur eine offen.** Die Schaltflächen stehen nebeneinander, ihre Körbe
 sind breiter als sie selbst — offen lägen sie übereinander. Dieselbe Regel wie
@@ -1119,13 +1125,19 @@ Der Handfächer trägt seine Form selbst: Seine Karten liegen gestaffelt und
 werfen Schatten — ein Kasten darum wäre ein Rahmen um etwas, das schon eine
 Gestalt hat.
 
-**Der Handfächer geht mittig über dem Schlachtfeld auf**, dicht über dem unteren
-Mattenrand — nicht rechts oben über seiner Schaltfläche, wo er die halbe Matte
-verdeckte. Er **rollt nicht**: Ein Rollbereich schnitte die gedrehten Ränder ab
-und die beim Zeigen angehobene Karte gleich mit. Nötig ist er auch nicht, denn
-der Fächer wird bei vielen Karten von selbst schmaler — der sichtbare Anteil je
-Karte schrumpft mit ihrer Zahl, gemessen in Kartenbreiten statt in Pixeln, damit
-er auf schmalen Schirmen mitschrumpft.
+**Der Handfächer geht mittig über dem Schlachtfeld auf**, dicht über den
+Lebenspunkten — nicht rechts oben über seiner Schaltfläche, wo er die halbe
+Matte verdeckte. Er **rollt nicht**: Ein Rollbereich schnitte die gedrehten
+Ränder ab und die beim Zeigen angehobene Karte gleich mit. Nötig ist er auch
+nicht, denn der Fächer wird bei vielen Karten von selbst schmaler — der sichtbare
+Anteil je Karte schrumpft mit ihrer Zahl, gemessen in Kartenbreiten statt in
+Pixeln, damit er auf schmalen Schirmen mitschrumpft.
+
+**Der Würfel nimmt die ganze Matte ein** und ist die einzige Lade, die keine
+Zone ist — auf einen Würfel legt man keine Karte, sie trägt deshalb kein
+Ablageziel. Sie liegt außerdem *unter* den drei anderen Emblemen: Die Leiste
+muss auf der offenen Bühne sichtbar und anklickbar bleiben, sonst käme man aus
+ihr nur noch mit Escape heraus. Mehr dazu unter „Der Würfel" weiter unten.
 
 Das Emblem trägt die Schaltfläche jeweils allein: kein Kasten darum, kein
 Beiwort daneben; lesbar über hellen wie dunklen Kartenbildern bleibt es durch
@@ -1137,8 +1149,7 @@ Text entfällt, nennt die Beschriftung für Vorleseprogramme Zone und Anzahl mit
 > hoch und kostete diese Höhe *dauernd*, obwohl man ihn nur ansieht, wenn man
 > etwas daraus spielen will; Friedhof und Exil wachsen über die Partie, werden
 > aber fast nur nachgeschlagen — das Exil bleibt in den meisten Partien sogar
-> leer. Den Platz bekommt das Schlachtfeld, das man ständig ansieht, und die
-> Lebenspunkte bekommen die volle Höhe ihrer Spalte.
+> leer. Den Platz bekommt das Schlachtfeld, das man ständig ansieht.
 >
 > Zieht man eine Karte heraus, **geht die Lade zu** — sie schwebt über der
 > Matte und läge sonst über genau den Zonen, auf die man zielt. Gesehen hat man
@@ -1270,8 +1281,43 @@ sie leer; der Regelfall kostet also nichts.
 Der Stand überlebt einen Neuladen der Seite; „Neues Spiel" des Gastgebers räumt
 ihn bei allen ab.
 
-Würfel und Einladeliste sind Zubehör und stehen eingeklappt am Ende — beim Wurf
-(auch dem eines Mitspielers) fährt der Würfelkasten von selbst auf.
+Die Einladeliste ist Zubehör und steht eingeklappt am Ende.
+
+### Der Würfel
+
+**Nur noch der W20.** W4, W6, W8, W10, W12 und das Eingabefeld für eine freie
+Seitenzahl sind weg. Gewürfelt wird in einer Partie um Anspiel, als Münzwurf-
+Ersatz und für die Effekte, die einen Zwanzigseiter verlangen; die übrigen
+Größen standen als Knopfreihe da und wurden nie angefasst.
+
+**Die Bühne ist die ganze Matte.** Ein Klick auf `assets/roll-the-dice.PNG`
+legt sie über das ganze Feld: der Würfel rollt quer darüber, das Ergebnis steht
+oben links, die letzten Würfe der Runde rechts, „Würfeln" unten in der Mitte.
+Vorher lag sie in einem einklappbaren Kasten *unter* der Matte und war
+340 × 150 px groß — der Würfel rollte durch einen Briefschlitz.
+
+**Jeder Wurf sieht anders aus.** Das Ergebnis steht vorher fest (ein
+`Math.random()`, einmal); die Schau darum wird jedes Mal neu ausgelost —
+Eintrittsseite (fünf), Zahl der Sprünge (1–3), Bogenhöhe, Drehachse,
+Drehgeschwindigkeit, Dauer des Taumelns, Dauer des Einrastens und der Fleck, auf
+dem er liegen bleibt. Vorher lief sie **immer gleich**: von links herein, flacher
+Bogen, 800 ms taumeln, 650 ms einrasten; nur die Drehachse war zufällig, und die
+sieht man einem taumelnden Körper nicht an.
+
+> Ein *Wurfplan* beschreibt diese Größen, und **eine** Kurve fliegt beide
+> Darsteller ab: den echten Ikosaeder aus three.js (per `import()` vom CDN
+> nachgeladen, einmal je Sitzung) und den SVG-Rückfall ohne Netz oder WebGL.
+> Zwei getrennte Wege liefen auseinander, sobald man einen davon ändert — und
+> die Abwechslung ginge am anderen vorbei.
+
+Ein Wurf **zeigt sich selbst**: Die Lade fährt auf, auch beim Wurf eines
+Mitspielers — sonst würfelte man ins Verborgene.
+
+Wo es keine Matte gibt — im Akkordeon und in einer Runde ohne gewähltes Deck —
+hängt der Würfel fest am Schirm: Knopf unten rechts, Bühne als Fenster darüber.
+Die drei Zonen-Laden gibt es dort nicht (das Akkordeon zeigt ohnehin eine Zone
+auf einmal), der Würfel schon: Er ist keine Zone, und ohne ihn gäbe es auf einem
+hochkant gehaltenen Handy gar keinen Wurf mehr.
 
 > Meldet die App „Spalte fehlt", ist die Datenbank älter als die App —
 > `supabase-schema.sql` erneut im SQL Editor ausführen (oder
@@ -1499,7 +1545,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `kartenansicht`  | Klebende Spaltenköpfe (auch im schmalen Fenster), Aufklappen beim Überfahren, kein Aufklappen beim Ziehen |
 | `zugabe`         | „Karte zum Deck“: Ausklappen, gefilterte Trefferliste, Zug in eine Kategorie, volles Deck |
 | `decks`          | Höchstens ein Deck aufgeklappt, Speicher und Baum stimmen überein, Truhe wirft die richtige Karte |
-| `spielrunde`     | Zonen der Matte: Ziehen zwischen ihnen, Tappen per Klick, die drei Laden (Ort, Rahmen, Zahl, immer nur eine offen, auch zugeklappt Ablageziel) |
+| `spielrunde`     | Die Matte: Ziehen zwischen den Zonen, Tappen per Klick, die Lebensreihe (vier Kacheln nebeneinander, kein Rollbalken), die vier Laden (Ort, Rahmen, Zahl, immer nur eine offen, auch zugeklappt Ablageziel) und der Würfel (nur W20, Bühne über der ganzen Matte, jeder Wurf anders) |
 
 ### Zwei Regeln, die dabei gelernt wurden
 
@@ -1524,8 +1570,13 @@ der die Kartenansicht rechnet.
 
 Als Browser dient Chrome/Chromium in dieser Reihenfolge: `CHROMIUM_PFAD`,
 `PLAYWRIGHT_BROWSERS_PATH`, System-Chrome. Auf den GitHub-Läufern ist Chrome
-vorinstalliert; `playwright install` braucht es dadurch nicht, und die einzige
-Abhängigkeit ist `playwright-core` — der Treiber ohne Browser.
+vorinstalliert; `playwright install` braucht es dadurch nicht.
+
+Abhängigkeiten sind zwei: `playwright-core` — der Treiber ohne Browser — und
+`three` in genau der Fassung, die die App vom CDN lädt. Der Fall `spielrunde`
+leitet die CDN-Anfrage auf `node_modules` um; ohne das liefe auf einem
+Prüfrechner ohne Netz immer der SVG-Rückfall, und der echte 3D-Würfel, den fast
+alle sehen, bliebe ungeprüft.
 
 ## Hinweise
 
