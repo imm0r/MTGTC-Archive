@@ -1091,35 +1091,46 @@ und ob sie ein Land ist, weiß die App aus der Typzeile.
 Ab **820 px Breite** liegen die Felder wie auf der offiziellen Spielmatte:
 Schlachtfeld groß links, Länder als Streifen darunter, rechts die schmalen
 Spalten (Commander-Steuer, Kommandozone, Bibliothek, Exil) und ganz rechts die
-Lebenspunkte aller Mitspieler samt Friedhof. Ein quer gehaltenes Handy erreicht
+Lebenspunkte aller Mitspieler. Ein quer gehaltenes Handy erreicht
 diese Breite und bekommt die Matte automatisch. Ab **1200 px** kommt rechts eine
 vierte Spalte über die volle Höhe dazu: die Kartenansicht (siehe unten).
 
-**Die Hand ist eine Lade**, unten links an der Matte: das Emblem
-`assets/cards-on-hand.PNG` mit der Kartenzahl unten rechts darauf. Ein Klick
-klappt den Fächer nach oben aus, Escape oder ein zweiter Klick wieder zu. Nach
-oben, weil am Tisch die Hand vor einem liegt — zur Seite auszufahren löste
-dieses Bild auf.
+**Hand und Friedhof sind Laden**, am Fuß des Schlachtfelds gleich links neben
+Exil: die Embleme `assets/cards-on-graveyard.PNG` und `assets/cards-on-hand.PNG`
+mit der Kartenzahl unten rechts darauf. Ein Klick klappt nach oben aus, Escape
+oder ein zweiter Klick wieder zu. Nach oben, weil am Tisch beide vor einem
+liegen — zur Seite auszufahren löste dieses Bild auf.
 
-Das Emblem trägt die Schaltfläche allein: kein Kasten darum, kein Beiwort
-daneben. Es bringt seinen eigenen Ring mit, eine Pille darum wäre ein Rahmen um
-einen Rahmen; lesbar über hellen wie dunklen Kartenbildern bleibt es durch den
-Schlagschatten. Lädt das Bild nicht, tritt ✋ an seine Stelle — dieselbe Regel
-wie am Zugabe-Knopf und an der Truhe. Weil der sichtbare Text entfällt, nennt
-die Beschriftung für Vorleseprogramme die Anzahl mit.
+**Immer nur eine offen.** Die Schaltflächen stehen nebeneinander, ihre Körbe
+sind breiter als sie selbst — offen lägen sie übereinander. Dieselbe Regel wie
+im Akkordeon, aus demselben Grund.
 
-> **Warum sie nicht mehr in der Reihe steht.** Der Fächer ist gut 230 px hoch.
-> Quer über die Matte kostete er diese Höhe *dauernd*, obwohl man die Hand nur
-> ansieht, wenn man etwas daraus spielen will. Das Schlachtfeld, das man ständig
-> ansieht, bekommt sie jetzt.
+**Rahmen nur beim Friedhof.** Sein Gitter ist eine lose Reihe kleiner Bilder
+und bräuchte sonst eine Fläche, um nicht über dem Schlachtfeld zu schwimmen.
+Der Handfächer trägt seine Form selbst: Seine Karten liegen gestaffelt und
+werfen Schatten — ein Kasten darum wäre ein Rahmen um etwas, das schon eine
+Gestalt hat.
+
+Das Emblem trägt die Schaltfläche jeweils allein: kein Kasten darum, kein
+Beiwort daneben; lesbar über hellen wie dunklen Kartenbildern bleibt es durch
+den Schlagschatten. Lädt ein Bild nicht, tritt sein Schriftzeichen an die
+Stelle — dieselbe Regel wie am Zugabe-Knopf und an der Truhe. Weil der sichtbare
+Text entfällt, nennt die Beschriftung für Vorleseprogramme Zone und Anzahl mit.
+
+> **Warum sie nicht mehr in der Reihe stehen.** Der Handfächer ist gut 230 px
+> hoch und kostete diese Höhe *dauernd*, obwohl man ihn nur ansieht, wenn man
+> etwas daraus spielen will; der Friedhof wächst über die Partie, wird aber fast
+> nur nachgeschlagen. Den Platz bekommt das Schlachtfeld, das man ständig
+> ansieht.
 >
 > Zieht man eine Karte heraus, **geht die Lade zu** — sie schwebt über der
 > Matte und läge sonst über genau den Zonen, auf die man zielt. Gesehen hat man
 > die Karte trotzdem: sie hängt am Zeiger. Dieselbe Überlegung wie bei der
 > Trefferliste im Deckbau.
 >
-> Die Schaltfläche ist auch **zugeklappt ein Ablageziel**. Etwas auf die Hand
-> zurückzunehmen, ohne sie vorher aufzuklappen, ist der häufigere Weg.
+> Die Schaltflächen sind auch **zugeklappt Ablageziele**. Etwas auf die Hand
+> zurückzunehmen oder auf den Friedhof zu legen, ohne vorher aufzuklappen, ist
+> der häufigere Weg.
 
 Die Spielrunde darf dabei **breiter werden als der Rest der App** (1800 statt
 1100 px): die Mattenspalten sind fest, alles Zusätzliche geht ans Schlachtfeld
