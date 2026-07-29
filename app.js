@@ -11845,16 +11845,6 @@ function sessionBoardHtml() {
     </details>` : ""}`;
 }
 
-function logZeile(ev) {
-  const p = SESSION_PLAYERS.find(x => x.user_id === ev.user_id);
-  const name = p?.profile?.display_name || (ev.user_id === USER?.id ? t("sess.you") : "?");
-  if (ev.kind === "dice")
-    // Die Seitenzahl kommt aus dem Event, nicht aus einer 20: Ältere Würfe
-    // einer laufenden Runde können noch W6 oder W12 gewesen sein.
-    return `<div class="log-zeile">&#127922; <b>${esc(name)}</b>: W${esc(String(ev.data?.sides || 20))} &rarr; <b>${esc(String(ev.data?.result))}</b></div>`;
-  return "";
-}
-
 /* ==================== Zonen der eigenen Partie ======================
    Der private Kartenüberblick einer Partie. Nur der Spieler selbst sieht ihn;
    Mitspieler sehen weiterhin bloß Deckname und Commander.
@@ -11902,6 +11892,8 @@ const zoneDef = k => ZONEN.find(z => z.key === k);
 
 let ZONE_OFFEN = "hand";        // welche Zone gerade aufgeklappt ist
 let schwebeOffen = null;        // welche schwebende Zone der Matte offen ist ("hand"/"grave"/null)
+let letzterWurf = null;         // letzter Wurf der Runde (steht auf dem Würfelemblem)
+let wurfEnde = null;            // blendet den Würfel nach dem Liegenbleiben aus
 let zoneZeigerArt = "mouse";    // womit zuletzt in den Zonen angefasst wurde
 let zoneHoverT = null;          // entprellt das Aufklappen per Maus
 let zoneSperre = 0;             // bis wann Hover ignoriert wird (Layout beruhigen)
@@ -12286,13 +12278,13 @@ const schwebeBeschriftung = (key, n) =>
 /* Die Schaltfläche IST ihr Emblem: kein Kasten darum, kein Beiwort daneben.
    Eine Funktion für alle vier — der Würfel sieht aus wie die drei Zonen, weil
    er an derselben Leiste steht und dasselbe tut (etwas Großes aufklappen). */
-function schwebeKnopfHtml(fach, bild, zeichen, titel, label, n) {
-  return `<button type="button" class="schwebe-knopf" data-schwebe="${esc(fach)}"
-      aria-expanded="${schwebeOffen === fach}" title="${esc(titel)}" aria-label="${esc(label)}">
+function schwebeKnopfHtml({ bild, zeichen, titel, label, n, matt, extra }) {
+  return `<button type="button" class="schwebe-knopf" ${extra}
+      title="${esc(titel)}" aria-label="${esc(label)}">
       <span class="schwebe-sym">
         <img class="schwebe-bild" src="${esc(bild)}" alt="" draggable="false">
         <span class="schwebe-ersatz" aria-hidden="true">${zeichen}</span>
-        ${n == null ? "" : `<span class="schwebe-n${n ? "" : " null"}">${n}</span>`}
+        ${n == null ? "" : `<span class="schwebe-n${matt ? " null" : ""}">${esc(String(n))}</span>`}
       </span>
     </button>`;
 }
@@ -12303,8 +12295,9 @@ function schwebeLeisteHtml() {
     return `<div class="schwebe-zone sz-${esc(z.key)}${offen ? " offen" : ""}${z.rahmen ? " mit-rahmen" : ""}"
          data-schwebe-fach="${esc(z.key)}" data-zone="${esc(z.key)}" data-zonedrop="${esc(z.key)}">
       <div class="schwebe-korb">${zoneKorbHtml(z.key)}</div>
-      ${schwebeKnopfHtml(z.key, z.bild, zoneDef(z.key).icon, t("zone." + z.key),
-                         schwebeBeschriftung(z.key, n), n)}
+      ${schwebeKnopfHtml({ bild: z.bild, zeichen: zoneDef(z.key).icon, titel: t("zone." + z.key),
+        label: schwebeBeschriftung(z.key, n), n, matt: !n,
+        extra: `data-schwebe="${esc(z.key)}" aria-expanded="${offen}"` })}
     </div>`;
   }).join("")}`;
 }
@@ -12313,23 +12306,15 @@ function schwebeLeisteHtml() {
    aus, und ein Neuaufbau setzte nebenbei den seitlichen Rollstand zurück. */
 function schwebeUmschalten(key) {
   schwebeOffen = schwebeOffen === key ? null : key;
-  $$(".schwebe-zone").forEach(z => {
+  $$(".schwebe-zone[data-schwebe-fach]").forEach(z => {
     const fach = z.dataset.schwebeFach;
     const offen = fach === schwebeOffen;
     z.classList.toggle("offen", offen);
     const knopf = z.querySelector(".schwebe-knopf");
     if (!knopf) return;
     knopf.setAttribute("aria-expanded", String(offen));
-    if (fach !== "wuerfel")
-      knopf.setAttribute("aria-label", schwebeBeschriftung(fach, zoneSumme(fach)));
+    knopf.setAttribute("aria-label", schwebeBeschriftung(fach, zoneSumme(fach)));
   });
-  // Die Bühne ist so breit wie die Matte; ihre Größe steht erst fest, wenn sie
-  // sichtbar ist. Zugeklappt gemessen käme 0 × 0 heraus.
-  // Und three.js wird hier ein zweites Mal angestoßen: oeffneSession() holt es
-  // beim Betreten der Runde, aber die Bühne soll auch dann einen echten Würfel
-  // zeigen, wenn sie auf anderem Weg aufgeht. load() ist gegen Mehrfachaufrufe
-  // gesichert und kostet dann nichts.
-  if (schwebeOffen === "wuerfel") { buehneMessen(); DiceGL.load().then(buehneMessen); }
 }
 const schwebeSchliessen = () => { if (schwebeOffen) schwebeUmschalten(schwebeOffen); };
 
@@ -13116,23 +13101,43 @@ function d20Html(faceVal) {
    GANZE Matte ab, damit der Würfel quer darüber rollen kann. Kein
    data-zonedrop: Auf einen Würfel legt man keine Karte. */
 function wuerfelBuehneHtml() {
-  const offen = schwebeOffen === "wuerfel";
-  const letzter = (SESSION_LOG || []).find(e => e.kind === "dice");
-  return `<div class="schwebe-zone sz-wuerfel${offen ? " offen" : ""}" data-schwebe-fach="wuerfel">
-    <div class="schwebe-korb wuerfel-buehne" id="wuerfel-buehne">
-      <div class="wuerfel-feld" id="wuerfel-feld">${d20Html(letzter?.data?.result)}</div>
+  // Der letzte Wurf der Runde: aus dem Merker, sonst aus dem Log. Der Merker
+  // steht davor, weil das Log erst mit dem Echo der Datenbank nachzieht — ein
+  // Neuzeichnen dazwischen setzte die Zahl sonst kurz zurück.
+  const letzter = letzterWurf || (SESSION_LOG || []).find(e => e.kind === "dice");
+  const zahl = letzter?.data?.result ?? null;
+  return `<div class="schwebe-zone sz-wuerfel">
+    <div class="wuerfel-buehne" id="wuerfel-buehne">
+      <div class="wuerfel-feld" id="wuerfel-feld">${d20Html(zahl)}</div>
       <div class="wuerfel-kopf" id="wuerfel-kopf">${wurfKopfHtml(letzter)}</div>
-      <div class="sess-log" id="sess-log">${(SESSION_LOG || []).slice(0, 30).map(logZeile).join("")}</div>
-      <button type="button" class="btn wuerfel-werfen" id="dice-roll">${esc(t("sess.roll"))}</button>
     </div>
-    ${schwebeKnopfHtml("wuerfel", "assets/roll-the-dice.PNG", "&#127922;", t("sess.dice"),
-                       t(offen ? "sess.diceClose" : "sess.diceOpen"), null)}
+    ${schwebeKnopfHtml({ bild: "assets/roll-the-dice.PNG", zeichen: "&#127922;",
+      titel: wuerfelTitel(), label: wuerfelBeschriftung(zahl),
+      // Vor dem ersten Wurf ein Gedankenstrich, matt: Der Platz der Zahl soll
+      // als solcher erkennbar sein, auch wenn noch keine dasteht.
+      n: zahl ?? "–", matt: zahl == null, extra: `id="dice-roll"` })}
   </div>`;
 }
+const wuerfelBeschriftung = (zahl) =>
+  t("sess.roll") + (zahl == null ? "" : " · " + t("sess.diceLast", { n: zahl }));
+
+/* Die Wurfliste der Runde steht im Tooltip des Emblems statt als Kasten auf der
+   Matte. Ohne Rahmen und Grund — und die sollten weg — lag sie als blanker Text
+   über den Kartenbildern und der Kartenspalte und war dort nicht zu lesen.
+   Verloren geht sie deshalb nicht: Sie ist einen Zeiger entfernt. */
+function wuerfelTitel() {
+  const l = (SESSION_LOG || []).filter(e => e.kind === "dice").slice(0, 8).map(ev => {
+    const p = SESSION_PLAYERS.find(x => x.user_id === ev.user_id);
+    const name = p?.profile?.display_name || (ev.user_id === USER?.id ? t("sess.you") : "?");
+    return `${name}: ${ev.data?.result}`;
+  });
+  return [t("sess.roll"), ...l].join("\n");
+}
+
 function wurfKopfHtml(ev) {
-  if (!ev) return `<span class="wuerfel-leer">${esc(t("sess.diceNone"))}</span>`;
+  if (!ev) return "";
   const p = SESSION_PLAYERS.find(x => x.user_id === ev.user_id);
-  const name = p?.profile?.display_name || (ev.user_id === USER?.id ? t("sess.you") : "?");
+  const name = ev.name || p?.profile?.display_name || (ev.user_id === USER?.id ? t("sess.you") : "?");
   return `<b>${esc(name)}</b> <span class="wuerfel-erg">${esc(String(ev.data?.result ?? ""))}</span>`;
 }
 
@@ -13151,7 +13156,12 @@ function buehneMessen() {
    verschobenen Karte nicht mehr würfeln: Der Knopf war ein anderer geworden. */
 function wireWuerfel() {
   const roll = $("#dice-roll");
-  if (roll) roll.onclick = () => wuerfeln();
+  if (!roll) return;
+  roll.onclick = () => wuerfeln();
+  // three.js im Hintergrund holen. oeffneSession() tut das beim Betreten der
+  // Runde; hier noch einmal, damit auch ein Wurf auf anderem Weg den echten
+  // Körper bekommt. load() ist gegen Mehrfachaufrufe gesichert.
+  DiceGL.load();
 }
 addEventListener("resize", () => { if (schwebeOffen === "wuerfel") buehneMessen(); });
 
@@ -13186,15 +13196,30 @@ function wurfRueckfall(feld, result, plan) {
 /* Wurf zeigen. Das Ergebnis steht vorher fest — alles hier ist Schau, und die
    sieht dank wurfPlan() jedes Mal anders aus. */
 function zeigeWurf(result, name) {
-  // Ein Wurf zeigt sich selbst: Die Lade fährt auf, auch beim Wurf eines
-  // Mitspielers — sonst würfelte man ins Verborgene.
-  if (schwebeOffen !== "wuerfel") schwebeUmschalten("wuerfel");
   if (wurfTakt) { clearInterval(wurfTakt); wurfTakt = null; }
+  letzterWurf = { user_id: null, kind: "dice", data: { sides: 20, result }, name };
+  // Die Zahl steht AUF dem Emblem und bleibt dort stehen — sie ist der
+  // dauerhafte Teil des Wurfs, der Würfel auf der Matte der flüchtige.
+  const zahl = $(".sz-wuerfel .schwebe-n");
+  if (zahl) { zahl.textContent = String(result); zahl.classList.remove("null"); }
+  const knopf = $("#dice-roll");
+  if (knopf) knopf.setAttribute("aria-label", wuerfelBeschriftung(result));
   const kopf = $("#wuerfel-kopf");
   if (kopf) kopf.innerHTML = `<b>${esc(name || "?")}</b> <span class="wuerfel-erg">${esc(String(result))}</span>`;
+
   const feld = $("#wuerfel-feld");
   if (!feld) return;
   const plan = wurfPlan();
+
+  /* Der Würfel liegt NICHT dauerhaft auf der Matte: Er verdeckte sonst genau
+     die Karten, für die man gewürfelt hat. Er rollt, bleibt einen Moment
+     liegen und blendet dann aus — die Zahl bleibt oben am Emblem. */
+  const buehne = $(".sz-wuerfel");
+  buehne?.classList.add("laeuft");
+  clearTimeout(wurfEnde);
+  wurfEnde = setTimeout(() => buehne?.classList.remove("laeuft"),
+    plan.taumeln + plan.legen + 2600);
+
   buehneMessen();
   if (DiceGL.ready) {
     if (DiceGL.canvas.parentNode !== feld) { feld.innerHTML = ""; feld.appendChild(DiceGL.canvas); }
@@ -13230,12 +13255,14 @@ function wurfSpeichern(s, result) {
     });
 }
 
-/* Ein Event vorn ins Log hängen und die Anzeige (falls sichtbar) neu zeichnen. */
+/* Ein Event vorn ins Log hängen. Sichtbar wird es im Tooltip des Würfelemblems
+   — als Liste auf der Matte lag es ohne Rahmen und Grund unlesbar über den
+   Kartenbildern. */
 function logHinzu(ev) {
   SESSION_LOG.unshift(ev);
   SESSION_LOG = SESSION_LOG.slice(0, 30);
-  const box = $("#sess-log");
-  if (box) box.innerHTML = SESSION_LOG.slice(0, 30).map(logZeile).join("");
+  const knopf = $("#dice-roll");
+  if (knopf) knopf.title = wuerfelTitel();
 }
 
 /* -------- Realtime -------- */

@@ -559,8 +559,6 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
   letter-spacing:.4px;text-transform:uppercase;color:var(--err);margin:1px 0 0}
 .sp-card.besiegt .sp-besiegt{display:flex}
 .sp-host{color:var(--acc)}
-.sess-log{margin-top:10px;display:flex;flex-direction:column;gap:3px;max-height:150px;overflow-y:auto}
-.log-zeile{font-size:13px;color:var(--dim)}
 .sp-deckname{font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 /* Schwebende Commander-Vorschau beim Hover (eigenes Element, nicht #hovercard) */
 .cmd-hover{position:fixed;z-index:95;display:none;pointer-events:none;background:var(--panel);
@@ -894,47 +892,58 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .sz-hand .hand-fan{overflow:visible}
 @media(prefers-reduced-motion:reduce){ .schwebe-korb{transition:none} }
 
-/* ===== Die Würfelbühne =====
-   Die vierte Lade, und die einzige, die keine Zone ist. Sie nimmt die GANZE
-   Matte ein: Der W20 soll quer darüber rollen, nicht in einem Kasten von
-   340 × 150 px wackeln, wie er es unter der Matte tat.
+/* ===== Der Würfel =====
+   KEINE LADE, sondern ein Wurf: Ein Klick auf das Emblem würfelt sofort. Der
+   W20 rollt DIREKT ÜBER DIE MATTE — kein Rahmen, kein Grund, keine Bühne, die
+   sich davorlegt. Er nimmt die ganze Mattenfläche ein, weil er quer darüber
+   rollen soll und nicht in einem Kasten von 340 × 150 px wackeln, wie er es
+   unter der Matte tat.
 
-   Sie hängt sich an die Matte, wenn es eine gibt. Sonst — im Akkordeon und in
-   einer Runde ohne gewähltes Deck — gibt es keine Fläche, an die sie sich
-   hängen könnte; dort ist der Würfel ein fester Knopf unten rechts und seine
-   Bühne ein Fenster über dem Schirm. Das ist der Standard hier, weil er ohne
-   jede Voraussetzung auskommt; die Matte ist der Sonderfall. */
+   Die Fläche hängt sich an die Matte, wenn es eine gibt. Sonst — im Akkordeon
+   und in einer Runde ohne gewähltes Deck — gibt es nichts, woran sie hängen
+   könnte; dort ist der Würfel ein fester Knopf unten rechts und rollt über den
+   Schirm. Das ist der Standard hier, weil er ohne jede Voraussetzung auskommt;
+   die Matte ist der Sonderfall. */
 .sz-wuerfel{position:fixed;inset:auto;z-index:70}
 .sz-wuerfel .schwebe-knopf{position:fixed;right:14px;bottom:14px}
-.sz-wuerfel .schwebe-korb{position:fixed;inset:12px;right:12px;bottom:12px}
-/* UNTER den anderen drei Laden (z-index 40): Die Bühne deckt die ganze Matte
-   ab, aber die Emblemleiste muss darauf sichtbar und anklickbar bleiben —
-   sonst käme man aus der offenen Bühne nur noch mit Escape heraus. Der eigene
-   Knopf steht im DOM hinter der Bühne und liegt damit ohnehin darüber. */
+.sz-wuerfel .wuerfel-buehne{position:fixed;inset:12px}
+/* UNTER den drei Laden (z-index 40): Der Würfel fliegt über die Matte, aber
+   ein offener Handfächer oder Friedhof gehört davor — man würfelt oft, während
+   eine Lade offen steht. Der eigene Knopf steht im DOM hinter der Fläche und
+   liegt damit ohnehin darüber. */
 .mat .sz-wuerfel{position:absolute;inset:0;bottom:0;z-index:30}
 .mat .sz-wuerfel .schwebe-knopf{position:absolute;right:calc(var(--sz-rand) + var(--sz-schritt) * 3);
   bottom:var(--sz-boden);top:auto}
-.mat .sz-wuerfel .schwebe-korb{position:absolute;inset:0;right:0;bottom:0}
-/* Sie klappt nicht nach oben auf wie die Zonenkörbe — sie liegt ja schon
-   überall. Nur ein kurzes Aufblenden aus der Fläche heraus. */
-.wuerfel-buehne{transform:scale(.98);max-height:none;overflow:hidden;
-  border:1px solid var(--line);border-radius:14px;
-  background:rgba(11,13,19,.94);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
-  box-shadow:0 14px 44px rgba(0,0,0,.65)}
-.schwebe-zone.offen .wuerfel-buehne{transform:none}
-/* Das Spielfeld des Würfels: die volle Bühne, und für Zeiger durchlässig —
-   sonst finge der Würfel Klicks ab, die dem Werfen-Knopf darunter gelten. */
-.wuerfel-feld{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.mat .sz-wuerfel .wuerfel-buehne{position:absolute;inset:0}
+/* Der Würfel liegt nicht dauerhaft da: Er verdeckte sonst genau die Karten,
+   für die man gewürfelt hat. Er rollt, bleibt einen Moment liegen und blendet
+   dann aus — die ZAHL bleibt am Emblem, sie ist der dauerhafte Teil.
+   visibility statt display, damit das Ausblenden überhaupt eine Dauer hat, und
+   damit die Leinwand ihre Größe behält (display:none misst 0 × 0). */
+.wuerfel-buehne{visibility:hidden;opacity:0;pointer-events:none;
+  transition:opacity .5s ease-out,visibility .5s}
+.sz-wuerfel.laeuft .wuerfel-buehne{visibility:visible;opacity:1}
+@media(prefers-reduced-motion:reduce){ .wuerfel-buehne{transition:none} }
+/* Das Spielfeld des Würfels: die volle Fläche, für Zeiger durchlässig — unter
+   ihm liegt die Matte, und deren Karten bleiben anfassbar, während er rollt. */
+.wuerfel-feld{position:absolute;inset:0;display:grid;place-items:center}
 .wuerfel-feld .d20{width:clamp(84px,14vw,132px);height:auto}
 .wuerfel-feld canvas.dice-gl{position:absolute;left:0;top:0;display:block}
-.wuerfel-kopf{position:absolute;top:12px;left:16px;font-size:13px;color:var(--dim);
-  display:flex;align-items:center;gap:10px}
-.wuerfel-erg{font-size:30px;font-weight:800;color:var(--acc);line-height:1;
+/* Wer geworfen hat und was — ohne Kasten, nur Schrift mit Schatten. Ein Grund
+   darunter wäre genau der Rahmen, der hier weg sollte; lesbar über hellen wie
+   dunklen Kartenbildern bleibt sie durch den Schatten, dieselbe Lösung wie bei
+   den Emblemen.
+   Sie steht LINKS NEBEN DER EMBLEMLEISTE, auf deren Höhe: Dort schaut man
+   ohnehin hin, wenn die Zahl am Würfel erscheint, und dort liegt der Streifen
+   der Länder statt einer Überschrift. Oben links stand sie über „Schlachtfeld",
+   und beides war übereinander nicht zu lesen. */
+.wuerfel-kopf{position:absolute;bottom:20px;right:96px;
+  text-shadow:0 1px 3px #000,0 0 10px #000;
+  font-size:13px;color:var(--txt);display:flex;align-items:center;gap:9px}
+.mat .wuerfel-kopf{bottom:calc(var(--sz-boden) + 16px);
+  right:calc(var(--sz-rand) + var(--sz-schritt) * 4)}
+.wuerfel-erg{font-size:26px;font-weight:800;color:var(--acc);line-height:1;
   font-variant-numeric:tabular-nums}
-.wuerfel-leer{font-style:italic}
-.wuerfel-buehne .sess-log{position:absolute;top:10px;right:12px;margin:0;
-  width:min(240px,38%);max-height:calc(100% - 76px)}
-.wuerfel-werfen{position:absolute;left:50%;bottom:14px;transform:translateX(-50%)}
 /* FRIEDHOF UND EXIL bekommen Rahmen und Grund. Ihre Gitter sind lose Reihen
    kleiner Bilder und bräuchten sonst eine Fläche, um nicht über dem
    Schlachtfeld zu schwimmen. Der Handfächer trägt seine Form selbst: Seine
