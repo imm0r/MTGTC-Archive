@@ -12266,10 +12266,13 @@ function handLadeHtml() {
   return `<div class="hand-lade${handOffen ? " offen" : ""}" data-zone="hand" data-zonedrop="hand">
     <div class="hand-lade-korb">${zoneKorbHtml("hand")}</div>
     <button type="button" class="hand-lade-knopf" data-handlade
-      aria-expanded="${handOffen}" title="${esc(auf)}" aria-label="${esc(auf)}">
-      <span class="hand-lade-zeichen" aria-hidden="true">${zoneDef("hand").icon}</span>
-      <span class="hand-lade-name">${esc(t("zone.hand"))}</span>
-      <span class="hand-lade-n${n ? "" : " null"}">${n}</span>
+      aria-expanded="${handOffen}" title="${esc(auf)}"
+      aria-label="${esc(auf + " · " + t("hand.cards", { n }))}">
+      <span class="hand-lade-sym">
+        <img class="hand-lade-bild" src="assets/cards-on-hand.PNG" alt="" draggable="false">
+        <span class="hand-lade-ersatz" aria-hidden="true">${zoneDef("hand").icon}</span>
+        <span class="hand-lade-n${n ? "" : " null"}">${n}</span>
+      </span>
     </button>
   </div>`;
 }
@@ -12285,9 +12288,21 @@ function handLadeUmschalten(auf) {
   if (knopf) {
     const txt = t(handOffen ? "hand.close" : "hand.open");
     knopf.setAttribute("aria-expanded", String(handOffen));
-    knopf.setAttribute("aria-label", txt);
+    knopf.setAttribute("aria-label", txt + " · " + t("hand.cards", { n: zoneSumme("hand") }));
     knopf.title = txt;
   }
+}
+
+/* Fehlt das Bild, tritt das Schriftzeichen an seine Stelle — dieselbe Regel wie
+   am Zugabe-Knopf und an der Truhe. Ein Knopf, der nur aus einem kaputten Bild
+   besteht, ist eine leere Fläche, die niemand anklickt. Muss nach JEDEM
+   Zeichnen neu gehängt werden: Das Bild ist dann ein anderes Element. */
+function handLadeBildWachen() {
+  const bild = $("#zonen .hand-lade-bild");
+  if (!bild) return;
+  if (bild.complete && bild.naturalWidth === 0) bild.closest(".hand-lade")?.classList.add("ohne-bild");
+  else bild.addEventListener("error",
+    () => bild.closest(".hand-lade")?.classList.add("ohne-bild"), { once: true });
 }
 const handLadeSchliessen = () => { if (handOffen) handLadeUmschalten(false); };
 
@@ -12591,6 +12606,7 @@ function renderZonen() {
   wireSpielerKacheln();
   const suche = $("#lib-suche");
   if (suche) { suche.value = suchtext; if (fokus) { suche.focus(); suche.selectionStart = suche.selectionEnd = suchtext.length; } }
+  handLadeBildWachen();
   wireZonenHover();
 }
 
@@ -12766,6 +12782,7 @@ function wireSession() {
   const deckSel = $("#sess-deck"); if (deckSel) deckSel.onchange = () => sessDeckWaehlen(deckSel.value);
   const trkReset = $("#trk-reset"); if (trkReset) trkReset.onclick = trackerReset;
   wireZonen();
+  handLadeBildWachen();
   // Auf-/Zugeklappt merken, damit ein Neuzeichnen (Realtime) es nicht aufreißt.
   const dbox = $("#dice-box"); if (dbox) dbox.ontoggle = () => wuerfelOffen = dbox.open;
   const ibox = $("#invite-box"); if (ibox) ibox.ontoggle = () => einladenOffen = ibox.open;

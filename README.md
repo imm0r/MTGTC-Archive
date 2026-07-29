@@ -1095,10 +1095,18 @@ Lebenspunkte aller Mitspieler samt Friedhof. Ein quer gehaltenes Handy erreicht
 diese Breite und bekommt die Matte automatisch. Ab **1200 px** kommt rechts eine
 vierte Spalte über die volle Höhe dazu: die Kartenansicht (siehe unten).
 
-**Die Hand ist eine Lade**, unten links an der Matte: eine Schaltfläche mit
-Handzeichen und Anzahl, ein Klick klappt den Fächer nach oben aus, Escape oder
-ein zweiter Klick wieder zu. Nach oben, weil am Tisch die Hand vor einem liegt —
-zur Seite auszufahren löste dieses Bild auf.
+**Die Hand ist eine Lade**, unten links an der Matte: das Emblem
+`assets/cards-on-hand.PNG` mit der Kartenzahl unten rechts darauf. Ein Klick
+klappt den Fächer nach oben aus, Escape oder ein zweiter Klick wieder zu. Nach
+oben, weil am Tisch die Hand vor einem liegt — zur Seite auszufahren löste
+dieses Bild auf.
+
+Das Emblem trägt die Schaltfläche allein: kein Kasten darum, kein Beiwort
+daneben. Es bringt seinen eigenen Ring mit, eine Pille darum wäre ein Rahmen um
+einen Rahmen; lesbar über hellen wie dunklen Kartenbildern bleibt es durch den
+Schlagschatten. Lädt das Bild nicht, tritt ✋ an seine Stelle — dieselbe Regel
+wie am Zugabe-Knopf und an der Truhe. Weil der sichtbare Text entfällt, nennt
+die Beschriftung für Vorleseprogramme die Anzahl mit.
 
 > **Warum sie nicht mehr in der Reihe steht.** Der Fächer ist gut 230 px hoch.
 > Quer über die Matte kostete er diese Höhe *dauernd*, obwohl man die Hand nur

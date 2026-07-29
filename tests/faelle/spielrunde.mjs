@@ -236,6 +236,40 @@ export default async function ({ seite, adresse, stand }) {
     [lade.klammer, lade.knopf], ["none", "auto"]);
   stand.ist("die Schaltfläche nennt die Anzahl", lade.zahl === "2", lade.zahl);
 
+  /* Die Schaltfläche IST das Emblem: kein Beiwort daneben, und die Zahl steht
+     unten rechts darauf statt daneben. Zwei Dinge daran können still
+     schiefgehen — das Bild lädt nicht (dann bliebe eine leere Fläche, die
+     niemand anklickt), oder die Zahl rutscht neben das Symbol statt darauf. */
+  const sym = await seite.evaluate(() => {
+    const knopf = document.querySelector(".hand-lade-knopf");
+    const bild = knopf.querySelector(".hand-lade-bild");
+    const s = knopf.querySelector(".hand-lade-sym").getBoundingClientRect();
+    const n = knopf.querySelector(".hand-lade-n").getBoundingClientRect();
+    return {
+      quelle: bild?.getAttribute("src") ?? null,
+      geladen: !!bild && bild.complete && bild.naturalWidth > 0,
+      ersatzVersteckt: getComputedStyle(knopf.querySelector(".hand-lade-ersatz")).display === "none",
+      // Auf dem Symbol: der Mittelpunkt der Zahl liegt innerhalb des Symbols …
+      draufX: n.left + n.width / 2 > s.left && n.left + n.width / 2 < s.right,
+      draufY: n.top + n.height / 2 > s.top && n.top + n.height / 2 < s.bottom,
+      // … und zwar in dessen unterem rechten Viertel.
+      untenRechts: n.left + n.width / 2 > s.left + s.width / 2 &&
+                   n.top + n.height / 2 > s.top + s.height / 2,
+      // Die Zahl darf das Symbol nicht erschlagen.
+      anteil: Math.round(n.width / s.width * 100),
+      beschriftung: knopf.getAttribute("aria-label"),
+    };
+  });
+  stand.ist("die Schaltfläche trägt das Emblem", sym.geladen, sym.quelle);
+  stand.ist("das Ersatzzeichen bleibt dabei versteckt", sym.ersatzVersteckt);
+  stand.gleich("die Zahl steht auf dem Symbol, unten rechts",
+    [sym.draufX, sym.draufY, sym.untenRechts], [true, true, true]);
+  stand.ist("und erschlägt es nicht", sym.anteil <= 40, sym.anteil + " % der Symbolbreite");
+  // Der sichtbare Text ist weg — für Vorleseprogramme muss die Anzahl deshalb
+  // in die Beschriftung, sonst wäre sie dort gar nicht mehr vorhanden.
+  stand.ist("die Beschriftung nennt die Anzahl mit",
+    /\b2\b/.test(sym.beschriftung || ""), sym.beschriftung);
+
   await seite.locator("[data-handlade]").click();
   await seite.waitForTimeout(400);
   const offen = await seite.evaluate(() => {
