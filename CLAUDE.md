@@ -35,8 +35,17 @@ einer mit falscher Identität werden weiterhin gemeldet.
 
 Das ist ein Notnagel. Der Hook wird bei jeder Container-Bereitstellung neu
 geschrieben, die Änderung überlebt die Sitzung also nicht — deshalb liegt sie
-hier statt im Container. Behoben gehört er dort, wo er herkommt (in Claude Code
-über `/bug`).
+hier statt im Container. Nachgewiesen am 29.07.2026: Die Sitzung wurde um
+08:48:20 neu aufgesetzt, der Hook kam im Original zurück und meldete prompt
+wieder GitHubs Merge-Commit. Ein Aufruf des Skripts, und er schwieg.
+
+**Schon gemeldet — nicht noch einmal melden.** Beide Fehlalarme sind bei
+Anthropic eingegangen, Referenz-ID
+`b5746b94-aef0-4d56-a8c4-22684b591659`. Behoben gehört der Hook dort, wo er
+herkommt; hier ist nichts weiter zu tun, als das Skript zu Beginn der Sitzung
+laufen zu lassen. Trägt eine künftige Fassung den Fehler nicht mehr, sagt das
+Skript das von selbst („sieht anders aus als erwartet") und ändert nichts —
+dann kann dieser Abschnitt samt `scripts/stop-hook-patch.mjs` weg.
 
 ## Pull Requests selbst zusammenführen
 
