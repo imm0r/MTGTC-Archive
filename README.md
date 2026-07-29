@@ -1076,9 +1076,9 @@ Bibliothek zuunterst.
 | --- | --- | --- |
 | ★ | Kommandozone | der Commander, solange er nicht im Spiel ist (nur bei Commander-Decks) |
 | ⚔️ | Schlachtfeld | alles, was ausgespielt auf dem Tisch liegt — mit getappt/ungetappt und +1/+1-Marken |
-| ⚰️ | Friedhof | Gestorbenes, Abgehandeltes, Abgeworfenes |
-| 🚫 | Exil | ins Exil geschickte Karten |
-| ✋ | Hand | aufgefächert, jedes Exemplar eine eigene Karte; auf der Matte eine Lade (siehe unten) |
+| ⚰️ | Friedhof | Gestorbenes, Abgehandeltes, Abgeworfenes; auf der Matte eine Lade (siehe unten) |
+| 🚫 | Exil | ins Exil geschickte Karten; auf der Matte eine Lade |
+| ✋ | Hand | aufgefächert, jedes Exemplar eine eigene Karte; auf der Matte eine Lade |
 | 📚 | Bibliothek | was noch im Deck steckt |
 
 Die **Länder** stehen dabei getrennt vom übrigen Schlachtfeld — in der Matte als
@@ -1090,26 +1090,42 @@ und ob sie ein Land ist, weiß die App aus der Typzeile.
 
 Ab **820 px Breite** liegen die Felder wie auf der offiziellen Spielmatte:
 Schlachtfeld groß links, Länder als Streifen darunter, rechts die schmalen
-Spalten (Commander-Steuer, Kommandozone, Bibliothek, Exil) und ganz rechts die
+Spalten (Commander-Steuer, Kommandozone, Bibliothek) und ganz rechts die
 Lebenspunkte aller Mitspieler. Ein quer gehaltenes Handy erreicht
 diese Breite und bekommt die Matte automatisch. Ab **1200 px** kommt rechts eine
 vierte Spalte über die volle Höhe dazu: die Kartenansicht (siehe unten).
 
-**Hand und Friedhof sind Laden**, am Fuß des Schlachtfelds gleich links neben
-Exil: die Embleme `assets/cards-on-graveyard.PNG` und `assets/cards-on-hand.PNG`
-mit der Kartenzahl unten rechts darauf. Ein Klick klappt nach oben aus, Escape
-oder ein zweiter Klick wieder zu. Nach oben, weil am Tisch beide vor einem
-liegen — zur Seite auszufahren löste dieses Bild auf.
+**Hand, Friedhof und Exil sind Laden** am unteren Mattenrand: die Embleme
+`assets/cards-on-hand.PNG`, `assets/cards-on-graveyard.PNG` und
+`assets/cards-at-exil.PNG` mit der Kartenzahl unten rechts darauf. Ein Klick
+klappt nach oben aus, Escape oder ein zweiter Klick wieder zu. Nach oben, weil
+am Tisch alle drei vor einem liegen — zur Seite auszufahren löste dieses Bild
+auf.
+
+**Jedes Emblem steht am Fuß seiner alten Spalte**: das Exil unter der mittleren,
+der Friedhof unter der rechten — also rechts neben dem alten Exil-Feld —, die
+Hand am rechten Rand des Schlachtfelds. So bleibt der Ort, an dem man eine Zone
+sucht, derselbe wie vorher; frei geworden ist nur die Fläche. Gerechnet werden
+die Abstände aus den Spaltenbreiten selbst, damit sie mitgehen, wenn sich eine
+ändert.
 
 **Immer nur eine offen.** Die Schaltflächen stehen nebeneinander, ihre Körbe
 sind breiter als sie selbst — offen lägen sie übereinander. Dieselbe Regel wie
 im Akkordeon, aus demselben Grund.
 
-**Rahmen nur beim Friedhof.** Sein Gitter ist eine lose Reihe kleiner Bilder
-und bräuchte sonst eine Fläche, um nicht über dem Schlachtfeld zu schwimmen.
+**Rahmen bei Friedhof und Exil.** Ihre Gitter sind lose Reihen kleiner Bilder
+und bräuchten sonst eine Fläche, um nicht über dem Schlachtfeld zu schwimmen.
 Der Handfächer trägt seine Form selbst: Seine Karten liegen gestaffelt und
 werfen Schatten — ein Kasten darum wäre ein Rahmen um etwas, das schon eine
 Gestalt hat.
+
+**Der Handfächer geht mittig über dem Schlachtfeld auf**, dicht über dem unteren
+Mattenrand — nicht rechts oben über seiner Schaltfläche, wo er die halbe Matte
+verdeckte. Er **rollt nicht**: Ein Rollbereich schnitte die gedrehten Ränder ab
+und die beim Zeigen angehobene Karte gleich mit. Nötig ist er auch nicht, denn
+der Fächer wird bei vielen Karten von selbst schmaler — der sichtbare Anteil je
+Karte schrumpft mit ihrer Zahl, gemessen in Kartenbreiten statt in Pixeln, damit
+er auf schmalen Schirmen mitschrumpft.
 
 Das Emblem trägt die Schaltfläche jeweils allein: kein Kasten darum, kein
 Beiwort daneben; lesbar über hellen wie dunklen Kartenbildern bleibt es durch
@@ -1119,9 +1135,10 @@ Text entfällt, nennt die Beschriftung für Vorleseprogramme Zone und Anzahl mit
 
 > **Warum sie nicht mehr in der Reihe stehen.** Der Handfächer ist gut 230 px
 > hoch und kostete diese Höhe *dauernd*, obwohl man ihn nur ansieht, wenn man
-> etwas daraus spielen will; der Friedhof wächst über die Partie, wird aber fast
-> nur nachgeschlagen. Den Platz bekommt das Schlachtfeld, das man ständig
-> ansieht.
+> etwas daraus spielen will; Friedhof und Exil wachsen über die Partie, werden
+> aber fast nur nachgeschlagen — das Exil bleibt in den meisten Partien sogar
+> leer. Den Platz bekommt das Schlachtfeld, das man ständig ansieht, und die
+> Lebenspunkte bekommen die volle Höhe ihrer Spalte.
 >
 > Zieht man eine Karte heraus, **geht die Lade zu** — sie schwebt über der
 > Matte und läge sonst über genau den Zonen, auf die man zielt. Gesehen hat man
@@ -1129,8 +1146,10 @@ Text entfällt, nennt die Beschriftung für Vorleseprogramme Zone und Anzahl mit
 > Trefferliste im Deckbau.
 >
 > Die Schaltflächen sind auch **zugeklappt Ablageziele**. Etwas auf die Hand
-> zurückzunehmen oder auf den Friedhof zu legen, ohne vorher aufzuklappen, ist
-> der häufigere Weg.
+> zurückzunehmen oder auf Friedhof und Exil zu legen, ohne vorher aufzuklappen,
+> ist der häufigere Weg. Ziel ist dabei nur die Schaltfläche selbst: Die Klammer
+> der Hand deckt die ganze Matte, damit ihr Fächer mittig aufgehen kann, und
+> jeder Punkt des Schlachtfelds wäre sonst ein Handziel.
 
 Die Spielrunde darf dabei **breiter werden als der Rest der App** (1800 statt
 1100 px): die Mattenspalten sind fest, alles Zusätzliche geht ans Schlachtfeld
@@ -1480,6 +1499,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `kartenansicht`  | Klebende Spaltenköpfe (auch im schmalen Fenster), Aufklappen beim Überfahren, kein Aufklappen beim Ziehen |
 | `zugabe`         | „Karte zum Deck“: Ausklappen, gefilterte Trefferliste, Zug in eine Kategorie, volles Deck |
 | `decks`          | Höchstens ein Deck aufgeklappt, Speicher und Baum stimmen überein, Truhe wirft die richtige Karte |
+| `spielrunde`     | Zonen der Matte: Ziehen zwischen ihnen, Tappen per Klick, die drei Laden (Ort, Rahmen, Zahl, immer nur eine offen, auch zugeklappt Ablageziel) |
 
 ### Zwei Regeln, die dabei gelernt wurden
 
