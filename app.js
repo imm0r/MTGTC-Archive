@@ -12695,6 +12695,153 @@ function feldAlleEnttappen() {
   if (geaendert) renderZonen();
 }
 
+/* ---- Mana in diesem Zug ---------------------------------------------
+   Wieviel Mana das eigene Schlachtfeld hergibt — über ALLE Karten, nicht nur
+   die Länder: Sol Ring, Signets und Elfen sind genau der Grund, warum Zählen
+   auf den Fingern irgendwann nicht mehr reicht.
+
+   GELESEN WIRD DER REGELTEXT (oracle_text, immer englisch — der gedruckte
+   Text wäre je Sprache anders und taugt nicht als Muster; dieselbe Regel wie
+   überall in der App). Eine Manafähigkeit ist eine Zeile „Kosten: Add …“:
+
+       {T}: Add {G}.                            → 1
+       {T}: Add {C}{C}.                         → 2   (Sol Ring)
+       {1}, {T}: Add two mana in any …          → 1   (Signet: 2 raus, 1 rein)
+       {T}, Sacrifice this artifact: Add one …  → 1   (Lotus Petal)
+
+   GEZÄHLT WIRD NETTO: was herauskommt, minus Mana in den Kosten. Nur so
+   stimmt die SUMME — ein Signet macht den Zug nicht um zwei Mana reicher,
+   sondern um eins, denn das Land, das es füttert, steht schon in der Zählung.
+
+   NUR FÄHIGKEITEN MIT {T} IN DEN KOSTEN. Das Tappen ist die natürliche
+   Schranke „einmal je Zug“, und es knüpft die Zahl an das, was die App ohnehin
+   führt: den Tapp-Zustand jedes Exemplars. Fähigkeiten ohne {T} sind fast
+   immer Mana-Filter, deren Netto ohnehin nicht positiv ist. Andere
+   Zusatzkosten (ein Geschöpf opfern, eine Karte abwerfen) disqualifizieren
+   die Fähigkeit — sie brauchen Material, das die Zählung nicht sehen kann.
+   Einzige Ausnahme: sich SELBST opfern (Lotus Petal), das ist in sich
+   abgeschlossen.
+
+   WAS DIE ZÄHLUNG BEWUSST NICHT SIEHT, steht im README: Einsatzverzögerung
+   frisch gelegter Geschöpfe, „nur für Artefakte“-Auflagen, gewährte
+   Fähigkeiten. Sie ist eine Schätzung — aber eine, die bei den Karten, die
+   tatsächlich auf Tischen liegt, fast immer stimmt. */
+const MANA_WORT = { one: 1, two: 2, three: 3, four: 4, five: 5,
+                    six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+
+/* Die Zusatzkosten einer Fähigkeit. → {mana} oder null (zählt nicht). */
+function manaKosten(roh, name) {
+  let tap = false, mana = 0;
+  for (let teil of roh.replace(/[()]/g, "").split(",")) {
+    teil = teil.trim();
+    if (!teil) continue;
+    if (/^(\{[^}]+\})+$/.test(teil)) {
+      for (const s of teil.match(/\{[^}]+\}/g)) {
+        const z = s.slice(1, -1);
+        if (z === "T") tap = true;
+        else if (z === "X") return null;
+        else if (/^\d+$/.test(z)) mana += +z;
+        else mana += 1;
+      }
+      continue;
+    }
+    if (/^sacrifice this\b/i.test(teil)
+        || teil.toLowerCase() === "sacrifice " + (name || "").toLowerCase()) continue;
+    return null;
+  }
+  return tap ? { mana } : null;
+}
+
+/* Was hinter „Add …“ steht. → Zahl oder null (variabel: X, „for each“).
+   Wahlmöglichkeiten („{G} or {W}“, „{W}{W}, {W}{B}, or {B}{B}“) werden an
+   Kommas und „or“ getrennt; es zählt die größte — mehr als das gibt eine
+   einzelne Aktivierung nie her. */
+function manaMenge(text) {
+  if (/\{X\}|\bfor each\b|amount of|equal to/i.test(text)) return null;
+  let best = 0;
+  for (const opt of text.split(/\s*,\s*|\s+or\s+/i)) {
+    const sym = (opt.match(/\{[^}]+\}/g) || []).length;
+    const wort = opt.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten)\b[^.]*?\bmana\b/i);
+    best = Math.max(best, sym, wort ? MANA_WORT[wort[1].toLowerCase()] : 0);
+  }
+  return best;
+}
+
+/* Netto-Mana einer Karte je Tappen. → {je, variabel} */
+function manaProduktion(c) {
+  let je = 0, variabel = false;
+  for (const m of (c.oracle_text || "").matchAll(/([^:\n.]*):\s*Add\s([^.\n]+)/g)) {
+    const kosten = manaKosten(m[1], c.name);
+    if (!kosten) continue;
+    const menge = manaMenge(m[2]);
+    if (menge === null) { variabel = true; continue; }
+    je = Math.max(je, menge - kosten.mana);
+  }
+  // Grundland-Typen tragen ihre Fähigkeit im REGELWERK, nicht im Text
+  // (CR 305.6): ein Wald macht {G}, auch wenn kein Erinnerungstext erfasst
+  // ist. Das fängt Altbestand ohne Regeltext ab — und Dryad Arbor gleich mit.
+  if (/\bLand\b/.test(c.type_line || "")
+      && /\b(Plains|Island|Swamp|Mountain|Forest)\b/.test(c.type_line || ""))
+    je = Math.max(je, 1);
+  return { je: Math.max(0, je), variabel };
+}
+
+/* Der Stand fürs Anzeigen: frei = was ungetappte Quellen noch geben können,
+   gesamt = alle Quellen, als wäre nichts getappt. Beides zusammen liest sich
+   als „so viel geht noch, so viel war es diesen Zug“. */
+function manaStand() {
+  const st = { frei: 0, gesamt: 0, teile: [], variabel: [], unbekannt: [] };
+  zoneKarten("field").forEach(({ card, n }) => {
+    const p = manaProduktion(card);
+    if (p.variabel) st.variabel.push(trkName(card));
+    if (!p.je) {
+      // null heißt „Text nie erfasst“ ('' ist eine Aussage: Vanilla). Das
+      // gehört in den Tooltip, sonst liest sich die Zahl sicherer, als sie ist.
+      if (card.oracle_text == null && !p.variabel) st.unbekannt.push(trkName(card));
+      return;
+    }
+    const wach = feldListe(card.id).filter(x => !x.t).length;
+    st.frei += p.je * wach;
+    st.gesamt += p.je * n;
+    st.teile.push({ name: trkName(card), je: p.je, n, wach });
+  });
+  return st;
+}
+
+function manaTitel(st) {
+  let s = t("mat.manaTitle", { frei: st.frei, gesamt: st.gesamt });
+  if (st.teile.length) s += "\n" + st.teile.map(x =>
+    t("mat.manaZeile", { name: x.name, n: x.n, je: x.je })).join("\n");
+  if (st.variabel.length) s += "\n" + t("mat.manaVariabel", { namen: st.variabel.join(", ") });
+  if (st.unbekannt.length) s += "\n" + t("mat.manaUnbekannt", { namen: st.unbekannt.join(", ") });
+  return s;
+}
+
+/* Das Feld in der Matte, unter der Commander-Steuer: gleiche Bauart, aber
+   eine ANZEIGE, kein Knopf — am Mana gibt es nichts zu klicken. Ohne eine
+   einzige Quelle ein matter Strich, wie bei der Steuer ohne Commander. */
+function matManaHtml() {
+  const st = manaStand();
+  const plus = st.variabel.length ? "+" : "";
+  return `<section class="mat-feld mat-mana">
+    <div class="mat-titel">${esc(t("mat.mana"))}</div>
+    <div class="mat-korb">${st.gesamt || st.variabel.length
+      ? `<div class="mat-manawert" title="${esc(manaTitel(st))}"><span class="mana-frei">${st.frei}${plus}</span><span class="mana-von">&thinsp;/&thinsp;${st.gesamt}${plus}</span></div>`
+      : `<div class="mat-manawert leer">&ndash;</div>`}</div>
+  </section>`;
+}
+
+/* Dasselbe im Akkordeon, als Marke in der Kopfzeile des Schlachtfelds — dort
+   gibt es keine Mattenspalte, aber die Kopfzeile ist immer zu sehen, auch
+   zugeklappt. Ohne Quellen bleibt sie ganz weg: eine „0/0“ neben jedem leeren
+   Feld wäre Lärm. */
+function zonenManaChip() {
+  const st = manaStand();
+  if (!st.gesamt && !st.variabel.length) return "";
+  const plus = st.variabel.length ? "+" : "";
+  return `<span class="zone-mana" title="${esc(manaTitel(st))}">${esc(t("mat.mana"))} ${st.frei}${plus}/${st.gesamt}${plus}</span>`;
+}
+
 /* ---- Verschieben ---------------------------------------------------- */
 /* Ein Exemplar von einer Zone in die andere. Die Bibliothek und die
    Kommandozone speichern nichts — sie wachsen und schrumpfen als Rest von
@@ -12900,6 +13047,7 @@ function matInnerHtml() {
                title="${esc(t("sess.cmdTaxTitle", { mana: steuer * 2, n: steuer }))}">+${steuer * 2}</button>`
           : `<span class="mat-steuerwert leer">&ndash;</span>`}</div>
       </section>
+      ${matManaHtml()}
       ${feld("cmd", t("zone.cmd"), { n: zoneSumme("cmd"), html: zoneKorbHtml("cmd") })}
       ${feld("lib", t("zone.lib"), { n: zoneSumme("lib"), html: zoneKorbHtml("lib") }, " mat-lib")}
     </div>
@@ -13264,6 +13412,7 @@ function zoneKopfHtml(z) {
     <span class="zone-icon">${z.icon}</span>
     <span class="zone-name">${esc(t("zone." + z.key))}</span>
     <span class="zone-n${n ? "" : " null"}">${n}</span>
+    ${z.key === "field" ? zonenManaChip() : ""}
     <span class="zone-thumbs">${thumbs}</span>
   </div>`;
 }

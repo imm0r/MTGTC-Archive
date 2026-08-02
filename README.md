@@ -1522,6 +1522,44 @@ hochkant gehaltenen Handy gar keinen Wurf mehr.
 > `supabase/migrations/20260725190000_field_state.sql` einzeln). Bis dahin
 > läuft die Partie im Browser weiter, wird aber nicht gespeichert.
 
+### Mana in diesem Zug
+
+Unter der Commander-Steuer zeigt eine Kachel, wieviel Mana das eigene
+Schlachtfeld hergibt — **über alle Karten, nicht nur die Länder**: Sol Ring,
+Signets und Elfen sind genau der Grund, warum Zählen auf den Fingern irgendwann
+nicht mehr reicht. Zwei Zahlen: **frei** (was ungetappte Quellen noch geben
+können) und **gesamt** (alle Quellen, als wäre nichts getappt). Der Tooltip
+schlüsselt auf, welche Karte wieviel beiträgt. Im Akkordeon steht dieselbe
+Zahl als Marke in der Kopfzeile des Schlachtfelds — die ist auch zugeklappt zu
+sehen.
+
+Gelesen wird der **Regeltext** (`oracle_text`, immer englisch — wie überall in
+der App, denn der gedruckte Text wäre je Sprache anders). Eine Manafähigkeit
+ist eine Zeile „Kosten: Add …“, und gezählt wird **netto**: was herauskommt,
+minus Mana in den Kosten. Ein Signet ({1}, {T}: zwei Mana) macht den Zug nicht
+um zwei Mana reicher, sondern um eins — das Land, das es füttert, steht schon
+in der Zählung. Bei Wahlmöglichkeiten („{G} or {W}“) zählt die größte Option.
+
+Mit zählt nur, was **{T}** in den Kosten trägt: Das Tappen ist die natürliche
+Schranke „einmal je Zug“, und es knüpft die Zahl an den Tapp-Zustand, den die
+App je Exemplar ohnehin führt — von drei Wäldern, einer getappt, können noch
+zwei. Andere Zusatzkosten (ein Geschöpf opfern, Karten abwerfen)
+disqualifizieren die Fähigkeit; sich **selbst** zu opfern (Lotus Petal) zählt,
+das ist in sich abgeschlossen. X-Fähigkeiten und „for each“ lassen sich nicht
+beziffern — solche Karten machen aus der Zahl ein „7+“ und stehen im Tooltip.
+
+> **Grundland-Typen wirken aus dem Regelwerk, nicht aus dem Text** (CR 305.6):
+> Ein Wald macht {G}, auch wenn im Bestand kein Erinnerungstext erfasst ist.
+> Karten ganz ohne erfassten Regeltext zählen nicht mit und werden im Tooltip
+> benannt — die Zahl soll sich nicht sicherer lesen, als sie ist.
+
+Die Zählung ist eine **Schätzung**. Was sie bewusst nicht sieht:
+Einsatzverzögerung frisch gelegter Geschöpfe, „nur für Artefakte“-Auflagen,
+von anderen Karten gewährte Fähigkeiten. Und auf der fremden Matte gibt es die
+Zahl nicht — deren Abfrage liefert keinen Regeltext, mit Absicht so wenig wie
+möglich.
+
+
 ### Die Matte eines Mitspielers ansehen
 
 Am Tisch sieht man, was vor den anderen liegt. In der App sah man davon nichts —
@@ -1807,6 +1845,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `synergien`      | Aufgehobene Vorschläge: die eingedampfte Karte, der Fingerabdruck als Warnung vor Überholtem, und dass ein frisches Ergebnis nicht überschrieben wird |
 | `spielrunde`     | Die Matte: Ziehen zwischen den Zonen, Tappen per Klick, die Lebensreihe (vier Kacheln nebeneinander, kein Rollbalken), die drei Laden (Ort, Rahmen, Zahl, immer nur eine offen, auch zugeklappt Ablageziel), der Würfel (nur W20, blanke Fläche über der ganzen Matte, Zahl aufs Emblem, jeder Wurf anders) und „Zufällig ziehen" (gewichtet über Exemplare, leere Bibliothek) |
 | `fremdmatte`     | Die Matte eines Mitspielers: dass die Abfrage die Spalte `hand` nicht führt und Zeilen ohne offene Zone überspringt, dass die Anzeige ein doch geliefertes `hand` gar nicht erst übernimmt, dass fremde Karten keine Handgriffe tragen, dass die Lebensreihe frei und anklickbar bleibt und dass der Takt nach dem Schließen samt Intervall verschwindet; dazu, dass die Lade hochkant im Blickfeld statt weit unten aufklappt und dass ein Zuschauer ohne eigenes Deck die Mitspieler samt Auge überhaupt sieht |
+| `mana`           | Mana in diesem Zug: der Übersetzer an einer Mustertabelle (Signet netto, Selbstopfer ja, fremdes Opfer nein, „for each“ variabel, CR 305.6 ohne Text), die Summen frei/gesamt je Exemplar, Tappen senkt frei, die Hand zählt nie mit, und ohne Quellen Strich statt Null |
 
 ### Zwei Regeln, die dabei gelernt wurden
 
