@@ -509,6 +509,29 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .legal-row+.legal-row{border-top:1px solid var(--line)}
 .legal-name{color:var(--txt);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .legal-qty{color:var(--dim);font-weight:600}
+/* ---- Verlauf je Deck: Stände von jung nach alt ----
+   Drei Spalten je Zeile — wann, was, und der Weg zurück. Die Zeitspalte ist
+   fest breit, damit die Zeitpunkte untereinander stehen und man den Abstand
+   zwischen zwei Ständen auf einen Blick sieht. */
+.verlauf{border:1px solid var(--line);border-radius:10px;background:var(--panel2);
+  padding:4px 0 0}
+.verlauf-zeile{display:grid;grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;gap:12px;padding:7px 12px;font-size:13px}
+.verlauf-zeile+.verlauf-zeile{border-top:1px solid var(--line)}
+/* Der aktuelle Stand ist kein Sprungziel, sondern der Bezugspunkt — er steht
+   oben und ist hervorgehoben, damit die Liste einen Anfang hat. */
+.verlauf-zeile.jetzt{background:var(--akt-flaeche)}
+.verlauf-zeit{color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap}
+.verlauf-n{display:block;font-size:11px;opacity:.75}
+.verlauf-was{color:var(--txt);min-width:0}
+.verlauf-tat{justify-self:end}
+.verlauf-jetzt{color:var(--acc);font-size:12px;font-weight:600;white-space:nowrap}
+.verlauf-hinweis{margin:0;padding:8px 12px 10px;border-top:1px solid var(--line)}
+@media (max-width:560px){
+  .verlauf-zeile{grid-template-columns:minmax(0,1fr) auto;gap:6px 10px}
+  .verlauf-zeit{grid-column:1/3}
+}
+
 /* Legalitäts-Pille im Deck-Kopf: Verdikt + Hover-Tooltip mit den Problemkarten.
    Kein overflow:hidden auf .card/.deck-kopf, daher darf der Tooltip herausragen. */
 .deck-legal-wrap{position:relative;display:inline-flex}

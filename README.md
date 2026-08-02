@@ -1092,6 +1092,80 @@ Zwei Dinge erzwingt die Datenbank, nicht die Anwendung:
 > verlustfrei — jede vorhandene Zuordnung wird zur **primären** der neuen
 > Tabelle, denn eine einzige ist immer auch die erste.
 
+## Verlauf je Deck: zurück auf einen älteren Stand
+
+Jedes Deck führt einen **Verlauf**. Der Knopf „↺ Verlauf" in der Werkzeugleiste
+klappt ihn auf: eine Zeile je Stand, von jung nach alt, mit Zeitpunkt,
+Deckgröße, dem Umbau in Worten — und einem Knopf, der das Deck dorthin
+zurücksetzt.
+
+```
+02.08.2026, 11:12   Karte 0-4 dazu                                 aktueller Stand
+5 Karten
+02.08.2026, 10:04   Karte 0-3 dazu · Karte 0-0 heraus · 1× mehr    ↺ Zurückspringen
+5 Karten            · 1 umsortiert · umbenannt in „Deck 0 v2"
+30.07.2026, 19:41   Ausgangsstand                                  ↺ Zurückspringen
+4 Karten
+```
+
+**Nicht rückwirkend.** Der erste Stand entsteht beim ersten Laden nach der
+Einführung. Was davor am Deck geschah, ist nicht rekonstruierbar — und wird
+auch nicht behauptet: Der älteste Eintrag heißt „Ausgangsstand", nicht „Deck
+angelegt".
+
+### Stände, keine Ereignisse
+
+Gespeichert wird der **fertige Stand** eines Decks (Kopf, Fächer, Karten mit
+Menge und Einordnung), nicht die Änderung. Der Unterschied ist keine Feinheit:
+
+Ein Ereignisstrom („Karte X ergänzt", „Kategorie umbenannt") müsste an jeder der
+rund zwanzig Schreibstellen der App mitgeschrieben werden. Eine davon zu
+vergessen fiele **nicht auf** — der Verlauf wäre still unvollständig, und ein
+Rücksprung landete auf einem Stand, den es nie gab. Geschrieben wird deshalb an
+genau einer Stelle: nach dem Laden der Decks, wenn sich der **Fingerabdruck**
+des Standes geändert hat. Was sich geändert *hat*, folgt aus dem Vergleich
+zweier Stände — es muss sich niemand merken.
+
+> Der Fingerabdruck rechnet über den sortierten Stand. Ohne Sortierung entstünde
+> ein neuer Eintrag, sobald die Datenbank die Zeilen einmal anders zurückgibt —
+> der Verlauf liefe voll mit Ständen, in denen sich nichts geändert hat.
+
+**Fächer stehen über ihren Namen darin**, nicht über ihre `id`. Ein Fach kann
+zwischendurch gelöscht und gleichnamig neu angelegt worden sein; über die `id`
+zeigte der Rücksprung dann ins Leere. Fehlt das Fach ganz, legt der Rücksprung
+es wieder an.
+
+### Was ein Rücksprung tut
+
+Deckkopf zurücksetzen, fehlende Fächer anlegen, alle Karten ersetzen, die
+Einordnungen wiederherstellen (samt der primären). Zwei Dinge sind dabei
+bewusst:
+
+* **Karten, die es nicht mehr gibt, kommen nicht zurück.** Der Fremdschlüssel
+  zeigt in die Sammlung, und aus der ist die Zeile verschwunden. Die Rückfrage
+  vor dem Sprung sagt, wie viele fehlen werden — stillschweigend ein kleineres
+  Deck herzustellen wäre schlimmer als die Ansage. Dasselbe gilt für einen
+  Commander, den es nicht mehr gibt: Das Deck verliert sein Aushängeschild,
+  nicht seinen Stand.
+* **Ein Rücksprung ist selbst eine Änderung** und bekommt seinen eigenen
+  Eintrag. Man kann ihn also zurücknehmen wie alles andere.
+
+Die Rechnung dahinter (`ruecksprungPlan`) steht getrennt vom Schreiben: Dort
+steckt alles, was man falsch machen kann, und genau das lässt sich ohne
+Datenbank prüfen.
+
+**Vierzig Stände je Deck**, danach fällt der älteste weg (Trigger
+`deck_history_kuerzen`). Der Verlauf ist ein Gedächtnis, kein Archiv; ein Deck
+mit hundert Karten wiegt als JSON rund sechs Kilobyte.
+
+Geteilte Decks zeigen ihren **aktuellen** Stand, nicht die Umwege dorthin — für
+`deck_history` gibt es bewusst keine Freigabe an Freunde.
+
+> Fehlt der Datenbank die Tabelle `deck_history`, bleibt der Knopf ohne Inhalt
+> und alles andere läuft wie zuvor — `supabase-schema.sql` erneut im SQL Editor
+> ausführen (oder `supabase/migrations/20260802090000_deck_verlauf.sql`
+> einzeln).
+
 ## Live-Spielrunde: die eigenen Karten am Tisch
 
 In der Spielrunde wählt jeder sein Deck; darunter steht der **private
@@ -1586,6 +1660,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `zugabe`         | „Karte zum Deck“: Ausklappen, gefilterte Trefferliste, Zug in eine Kategorie, volles Deck |
 | `decks`          | Höchstens ein Deck aufgeklappt, Speicher und Baum stimmen überein, Truhe wirft die richtige Karte |
 | `sammlung`       | „Verbaute ausblenden": erst wenn ALLE Exemplare in Decks liegen, über alle Decks zusammen gezählt, je Druck statt je Zeile |
+| `verlauf`        | Deck-Verlauf: Fingerabdruck unabhängig von der Reihenfolge, der Umbau in Worten, und was ein Rücksprung schreiben würde (fehlende Karten, fehlende Fächer, primäre Einordnung) |
 | `spielrunde`     | Die Matte: Ziehen zwischen den Zonen, Tappen per Klick, die Lebensreihe (vier Kacheln nebeneinander, kein Rollbalken), die drei Laden (Ort, Rahmen, Zahl, immer nur eine offen, auch zugeklappt Ablageziel) und der Würfel (nur W20, blanke Fläche über der ganzen Matte, Zahl aufs Emblem, jeder Wurf anders) |
 
 ### Zwei Regeln, die dabei gelernt wurden
