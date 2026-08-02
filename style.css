@@ -1319,6 +1319,52 @@ body.zieht-gerade .zk:hover,body.zieht-gerade .zk:focus-within{transform:none}
 .pill.rolle{font-size:10px;padding:1px 6px}
 .mitglieder-blaettern{align-items:center;justify-content:center;gap:10px;margin-top:10px}
 
+/* ===== Community-Decks =====
+   Kacheln statt Zeilen: Ein Deck hat ein Bild (den Commander), und das trägt
+   mehr zur Wiedererkennung bei als sein Name. */
+.cdeck-gitter{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+.cdeck{display:flex;flex-direction:column;gap:8px;padding:10px;
+  border:1px solid var(--line);border-radius:10px;background:var(--panel2)}
+.cdeck-kopf{display:flex;gap:10px;min-width:0}
+.cdeck-bild{width:52px;height:73px;object-fit:cover;border-radius:5px;flex:none;
+  border:1px solid var(--line);background:#000}
+.cdeck-txt{min-width:0;display:flex;flex-direction:column;gap:4px}
+.cdeck-name{font-size:15px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cdeck-meta{display:flex;flex-wrap:wrap;align-items:center;gap:5px}
+.cdeck-wer{display:inline-flex;align-items:center;gap:6px;padding:0;border:none;
+  background:none;cursor:pointer;color:var(--dim);font-size:12px;text-align:left}
+.cdeck-wer:hover{color:var(--acc)}
+.cdeck-wer:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:6px}
+.cdeck-fuss{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  border-top:1px solid var(--line);padding-top:8px;margin-top:auto}
+.cdeck-wert{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+
+/* Die Sterne. Der EIGENE Stern (bereits vergeben) leuchtet kräftiger als der
+   Durchschnitt darunter — sonst wüsste man nicht, was man selbst gegeben hat.
+   Beim Überfahren leuchten alle bis zum Zeiger mit: Man soll sehen, was ein
+   Klick bewirkt, bevor man klickt. */
+.sterne{display:inline-flex;align-items:center;gap:1px}
+.stern{padding:0 1px;border:none;background:none;cursor:pointer;line-height:1;
+  font-size:17px;color:var(--line);transition:color .1s,transform .1s}
+.stern.an{color:var(--dim)}
+.stern.meine{color:var(--acc)}
+/* Beim Überfahren leuchtet die Vorschau: ALLE Sterne an, dann die NACH dem
+   Zeiger wieder aus. Andersherum ginge es nicht — CSS erreicht mit ~ nur die
+   Nachfolger, nie die Vorgänger. Genau deshalb stand hier zuerst das falsche
+   Bild: die Sterne vor dem Zeiger blieben matt. */
+.sterne:not(.fest):hover .stern{color:var(--acc)}
+.sterne:not(.fest) .stern:hover ~ .stern{color:var(--line)}
+.sterne:not(.fest) .stern:hover{transform:scale(1.15)}
+.stern:focus-visible{outline:2px solid var(--acc);outline-offset:1px;border-radius:3px}
+.sterne.fest .stern{cursor:help}
+.stern-weg{margin-left:4px;padding:0 4px;border:none;background:none;cursor:pointer;
+  color:var(--dim);font-size:14px;line-height:1}
+.stern-weg:hover{color:var(--err)}
+/* Der Schalter „Öffentlich", wenn er an ist: dieselbe Sprache wie überall,
+   wo etwas eingeschaltet ist. */
+.deck-manage .btn.an{border-color:var(--akt-rand);background:var(--akt-flaeche);color:var(--acc2)}
+
+
 /* ===== Öffentliches Profil (im Dialog) ===== */
 .pp-kopf{display:flex;align-items:center;gap:12px;margin-bottom:10px}
 .pp-rollen{display:flex;flex-wrap:wrap;gap:4px}
