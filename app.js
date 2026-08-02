@@ -7888,7 +7888,11 @@ addEventListener("keydown", e => { if (e.key === "Escape" && (ziehKat || ziehAns
    Schaltfläche. Läuft gerade ein Zug, hat der Vorrang — die Zeile oben räumt
    ihn ab, und die Lade ist dann ohnehin schon zu. */
 addEventListener("keydown", e => {
-  if (e.key === "Escape" && schwebeOffen && !ziehKat && !ziehAnsatz) schwebeSchliessen();
+  if (e.key !== "Escape" || ziehKat || ziehAnsatz) return;
+  // Die fremde Matte liegt ÜBER der Lade und geht deshalb zuerst zu: Escape
+  // räumt ab, was obenauf liegt, nicht was zufällig zuerst geprüft wird.
+  if (FREMD) fremdMatteSchliessen();
+  else if (schwebeOffen) schwebeSchliessen();
 });
 addEventListener("pointercancel", () => { if (ziehKat || ziehAnsatz) katZiehAus(); });
 
@@ -11958,6 +11962,9 @@ function sessionBadge() {
    eingebetteter Filter). */
 async function ladeSession() {
   SESSION = null; SESSION_PLAYERS = []; SESSION_INVITES = [];
+  // Eine offene fremde Matte gehört zur alten Runde; sie stünde sonst beim
+  // Betreten der nächsten unvermittelt wieder da.
+  FREMD = null; clearInterval(fremdTakt); fremdTakt = null;
   if (!USER) { sessionBadge(); return; }
   const sp = await sb.from("session_players").select("session_id,status")
     .eq("user_id", USER.id).in("status", ["joined", "invited"]);
@@ -12436,8 +12443,19 @@ function spielerKachelHtml(p) {
   const besiegt = joined && p.life <= 0;   // bei 0 Leben ausgeschieden
   const name = p.profile?.display_name
     || (p.user_id === USER.id ? (PROFILE?.display_name || t("sess.you")) : t("friends.unknown"));
+  // Das Auge sitzt AM AVATAR, nicht in einer eigenen Spalte: In der Mattenreihe
+  // ist eine Kachel bei vier Mitspielern und 820 px Fensterbreite 141 px breit,
+  // und um die ringen Name, Lebenszahl und vier Knöpfe schon jetzt. Der Avatar
+  // hat feste Maße und steht in beiden Anordnungen ganz links — an seiner Ecke
+  // kostet das Auge keine Breite, die woanders fehlt.
+  const auge = joined && p.user_id !== USER.id
+    ? `<button type="button" class="sp-matte${FREMD?.uid === p.user_id ? " an" : ""}"
+         data-matte="${esc(p.user_id)}" aria-pressed="${FREMD?.uid === p.user_id}"
+         title="${esc(t(FREMD?.uid === p.user_id ? "peek.close" : "peek.open", { name }))}"
+         aria-label="${esc(t(FREMD?.uid === p.user_id ? "peek.close" : "peek.open", { name }))}">&#128065;&#xFE0F;</button>`
+    : "";
   return `<div class="sp-card${joined ? "" : " wartet"}${besiegt ? " besiegt" : ""}">
-    ${avatarHtml(38, p.profile)}
+    <div class="sp-avatar">${avatarHtml(38, p.profile)}${auge}</div>
     <div class="sp-mitte">
       <div class="sp-name">${esc(name)}${p.user_id === SESSION.host ? ` <span class="sp-host" title="${esc(t("sess.host"))}">&#9733;</span>` : ""}</div>
       ${p.deck_name ? `<div class="sp-deck"${p.commander_img ? ` data-cmd-img="${esc(p.commander_img)}" data-cmd-name="${esc(p.commander || p.deck_name)}"` : ""} title="${esc(p.commander || p.deck_name)}">${p.commander_img ? `<img class="sp-cmd" src="${esc(p.commander_img)}" alt="">` : ""}<span class="sp-deckname">${esc(p.deck_name)}</span></div>` : ""}
@@ -12479,9 +12497,12 @@ function sessionBoardHtml() {
                     : `<button class="btn danger sm" id="sess-leave">${esc(t("sess.leave"))}</button>`}
         </div>
       </div>
-      <!-- In der Matte stehen die Spieler im Feld „Lebenspunkte"; hier wäre
-           dieselbe Reihe ein zweites Mal. -->
-      ${MAT_AN ? "" : `<div class="sp-grid">${spieler}</div>`}
+      <!-- In der Matte stehen die Spieler im Feld „Lebenspunkte“; hier wäre
+           dieselbe Reihe ein zweites Mal. OHNE gewähltes Deck gibt es keine
+           Matte — dann muss sie hier stehen, sonst sähe man auf einem breiten
+           Schirm weder Lebenspunkte noch Mitspieler noch das Auge zu deren
+           Matte. Wer nur zusieht, hat kein Deck und braucht beides am meisten. -->
+      ${MAT_AN && tracker ? "" : `<div class="sp-grid">${spieler}</div>`}
       <div class="row" style="align-items:center;margin-top:12px">
         <div style="flex:none"><label style="margin:0">${esc(t("sess.myDeck"))}</label></div>
         <div style="flex:none;min-width:200px"><select id="sess-deck">
@@ -12497,7 +12518,7 @@ function sessionBoardHtml() {
          #zonen). Ohne gewähltes Deck gibt es beides nicht — dann steht er für
          sich, sonst könnte in einer Runde ohne Deck niemand würfeln. Er trägt
          dort keine eigene Fläche: Knopf und Bühne hängen fest am Schirm. -->
-    ${tracker ? "" : wuerfelBuehneHtml()}
+    ${tracker ? "" : wuerfelBuehneHtml() + fremdBuehneHtml()}
 
     <!-- Die Einladeliste ist Zubehör: gebraucht einmal zu Beginn. Zugeklappt
          bleibt eine Zeile, statt dauerhaft ein paar hundert Pixel zu belegen. -->
@@ -12882,7 +12903,7 @@ function matInnerHtml() {
       ${feld("cmd", t("zone.cmd"), { n: zoneSumme("cmd"), html: zoneKorbHtml("cmd") })}
       ${feld("lib", t("zone.lib"), { n: zoneSumme("lib"), html: zoneKorbHtml("lib") }, " mat-lib")}
     </div>
-    ${schwebeLeisteHtml()}
+    ${schwebeLeisteHtml()}${fremdBuehneHtml()}
     ${SPK_SPALTE ? `<section class="mat-feld mat-vorschau">
       <div class="mat-titel">${esc(t("spk.slot"))}</div>
       <div class="spk" id="spk-feld"><div class="spk-leer">${esc(t("spk.slotEmpty"))}</div></div>
@@ -12981,6 +13002,231 @@ function schwebeUmschalten(key) {
 }
 const schwebeSchliessen = () => { if (schwebeOffen) schwebeUmschalten(schwebeOffen); };
 
+/* ---- Die Matte eines Mitspielers ansehen ----------------------------
+   Am Tisch sieht man, was vor den anderen liegt: ihr Schlachtfeld, ihren
+   Friedhof, ihr Exil, ihre Kommandozone. In der App sah man davon bisher
+   nichts — jeder Zonenstand ist privat, weil in derselben Zeile die HAND
+   steht. Diese Lade holt das Offene hervor und lässt das Verdeckte, wo es ist.
+
+   NICHT ZU SEHEN SIND HAND UND BIBLIOTHEK, und zwar nicht, weil die Anzeige
+   sie weglässt: Die Abfrage session_board (supabase-schema.sql) wählt die
+   Spalte `hand` gar nicht erst aus und überspringt Zeilen, in denen nur sie
+   steht — sonst verriete deren Anzahl, wie viele verschiedene Karten jemand
+   hält. Die Bibliothek steht ohnehin in keiner Tabelle: Sie ist der Rest aus
+   der Deckmenge, und die Deckliste eines anderen liefert die Abfrage nicht.
+   Ausgenommen sind allein die beiden Commander-Karten — ihre Deckmenge kommt
+   als `cmdQty` mit, weil die Kommandozone am Tisch offen liegt und sich sonst
+   nicht von der Bibliothek unterscheiden ließe. Öffentlich sind sie längst:
+   session_roster schickt Name und Bild des Commanders an alle Mitspieler.
+
+   NUR ANSEHEN. Keine Zielknöpfe, kein Ziehen, kein Tappen — auf einer fremden
+   Matte hat man nichts zu verschieben. Was bleibt, ist die Vorschau beim
+   Überfahren: dieselbe wie am Commander in der Spielerkachel.
+
+   AUFGEFRISCHT WIRD IM TAKT, solange die Lade offen steht. Der Zonenstand
+   kommt nicht über Realtime — die Zeilen sind privat, ein Kanal darauf bekäme
+   für fremde Spieler nichts zu sehen. Alle vier Sekunden neu zu fragen ist der
+   ehrliche Weg: Er kostet nur, während jemand hinsieht, und hört mit dem
+   Schließen von selbst auf. */
+let FREMD = null;          // {uid, name, stand:"laedt"|"da"|"fehler", karten:[], zeit}
+let fremdTakt = null;      // Kennung des Auffrisch-Intervalls
+const FREMD_TAKT_MS = 4000;
+
+/* Die Abfrage getrennt, damit die Prüfungen sie ersetzen können — dieselbe
+   Naht wie bei zoneSchreiben und wurfSpeichern. */
+async function fremdMatteLaden(uid) {
+  const { data, error } = await sb.rpc("session_board", { p_session: SESSION.id, p_user: uid });
+  if (error) throw error;
+  return data || [];
+}
+
+/* Eine Zeile der Abfrage in das, womit die Anzeige rechnet. `disp`/`lang`
+   heißen hier wie in CARDS, damit trkName() ohne Sonderfall greift. */
+const fremdKarte = r => ({
+  id: r.card_id, name: r.name, disp: r.printed_name, lang: r.lang,
+  img: r.img, type_line: r.type_line,
+  field: r.field || 0, grave: r.graveyard || 0, exile: r.exile || 0,
+  cast: r.cast_count || 0,
+  fs: Array.isArray(r.field_state) ? r.field_state : [],
+  cmd: !!r.is_cmd,
+  // Kommandozone = Deckmenge − was anderswo liegt. Nur für Commander gefüllt.
+  cmdRest: r.is_cmd ? Math.max(0, (r.cmd_qty || 1) - (r.field || 0) - (r.graveyard || 0) - (r.exile || 0)) : 0,
+});
+
+const fremdAnzahl = (k, zone) => zone === "cmd" ? k.cmdRest : (k[zone] || 0);
+const fremdZone = zone => (FREMD?.karten || []).filter(k => fremdAnzahl(k, zone) > 0);
+const fremdSumme = zone => fremdZone(zone).reduce((s, k) => s + fremdAnzahl(k, zone), 0);
+
+/* Die Exemplarliste des Feldes, auf die richtige Länge gerückt — dieselbe
+   Vorsicht wie in feldListe(): Die Zusicherung „so lang wie field" erzwingt
+   niemand, und eine zu kurze Liste ließe Karten verschwinden. */
+function fremdFeldStapel(k) {
+  const fs = k.fs.slice(0, k.field).map(x => ({ t: x?.t ? 1 : 0, c: Math.max(0, x?.c | 0) }));
+  while (fs.length < k.field) fs.push({ t: 0, c: 0 });
+  const gruppen = new Map();
+  fs.forEach(x => {
+    const s = x.t + "|" + x.c;
+    if (!gruppen.has(s)) gruppen.set(s, { t: x.t, c: x.c, n: 0 });
+    gruppen.get(s).n++;
+  });
+  return [...gruppen.values()].sort((a, b) => a.t - b.t || b.c - a.c);
+}
+
+/* Eine Karte auf der fremden Matte. Bewusst NICHT zoneKarteHtml(): Das trägt
+   data-move, data-tap, data-marke und data-spk — lauter Handgriffe, die es
+   hier nicht geben darf. Ein gemeinsamer Baustein mit Schaltern für „alles
+   aus" wäre ein Bauteil, bei dem ein vergessener Schalter fremde Karten
+   verschiebbar macht. Getrennt kann das nicht passieren. */
+function fremdKarteHtml(k, zone, n, st) {
+  const nm = trkName(k);
+  return `<div class="zk fk${st?.t ? " getappt" : ""}" data-fremd-img="${esc(k.img || "")}"
+       data-fremd-name="${esc(nm)}" title="${esc(nm)}${st?.t ? " · " + t("zone.tapped") : ""}">
+    ${k.img ? `<img src="${esc(k.img)}" alt="${esc(nm)}" loading="lazy" draggable="false">`
+            : `<div class="zk-ohnebild">${esc(nm)}</div>`}
+    ${n > 1 ? `<span class="zk-n">&times;${n}</span>` : ""}
+    ${st?.c ? `<span class="zk-marke" title="${esc(t("zone.counters", { n: st.c }))}">+${st.c}/+${st.c}</span>` : ""}
+  </div>`;
+}
+
+function fremdGitterHtml(zone, liste) {
+  if (!liste.length) return `<div class="zone-leer">${esc(t("zone.empty"))}</div>`;
+  return `<div class="zone-gitter">${liste.flatMap(k => zone === "field"
+    ? fremdFeldStapel(k).map(s => fremdKarteHtml(k, zone, s.n, s))
+    : [fremdKarteHtml(k, zone, fremdAnzahl(k, zone))]).join("")}</div>`;
+}
+
+/* Der Inhalt der Lade. Vier Felder in derselben Anordnung wie die eigene Matte
+   — Schlachtfeld groß, Länder als eigener Streifen darunter, Friedhof und Exil
+   daneben —, damit man nicht umlernen muss, wenn man hinübersieht. */
+function fremdInhaltHtml() {
+  if (!FREMD) return "";
+  if (FREMD.stand === "laedt") return `<div class="fremd-lade">${esc(t("peek.loading"))}</div>`;
+  if (FREMD.stand === "fehler") return `<div class="fremd-lade fehler">${esc(FREMD.fehler || t("peek.failed"))}</div>`;
+
+  const feld = fremdZone("field");
+  const bleibend = feld.filter(k => !istLand(k));
+  const laender  = feld.filter(k => istLand(k));
+  const summe = liste => liste.reduce((s, k) => s + k.field, 0);
+  const cmdKarte = fremdZone("cmd")[0];
+  const steuer = (FREMD.karten || []).filter(k => k.cmd).reduce((s, k) => s + k.cast, 0);
+  const feldHtml = (titel, zone, n, inhalt, extra = "") => `
+    <section class="mat-feld${extra}">
+      <div class="mat-titel">${zoneDef(zone)?.icon || ""} ${esc(titel)}<span class="mat-n">${n}</span></div>
+      <div class="mat-korb">${inhalt}</div>
+    </section>`;
+
+  return `<div class="fremd-gitter">
+    <div class="fremd-links">
+      ${feldHtml(t("zone.field"), "field", summe(bleibend), fremdGitterHtml("field", bleibend), " mat-gross")}
+      ${feldHtml(t("mat.lands"), "field", summe(laender), fremdGitterHtml("field", laender), " mat-laender")}
+    </div>
+    <div class="fremd-rechts">
+      ${feldHtml(t("zone.cmd"), "cmd", fremdSumme("cmd"),
+        `${cmdKarte ? `<div class="fremd-steuer" title="${esc(t("sess.cmdTaxTitle", { mana: steuer * 2, n: steuer }))}">+${steuer * 2}</div>` : ""}
+         ${fremdGitterHtml("cmd", fremdZone("cmd"))}`)}
+      ${feldHtml(t("zone.grave"), "grave", fremdSumme("grave"), fremdGitterHtml("grave", fremdZone("grave")))}
+      ${feldHtml(t("zone.exile"), "exile", fremdSumme("exile"), fremdGitterHtml("exile", fremdZone("exile")))}
+    </div>
+  </div>
+  <!-- Ausdrücklich hingeschrieben, nicht bloß weggelassen: Wer auf eine fremde
+       Matte sieht, soll wissen, dass Hand und Bibliothek nicht fehlen, sondern
+       verdeckt sind — und dass das auch für die eigene gilt. -->
+  <div class="fremd-fuss">&#128274; ${esc(t("peek.private"))}</div>`;
+}
+
+function fremdBuehneHtml() {
+  if (!FREMD) return "";
+  return `<div class="fremd-buehne" id="fremd-buehne" role="dialog" aria-modal="false"
+       aria-label="${esc(t("peek.title", { name: FREMD.name }))}">
+    <div class="fremd-kopf">
+      <div class="fremd-wer">${esc(t("peek.title", { name: FREMD.name }))}</div>
+      <button type="button" class="btn ghost sm" id="fremd-frisch"
+        title="${esc(t("peek.refreshTitle"))}">&#8635; ${esc(t("peek.refresh"))}</button>
+      <button type="button" class="btn ghost sm" id="fremd-zu"
+        title="${esc(t("peek.close"))}" aria-label="${esc(t("peek.close"))}">&times;</button>
+    </div>
+    <div class="fremd-inhalt" id="fremd-inhalt">${fremdInhaltHtml()}</div>
+  </div>`;
+}
+
+/* Nur den Inhalt auffrischen, nicht die ganze Matte: Ein renderZonen() im Takt
+   risse dem Nutzer alle vier Sekunden die eigene Bibliothekssuche unter den
+   Fingern weg und setzte den Rollstand der fremden Zonen zurück. */
+function fremdZeichnen() {
+  const el = $("#fremd-inhalt");
+  if (!el) return fremdNeuzeichnen();
+  const roll = el.scrollTop;
+  el.innerHTML = fremdInhaltHtml();
+  el.scrollTop = roll;
+  wireFremdHover();
+}
+
+async function fremdHolen() {
+  if (!FREMD) return;
+  // Runde inzwischen beendet oder verlassen: Der Takt läuft sonst weiter und
+  // fragte gleich nach einer Sitzung, die es nicht mehr gibt.
+  if (!SESSION) return fremdMatteSchliessen();
+  const uid = FREMD.uid;
+  try {
+    const zeilen = await fremdMatteLaden(uid);
+    if (FREMD?.uid !== uid) return;        // inzwischen umgeschaltet oder zu
+    FREMD.karten = zeilen.map(fremdKarte);
+    FREMD.stand = "da";
+  } catch (e) {
+    if (FREMD?.uid !== uid) return;
+    FREMD.stand = "fehler";
+    FREMD.fehler = dbErr(e);
+  }
+  fremdZeichnen();
+}
+
+function fremdMatteOeffnen(uid) {
+  const p = SESSION_PLAYERS.find(x => x.user_id === uid);
+  if (!p || uid === USER?.id) return;      // die eigene Matte liegt schon da
+  schwebeSchliessen();                     // sonst läge ein offener Fächer darüber
+  FREMD = { uid, name: p.profile?.display_name || t("friends.unknown"), stand: "laedt", karten: [] };
+  fremdNeuzeichnen();
+  fremdHolen();
+  clearInterval(fremdTakt);
+  fremdTakt = setInterval(fremdHolen, FREMD_TAKT_MS);
+}
+
+function fremdMatteSchliessen() {
+  if (!FREMD) return;
+  FREMD = null;
+  clearInterval(fremdTakt); fremdTakt = null;
+  versteckeCmdHover();
+  fremdNeuzeichnen();
+}
+
+/* Die Bühne steckt in #zonen — außer in einer Runde OHNE gewähltes Deck, wo es
+   weder Matte noch Akkordeon gibt und sie wie der Würfel am Schirm hängt. Dann
+   muss die ganze Runde neu, sonst entstünde sie nirgends. */
+const fremdNeuzeichnen = () => $("#zonen") ? renderZonen() : renderSession();
+
+/* Kopfknöpfe der Lade. Wie wireWuerfel() nach JEDEM Zeichnen neu: In einer
+   Runde ohne gewähltes Deck hängt die Bühne nicht in #zonen, sondern für sich
+   am Schirm — eine Delegation an #zonen erreichte sie dort nicht. */
+function wireFremd() {
+  const zu = $("#fremd-zu");
+  if (zu) zu.onclick = fremdMatteSchliessen;
+  const frisch = $("#fremd-frisch");
+  if (frisch) frisch.onclick = () => fremdHolen();
+  wireFremdHover();
+}
+
+/* Die Vorschau beim Überfahren — dieselbe, die am Commander in der
+   Spielerkachel hängt. Sie braucht nur Bild und Name, also genau das, was die
+   fremde Karte mitbringt. */
+function wireFremdHover() {
+  if (!HOVER_OK) return;
+  $$("#fremd-inhalt [data-fremd-img]").forEach(el => {
+    if (!el.dataset.fremdImg) return;
+    el.addEventListener("mousemove", e => zeigeCmdHover(el.dataset.fremdImg, el.dataset.fremdName, e.clientX, e.clientY));
+    el.addEventListener("mouseleave", versteckeCmdHover);
+  });
+}
+
 /* Fehlt ein Bild, tritt das Schriftzeichen an seine Stelle — dieselbe Regel wie
    am Zugabe-Knopf und an der Truhe. Ein Knopf, der nur aus einem kaputten Bild
    besteht, ist eine leere Fläche, die niemand anklickt. Muss nach JEDEM
@@ -13003,7 +13249,7 @@ function zonenInnerHtml() {
              data-zonedrop="${z.key}">
       ${zoneKopfHtml(z)}
       <div class="zone-korb">${zoneKorbHtml(z.key)}</div>
-    </section>`).join("") + wuerfelBuehneHtml();
+    </section>`).join("") + wuerfelBuehneHtml() + fremdBuehneHtml();
 }
 
 /* Kopfzeile: immer sichtbar, auch zugeklappt. Die Miniaturen verraten auf einen
@@ -13328,6 +13574,7 @@ function renderZonen() {
   if (suche) { suche.value = suchtext; if (fokus) { suche.focus(); suche.selectionStart = suche.selectionEnd = suchtext.length; } }
   schwebeBilderWachen();
   wireWuerfel();
+  wireFremd();
   wireZonenHover();
 }
 
@@ -13512,6 +13759,13 @@ function wireSession() {
    neu entstehen — renderZonen() ruft das deshalb ebenfalls auf. */
 function wireSpielerKacheln() {
   $$("#v-session [data-life]").forEach(b => b.onclick = () => lebenAendern(b.dataset.life, parseInt(b.dataset.d)));
+  // Dasselbe Auge schließt wieder, wenn die Matte dieses Spielers schon offen
+  // steht — sonst bliebe der einzige Weg zurück der Knopf in der Lade, und der
+  // liegt woanders als der, mit dem man sie aufgemacht hat.
+  $$("#v-session [data-matte]").forEach(b => b.onclick = () => {
+    const uid = b.dataset.matte;
+    if (FREMD?.uid === uid) fremdMatteSchliessen(); else fremdMatteOeffnen(uid);
+  });
   if (!HOVER_OK) return;
   $$("#v-session .sp-deck[data-cmd-img]").forEach(el => {
     if (el.dataset.cmdWired) return;   // addEventListener stapelt sich sonst

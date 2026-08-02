@@ -1522,6 +1522,64 @@ hochkant gehaltenen Handy gar keinen Wurf mehr.
 > `supabase/migrations/20260725190000_field_state.sql` einzeln). Bis dahin
 > läuft die Partie im Browser weiter, wird aber nicht gespeichert.
 
+### Die Matte eines Mitspielers ansehen
+
+Am Tisch sieht man, was vor den anderen liegt. In der App sah man davon nichts —
+jeder Zonenstand ist privat, weil in derselben Zeile die **Hand** steht.
+
+Das **Auge am Avatar** einer Spielerkachel klappt die Matte dieses Mitspielers
+über die eigene: Schlachtfeld, Länder, Kommandozone, Friedhof, Exil — in
+derselben Anordnung wie die eigene, damit man beim Hinübersehen nicht umlernt.
+Getappte Karten stehen gedreht, Marken tragen ihr Abzeichen, die
+Commander-Steuer steht als Zahl. Ein zweites Auge schaltet um, dasselbe noch
+einmal macht zu, Escape ebenfalls.
+
+**Hand und Bibliothek bleiben verdeckt.** Das steht nicht in der Anzeige,
+sondern in der Abfrage: `session_board` wählt die Spalte `hand` **gar nicht
+erst aus** und überspringt Zeilen, in denen nur sie steht — sonst verriete
+deren Anzahl, wie viele verschiedene Karten jemand hält. Die Bibliothek steht
+ohnehin in keiner Tabelle: Sie ist der Rest aus der Deckmenge, und die
+Deckliste eines anderen gibt die Abfrage nicht heraus.
+
+> **Die Kommandozone ist die eine Ausnahme**, und sie muss es sein: Sie liegt am
+> Tisch offen, lässt sich aber aus den vier gespeicherten Zonen nicht ableiten —
+> eine Karte, die nirgends liegt, ist entweder in der Bibliothek *oder* in der
+> Kommandozone. Für die beiden Commander-Karten kommt deshalb die Deckmenge mit,
+> für keine andere. Öffentlich sind sie längst: `session_roster` schickt Name
+> und Bild des Commanders seit jeher an alle Mitspieler.
+
+**Nur ansehen.** Keine Zielknöpfe, kein Ziehen, kein Tappen. Die fremde Karte
+ist bewusst ein eigener Baustein und nicht der eigene mit abgeschalteten
+Handgriffen: Bei einem gemeinsamen Bauteil macht ein vergessener Schalter fremde
+Karten verschiebbar, getrennt kann das nicht passieren.
+
+**Die Lade endet über der Lebensreihe.** Nicht Kosmetik — geöffnet wird sie an
+den Spielerkacheln, und die stehen in dieser Reihe. Deckte sie sie zu, käme man
+von einem Mitspieler nicht zum nächsten, ohne erst zu schließen. (Gemessen: Der
+Klick aufs zweite Auge lief in einen Zeitablauf, solange sie darüber lag.)
+
+**Aufgefrischt wird im Takt**, alle vier Sekunden, solange die Lade offen steht.
+Über Realtime ginge es nicht: Die Zeilen sind privat, ein Kanal darauf bekäme
+für fremde Spieler nichts zu sehen. Der Takt kostet nur, während jemand
+hinsieht, und hört mit dem Schließen auf — auch das Intervall selbst wird
+abgeräumt, nicht bloß wirkungslos gestellt.
+
+**Auch als Zuschauer.** Wer kein Deck gewählt hat, hat keine Matte — und sah
+deshalb auf einem breiten Schirm bisher weder Lebenspunkte noch Mitspieler, weil
+die Spielerreihe nur *in* der Matte stand. Ohne Matte steht sie jetzt wieder in
+der Runde selbst. Wer bloß zusieht, braucht sie am meisten.
+
+Hochkant, wo statt der Matte das Akkordeon steht, hängt die Lade **fest am
+Schirm** — wie der Würfel. Am Akkordeon aufgehängt klappte sie außerhalb des
+Blickfelds auf (bei 560 × 860 px erst auf Höhe 576): Man klickt oben auf das
+Auge, und „nichts passiert“. Genau diese Meldung gab es hier schon einmal, beim
+Deck-Verlauf.
+
+> Kennt die Datenbank `session_board` noch nicht, meldet die Lade das und die
+> übrige Runde läuft weiter. `supabase-schema.sql` erneut im SQL Editor
+> ausführen (oder `supabase/migrations/20260802160000_fremde_matte.sql`
+> einzeln).
+
 ## Preisverlauf: Langzeitarchiv aus MTGJSON
 
 Scryfall liefert nur den **Tagespreis** — einen Verlauf gibt es dort nicht. Die
@@ -1748,6 +1806,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `wunschliste`    | Karte direkt vormerken: die Zeile (Bestand 0, Setcode groß, Preis mit erstem Punkt) und die Doppelprüfung — auch gegen eine andere Auflage derselben Karte |
 | `synergien`      | Aufgehobene Vorschläge: die eingedampfte Karte, der Fingerabdruck als Warnung vor Überholtem, und dass ein frisches Ergebnis nicht überschrieben wird |
 | `spielrunde`     | Die Matte: Ziehen zwischen den Zonen, Tappen per Klick, die Lebensreihe (vier Kacheln nebeneinander, kein Rollbalken), die drei Laden (Ort, Rahmen, Zahl, immer nur eine offen, auch zugeklappt Ablageziel), der Würfel (nur W20, blanke Fläche über der ganzen Matte, Zahl aufs Emblem, jeder Wurf anders) und „Zufällig ziehen" (gewichtet über Exemplare, leere Bibliothek) |
+| `fremdmatte`     | Die Matte eines Mitspielers: dass die Abfrage die Spalte `hand` nicht führt und Zeilen ohne offene Zone überspringt, dass die Anzeige ein doch geliefertes `hand` gar nicht erst übernimmt, dass fremde Karten keine Handgriffe tragen, dass die Lebensreihe frei und anklickbar bleibt und dass der Takt nach dem Schließen samt Intervall verschwindet; dazu, dass die Lade hochkant im Blickfeld statt weit unten aufklappt und dass ein Zuschauer ohne eigenes Deck die Mitspieler samt Auge überhaupt sieht |
 
 ### Zwei Regeln, die dabei gelernt wurden
 
