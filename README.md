@@ -1158,6 +1158,49 @@ nicht darin stehen: für `deck_synergies` gibt es keine Freigabe an Freunde.
 > ausführen (oder `supabase/migrations/20260802120000_deck_synergien.sql`
 > einzeln).
 
+## Deck ausgeben: die Deckliste als Text
+
+Der Knopf **„📋 Exportieren"** in der Werkzeugleiste jedes Decks öffnet die
+Deckliste als Text — zum Kopieren in die Zwischenablage oder als `.txt`-Datei.
+Der Gegenweg zum Import, für eine Deckseite, einen Shop oder den Chat.
+
+Eine Zeile je Auflage:
+
+```
+1x Capricious Hellraiser (ONE) 125
+ │  │                     │     └ Sammlernummer der Auflage
+ │  │                     └────── Setcode, groß
+ │  └──────────────────────────── Kartenname, ENGLISCH
+ └─────────────────────────────── Anzahl im Deck
+```
+
+**Englisch, nicht wie gedruckt.** Eine deutsche Auflage heißt hier trotzdem
+„Capricious Hellraiser": Der Export ist dafür da, *anderswo* gelesen zu werden,
+und der englische Name ist der einzige, den jedes Werkzeug kennt. Überall sonst
+zeigt die App den gedruckten Namen — hier ist es bewusst umgekehrt.
+
+**Set und Nummer** stehen daneben, damit genau *diese* Auflage gemeint ist —
+dieselbe Kombination, mit der die Sammlung ihre Drucke auseinanderhält. Fehlt
+eines von beiden (Altbestand ohne Auflagenangabe), bleibt die Zeile beim Namen:
+Ein „() " mittendrin läse kein Werkzeug, und ungenau ist besser als unlesbar.
+
+**Ausgegeben wird die Deckmenge, nicht der Bestand.** Neun Wälder im Deck
+bleiben neun, auch wenn vier im Schrank liegen — sonst verschwänden aus der
+Liste genau die Karten, die man nachkaufen will.
+
+**Alphabetisch nach dem englischen Namen**, damit zwei Ausgaben desselben Decks
+Zeile für Zeile vergleichbar sind. Die Reihenfolge der Einträge in der Datenbank
+ist es nicht; sie folgt dem Zufall des Einbuchens.
+
+> **Ein Format, als Liste angelegt.** `EXPORT_FORMATE` in `app.js` hält
+> genau einen Eintrag; ein zweites Format ist ein Eintrag mehr und eine Auswahl
+> im Dialog. Was diese Fassung **nicht** kann: den Commander als solchen
+> kennzeichnen (das Format sieht keine Abschnitte vor) und Kategorien mitgeben.
+> Beides gehört in ein zweites Format, nicht in dieses.
+
+Geht das Kopieren nicht (der Browser gibt die Zwischenablage nicht ohne
+Weiteres her), markiert die App den Text stattdessen — dann genügt Strg+C.
+
 ## Verlauf je Deck: zurück auf einen älteren Stand
 
 Jedes Deck führt einen **Verlauf**. Der Knopf „↺ Verlauf" in der Werkzeugleiste
@@ -1870,6 +1913,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `spielrunde`     | Die Matte: Ziehen zwischen den Zonen, Tappen per Klick, die Lebensreihe (vier Kacheln nebeneinander, kein Rollbalken), die drei Laden (Ort, Rahmen, Zahl, immer nur eine offen, auch zugeklappt Ablageziel), der Würfel (nur W20, blanke Fläche über der ganzen Matte, Zahl aufs Emblem, jeder Wurf anders) und „Zufällig ziehen" (gewichtet über Exemplare, leere Bibliothek) |
 | `fremdmatte`     | Die Matte eines Mitspielers: dass die Abfrage die Spalte `hand` nicht führt und Zeilen ohne offene Zone überspringt, dass die Anzeige ein doch geliefertes `hand` gar nicht erst übernimmt, dass fremde Karten keine Handgriffe tragen, dass die Lebensreihe frei und anklickbar bleibt und dass der Takt nach dem Schließen samt Intervall verschwindet; dazu, dass die Lade hochkant im Blickfeld statt weit unten aufklappt und dass ein Zuschauer ohne eigenes Deck die Mitspieler samt Auge überhaupt sieht |
 | `mana`           | Mana in diesem Zug: der Übersetzer an einer Mustertabelle (Signet netto, Selbstopfer ja, fremdes Opfer nein, „for each“ variabel, CR 305.6 ohne Text), die Summen frei/gesamt je Exemplar, Tappen senkt frei, die Hand zählt nie mit, und ohne Quellen Strich statt Null — dazu die Farbaufteilung: feste Reihenfolge, Summe der Marken gleich der Gesamtzahl, Tappen kommt in der Farbe an, und alle sieben Marken brechen in der 154-px-Spalte um, statt hinauszulaufen |
+| `export`         | Deck ausgeben: die fünf Zeilen genau so, wie sie dastehen müssen — englischer Name statt gedrucktem, Setcode groß, keine leere Klammer ohne Auflage, alphabetisch sortiert, Deckmenge statt Bestand; dazu Datei, Zwischenablage und der Rückfall „Text markiert“, wenn das Kopieren scheitert |
 
 ### Zwei Regeln, die dabei gelernt wurden
 
