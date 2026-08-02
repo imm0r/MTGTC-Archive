@@ -1533,6 +1533,30 @@ schlüsselt auf, welche Karte wieviel beiträgt. Im Akkordeon steht dieselbe
 Zahl als Marke in der Kopfzeile des Schlachtfelds — die ist auch zugeklappt zu
 sehen.
 
+**Aufgeschlüsselt nach Farben.** Unter den beiden Zahlen steht je eine Marke
+für jede Farbe, die tatsächlich vorkommt — in der festen Reihenfolge WUBRG,
+farblos, wählbar. Sieben Mana sind wertlos, wenn der Zauber zwei blaue verlangt
+und kein blaues darunter ist. Die Marken tragen dieselben zwei Zahlen wie oben
+(im Akkordeon aus Platzgründen nur die freie), und **ihre Summe ist immer genau
+die Gesamtzahl** — eine Aufschlüsselung, die ihrer eigenen Summe widerspricht,
+wäre schlimmer als keine.
+
+Damit das aufgeht, muss klar sein, wohin ein Mana fällt, das keine feste Farbe
+hat. Die Regel:
+
+| Fähigkeit | Marke |
+| --- | --- |
+| `{T}: Add {G}.` | grün 1 |
+| `{T}: Add {C}{C}.` | farblos 2 |
+| `{1}, {T}: Add {G}{G}.` (Filterland) | **grün 1** — ohne Wahl bleibt die eine Farbe eine Aussage |
+| `{1}, {T}: Add {W}{U}.` (Signet) | **wählbar 1** — netto eins, und man sucht es sich aus |
+| `{T}: Add {G} or {W}.` | wählbar 1 |
+| `{T}: Add one mana of any color.` | wählbar 1 |
+
+„Wählbar“ trägt das Mehrfarbig-Zeichen: Ein Symbol für „such dir eins aus“ gibt
+es nicht, und das Rad ist die nächste Verwandte. Trägt ein Land **zwei**
+Grundtypen, ist auch das eine Wahl.
+
 Gelesen wird der **Regeltext** (`oracle_text`, immer englisch — wie überall in
 der App, denn der gedruckte Text wäre je Sprache anders). Eine Manafähigkeit
 ist eine Zeile „Kosten: Add …“, und gezählt wird **netto**: was herauskommt,
@@ -1845,7 +1869,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `synergien`      | Aufgehobene Vorschläge: die eingedampfte Karte, der Fingerabdruck als Warnung vor Überholtem, und dass ein frisches Ergebnis nicht überschrieben wird |
 | `spielrunde`     | Die Matte: Ziehen zwischen den Zonen, Tappen per Klick, die Lebensreihe (vier Kacheln nebeneinander, kein Rollbalken), die drei Laden (Ort, Rahmen, Zahl, immer nur eine offen, auch zugeklappt Ablageziel), der Würfel (nur W20, blanke Fläche über der ganzen Matte, Zahl aufs Emblem, jeder Wurf anders) und „Zufällig ziehen" (gewichtet über Exemplare, leere Bibliothek) |
 | `fremdmatte`     | Die Matte eines Mitspielers: dass die Abfrage die Spalte `hand` nicht führt und Zeilen ohne offene Zone überspringt, dass die Anzeige ein doch geliefertes `hand` gar nicht erst übernimmt, dass fremde Karten keine Handgriffe tragen, dass die Lebensreihe frei und anklickbar bleibt und dass der Takt nach dem Schließen samt Intervall verschwindet; dazu, dass die Lade hochkant im Blickfeld statt weit unten aufklappt und dass ein Zuschauer ohne eigenes Deck die Mitspieler samt Auge überhaupt sieht |
-| `mana`           | Mana in diesem Zug: der Übersetzer an einer Mustertabelle (Signet netto, Selbstopfer ja, fremdes Opfer nein, „for each“ variabel, CR 305.6 ohne Text), die Summen frei/gesamt je Exemplar, Tappen senkt frei, die Hand zählt nie mit, und ohne Quellen Strich statt Null |
+| `mana`           | Mana in diesem Zug: der Übersetzer an einer Mustertabelle (Signet netto, Selbstopfer ja, fremdes Opfer nein, „for each“ variabel, CR 305.6 ohne Text), die Summen frei/gesamt je Exemplar, Tappen senkt frei, die Hand zählt nie mit, und ohne Quellen Strich statt Null — dazu die Farbaufteilung: feste Reihenfolge, Summe der Marken gleich der Gesamtzahl, Tappen kommt in der Farbe an, und alle sieben Marken brechen in der 154-px-Spalte um, statt hinauszulaufen |
 
 ### Zwei Regeln, die dabei gelernt wurden
 

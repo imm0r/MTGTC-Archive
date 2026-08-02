@@ -12752,45 +12752,102 @@ function manaKosten(roh, name) {
   return tap ? { mana } : null;
 }
 
-/* Was hinter „Add …“ steht. → Zahl oder null (variabel: X, „for each“).
-   Wahlmöglichkeiten („{G} or {W}“, „{W}{W}, {W}{B}, or {B}{B}“) werden an
-   Kommas und „or“ getrennt; es zählt die größte — mehr als das gibt eine
-   einzelne Aktivierung nie her. */
-function manaMenge(text) {
+/* Was hinter „Add …“ steht. → {menge, farben, wahl} oder null (variabel).
+
+   `farben` ist die Verteilung der BESTEN Option auf W/U/B/R/G/C; `wahl` sagt,
+   dass es überhaupt mehrere Optionen gab („{G} or {W}“, „{W}{W}, {W}{B}, or
+   {B}{B}“). Getrennt wird an Kommas und „or“; es zählt die größte Option —
+   mehr als das gibt eine einzelne Aktivierung nie her.
+
+   Eine Farbe, die niemand benennt („one mana of any color“), erscheint in
+   `farben` GAR NICHT. Die Menge steht dann trotzdem: Ein Mana ist es, man
+   sucht sich nur aus, welches. */
+function manaAusgabe(text) {
   if (/\{X\}|\bfor each\b|amount of|equal to/i.test(text)) return null;
-  let best = 0;
-  for (const opt of text.split(/\s*,\s*|\s+or\s+/i)) {
-    const sym = (opt.match(/\{[^}]+\}/g) || []).length;
-    const wort = opt.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten)\b[^.]*?\bmana\b/i);
-    best = Math.max(best, sym, wort ? MANA_WORT[wort[1].toLowerCase()] : 0);
+  const optionen = text.split(/\s*,\s*|\s+or\s+/i);
+  let best = null, mehr = 0;
+  for (const opt of optionen) {
+    const farben = {};
+    let menge = 0;
+    for (const s of opt.match(/\{[^}]+\}/g) || []) {
+      const z = s.slice(1, -1).toUpperCase();
+      menge += 1;
+      if (/^[WUBRGC]$/.test(z)) farben[z] = (farben[z] || 0) + 1;
+    }
+    if (!menge) {
+      const w = opt.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten)\b[^.]*?\bmana\b/i);
+      if (w) menge = MANA_WORT[w[1].toLowerCase()];   // Farbe bleibt offen
+    }
+    if (menge) mehr++;
+    if (!best || menge > best.menge) best = { menge, farben };
   }
-  return best;
+  if (!best || !best.menge) return null;
+  return { menge: best.menge, farben: best.farben, wahl: mehr > 1 };
 }
 
-/* Netto-Mana einer Karte je Tappen. → {je, variabel} */
+/* Netto-Mana einer Karte je Tappen. → {je, farben, variabel}
+
+   WIE DIE NETTO-MENGE AUF FARBEN FÄLLT, wenn Kosten im Spiel sind oder eine
+   Wahl besteht: Steht genau EINE Farbe in der Ausgabe, bekommt sie alles —
+   ein Filterland ({1}, {T}: Add {G}{G}) macht netto ein grünes Mana, und das
+   ist eine brauchbare Aussage. Sind es mehrere oder gar keine benannte, geht
+   die Menge in „wählbar“ (ANY): Ein Signet ({1}, {T}: Add {W}{U}) bringt den
+   Zug um EIN Mana voran, und man sucht sich aus, welches.
+
+   Warum nicht die Brutto-Farben mit der Netto-Summe zeigen: Dann summierten
+   sich die Farbzahlen auf mehr, als oben als Gesamtzahl steht — eine
+   Aufschlüsselung, die ihrer eigenen Summe widerspricht, ist schlimmer als
+   keine. Die Summe der Farben ist HIER immer die Gesamtzahl; darauf kann man
+   sich verlassen. */
+const MANA_ANY = "ANY";
 function manaProduktion(c) {
-  let je = 0, variabel = false;
+  let je = 0, farben = null, variabel = false;
   for (const m of (c.oracle_text || "").matchAll(/([^:\n.]*):\s*Add\s([^.\n]+)/g)) {
     const kosten = manaKosten(m[1], c.name);
     if (!kosten) continue;
-    const menge = manaMenge(m[2]);
-    if (menge === null) { variabel = true; continue; }
-    je = Math.max(je, menge - kosten.mana);
+    const a = manaAusgabe(m[2]);
+    if (!a) { variabel = true; continue; }
+    const netto = a.menge - kosten.mana;
+    if (netto <= je) continue;
+    je = netto;
+    const benannt = Object.keys(a.farben);
+    // Deckt die Aufzählung die ganze Menge? Bei „one mana of any color“ nicht:
+    // Dort steht eine Menge ohne eine einzige benannte Farbe, und der Rest
+    // gehört nach „wählbar“ — sonst fiele er aus der Aufschlüsselung heraus
+    // und die Farben summierten sich auf WENIGER als die Gesamtzahl.
+    const gedeckt = Object.values(a.farben).reduce((s, v) => s + v, 0) === a.menge;
+    // Eine WAHL geht immer nach „wählbar“, auch wenn die größte Option nur eine
+    // Farbe kennt: „Add {W}{W}, {W}{B}, or {B}{B}“ als zwei weiße zu führen
+    // hieße, eine der drei Möglichkeiten zur einzigen zu erklären.
+    farben = (gedeckt && !a.wahl && kosten.mana === 0) ? { ...a.farben }
+           : (gedeckt && !a.wahl && benannt.length === 1) ? { [benannt[0]]: netto }
+           : { [MANA_ANY]: netto };
   }
   // Grundland-Typen tragen ihre Fähigkeit im REGELWERK, nicht im Text
   // (CR 305.6): ein Wald macht {G}, auch wenn kein Erinnerungstext erfasst
   // ist. Das fängt Altbestand ohne Regeltext ab — und Dryad Arbor gleich mit.
-  if (/\bLand\b/.test(c.type_line || "")
-      && /\b(Plains|Island|Swamp|Mountain|Forest)\b/.test(c.type_line || ""))
-    je = Math.max(je, 1);
-  return { je: Math.max(0, je), variabel };
+  // Trägt ein Land ZWEI Grundtypen, ist es eine Wahl und damit „wählbar“.
+  if (je < 1 && /\bLand\b/.test(c.type_line || "")) {
+    const typen = [...new Set([["Plains", "W"], ["Island", "U"], ["Swamp", "B"],
+                               ["Mountain", "R"], ["Forest", "G"]]
+      .filter(([n]) => new RegExp(`\\b${n}\\b`).test(c.type_line || "")).map(x => x[1]))];
+    if (typen.length) { je = 1; farben = { [typen.length === 1 ? typen[0] : MANA_ANY]: 1 }; }
+  }
+  return { je: Math.max(0, je), farben: je > 0 ? (farben || {}) : null, variabel };
 }
 
 /* Der Stand fürs Anzeigen: frei = was ungetappte Quellen noch geben können,
    gesamt = alle Quellen, als wäre nichts getappt. Beides zusammen liest sich
-   als „so viel geht noch, so viel war es diesen Zug“. */
+   als „so viel geht noch, so viel war es diesen Zug“ — und dasselbe noch
+   einmal je Farbe, denn sieben Mana sind wertlos, wenn der Zauber zwei blaue
+   verlangt und kein blaues darunter ist. */
+const MANA_FOLGE = ["W", "U", "B", "R", "G", "C", MANA_ANY];
 function manaStand() {
-  const st = { frei: 0, gesamt: 0, teile: [], variabel: [], unbekannt: [] };
+  const st = { frei: 0, gesamt: 0, farben: {}, teile: [], variabel: [], unbekannt: [] };
+  const buchen = (f, frei, gesamt) => {
+    const e = st.farben[f] || (st.farben[f] = { frei: 0, gesamt: 0 });
+    e.frei += frei; e.gesamt += gesamt;
+  };
   zoneKarten("field").forEach(({ card, n }) => {
     const p = manaProduktion(card);
     if (p.variabel) st.variabel.push(trkName(card));
@@ -12803,14 +12860,40 @@ function manaStand() {
     const wach = feldListe(card.id).filter(x => !x.t).length;
     st.frei += p.je * wach;
     st.gesamt += p.je * n;
-    st.teile.push({ name: trkName(card), je: p.je, n, wach });
+    for (const [f, k] of Object.entries(p.farben)) buchen(f, k * wach, k * n);
+    st.teile.push({ name: trkName(card), je: p.je, n, wach, farben: p.farben });
   });
+  // Feste Reihenfolge WUBRG, dann farblos, dann wählbar — dieselbe wie überall
+  // in der App und die, in der Spieler ihre Kosten lesen.
+  st.reihe = MANA_FOLGE.filter(f => st.farben[f]).map(f => ({ f, ...st.farben[f] }));
   return st;
+}
+
+/* Ein Symbol für eine Farbe. „Wählbar“ bekommt das Mehrfarbig-Zeichen: Es gibt
+   kein Symbol für „such dir eins aus“, und das Rad ist die nächste Verwandte —
+   es steht überall dort, wo mehrere Farben gemeint sind. */
+const manaFarbSymbol = f => f === MANA_ANY
+  ? `<i class="ms ms-multicolor ms-cost" role="img" aria-label="${esc(t("mat.manaAny"))}"></i>`
+  : mitSymbolen(`{${f}}`);
+const manaFarbName = f => f === MANA_ANY ? t("mat.manaAny") : t("color." + f);
+
+/* Die Farbreihe. Kompakt (Akkordeon-Kopfzeile) steht nur die freie Menge — dort
+   ist der Platz eine Zeile neben Namen, Anzahl und Miniaturen. Auf der Matte
+   steht frei/gesamt, wie in der großen Zahl darüber. */
+function manaFarbenHtml(st, kompakt) {
+  if (!st.reihe.length) return "";
+  return `<div class="mana-farben${kompakt ? " kompakt" : ""}">${st.reihe.map(x =>
+    `<span class="mana-chip" title="${esc(t("mat.manaFarbTitel",
+        { farbe: manaFarbName(x.f), frei: x.frei, gesamt: x.gesamt }))}">${manaFarbSymbol(x.f)}<span
+       class="mana-frei">${x.frei}</span>${kompakt ? "" :
+       `<span class="mana-von">&thinsp;/&thinsp;${x.gesamt}</span>`}</span>`).join("")}</div>`;
 }
 
 function manaTitel(st) {
   let s = t("mat.manaTitle", { frei: st.frei, gesamt: st.gesamt });
-  if (st.teile.length) s += "\n" + st.teile.map(x =>
+  if (st.reihe.length) s += "\n" + st.reihe.map(x =>
+    t("mat.manaFarbTitel", { farbe: manaFarbName(x.f), frei: x.frei, gesamt: x.gesamt })).join("\n");
+  if (st.teile.length) s += "\n\n" + st.teile.map(x =>
     t("mat.manaZeile", { name: x.name, n: x.n, je: x.je })).join("\n");
   if (st.variabel.length) s += "\n" + t("mat.manaVariabel", { namen: st.variabel.join(", ") });
   if (st.unbekannt.length) s += "\n" + t("mat.manaUnbekannt", { namen: st.unbekannt.join(", ") });
@@ -12826,7 +12909,7 @@ function matManaHtml() {
   return `<section class="mat-feld mat-mana">
     <div class="mat-titel">${esc(t("mat.mana"))}</div>
     <div class="mat-korb">${st.gesamt || st.variabel.length
-      ? `<div class="mat-manawert" title="${esc(manaTitel(st))}"><span class="mana-frei">${st.frei}${plus}</span><span class="mana-von">&thinsp;/&thinsp;${st.gesamt}${plus}</span></div>`
+      ? `<div class="mat-manawert" title="${esc(manaTitel(st))}"><span class="mana-frei">${st.frei}${plus}</span><span class="mana-von">&thinsp;/&thinsp;${st.gesamt}${plus}</span></div>${manaFarbenHtml(st)}`
       : `<div class="mat-manawert leer">&ndash;</div>`}</div>
   </section>`;
 }
@@ -12839,7 +12922,7 @@ function zonenManaChip() {
   const st = manaStand();
   if (!st.gesamt && !st.variabel.length) return "";
   const plus = st.variabel.length ? "+" : "";
-  return `<span class="zone-mana" title="${esc(manaTitel(st))}">${esc(t("mat.mana"))} ${st.frei}${plus}/${st.gesamt}${plus}</span>`;
+  return `<span class="zone-mana" title="${esc(manaTitel(st))}">${st.frei}${plus}/${st.gesamt}${plus}${manaFarbenHtml(st, true)}</span>`;
 }
 
 /* ---- Verschieben ---------------------------------------------------- */
