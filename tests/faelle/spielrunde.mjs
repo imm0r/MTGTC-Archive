@@ -620,6 +620,127 @@ export default async function ({ seite, adresse, stand }) {
     streuung.tempo > 30 && streuung.taumeln > 25 && streuung.legen > 25 && streuung.mitte > 30,
     JSON.stringify(streuung));
 
+  /* --- Zufällig ziehen -------------------------------------------------- */
+  /* Am Tisch zieht man physisch und sagt der App nur, WELCHE Karte es war.
+     Wer ohne Karten spielt, hat niemanden, der für ihn mischt.
+
+     Die Falle steckt in der Gewichtung: Gezogen werden muss über EXEMPLARE,
+     nicht über Zeilen. Vier Wälder sind vier Chancen, nicht eine — sonst käme
+     aus einem Deck mit 38 Ländern und 62 Einzelkarten fast nie ein Land.
+     Geprüft wird das ohne Statistik: Math.random wird festgehalten, und dann
+     muss jedes Los bei der Karte landen, der es zusteht. */
+  await seite.evaluate(() => {
+    // Den Stand sichern: Die Prüfungen danach brauchen das Deck, wie es war.
+    window.SICHERUNG = { entries: JSON.parse(JSON.stringify(DECKS[0].entries)),
+                         zonen: JSON.stringify(SESSION_ZONEN) };
+    // Genau zwei Karten in der Bibliothek, sonst nichts. Die Zonenstände der
+    // beiden werden geräumt — die Bibliothek ist der REST, und nur was
+    // nirgendwo sonst liegt, liegt in ihr. Auf Übriggebliebenes aus den Zügen
+    // weiter oben ist kein Verlass: Da kann längst alles verteilt sein.
+    // Der Commander bleibt außen vor: Er liegt in der Kommandozone, nicht in
+    // der Bibliothek (zAnzahl gibt für ihn dort 0 zurück).
+    const d = DECKS[0];
+    const zwei = d.entries.map(e => e.cardId)
+      .filter(id => id !== d.main_card_id && id !== d.second_card_id).slice(0, 2);
+    zwei.forEach(id => delete SESSION_ZONEN[id]);
+    d.entries = d.entries.filter(e => zwei.includes(e.cardId));
+    d.entries.forEach(e => { e.qty = 1; });
+    renderZonen();
+  });
+  const bib = await seite.evaluate(() => {
+    const lib = zoneKarten("lib");
+    // Die ZWEITE der beiden bekommt drei Exemplare — dann steht die einzelne
+    // vorn und das erste Los muss bei ihr landen.
+    DECKS[0].entries.forEach(e => { if (e.cardId === lib[1].card.id) e.qty = 3; });
+    renderZonen();
+    const jetzt = zoneKarten("lib");
+    return { reihenfolge: jetzt.map(x => [x.card.id, x.n]),
+             eins: jetzt[0].card.id, drei: jetzt[1].card.id };
+  });
+  await seite.waitForTimeout(200);
+  stand.gleich("die Probe steht: eine Karte einmal, eine dreimal in der Bibliothek",
+    bib.reihenfolge.map(x => x[1]), [1, 3]);
+
+  stand.gleich("die Bibliothek trägt einen Knopf zum zufälligen Ziehen",
+    await seite.evaluate(() => ({
+      da: document.querySelectorAll("#lib-zufall").length,
+      gesperrt: document.querySelector("#lib-zufall")?.disabled,
+      // Über der Liste, gleich unter dem Suchfeld — beides sind Wege, eine
+      // Karte aus der Bibliothek auf die Hand zu bekommen.
+      vorDerListe: !!(document.querySelector("#lib-zufall")
+        .compareDocumentPosition(document.querySelector(".lib-liste")) & Node.DOCUMENT_POSITION_FOLLOWING),
+      // Die Mattenspalte ist 154–172 px schmal. Ein Knopf, dessen Aufschrift
+      // dort nicht hineinpasst, sieht nicht kaputt aus — er ist nur
+      // abgeschnitten, und das fällt keinem Fehler auf.
+      passt: (() => { const b = document.querySelector("#lib-zufall");
+        const sp = document.querySelector(".mat-mitte").getBoundingClientRect();
+        const r = b.getBoundingClientRect();
+        return b.scrollWidth <= b.clientWidth && r.left >= sp.left - 1 && r.right <= sp.right + 1; })(),
+    })),
+    { da: 1, gesperrt: false, vorDerListe: true, passt: true });
+
+  const lose = await seite.evaluate(([eins, drei]) => {
+    const alt = Math.random;
+    const stand0 = JSON.stringify(SESSION_ZONEN);
+    const gezogen = [];
+    // Vier Exemplare in der Bibliothek: eines der einen Karte, drei der
+    // anderen. Jedes Los muss bei der Karte landen, der es zusteht.
+    for (const wert of [0.1, 0.3, 0.6, 0.9]) {
+      SESSION_ZONEN = JSON.parse(stand0);
+      Math.random = () => wert;
+      const c = zufallsKarteZiehen();
+      gezogen.push(c?.id === eins ? "eins" : c?.id === drei ? "drei" : "?");
+    }
+    Math.random = alt;
+    SESSION_ZONEN = JSON.parse(stand0);
+    renderZonen();
+    return gezogen;
+  }, [bib.eins, bib.drei]);
+  stand.gleich("das erste Los zieht die einzelne Karte, die drei anderen die dreifache",
+    lose, ["eins", "drei", "drei", "drei"]);
+
+  const zug = await seite.evaluate(() => {
+    const vorher = { lib: zoneSumme("lib"), hand: zoneSumme("hand") };
+    window.GESCHRIEBEN = [];
+    const c = zufallsKarteZiehen();
+    return { name: c ? trkName(c) : null, vorher,
+             nachher: { lib: zoneSumme("lib"), hand: zoneSumme("hand") },
+             gemeldet: window.GESCHRIEBEN.length,
+             meldung: document.querySelector("#toast")?.textContent || "" };
+  });
+  await seite.waitForTimeout(200);
+  stand.gleich("ein Zug nimmt genau ein Exemplar aus der Bibliothek auf die Hand",
+    [zug.vorher.lib - zug.nachher.lib, zug.nachher.hand - zug.vorher.hand], [1, 1]);
+  stand.ist("und wird zum Speichern angemeldet", zug.gemeldet === 1, zug.gemeldet);
+  stand.ist("die Meldung nennt die gezogene Karte",
+    !!zug.name && zug.meldung.includes(zug.name), zug.meldung);
+
+  /* Leere Bibliothek: kein Zug, kein stiller Fehlschlag — und der Knopf ist
+     gesperrt, damit man es gar nicht erst versucht. */
+  const leer = await seite.evaluate(() => {
+    const d = DECKS[0];
+    // Alles auf die Hand: Dann ist die Bibliothek leer (sie ist der Rest).
+    d.entries.forEach(e => { SESSION_ZONEN[e.cardId] = { hand: e.qty, field: 0, grave: 0, exile: 0, cast: 0 }; });
+    renderZonen();
+    const vorher = zoneSumme("hand");
+    const c = zufallsKarteZiehen();
+    return { rest: zoneSumme("lib"), gezogen: c, hand: zoneSumme("hand") - vorher,
+             gesperrt: document.querySelector("#lib-zufall")?.disabled,
+             meldung: document.querySelector("#toast")?.textContent || "" };
+  });
+  stand.gleich("aus einer leeren Bibliothek wird nichts gezogen",
+    [leer.rest, leer.gezogen, leer.hand], [0, null, 0]);
+  stand.gleich("der Knopf ist dann gesperrt und sagt, woran es liegt",
+    [leer.gesperrt, /leer|empty|vide|vacía|vuota/i.test(leer.meldung)], [true, true]);
+
+  // Stand zurückgeben: Die Prüfungen danach brauchen das Deck, wie es war.
+  await seite.evaluate(() => {
+    DECKS[0].entries = window.SICHERUNG.entries;
+    SESSION_ZONEN = JSON.parse(window.SICHERUNG.zonen);
+    renderZonen();
+  });
+  await seite.waitForTimeout(200);
+
   /* Danach räumt er sich selbst weg. Bliebe er liegen, verdeckte er genau die
      Karten, für die man gewürfelt hat — die Zahl bleibt am Emblem stehen. */
   await seite.waitForTimeout(6000);          // taumeln + legen + 2600 ms Halten + Ausblenden

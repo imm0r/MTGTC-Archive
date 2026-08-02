@@ -1409,6 +1409,16 @@ App nur sagen, *welche* Karte es war — dafür steht dort ein Suchfeld statt ei
 Dauerliste. Die ganze Bibliothek ist einen Klick entfernt, wenn du sehen willst,
 was noch drin ist.
 
+**🎲 Zufällig ziehen** nimmt gleich darunter eine zufällige Karte aus der
+Bibliothek auf die Hand — für Probehände, Testläufe und Runden ohne Karten auf
+dem Tisch, wo niemand da ist, der mischt. Ist die Bibliothek leer, ist der Knopf
+gesperrt.
+
+> **Gezogen wird über Exemplare, nicht über Zeilen.** Vier Wälder sind vier
+> Chancen, nicht eine. Über die Zeilen gezogen käme aus einem Deck mit 38
+> Ländern und 62 Einzelkarten fast nie ein Land — das wäre keine Bibliothek
+> mehr, sondern eine Namensliste.
+
 Eine Zeile trägt dabei **nur Kartenname und Anzahl**. Alles Weitere steht in der
 **Kartenansicht für den Spielmodus**: Zeigen blendet sie ein, Klicken hält sie
 fest. Erst dann wird sie bedienbar und trägt die Zielknöpfe.
@@ -1737,7 +1747,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `verlauf`        | Deck-Verlauf: Fingerabdruck unabhängig von der Reihenfolge, der Umbau in Worten, und was ein Rücksprung schreiben würde (fehlende Karten, fehlende Fächer, primäre Einordnung) |
 | `wunschliste`    | Karte direkt vormerken: die Zeile (Bestand 0, Setcode groß, Preis mit erstem Punkt) und die Doppelprüfung — auch gegen eine andere Auflage derselben Karte |
 | `synergien`      | Aufgehobene Vorschläge: die eingedampfte Karte, der Fingerabdruck als Warnung vor Überholtem, und dass ein frisches Ergebnis nicht überschrieben wird |
-| `spielrunde`     | Die Matte: Ziehen zwischen den Zonen, Tappen per Klick, die Lebensreihe (vier Kacheln nebeneinander, kein Rollbalken), die drei Laden (Ort, Rahmen, Zahl, immer nur eine offen, auch zugeklappt Ablageziel) und der Würfel (nur W20, blanke Fläche über der ganzen Matte, Zahl aufs Emblem, jeder Wurf anders) |
+| `spielrunde`     | Die Matte: Ziehen zwischen den Zonen, Tappen per Klick, die Lebensreihe (vier Kacheln nebeneinander, kein Rollbalken), die drei Laden (Ort, Rahmen, Zahl, immer nur eine offen, auch zugeklappt Ablageziel), der Würfel (nur W20, blanke Fläche über der ganzen Matte, Zahl aufs Emblem, jeder Wurf anders) und „Zufällig ziehen" (gewichtet über Exemplare, leere Bibliothek) |
 
 ### Zwei Regeln, die dabei gelernt wurden
 
