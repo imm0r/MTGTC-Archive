@@ -1113,6 +1113,14 @@ Einführung. Was davor am Deck geschah, ist nicht rekonstruierbar — und wird
 auch nicht behauptet: Der älteste Eintrag heißt „Ausgangsstand", nicht „Deck
 angelegt".
 
+Der Kasten sitzt **über der Kartenliste**, gleich unter der Werkzeugleiste und
+neben der Statistik. Unter der Liste — wo die übrigen Kästen stehen — lag er bei
+einem großen Deck rund zweitausend Pixel tiefer, und ein Klick auf „Verlauf" sah
+aus, als geschähe nichts. Im schmalen Fenster reicht das allein nicht: Dort
+bricht die Werkzeugleiste um, der Kasten liegt gemessen bei 879 px hinter dem
+unteren Rand eines 720 px hohen Fensters — der Klick holt ihn deshalb zusätzlich
+heran.
+
 ### Stände, keine Ereignisse
 
 Gespeichert wird der **fertige Stand** eines Decks (Kopf, Fächer, Karten mit

@@ -2981,6 +2981,7 @@ Object.assign(I18N.it, {
 
 /* ---- Teil 20: Verlauf je Deck ---- */
 Object.assign(I18N.de, {
+  "hist.needSchema": "Dafür fehlt der Datenbank die Tabelle deck_history — supabase-schema.sql erneut im SQL Editor ausführen (oder supabase/migrations/20260802090000_deck_verlauf.sql einzeln).",
   "hist.btn": "Verlauf",
   "hist.title": "Ältere Stände dieses Decks ansehen und zurückspringen",
   "hist.loading": "Verlauf wird geladen…",
@@ -3010,6 +3011,7 @@ Object.assign(I18N.de, {
   "dlg.histBackGone": "Deck „{name}“ auf diesen Stand zurücksetzen? {n} Karten von damals gibt es nicht mehr in der Sammlung und fehlen danach. Der jetzige Stand bleibt im Verlauf.",
 });
 Object.assign(I18N.en, {
+  "hist.needSchema": "The database is missing the deck_history table — run supabase-schema.sql again in the SQL editor (or supabase/migrations/20260802090000_deck_verlauf.sql on its own).",
   "hist.btn": "History",
   "hist.title": "View earlier states of this deck and roll back",
   "hist.loading": "Loading history…",
@@ -3039,6 +3041,7 @@ Object.assign(I18N.en, {
   "dlg.histBackGone": "Reset deck “{name}” to this state? {n} cards from back then are no longer in the collection and will be missing. The current state stays in the history.",
 });
 Object.assign(I18N.fr, {
+  "hist.needSchema": "La base n’a pas la table deck_history — réexécuter supabase-schema.sql dans l’éditeur SQL (ou supabase/migrations/20260802090000_deck_verlauf.sql seul).",
   "hist.btn": "Historique",
   "hist.title": "Voir les états antérieurs de ce deck et y revenir",
   "hist.loading": "Chargement de l’historique…",
@@ -3068,6 +3071,7 @@ Object.assign(I18N.fr, {
   "dlg.histBackGone": "Rétablir le deck « {name} » à cet état ? {n} cartes d’alors ne sont plus dans la collection et manqueront. L’état actuel reste dans l’historique.",
 });
 Object.assign(I18N.es, {
+  "hist.needSchema": "A la base de datos le falta la tabla deck_history — vuelve a ejecutar supabase-schema.sql en el editor SQL (o supabase/migrations/20260802090000_deck_verlauf.sql por separado).",
   "hist.btn": "Historial",
   "hist.title": "Ver estados anteriores de este mazo y volver a ellos",
   "hist.loading": "Cargando el historial…",
@@ -3097,6 +3101,7 @@ Object.assign(I18N.es, {
   "dlg.histBackGone": "¿Restablecer el mazo «{name}» a este estado? {n} cartas de entonces ya no están en la colección y faltarán. El estado actual permanece en el historial.",
 });
 Object.assign(I18N.it, {
+  "hist.needSchema": "Al database manca la tabella deck_history — esegui di nuovo supabase-schema.sql nell’editor SQL (o supabase/migrations/20260802090000_deck_verlauf.sql da solo).",
   "hist.btn": "Cronologia",
   "hist.title": "Vedere stati precedenti di questo mazzo e tornarci",
   "hist.loading": "Caricamento della cronologia…",

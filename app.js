@@ -8199,9 +8199,19 @@ async function deckVerlaufZeigen(deckId) {
     if (!jetzt) return;
     jetzt.innerHTML = deckVerlaufHtml(deckId, eintraege);
     wireVerlauf(jetzt);
+    // Auch über der Tabelle kann der Kasten außerhalb des Bildes liegen — bei
+    // langen Werkzeugleisten oder auf einem Handy. Dasselbe tut der
+    // Bracket-Knopf, aus demselben Grund.
+    jetzt.scrollIntoView({ behavior: "smooth", block: "nearest" });
   } catch (e) {
     const jetzt = verlaufKasten(deckId);
-    if (jetzt) jetzt.innerHTML = `<div class="empty">${esc(dbErr(e))}</div>`;
+    if (!jetzt) return;
+    // „relation does not exist" heißt hier nur eines: Das Schema ist älter als
+    // die App. Der rohe Datenbankfehler sagt dem Leser nichts, der Satz schon.
+    const fehltTabelle = DECK_VERLAUF_FEHLT ||
+      /42P01|does not exist|schema cache/i.test(e?.code + " " + e?.message);
+    jetzt.innerHTML = `<div class="empty">${esc(fehltTabelle ? t("hist.needSchema") : dbErr(e))}</div>`;
+    jetzt.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 }
 
@@ -8474,6 +8484,12 @@ function renderDecks() {
           </div>` : ""}
         </div>
         <div class="deck-dash" data-dash="${d.id}" style="margin-top:12px"></div>
+        <!-- Der Verlauf steht ÜBER der Kartentabelle, nicht wie die übrigen
+             Kästen darunter: Bei hundert Karten läge er sonst zweitausend Pixel
+             tiefer, und ein Klick auf „Verlauf" sähe aus, als geschähe nichts.
+             Statistik und Verlauf sind beides Dinge, die man aufklappt und
+             gleich ansieht — sie gehören an dieselbe Stelle. -->
+        <div class="deck-verlauf" data-histbox="${d.id}" style="margin-top:12px"></div>
         ${rows ? `${deckGruppeLeisteHtml(d)}
                   ${deckAnsicht.karten(d.id)
                     ? deckStapelHtml(d, gruppen)
@@ -8484,7 +8500,6 @@ function renderDecks() {
         <div class="deck-combos" data-combobox="${d.id}" style="margin-top:12px"></div>
         <div class="deck-legal" data-legalbox="${d.id}" style="margin-top:12px"></div>
         <div class="deck-bracket" data-bracketbox="${d.id}" style="margin-top:12px"></div>
-        <div class="deck-verlauf" data-histbox="${d.id}" style="margin-top:12px"></div>
       </div>
     </div>`;
   }).join("");
