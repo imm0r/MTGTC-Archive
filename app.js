@@ -226,7 +226,7 @@ async function reload() {
   // erlaubt die RLS auch das Lesen geteilter Freundes-Decks/-Karten — die
   // dürfen hier aber nicht in die eigene Sammlung/Deckliste sickern. Fremdes
   // wird nur gezielt beim Ansehen eines Freundes geladen.
-  const [c, d, e, k, z] = await Promise.all([
+  const [c, d, e, k, z, v] = await Promise.all([
     sb.from("cards").select("*").eq("user_id", USER.id).order("name"),
     sb.from("decks").select("*").eq("user_id", USER.id).order("created"),
     sb.from("deck_entries").select("*").eq("user_id", USER.id),
@@ -237,7 +237,13 @@ async function reload() {
       .order("pos").order("created"),
     // Die Zuordnungen Karte → Kategorie. Eine Karte darf in mehreren stehen,
     // genau eine davon ist die primäre.
-    sb.from("deck_entry_categories").select("*").eq("user_id", USER.id)
+    sb.from("deck_entry_categories").select("*").eq("user_id", USER.id),
+    // Nur die FINGERABDRÜCKE des Verlaufs, nicht die Stände selbst: Gebraucht
+    // wird hier bloß die Frage „hat sich seit dem letzten Eintrag etwas
+    // geändert". Die Stände (jeweils einige Kilobyte) holt erst, wer den
+    // Verlauf aufklappt.
+    sb.from("deck_history").select("deck_id, stand")
+      .eq("user_id", USER.id).order("created", { ascending: false })
   ]);
   for (const r of [c, d, e]) if (r.error) throw r.error;
   // Die Kategorien werden NICHT mitgeworfen: Wer das Schema noch nicht
@@ -276,6 +282,16 @@ async function reload() {
   // es noch nicht kennt, und kehrt sofort zurück, wenn nichts übrig bleibt.
   // Bewusst ohne await — die Sammlung soll nicht auf das Archiv warten.
   ladePreisHistorie().catch(() => {});
+
+  // Der Verlauf der Decks. Fehlt die Tabelle, bleibt die Funktion einfach aus —
+  // wie bei den Kategorien soll das den Rest der App nicht aufhalten.
+  DECK_VERLAUF_FEHLT = !!v.error;
+  deckVerlaufStand.clear();
+  // Absteigend geladen: Der ERSTE Eintrag je Deck ist der jüngste.
+  for (const r of (v.error ? [] : v.data))
+    if (!deckVerlaufStand.has(r.deck_id)) deckVerlaufStand.set(r.deck_id, r.stand);
+  // Ohne await: Ein neuer Stand darf die Anzeige nicht aufhalten.
+  verlaufNachtragen().catch(() => {});
 }
 
 /* ============================== Scryfall ============================== */
@@ -7995,6 +8011,305 @@ async function kategorienVerwalten(deckId) {
   } catch (e) { toast(dbErr(e)); }
 }
 
+/* ========================= Verlauf je Deck ============================
+   Nach jeder Änderung ein Stand, und der Weg zurück zu einem älteren.
+
+   ALS STAND, NICHT ALS EREIGNIS. Ein Ereignisstrom („Karte X ergänzt",
+   „Kategorie umbenannt") müsste an jeder der rund zwanzig Schreibstellen
+   mitgeschrieben werden — und eine davon zu vergessen fiele nicht auf: Der
+   Verlauf wäre still unvollständig, und ein Rücksprung landete auf einem Stand,
+   den es nie gab. Geschrieben wird deshalb der FERTIGE STAND, an genau einer
+   Stelle: nach dem Laden der Decks, wenn sich der Fingerabdruck geändert hat.
+   Was sich geändert HAT, rechnet standUnterschied() aus dem Vergleich zweier
+   Stände aus, statt es sich merken zu müssen.
+
+   NICHT RÜCKWIRKEND. Der erste Stand entsteht beim ersten Laden nach dieser
+   Änderung. Was davor am Deck geschah, ist nicht rekonstruierbar — und wird
+   auch nicht behauptet: Der älteste Eintrag heißt „Ausgangsstand", nicht
+   „Deck angelegt".
+
+   KATEGORIEN ÜBER IHREN NAMEN. Im Stand steht „Ramp", nicht die id des Fachs.
+   Ein Fach kann zwischendurch gelöscht und gleichnamig neu angelegt worden
+   sein; über die id zeigte der Rücksprung dann ins Leere, über den Namen
+   dorthin, wo man ihn erwartet. Fehlt das Fach ganz, legt der Rücksprung es
+   wieder an. */
+let DECK_VERLAUF_FEHLT = false;        // Tabelle nicht angelegt → Funktion aus
+const deckVerlaufStand = new Map();    // deckId → Fingerabdruck des jüngsten Eintrags
+const verlaufOffen = new Set();        // welche Verlaufskästen aufgeklappt sind
+
+/* Der Stand eines Decks als reine Daten: Deckkopf, Fächer, Karten mit Menge und
+   Einordnung. ALLES SORTIERT — der Fingerabdruck darf sich nicht ändern, bloß
+   weil die Datenbank die Zeilen in anderer Reihenfolge zurückgab. */
+function deckStand(d) {
+  const katName = new Map((d.kategorien || []).map(k => [k.id, k.name]));
+  return {
+    name: d.name || "",
+    format: d.format || null,
+    archetyp: d.archetype || null,
+    haupt: d.main_card_id || null,
+    zweit: d.second_card_id || null,
+    kats: (d.kategorien || []).map(k => k.name).sort(),
+    karten: (d.entries || []).map(e => ({
+      id: e.cardId,
+      n: e.qty,
+      // Die primäre Einordnung trägt einen Stern davor — sie beantwortet die
+      // Frage, wo die Karte steht, wenn jede nur einmal vorkommen darf.
+      kats: (e.kats || []).map(x => (x.primaer ? "*" : "") + (katName.get(x.id) || ""))
+        .filter(s => s !== "" && s !== "*").sort(),
+    })).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
+  };
+}
+
+/* Fingerabdruck (cyrb53). Ein Hash kann kollidieren; hier wäre die Folge ein
+   FEHLENDER Verlaufseintrag, nicht ein falscher — bei 53 Bit und vierzig
+   Ständen je Deck ist das kein Risiko, das eine Volltextspalte wert wäre. */
+function fingerabdruck(text) {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
+
+/* Neue Stände nachtragen. Läuft nach jedem Laden der Decks und schreibt nur,
+   was sich geändert hat — sonst bekäme jedes Öffnen der Seite einen Eintrag.
+   Ohne await aufgerufen: Der Verlauf darf die Anzeige nicht aufhalten. */
+async function verlaufNachtragen() {
+  if (DECK_VERLAUF_FEHLT || !USER || !DECKS.length) return;
+  const neu = [];
+  for (const d of DECKS) {
+    const daten = deckStand(d);
+    const stand = fingerabdruck(JSON.stringify(daten));
+    if (deckVerlaufStand.get(d.id) === stand) continue;
+    deckVerlaufStand.set(d.id, stand);
+    neu.push({ deck_id: d.id, user_id: USER.id, stand, daten });
+  }
+  if (!neu.length) return;
+  const { error } = await sb.from("deck_history").insert(neu);
+  // Schlägt es fehl (Tabelle fehlt, Netz weg), den gemerkten Stand wieder
+  // vergessen: Sonst hielte die App einen Eintrag für geschrieben, den es nicht
+  // gibt, und die nächste Änderung fiele unter den Tisch.
+  if (error) { DECK_VERLAUF_FEHLT = true; neu.forEach(x => deckVerlaufStand.delete(x.deck_id)); }
+}
+
+/* Was liegt zwischen zwei Ständen? In Worten, aus dem Vergleich gerechnet —
+   nicht aus einem Protokoll, das jemand hätte führen müssen. */
+function standUnterschied(alt, neu) {
+  if (!alt) return [t("hist.first")];
+  const out = [];
+  const nm = id => CARDS.find(c => c.id === id)?.disp || t("hist.goneCard");
+  const A = new Map((alt.karten || []).map(k => [k.id, k]));
+  const B = new Map((neu.karten || []).map(k => [k.id, k]));
+  const dazu = [...B.keys()].filter(id => !A.has(id));
+  const weg = [...A.keys()].filter(id => !B.has(id));
+  let mehr = 0, weniger = 0, umsortiert = 0;
+  for (const [id, b] of B) {
+    const a = A.get(id);
+    if (!a) continue;
+    if (b.n > a.n) mehr += b.n - a.n;
+    if (b.n < a.n) weniger += a.n - b.n;
+    if (JSON.stringify(a.kats) !== JSON.stringify(b.kats)) umsortiert++;
+  }
+  if (dazu.length) out.push(dazu.length === 1
+    ? t("hist.addOne", { name: nm(dazu[0]) }) : t("hist.addN", { n: dazu.length }));
+  if (weg.length) out.push(weg.length === 1
+    ? t("hist.delOne", { name: nm(weg[0]) }) : t("hist.delN", { n: weg.length }));
+  if (mehr) out.push(t("hist.qtyUp", { n: mehr }));
+  if (weniger) out.push(t("hist.qtyDown", { n: weniger }));
+  if (umsortiert) out.push(t("hist.recat", { n: umsortiert }));
+  if (alt.name !== neu.name) out.push(t("hist.renamed", { name: neu.name }));
+  if (alt.format !== neu.format || alt.archetyp !== neu.archetyp) out.push(t("hist.classified"));
+  if (alt.haupt !== neu.haupt || alt.zweit !== neu.zweit) out.push(t("hist.commander"));
+  const kd = (neu.kats || []).filter(k => !(alt.kats || []).includes(k));
+  const kw = (alt.kats || []).filter(k => !(neu.kats || []).includes(k));
+  if (kd.length) out.push(t("hist.catAdd", { name: kd[0], n: kd.length }));
+  if (kw.length) out.push(t("hist.catDel", { name: kw[0], n: kw.length }));
+  // Zwei Stände mit verschiedenem Fingerabdruck, die hier nichts hergeben, gibt
+  // es nicht — aber eine leere Zeile wäre schlimmer als ein allgemeines Wort.
+  return out.length ? out : [t("hist.other")];
+}
+
+/* Steht für sich, damit die Prüfungen eine Attrappe einhängen können —
+   dieselbe Aufteilung wie bei zoneSchreiben() und wurfSpeichern(). */
+async function deckVerlaufLaden(deckId) {
+  const { data, error } = await sb.from("deck_history")
+    .select("id, created, daten").eq("deck_id", deckId)
+    .order("created", { ascending: false }).limit(40);
+  if (error) throw error;
+  return data || [];
+}
+
+const verlaufZeit = s => {
+  const d = new Date(s);
+  return isNaN(d) ? "" : d.toLocaleString(LANG,
+    { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+};
+
+function deckVerlaufHtml(deckId, eintraege) {
+  if (!eintraege.length) return `<div class="empty">${esc(t("hist.none"))}</div>`;
+  return `<div class="verlauf">
+    ${eintraege.map((e, i) => {
+      // Der Vergleich geht gegen den NÄCHSTÄLTEREN Eintrag: Die Liste steht
+      // absteigend, der Vorgänger einer Zeile ist also die Zeile darunter.
+      const was = standUnterschied(eintraege[i + 1]?.daten || null, e.daten);
+      const jetzt = i === 0;
+      const n = (e.daten?.karten || []).reduce((s, k) => s + (k.n || 0), 0);
+      return `<div class="verlauf-zeile${jetzt ? " jetzt" : ""}">
+        <div class="verlauf-zeit">${esc(verlaufZeit(e.created))}
+          <span class="verlauf-n">${n} ${esc(t("common.cards"))}</span></div>
+        <div class="verlauf-was">${was.map(esc).join(" &middot; ")}</div>
+        <div class="verlauf-tat">${jetzt
+          ? `<span class="verlauf-jetzt">${esc(t("hist.current"))}</span>`
+          : `<button class="btn ghost sm" data-histback="${esc(deckId)}|${esc(e.id)}"
+               title="${esc(t("hist.restoreTitle"))}">&#8634; ${esc(t("hist.restore"))}</button>`}</div>
+      </div>`;
+    }).join("")}
+    <p class="hint verlauf-hinweis">${esc(t("hist.hint"))}</p>
+  </div>`;
+}
+
+const verlaufKasten = deckId => $(`.deck-verlauf[data-histbox="${deckId}"]`);
+
+function deckVerlaufUmschalten(deckId) {
+  if (verlaufOffen.has(deckId)) {
+    verlaufOffen.delete(deckId);
+    const box = verlaufKasten(deckId);
+    if (box) box.innerHTML = "";
+    return Promise.resolve();
+  }
+  verlaufOffen.add(deckId);
+  return deckVerlaufZeigen(deckId);
+}
+
+/* Füllt den Kasten. Steht getrennt vom Umschalten, weil renderDecks() die
+   Kästen neu baut: Ein offener Verlauf soll ein Neuzeichnen überleben (etwa
+   nach einem Rücksprung), statt still leer dazustehen. */
+async function deckVerlaufZeigen(deckId) {
+  const box = verlaufKasten(deckId);
+  if (!box) return;
+  box.innerHTML = `<div class="empty">${esc(t("hist.loading"))}</div>`;
+  try {
+    const eintraege = await deckVerlaufLaden(deckId);
+    if (!verlaufOffen.has(deckId)) return;          // zwischendurch zugeklappt
+    const jetzt = verlaufKasten(deckId);            // und womöglich neu gezeichnet
+    if (!jetzt) return;
+    jetzt.innerHTML = deckVerlaufHtml(deckId, eintraege);
+    wireVerlauf(jetzt);
+  } catch (e) {
+    const jetzt = verlaufKasten(deckId);
+    if (jetzt) jetzt.innerHTML = `<div class="empty">${esc(dbErr(e))}</div>`;
+  }
+}
+
+function wireVerlauf(box) {
+  box.querySelectorAll("[data-histback]").forEach(b => b.onclick = () => {
+    const [deckId, eintragId] = b.dataset.histback.split("|");
+    deckZurueckspringen(deckId, eintragId, b);
+  });
+}
+
+/* WAS geschrieben werden müsste, um dieses Deck auf einen alten Stand zu
+   bringen — als reine Rechnung, ohne Datenbank. Getrennt vom Schreiben, weil
+   hier das Nachdenken steckt: welche Karten es noch gibt, welche Fächer neu
+   angelegt werden müssen, welche Einordnung die primäre war. Genau das lässt
+   sich so auch prüfen. */
+function ruecksprungPlan(d, daten, vorhanden) {
+  const alle = daten.karten || [];
+  // Karten, die es nicht mehr gibt, können nicht zurückkommen: Der
+  // Fremdschlüssel zeigt auf die Sammlung, und aus der ist die Zeile
+  // verschwunden. Gezählt werden sie trotzdem — stillschweigend ein kleineres
+  // Deck herzustellen wäre schlimmer als die Ansage.
+  const karten = alle.filter(k => vorhanden.has(k.id));
+  const katId = new Map((d.kategorien || []).map(k => [k.name, k.id]));
+  return {
+    kopf: {
+      name: daten.name || d.name,
+      format: daten.format ?? null,
+      archetype: daten.archetyp ?? null,
+      // Ein Commander, den es nicht mehr gibt, fällt weg — das Deck behält
+      // seinen Stand, verliert aber sein Aushängeschild.
+      main_card_id: vorhanden.has(daten.haupt) ? daten.haupt : null,
+      second_card_id: vorhanden.has(daten.zweit) ? daten.zweit : null,
+    },
+    neueKats: (daten.kats || []).filter(n => !katId.has(n)),
+    karten: karten.map(k => ({ card_id: k.id, qty: Math.max(1, k.n | 0) })),
+    // Die Einordnungen tragen noch den NAMEN des Fachs: Dessen id steht erst
+    // fest, wenn die fehlenden Fächer angelegt sind. Der Stern markiert die
+    // primäre Einordnung.
+    zuord: karten.flatMap(k => (k.kats || []).map(s => ({
+      card_id: k.id, kat: s.startsWith("*") ? s.slice(1) : s, primaer: s.startsWith("*"),
+    }))).filter(x => x.kat),
+    fehlend: alle.length - karten.length,
+  };
+}
+
+/* Zurück auf einen älteren Stand. Der Rücksprung ist selbst eine Änderung und
+   bekommt beim nächsten Laden seinen eigenen Verlaufseintrag — man kann ihn
+   also zurücknehmen wie alles andere. */
+async function deckZurueckspringen(deckId, eintragId, knopf) {
+  const d = DECKS.find(x => x.id === deckId);
+  if (!d) return;
+  let daten;
+  try {
+    const { data, error } = await sb.from("deck_history").select("daten").eq("id", eintragId).single();
+    if (error) throw error;
+    daten = data.daten;
+  } catch (e) { toast(dbErr(e)); return; }
+
+  const plan = ruecksprungPlan(d, daten, new Set(CARDS.map(c => c.id)));
+
+  if (!await confirmDlg(plan.fehlend
+    ? t("dlg.histBackGone", { name: esc(d.name), n: plan.fehlend })
+    : t("dlg.histBack", { name: esc(d.name) }))) return;
+
+  if (knopf) knopf.disabled = true;
+  try {
+    let r = await sb.from("decks").update(plan.kopf).eq("id", deckId);
+    if (r.error) throw r.error;
+
+    // Fehlende Fächer wieder anlegen — der Stand nennt sie beim Namen.
+    const katId = new Map((d.kategorien || []).map(k => [k.name, k.id]));
+    if (plan.neueKats.length && !DECK_KAT_TABELLE_FEHLT) {
+      const basis = (d.kategorien || []).length;
+      const { data: nk, error } = await sb.from("deck_categories")
+        .insert(plan.neueKats.map((name, i) => ({ deck_id: deckId, name, pos: basis + i })))
+        .select("id, name");
+      if (error) throw error;
+      (nk || []).forEach(k => katId.set(k.name, k.id));
+    }
+
+    // Erst alles weg, dann der alte Stand hinein — die Einordnungen hängen am
+    // Deckplatz und gehen dabei mit (Kaskade).
+    r = await sb.from("deck_entries").delete().eq("deck_id", deckId);
+    if (r.error) throw r.error;
+    for (let i = 0; i < plan.karten.length; i += 100) {
+      r = await sb.from("deck_entries").insert(
+        plan.karten.slice(i, i + 100).map(k => ({ deck_id: deckId, ...k })));
+      if (r.error) throw r.error;
+    }
+
+    const zeilen = plan.zuord
+      .filter(x => katId.has(x.kat))
+      .map(x => ({ deck_id: deckId, card_id: x.card_id,
+                   category_id: katId.get(x.kat), is_primary: x.primaer }));
+    for (let i = 0; i < zeilen.length; i += 100) {
+      r = await sb.from("deck_entry_categories").insert(zeilen.slice(i, i + 100));
+      if (r.error) throw r.error;
+    }
+
+    await reload(); renderAll();
+    toast(plan.fehlend ? t("hist.doneGone", { n: plan.fehlend }) : t("hist.done"));
+  } catch (e) {
+    toast(dbErr(e));
+  } finally {
+    if (knopf) knopf.disabled = false;
+  }
+}
+
 function renderDecks() {
   if (!DECKS.length) {
     $("#deck-list").innerHTML = `<div class="card"><div class="empty">${esc(t("deck.none"))}</div></div>`;
@@ -8128,6 +8443,8 @@ function renderDecks() {
                   title="${esc(t("bracket.title"))}">&#9878; ${esc(t("bracket.btn"))}</button>
                 <button class="btn ghost" data-legalbtn="${d.id}"
                   title="${esc(t("legal.deckTitle"))}">&#9878; ${esc(t("legal.deckBtn"))}</button>
+                <button class="btn ghost" data-histbtn="${d.id}"
+                  title="${esc(t("hist.title"))}">&#8634; ${esc(t("hist.btn"))}</button>
                 ${fehlt ? `<button class="btn ghost" data-buybtn="${d.id}"
                   title="${esc(t("buy.deckTitle"))}">&#128722; ${esc(t("buy.deckBtn", { n: fehlt }))}</button>` : ""}
               </div>
@@ -8167,6 +8484,7 @@ function renderDecks() {
         <div class="deck-combos" data-combobox="${d.id}" style="margin-top:12px"></div>
         <div class="deck-legal" data-legalbox="${d.id}" style="margin-top:12px"></div>
         <div class="deck-bracket" data-bracketbox="${d.id}" style="margin-top:12px"></div>
+        <div class="deck-verlauf" data-histbox="${d.id}" style="margin-top:12px"></div>
       </div>
     </div>`;
   }).join("");
@@ -8413,6 +8731,12 @@ function renderDecks() {
       renderDecks();
     });
   });
+
+  $$("[data-histbtn]").forEach(b => b.onclick = () => deckVerlaufUmschalten(b.dataset.histbtn));
+  // Ein offener Verlauf überlebt das Neuzeichnen. Nach einem Rücksprung baut
+  // renderAll() die Kästen neu, und der eben benutzte stünde sonst leer da —
+  // ausgerechnet in dem Augenblick, in dem man den neuen Eintrag sehen will.
+  verlaufOffen.forEach(id => { if (verlaufKasten(id)) deckVerlaufZeigen(id); });
 
   $$("[data-ded]").forEach(b => b.onclick = () => editDeck(b.dataset.ded));
   $$("[data-share]").forEach(b => b.onclick = () => shareDeck(b.dataset.share));
