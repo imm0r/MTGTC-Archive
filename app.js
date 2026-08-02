@@ -10504,6 +10504,10 @@ function renderSettings() {
         }</select></div>
       </div>
       <p class="hint">${esc(t("community.vis." + communitySichtbarkeit() + "Hint"))}</p>
+      <!-- Die Ausnahme steht bei JEDER Stufe, nicht nur bei einer: Sie gilt für
+           alle drei, und wer sie nur unter „Anonym" läse, hielte sie für deren
+           Eigenheit. -->
+      <p class="hint">&#128100; ${esc(t("community.vis.memberNote"))}</p>
       <p class="hint">${esc(t("community.vis.note"))}</p>
     </div>${IS_ADMIN ? `
     <div class="card">

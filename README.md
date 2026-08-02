@@ -546,6 +546,44 @@ Absender ist das eigene Postfach — dafür gelten dessen Tageslimits (Gmail
 ~500 Mails/Tag), was für eine Spielgruppe reichlich ist. Der `CRON_SECRET`
 gehört wie alle Secrets **nicht** ins Repository.
 
+## Sichtbarkeit in der Community — und was sie nicht regelt
+
+Jedes Profil wählt eine von drei Stufen (`profiles.community_visibility`):
+
+| Stufe | Aktivitätsstrom | Kacheln zu Karten und Sammlung |
+| --- | --- | --- |
+| **Öffentlich** | Name und Karte | Name und Karte |
+| **Anonym** | „Ein Mitglied", Karte und Preis bleiben | ungenannt |
+| **Privat** | erscheint nicht, wird nicht gespeichert | fällt ganz heraus |
+
+Durchgesetzt wird das in der Datenbank, nicht in der Anzeige — `community_feed`
+und `community_highlights` filtern selbst.
+
+### Die Mitgliederliste kennt keine Stufen
+
+Die Kachel **„neuestes Mitglied"** nennt in *jeder* Stufe den echten Namen.
+„Ein Mitglied, dabei seit dem 2.8.2026" ist keine Auskunft, sondern eine leere
+Zeile: Sie nennt weder jemanden, den man begrüßen, noch jemanden, den man
+anschreiben könnte.
+
+Die Stufen regeln, **was** jemand tut — welche Karten er kauft, was er sammelt,
+was er ausgibt. **Dass** er dabei ist, ist etwas anderes. Wer gar nicht genannt
+werden will, lässt den Anzeigenamen leer; dann steht dort weiterhin die
+Ersatzbezeichnung. Dieser Satz steht in den Einstellungen unter **jeder** der
+drei Stufen, nicht nur unter einer.
+
+> **Die Personensuche hing daran nie.** Wer als Freund gefunden werden kann,
+> entscheidet der eigene Schalter „In der Personensuche auffindbar"
+> (`profiles.findable`) — wer auf „anonym" stand, war über seinen Namen
+> ohnehin schon zu finden. Diese Änderung macht also nichts auffindbar, was
+> verborgen war; sie schließt die Lücke zwischen zwei Stellen, die dasselbe
+> Profil verschieden benannten.
+
+Mit der Umstellung ist auch der Zusagetext gewandert: Er versprach wörtlich
+„Auch in den Kacheln bleibst du ungenannt" und nennt jetzt, welche Kacheln
+gemeint sind. Ein Satz, der nach einer Änderung das Gegenteil dessen behauptet,
+was geschieht, ist schlimmer als die Änderung selbst.
+
 ## Sammlung: was noch frei ist
 
 Neben Suche, Set, Ausführung, Farbidentität und Kartentyp steht in der
@@ -1933,6 +1971,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `fremdmatte`     | Die Matte eines Mitspielers: dass die Abfrage die Spalte `hand` nicht führt und Zeilen ohne offene Zone überspringt, dass die Anzeige ein doch geliefertes `hand` gar nicht erst übernimmt, dass fremde Karten keine Handgriffe tragen, dass die Lebensreihe frei und anklickbar bleibt und dass der Takt nach dem Schließen samt Intervall verschwindet; dazu, dass die Lade hochkant im Blickfeld statt weit unten aufklappt und dass ein Zuschauer ohne eigenes Deck die Mitspieler samt Auge überhaupt sieht |
 | `mana`           | Mana in diesem Zug: der Übersetzer an einer Mustertabelle (Signet netto, Selbstopfer ja, fremdes Opfer nein, „for each“ variabel, CR 305.6 ohne Text), die Summen frei/gesamt je Exemplar, Tappen senkt frei, die Hand zählt nie mit, und ohne Quellen Strich statt Null — dazu die Farbaufteilung: feste Reihenfolge, Summe der Marken gleich der Gesamtzahl, Tappen kommt in der Farbe an, und alle sieben Marken brechen in der 154-px-Spalte um, statt hinauszulaufen |
 | `export`         | Deck ausgeben: die fünf Zeilen genau so, wie sie dastehen müssen — englischer Name statt gedrucktem, Setcode groß, keine leere Klammer ohne Auflage, alphabetisch sortiert, Deckmenge statt Bestand; dazu Datei, Zwischenablage und der Rückfall „Text markiert“, wenn das Kopieren scheitert |
+| `mitglieder`     | Die Mitgliederliste ohne Stufen: dass die Abfrage das neueste Mitglied aus allen Profilen und mit echtem Namen nimmt, dass Karten und „größte Sammlung“ weiterhin an den Stufen hängen, dass ein leerer Anzeigename die Ersatzbezeichnung behält — und dass die Zusage in allen fünf Sprachen mitgewandert ist |
 
 ### Zwei Regeln, die dabei gelernt wurden
 
