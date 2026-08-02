@@ -11607,13 +11607,232 @@ function renderCommunity() {
       <h3 style="margin-top:0">${esc(t("community.title"))}</h3>
       <p class="hint" style="margin-top:-4px">${esc(t("community.hint"))}</p>
       <div id="community-body">${communityBodyHtml()}</div>
-    </div>`;
+    </div>
+    <!-- Die Mitgliederliste steht als eigene Karte UNTER dem Feed: Der Feed
+         beantwortet „was passiert gerade", die Liste „wer ist überhaupt da".
+         Zwei Fragen, zwei Karten. -->
+    ${mitgliederKarteHtml()}`;
   wireCommunityFeedToggle();
   wireCommunityKartenHover(el);
   wireCommunityHighlights(el);
+  wireMitgliederSuche();
+  wireMitgliederListe();
+  // Beim ersten Öffnen holen; danach steht die Liste und wird nur auf Suche
+  // oder Blättern neu geholt.
+  if (!MITGLIEDER.zeilen.length && !MITGLIEDER.laedt && !MITGLIEDER.fehler) mitgliederHolen();
   // Beim Login geladen; war das erfolglos oder steht die Ansicht früher, hier
   // nachziehen. Kein Kreislauf: ladeCommunityFoundation() ruft nur zeigeCommunity().
   if (!COMMUNITY_STATS && !COMMUNITY_FEED.length) ladeCommunityFoundation().catch(() => {});
+}
+
+
+/* ---- Die Mitgliederliste --------------------------------------------
+   Bisher gab es nur die Kachel „neuestes Mitglied" und die Personensuche, die
+   einen Namen VERLANGT, bevor sie etwas zeigt. Wer wissen wollte, wer sonst
+   noch da ist, hatte keine Stelle dafür.
+
+   Je Zeile Avatar, Name, Rollen, seit wann dabei — und gleich der richtige
+   Knopf: anfragen, annehmen, schreiben oder gar keiner (man selbst). Das
+   Verhältnis kommt aus derselben Abfrage mit, wie bei der Personensuche; ein
+   Nachfragen je Zeile wäre eine Anfrage je Mitglied.
+
+   WER NICHT DARIN STEHT: Wer den Schalter „In der Personensuche auffindbar"
+   ausgeschaltet hat. Dessen Zusage lautet „nur noch über deinen
+   Freundescode erreichbar", und eine durchsuchbare Mitgliederliste wäre genau
+   das, wovor sie schützt. Das ist der Unterschied zur Sichtbarkeitsstufe: Die
+   regelt, was jemand TUT; findable regelt, ob er in Listen auftaucht.
+
+   GEBLÄTTERT WIRD, statt alles zu holen: Bei tausend Mitgliedern wäre eine
+   Liste ohne Ende weder zu lesen noch zu laden. */
+const MITGLIEDER_PRO_SEITE = 24;
+let MITGLIEDER = { zeilen: [], gesamt: 0, seite: 0, suche: "", laedt: false, fehler: null };
+
+/* Die Abfrage getrennt — dieselbe Naht wie bei zoneSchreiben und
+   fremdMatteLaden, damit die Prüfungen ohne Datenbank auskommen. */
+async function mitgliederLaden(suche, seite) {
+  const { data, error } = await sb.rpc("member_list", {
+    q: suche || null,
+    p_limit: MITGLIEDER_PRO_SEITE,
+    p_offset: seite * MITGLIEDER_PRO_SEITE,
+  });
+  if (error) throw error;
+  return data || [];
+}
+
+async function mitgliederHolen() {
+  MITGLIEDER.laedt = true; MITGLIEDER.fehler = null;
+  mitgliederZeichnen();
+  try {
+    const zeilen = await mitgliederLaden(MITGLIEDER.suche, MITGLIEDER.seite);
+    MITGLIEDER.zeilen = zeilen;
+    // Die Gesamtzahl steht in jeder Zeile; bei null Treffern gibt es keine —
+    // dann ist sie 0, und das ist die richtige Auskunft.
+    MITGLIEDER.gesamt = Number(zeilen[0]?.gesamt || 0);
+  } catch (e) {
+    MITGLIEDER.zeilen = []; MITGLIEDER.gesamt = 0; MITGLIEDER.fehler = dbErr(e);
+  }
+  MITGLIEDER.laedt = false;
+  mitgliederZeichnen();
+}
+
+const mitgliedName = m => (m.display_name || "").trim() || t("community.anonMember");
+
+function mitgliedZeileHtml(m) {
+  const knopf = {
+    friend:   `<button class="btn ghost sm" data-dmwith="${esc(m.id)}">${esc(t("dm.write"))}</button>`,
+    sent:     `<span class="pill">${esc(t("friends.waiting"))}</span>`,
+    incoming: `<button class="btn sm" data-accept2="${esc(m.id)}">${esc(t("friends.accept"))}</button>`,
+    none:     `<button class="btn sm" data-req="${esc(m.id)}">${esc(t("friends.sendReq"))}</button>`,
+    self:     `<span class="pill">${esc(t("members.you"))}</span>`,
+  }[m.status] || "";
+  const rollen = (m.roles || []).slice(0, 2)
+    .map(r => `<span class="pill rolle">${esc(r)}</span>`).join("");
+  const seit = Number.isFinite(Date.parse(m.created))
+    ? t("community.hl.since", { d: new Date(m.created).toLocaleDateString(LANG) }) : "";
+  return `<div class="mitglied-zeile">
+    <button type="button" class="mitglied-wer" data-mitglied="${esc(m.id)}"
+        title="${esc(t("members.openProfile", { name: mitgliedName(m) }))}">
+      ${avatarHtml(38, { display_name: m.display_name, avatar_url: m.avatar_url })}
+      <span class="mitglied-txt">
+        <span class="mitglied-name">${esc(mitgliedName(m))}${rollen}</span>
+        <span class="mitglied-seit">${esc(seit)}</span>
+      </span>
+    </button>
+    <span class="mitglied-akt">${knopf}</span>
+  </div>`;
+}
+
+function mitgliederInnerHtml() {
+  if (MITGLIEDER.fehler) return `<div class="empty">${esc(MITGLIEDER.fehler)}</div>`;
+  if (MITGLIEDER.laedt && !MITGLIEDER.zeilen.length)
+    return `<div class="meta"><span class="syn-spin">&#9881;</span></div>`;
+  if (!MITGLIEDER.zeilen.length)
+    return `<div class="empty">${esc(t(MITGLIEDER.suche ? "members.none" : "members.empty"))}</div>`;
+  const seiten = Math.ceil(MITGLIEDER.gesamt / MITGLIEDER_PRO_SEITE);
+  return `<div class="mitglieder-gitter">${MITGLIEDER.zeilen.map(mitgliedZeileHtml).join("")}</div>
+    ${seiten > 1 ? `<div class="row mitglieder-blaettern">
+      <button class="btn ghost sm" id="mit-zurueck"${MITGLIEDER.seite ? "" : " disabled"}>&#8592;</button>
+      <span class="hint">${esc(t("members.page", { i: MITGLIEDER.seite + 1, n: seiten }))}</span>
+      <button class="btn ghost sm" id="mit-vor"${MITGLIEDER.seite + 1 < seiten ? "" : " disabled"}>&#8594;</button>
+    </div>` : ""}`;
+}
+
+/* Nur die Liste neu zeichnen, nicht die ganze Ansicht: Ein Tastendruck im
+   Suchfeld soll nicht den Feed darüber neu aufbauen — und nicht den Fokus
+   nehmen, in dem gerade getippt wird. */
+function mitgliederZeichnen() {
+  const el = $("#mitglieder-liste");
+  if (!el) return;
+  el.innerHTML = mitgliederInnerHtml();
+  // Die Zahl steht in der Überschrift, also AUSSERHALB der Liste — sie muss
+  // eigens nachgezogen werden. Beim ersten Bauen ist sie 0, weil die Antwort
+  // noch unterwegs ist; ohne diese Zeile bliebe sie es für immer.
+  const zahl = $("#mit-gesamt");
+  if (zahl) zahl.innerHTML = "&middot; " + MITGLIEDER.gesamt;
+  wireMitgliederListe();
+}
+
+function mitgliederKarteHtml() {
+  return `<div class="card" id="mitglieder-karte">
+    <div class="row" style="align-items:center;justify-content:space-between">
+      <h3 style="margin:0">${esc(t("members.title"))}
+        <span class="hint" id="mit-gesamt">&middot; ${MITGLIEDER.gesamt}</span></h3>
+    </div>
+    <p class="hint" style="margin-top:-2px">${esc(t("members.hint"))}</p>
+    <div class="row" style="margin-bottom:8px">
+      <div style="flex:1"><input type="search" id="mit-suche" autocomplete="off"
+        value="${esc(MITGLIEDER.suche)}" placeholder="${esc(t("members.searchPh"))}"></div>
+    </div>
+    <div id="mitglieder-liste">${mitgliederInnerHtml()}</div>
+  </div>`;
+}
+
+let mitgliederTimer = 0;
+function wireMitgliederSuche() {
+  const feld = $("#mit-suche");
+  if (!feld) return;
+  feld.oninput = () => {
+    clearTimeout(mitgliederTimer);
+    mitgliederTimer = setTimeout(() => {
+      MITGLIEDER.suche = feld.value.trim();
+      MITGLIEDER.seite = 0;
+      mitgliederHolen();
+    }, 250);
+  };
+}
+
+function wireMitgliederListe() {
+  $$("#mitglieder-liste [data-mitglied]").forEach(b =>
+    b.onclick = () => mitgliedProfilZeigen(b.dataset.mitglied));
+  $$("#mitglieder-liste [data-req]").forEach(b =>
+    b.onclick = async () => { await freundAnfragenAn(b.dataset.req); mitgliederHolen(); });
+  $$("#mitglieder-liste [data-accept2]").forEach(b =>
+    b.onclick = async () => { await freundAntwort(b.dataset.accept2, true); mitgliederHolen(); });
+  $$("#mitglieder-liste [data-dmwith]").forEach(b =>
+    b.onclick = () => dmMitPerson(b.dataset.dmwith));
+  const zurueck = $("#mit-zurueck"), vor = $("#mit-vor");
+  if (zurueck) zurueck.onclick = () => { MITGLIEDER.seite = Math.max(0, MITGLIEDER.seite - 1); mitgliederHolen(); };
+  if (vor) vor.onclick = () => { MITGLIEDER.seite++; mitgliederHolen(); };
+}
+
+/* ---- Das öffentliche Profil ------------------------------------------
+   Im eigenen Profil ließen sich Steckbrief, Ort, Lieblingsformat und Website
+   längst hinterlegen — zu sehen waren sie nirgends. Ein Formular, dessen
+   Inhalt niemand je zu Gesicht bekommt, ist eine Falle: Man füllt es aus und
+   hält sich für vorgestellt.
+
+   Die Abfrage public_profile() gibt es seit der Rollen-Migration; sie war nur
+   nie aufgerufen worden. Sie liefert genau das Öffentliche und nichts weiter
+   — keine E-Mail, keinen Freundescode, keine Einstellungen. */
+async function profilLaden(userId) {
+  const { data, error } = await sb.rpc("public_profile", { p_user: userId });
+  if (error) throw error;
+  return (data || [])[0] || null;
+}
+
+function profilKarteHtml(p) {
+  const datum = s => Number.isFinite(Date.parse(s)) ? new Date(s).toLocaleDateString(LANG) : "–";
+  const name = (p.display_name || "").trim() || t("community.anonMember");
+  const zeile = (k, v) => v ? `<div class="pp-zeile"><span class="pp-k">${esc(k)}</span><span class="pp-v">${v}</span></div>` : "";
+  // Die Website ist die einzige Angabe, die zu einem Verweis wird — und nur,
+  // wenn sie mit http(s) beginnt. Alles andere (javascript:, data:) bliebe
+  // Text. Geprüft wird hier UND beim Speichern, nicht nur an einer Stelle.
+  const web = !p.website ? ""
+    : /^https?:\/\//i.test(p.website)
+      ? `<a href="${esc(p.website)}" target="_blank" rel="noopener noreferrer">${esc(p.website)}</a>`
+      // Kein Verweis — aber auch nicht stillschweigend weg: Wer hinsieht, soll
+      // erkennen, dass dort etwas Unbrauchbares steht, statt sich zu fragen,
+      // warum die Zeile fehlt.
+      : esc(p.website);
+  return `<div class="pp-kopf">
+      ${avatarHtml(64, { display_name: p.display_name, avatar_url: p.avatar_url })}
+      <div style="min-width:0">
+        <h3 style="margin:0 0 2px">${esc(name)}</h3>
+        <div class="pp-rollen">${(p.roles || []).map(r => `<span class="pill rolle">${esc(r)}</span>`).join("")}</div>
+      </div>
+    </div>
+    ${p.bio ? `<p class="pp-bio">${esc(p.bio)}</p>` : ""}
+    <div class="pp-daten">
+      ${zeile(t("community.hl.newestMember"), esc(datum(p.created)))}
+      ${zeile(t("members.lastSeen"), p.last_seen ? esc(datum(p.last_seen)) : "")}
+      ${zeile(t("profile.location"), esc(p.location || ""))}
+      ${zeile(t("profile.favFormat"), esc(p.favourite_format || ""))}
+      ${zeile(t("profile.website"), web)}
+    </div>
+    ${p.is_friend ? "" : `<p class="hint" style="margin-bottom:0">${esc(t("members.notFriend"))}</p>`}`;
+}
+
+async function mitgliedProfilZeigen(userId) {
+  const zu = confirmDlg(`<div id="pp-body"><div class="meta"><span class="syn-spin">&#9881;</span></div></div>`);
+  try {
+    const p = await profilLaden(userId);
+    const body = $("#pp-body");
+    if (body) body.innerHTML = p ? profilKarteHtml(p) : `<div class="empty">${esc(t("members.gone"))}</div>`;
+  } catch (e) {
+    const body = $("#pp-body");
+    if (body) body.innerHTML = `<div class="empty">${esc(dbErr(e))}</div>`;
+  }
+  await zu;
 }
 
 async function oeffneFreunde() { await ladeFreunde(); renderFriends(); }

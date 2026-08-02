@@ -1296,6 +1296,40 @@ body.zieht-gerade .zk:hover,body.zieht-gerade .zk:focus-within{transform:none}
    Mitspielern nur 141 px breit, und um die ringen Name, Lebenszahl und vier
    Knöpfe schon ohne einen fünften. Der Avatar dagegen ist überall 38 px. */
 .sp-avatar{position:relative;flex:none;line-height:0}
+
+/* ===== Mitgliederliste =====
+   Ein Gitter statt einer Spalte: Bei vierundzwanzig Zeilen untereinander
+   rollte man an lauter Namen vorbei, die alle gleich aussehen. Zwei bis drei
+   Spalten machen daraus eine Übersicht.
+   Die ganze Zeile bis auf den Knopf ist EIN Schaltelement — wer ein Profil
+   ansehen will, zielt auf den Namen, nicht auf ein Sinnbild daneben. */
+.mitglieder-gitter{display:grid;gap:8px;
+  grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+.mitglied-zeile{display:flex;align-items:center;gap:10px;padding:7px 10px;
+  border:1px solid var(--line);border-radius:10px;background:var(--panel2)}
+.mitglied-wer{flex:1;min-width:0;display:flex;align-items:center;gap:10px;
+  padding:0;border:none;background:none;cursor:pointer;text-align:left;color:inherit}
+.mitglied-wer:hover .mitglied-name{color:var(--acc)}
+.mitglied-wer:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:8px}
+.mitglied-txt{min-width:0;display:flex;flex-direction:column;gap:1px}
+.mitglied-name{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .12s}
+.mitglied-seit{font-size:11px;color:var(--dim)}
+.mitglied-akt{flex:none}
+.pill.rolle{font-size:10px;padding:1px 6px}
+.mitglieder-blaettern{align-items:center;justify-content:center;gap:10px;margin-top:10px}
+
+/* ===== Öffentliches Profil (im Dialog) ===== */
+.pp-kopf{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.pp-rollen{display:flex;flex-wrap:wrap;gap:4px}
+.pp-bio{margin:0 0 12px;font-size:14px;line-height:1.5;white-space:pre-wrap;
+  overflow-wrap:anywhere}
+.pp-daten{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.pp-zeile{display:flex;gap:10px;font-size:13px}
+.pp-k{flex:none;width:150px;color:var(--dim)}
+.pp-v{min-width:0;overflow-wrap:anywhere}
+@media (max-width:560px){ .pp-k{width:110px} }
+
 .sp-matte{position:absolute;right:-5px;bottom:-5px;width:21px;height:21px;padding:0;
   display:grid;place-items:center;font-size:11px;line-height:1;cursor:pointer;
   border:1px solid var(--line);border-radius:50%;background:var(--panel);
