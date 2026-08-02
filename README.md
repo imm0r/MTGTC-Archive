@@ -1160,7 +1160,7 @@ nicht darin stehen: für `deck_synergies` gibt es keine Freigabe an Freunde.
 
 ## Deck ausgeben: die Deckliste als Text
 
-Der Knopf **„📋 Exportieren"** in der Werkzeugleiste jedes Decks öffnet die
+Der Knopf **„📋 Exportieren"** in der Kopfleiste jedes Decks öffnet die
 Deckliste als Text — zum Kopieren in die Zwischenablage oder als `.txt`-Datei.
 Der Gegenweg zum Import, für eine Deckseite, einen Shop oder den Chat.
 
@@ -1201,9 +1201,22 @@ ist es nicht; sie folgt dem Zufall des Einbuchens.
 Geht das Kopieren nicht (der Browser gibt die Zwischenablage nicht ohne
 Weiteres her), markiert die App den Text stattdessen — dann genügt Strg+C.
 
+### Die Kopfleiste eines Decks
+
+Fünf Knöpfe, in dieser Reihenfolge:
+
+```
+👥 Geteilt   📋 Exportieren   ✎ Bearbeiten   ↺ Verlauf   Deck löschen
+```
+
+Exportieren und Verlauf standen zuerst in der Werkzeugleiste *innerhalb* des
+aufgeklappten Decks. Im Kopf sind sie auch am zugeklappten erreichbar — und dort
+gehören sie hin, denn beides sind Dinge, die man einem Deck antut, nicht Dinge,
+die man darin tut.
+
 ## Verlauf je Deck: zurück auf einen älteren Stand
 
-Jedes Deck führt einen **Verlauf**. Der Knopf „↺ Verlauf" in der Werkzeugleiste
+Jedes Deck führt einen **Verlauf**. Der Knopf „↺ Verlauf" in der Kopfleiste
 klappt ihn auf: eine Zeile je Stand, von jung nach alt, mit Zeitpunkt,
 Deckgröße, dem Umbau in Worten — und einem Knopf, der das Deck dorthin
 zurücksetzt.
@@ -1229,6 +1242,12 @@ aus, als geschähe nichts. Im schmalen Fenster reicht das allein nicht: Dort
 bricht die Werkzeugleiste um, der Kasten liegt gemessen bei 879 px hinter dem
 unteren Rand eines 720 px hohen Fensters — der Klick holt ihn deshalb zusätzlich
 heran.
+
+Seit der Knopf in der **Kopfleiste** sitzt, kommt ein dritter Fall dazu: Am
+zugeklappten Deck gibt es den Kasten noch gar nicht zu sehen — der Inhalt steht
+auf `display:none`. Der Knopf klappt das Deck deshalb selbst auf, bevor er den
+Verlauf holt. Beim **Schließen** des Verlaufs tut er das nicht: Dann bleibt das
+Deck, wie es ist.
 
 ### Stände, keine Ereignisse
 

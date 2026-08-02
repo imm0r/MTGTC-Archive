@@ -8698,11 +8698,20 @@ function renderDecks() {
             d.shared ? ` &middot; <span style="color:var(--ok)">${esc(t("deck.shared"))}</span>` : ""}${
             fehlt ? ` &middot; <span style="color:var(--err)">${esc(t("deck.incomplete", { n: fehlt }))}</span>` : ""}</div>
         </div>
+        <!-- Reihenfolge wie gewünscht: Geteilt, Exportieren, Bearbeiten,
+             Verlauf, Löschen. Beide Zugaben standen vorher in der Werkzeugleiste
+             INNERHALB des aufgeklappten Decks — hier sind sie auch am
+             zugeklappten erreichbar. Für den Verlauf heißt das, dass sein
+             Kasten erst entstehen muss: siehe deckVerlaufKnopf(). -->
         <div class="deck-manage">
           <button class="btn ghost sm" data-share="${d.id}"
             title="${d.shared ? esc(t("deck.unshareTitle")) : esc(t("deck.shareTitle"))}">${d.shared ? "&#128101; " + esc(t("deck.sharedBtn")) : esc(t("deck.share"))}</button>
+          <button class="btn ghost sm" data-exportbtn="${d.id}"
+            title="${esc(t("exp.title", { name: d.name }))}">&#128203; ${esc(t("exp.btn"))}</button>
           <button class="btn ghost sm" data-ded="${d.id}"
             title="${esc(t("deck.editTitle"))}">&#9998; ${esc(t("deck.editBtn"))}</button>
+          <button class="btn ghost sm" data-histbtn="${d.id}"
+            title="${esc(t("hist.title"))}">&#8634; ${esc(t("hist.btn"))}</button>
           <button class="btn danger sm" data-dx="${d.id}">${esc(t("deck.delete"))}</button>
         </div>
       </div>
@@ -8729,10 +8738,6 @@ function renderDecks() {
                   title="${esc(t("bracket.title"))}">&#9878; ${esc(t("bracket.btn"))}</button>
                 <button class="btn ghost" data-legalbtn="${d.id}"
                   title="${esc(t("legal.deckTitle"))}">&#9878; ${esc(t("legal.deckBtn"))}</button>
-                <button class="btn ghost" data-histbtn="${d.id}"
-                  title="${esc(t("hist.title"))}">&#8634; ${esc(t("hist.btn"))}</button>
-                <button class="btn ghost" data-exportbtn="${d.id}"
-                  title="${esc(t("exp.title", { name: d.name }))}">&#128203; ${esc(t("exp.btn"))}</button>
                 ${fehlt ? `<button class="btn ghost" data-buybtn="${d.id}"
                   title="${esc(t("buy.deckTitle"))}">&#128722; ${esc(t("buy.deckBtn", { n: fehlt }))}</button>` : ""}
               </div>
@@ -8791,36 +8796,61 @@ function renderDecks() {
   // kein renderDecks aus). deckLegalAutoTrigger prüft Einstellung + Aktualität.
   if (suchPrefs().autoDeckLegal) sichtbar.forEach(d => { if (deckOffen.ist(d.id)) deckLegalAutoTrigger(d); });
 
+/* Den aufgeklappten Zustand in den Baum schreiben. Steht getrennt vom
+   Klick-Handler, seit der Verlauf-Knopf im KOPF sitzt: Sein Kasten liegt im
+   Inhalt, und der ist am zugeklappten Deck display:none — ein Klick sähe aus,
+   als geschähe nichts. Genau diese Meldung gab es hier schon einmal.
+
+   Neu gezeichnet wird absichtlich nicht: Das verlöre die Scrollposition. */
+function deckKlappUmsetzen(k, offen) {
+  const karte = k.parentElement;
+  // Die ANDEREN gleich mit zuklappen. deckOffen merkt sich nur noch eines;
+  // ohne diese Schleife stünde der Baum anders da als der gemerkte Zustand,
+  // bis das nächste Neuzeichnen ihn einholt.
+  $$("#deck-list .deck-kopf").forEach(anderer => {
+    const auf = anderer === k && offen;
+    const inhalt = anderer.parentElement.querySelector(".deck-inhalt");
+    if (inhalt) inhalt.style.display = auf ? "block" : "none";
+    const pfeil = anderer.querySelector(".deck-pfeil");
+    if (pfeil) pfeil.innerHTML = auf ? "&#9660;" : "&#9654;";
+    anderer.title = auf ? t("common.collapse") : t("common.expand");
+  });
+  // Die klebenden Höhen hängen an einer Leiste, die eben erst sichtbar wurde.
+  schwebemasseMessen();
+  // Einstellung „Combos automatisch laden": beim Aufklappen die Combo-Suche
+  // anstoßen — über den Knopf, damit Busy-Zustand und Anzeige identisch zum
+  // Handklick laufen. Nur wenn der Kasten noch leer ist (kein Doppel-Laden).
+  if (offen && suchPrefs().comboAuto) {
+    const boxC = karte.querySelector(".deck-combos");
+    const btnC = karte.querySelector(`[data-combobtn="${k.dataset.toggle}"]`);
+    if (boxC && !boxC.childElementCount && btnC && !btnC.disabled) btnC.click();
+  }
+  // Einstellung „Deck-Legalität beim Öffnen prüfen": still nur in die Header-Pille.
+  if (offen) deckLegalAutoTrigger(DECKS.find(x => x.id === k.dataset.toggle));
+}
+
+/* Ein zugeklapptes Deck aufklappen — ohne etwas zu tun, wenn es schon offen
+   ist. Der Klick-Handler des Kopfes SCHALTET, das ist hier falsch. */
+function deckAufklappen(deckId) {
+  if (deckOffen.ist(deckId)) return;
+  const k = $$("#deck-list .deck-kopf").find(x => x.dataset.toggle === deckId);
+  if (!k) return;
+  deckOffen.schalte(deckId);
+  deckKlappUmsetzen(k, true);
+}
+
+/* Der Verlauf-Knopf aus dem Kopf. Aufgeklappt wird nur, wenn der Verlauf
+   AUFGEHT — beim Zuklappen des Verlaufs soll das Deck bleiben, wie es ist. */
+function deckVerlaufKnopf(deckId) {
+  if (!verlaufOffen.has(deckId)) deckAufklappen(deckId);
+  return deckVerlaufUmschalten(deckId);
+}
+
   $$("#deck-list .deck-kopf").forEach(k => k.onclick = ev => {
     // Im Kopf sitzen Knöpfe (Umbenennen, Löschen) und die Legalitäts-Pille (nur
     // zum Hovern) — deren Klick darf nicht zuklappen.
     if (ev.target.closest("button, .deck-legal-wrap")) return;
-    const offen = deckOffen.schalte(k.dataset.toggle);
-    const karte = k.parentElement;
-    // Die ANDEREN gleich mit zuklappen. deckOffen merkt sich nur noch eines;
-    // ohne diese Schleife stünde der Baum anders da als der gemerkte Zustand,
-    // bis das nächste Neuzeichnen ihn einholt. Neu gezeichnet wird hier
-    // absichtlich nicht — das verlöre die Scrollposition.
-    $$("#deck-list .deck-kopf").forEach(anderer => {
-      const auf = anderer === k && offen;
-      const inhalt = anderer.parentElement.querySelector(".deck-inhalt");
-      if (inhalt) inhalt.style.display = auf ? "block" : "none";
-      const pfeil = anderer.querySelector(".deck-pfeil");
-      if (pfeil) pfeil.innerHTML = auf ? "&#9660;" : "&#9654;";
-      anderer.title = auf ? t("common.collapse") : t("common.expand");
-    });
-    // Die klebenden Höhen hängen an einer Leiste, die eben erst sichtbar wurde.
-    schwebemasseMessen();
-    // Einstellung „Combos automatisch laden": beim Aufklappen die Combo-Suche
-    // anstoßen — über den Knopf, damit Busy-Zustand und Anzeige identisch zum
-    // Handklick laufen. Nur wenn der Kasten noch leer ist (kein Doppel-Laden).
-    if (offen && suchPrefs().comboAuto) {
-      const boxC = karte.querySelector(".deck-combos");
-      const btnC = karte.querySelector(`[data-combobtn="${k.dataset.toggle}"]`);
-      if (boxC && !boxC.childElementCount && btnC && !btnC.disabled) btnC.click();
-    }
-    // Einstellung „Deck-Legalität beim Öffnen prüfen": still nur in die Header-Pille.
-    if (offen) deckLegalAutoTrigger(DECKS.find(x => x.id === k.dataset.toggle));
+    deckKlappUmsetzen(k, deckOffen.schalte(k.dataset.toggle));
   });
 
   // Commanderkarte im Deck-Kopf: beim Hover die große Vorschau + Name schweben
@@ -9030,7 +9060,7 @@ function renderDecks() {
   // eine der vorgeschlagenen Karten ins Deck legt.
   synGespeicherteZeigen();
 
-  $$("[data-histbtn]").forEach(b => b.onclick = () => deckVerlaufUmschalten(b.dataset.histbtn));
+  $$("[data-histbtn]").forEach(b => b.onclick = () => deckVerlaufKnopf(b.dataset.histbtn));
   $$("[data-exportbtn]").forEach(b => b.onclick = () => deckExportOeffnen(b.dataset.exportbtn));
   // Ein offener Verlauf überlebt das Neuzeichnen. Nach einem Rücksprung baut
   // renderAll() die Kästen neu, und der eben benutzte stünde sonst leer da —

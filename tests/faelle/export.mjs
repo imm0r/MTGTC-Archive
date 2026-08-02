@@ -89,6 +89,31 @@ export default async function ({ seite, adresse, stand }) {
   /* --- Der Knopf und der Dialog --------------------------------------- */
   stand.ist("das Deck trägt einen Export-Knopf",
     await seite.evaluate(id => !!document.querySelector(`[data-exportbtn="${id}"]`), deckId));
+  /* Er steht im Deck-KOPF, zwischen „Geteilt“ und „Bearbeiten“ — dort ist er
+     auch am zugeklappten Deck erreichbar. In der Werkzeugleiste innerhalb des
+     Decks stand er zuerst und war es nicht. */
+  stand.gleich("die Kopfleiste steht in der gewünschten Reihenfolge",
+    await seite.evaluate(() => [...document.querySelectorAll(".deck-manage button")].map(b =>
+      b.dataset.share ? "geteilt" : b.dataset.exportbtn ? "exportieren"
+      : b.dataset.ded ? "bearbeiten" : b.dataset.histbtn ? "verlauf"
+      : b.dataset.dx ? "löschen" : "?")),
+    ["geteilt", "exportieren", "bearbeiten", "verlauf", "löschen"]);
+  stand.ist("und nicht mehr in der Werkzeugleiste",
+    await seite.evaluate(() => !document.querySelector(".deck-tools [data-exportbtn]")));
+
+  /* Am ZUGEKLAPPTEN Deck muss er genauso gehen — er hängt an keinem Kasten,
+     der erst entstehen müsste, aber geprüft gehört es trotzdem: Der Knopf ist
+     eben erst dorthin gewandert, wo das überhaupt vorkommen kann. */
+  await seite.evaluate(() => {
+    if (deckOffen.ist(DECKS[0].id)) { deckOffen.schalte(DECKS[0].id); renderDecks(); }
+  });
+  await seite.waitForTimeout(250);
+  await seite.click(`[data-exportbtn="${deckId}"]`);
+  await seite.waitForTimeout(300);
+  stand.ist("am zugeklappten Deck geht der Dialog trotzdem auf",
+    await seite.evaluate(() => !!document.querySelector("#exp-text")));
+  await seite.evaluate(() => document.querySelector("#dlg")?.close());
+  await seite.waitForTimeout(150);
   await seite.click(`[data-exportbtn="${deckId}"]`);
   await seite.waitForTimeout(300);
   const dlg = await seite.evaluate(() => {
