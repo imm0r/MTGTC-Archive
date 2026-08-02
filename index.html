@@ -73,6 +73,26 @@
   </div>
 
   <!-- Anmeldung -->
+  <!-- Nachtrag für Konten, die vor der Pflicht angelegt wurden. Eine eigene
+       Pane und nicht ein Dialog in der App: Ohne Namen soll die App gar nicht
+       erst erscheinen — ein Dialog wäre etwas, das man wegklickt. Abmelden
+       bleibt möglich, sonst säße hier fest, wer es sich anders überlegt. -->
+  <div class="pane" data-pane="name" style="display:none">
+    <p class="hint" style="margin-top:2px" data-i18n="auth.nameNeeded">Dein Konto hat noch keinen Anzeigenamen. Bitte trag einen ein — ohne ihn geht es nicht weiter.</p>
+    <form class="card" id="name-form">
+      <div style="margin-bottom:12px">
+        <label data-i18n="profile.displayName">Anzeigename</label>
+        <input type="text" id="name-input" maxlength="40" autocomplete="nickname" required>
+        <p class="hint" style="margin:4px 0 0" data-i18n="auth.nameHint">So erscheinst du für andere Mitglieder.</p>
+      </div>
+      <button class="btn" style="width:100%" type="submit" id="name-go" data-i18n="common.save">Speichern</button>
+      <div class="msg" id="name-msg"></div>
+      <div class="row" style="margin-top:10px;justify-content:center">
+        <button type="button" class="btn ghost sm" id="name-logout" data-i18n="nav.logout">Abmelden</button>
+      </div>
+    </form>
+  </div>
+
   <div class="pane" data-pane="auth" style="display:none">
     <p class="hint" style="margin-top:2px" data-i18n="auth.hint">Melde dich an, um deine Sammlung auf allen Geräten zu sehen.</p>
     <form class="card" id="auth-form">
@@ -87,6 +107,16 @@
       <div style="margin-bottom:12px">
         <label data-i18n="field.password">Passwort</label>
         <input type="password" id="auth-pw" autocomplete="current-password" required>
+      </div>
+      <!-- Nur beim Anlegen eines Kontos. Steht NACH dem Passwort, weil davor
+           die beiden Felder stehen, die jeder Anmeldung gemein sind — beim
+           Umschalten auf „Anmelden" verschwindet nur das letzte, und die
+           Maske springt nicht. Das required-Merkmal setzt wireAuth beim
+           Umschalten: am versteckten Feld verhinderte es sonst das Absenden. -->
+      <div style="margin-bottom:12px" id="auth-name-feld" hidden>
+        <label data-i18n="profile.displayName">Anzeigename</label>
+        <input type="text" id="auth-name" maxlength="40" autocomplete="nickname">
+        <p class="hint" style="margin:4px 0 0" data-i18n="auth.nameHint">So erscheinst du für andere Mitglieder.</p>
       </div>
       <button class="btn" style="width:100%" type="submit" id="auth-go" data-i18n="auth.signin">Anmelden</button>
       <div class="msg" id="auth-msg"></div>

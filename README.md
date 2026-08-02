@@ -559,6 +559,39 @@ Jedes Profil wählt eine von drei Stufen (`profiles.community_visibility`):
 Durchgesetzt wird das in der Datenbank, nicht in der Anzeige — `community_feed`
 und `community_highlights` filtern selbst.
 
+### Der Anzeigename ist Pflicht
+
+Er entsteht an **einer** Stelle und verschwindet an keiner:
+
+| Wann | Wo |
+| --- | --- |
+| **Konto anlegen** | Feld in der Anmeldemaske, nur im Modus „Konto anlegen" |
+| **Altes Konto, kein Name** | eigene Maske vor der App, bei der nächsten Anmeldung |
+| **Profil** | das Feld lässt sich nicht mehr leeren |
+
+Alle drei prüfen mit derselben Funktion (`nameGeprueft`): getrimmt, mehrfache
+Leerzeichen zusammengezogen, **2 bis 40 Zeichen**. Zwei genügen, damit kürzeste
+echte Namen („Jo", „Al") durchgehen; vierzig ist dieselbe Schranke wie im
+Profilfeld. Drei getrennte Prüfungen liefen irgendwann auseinander — dann hinge
+es davon ab, *wann* jemand sein Konto angelegt hat.
+
+> **Der Name reist in den Nutzer-Metadaten mit.** Muss die Adresse erst per
+> Mail bestätigt werden, gibt es beim Anlegen noch keine Sitzung, und in
+> `profiles` ließe sich nichts schreiben. `signUp` gibt ihn deshalb als
+> `options.data.display_name` mit; `ladeProfile()` holt ihn von dort, sobald
+> das Profil entsteht. Ohne diesen Umweg wäre das Feld eines, dessen Inhalt
+> niemand je wiedersieht.
+
+Der Nachtrag ist eine eigene **Gate-Pane**, kein Dialog in der App: Ohne Namen
+soll die App gar nicht erst erscheinen, und ein Dialog wäre etwas, das man
+wegklickt. **Abmelden** bleibt möglich — sonst säße fest, wer es sich anders
+überlegt.
+
+Die Spalte `profiles.display_name` bleibt **nullable**. Ein `NOT NULL` bräuchte
+einen Vorgabewert für alle bestehenden Zeilen, und der wäre ein erfundener Name
+— genau das, was die Maske vermeiden soll. Erzwungen wird beim Hineingehen, und
+zwar an jeder Tür.
+
 ### Die Mitgliederliste kennt keine Stufen
 
 Die Kachel **„neuestes Mitglied"** nennt in *jeder* Stufe den echten Namen.
@@ -567,10 +600,13 @@ Zeile: Sie nennt weder jemanden, den man begrüßen, noch jemanden, den man
 anschreiben könnte.
 
 Die Stufen regeln, **was** jemand tut — welche Karten er kauft, was er sammelt,
-was er ausgibt. **Dass** er dabei ist, ist etwas anderes. Wer gar nicht genannt
-werden will, lässt den Anzeigenamen leer; dann steht dort weiterhin die
-Ersatzbezeichnung. Dieser Satz steht in den Einstellungen unter **jeder** der
-drei Stufen, nicht nur unter einer.
+was er ausgibt. **Dass** er dabei ist, ist etwas anderes. Dass man in jeder
+Stufe mit Namen dasteht, steht in den Einstellungen unter **jeder** der drei
+Stufen, nicht nur unter einer.
+
+Die Ersatzbezeichnung „Ein Mitglied" bleibt als Rückfall für Zeilen ohne Namen
+— seit der Anzeigename Pflicht ist (siehe oben), betrifft das nur noch Konten,
+die sich seither nicht wieder angemeldet haben.
 
 > **Die Personensuche hing daran nie.** Wer als Freund gefunden werden kann,
 > entscheidet der eigene Schalter „In der Personensuche auffindbar"
@@ -1972,6 +2008,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `mana`           | Mana in diesem Zug: der Übersetzer an einer Mustertabelle (Signet netto, Selbstopfer ja, fremdes Opfer nein, „for each“ variabel, CR 305.6 ohne Text), die Summen frei/gesamt je Exemplar, Tappen senkt frei, die Hand zählt nie mit, und ohne Quellen Strich statt Null — dazu die Farbaufteilung: feste Reihenfolge, Summe der Marken gleich der Gesamtzahl, Tappen kommt in der Farbe an, und alle sieben Marken brechen in der 154-px-Spalte um, statt hinauszulaufen |
 | `export`         | Deck ausgeben: die fünf Zeilen genau so, wie sie dastehen müssen — englischer Name statt gedrucktem, Setcode groß, keine leere Klammer ohne Auflage, alphabetisch sortiert, Deckmenge statt Bestand; dazu Datei, Zwischenablage und der Rückfall „Text markiert“, wenn das Kopieren scheitert |
 | `mitglieder`     | Die Mitgliederliste ohne Stufen: dass die Abfrage das neueste Mitglied aus allen Profilen und mit echtem Namen nimmt, dass Karten und „größte Sammlung“ weiterhin an den Stufen hängen, dass ein leerer Anzeigename die Ersatzbezeichnung behält — und dass die Zusage in allen fünf Sprachen mitgewandert ist |
+| `anzeigename`    | Der Anzeigename als Pflicht: die Regel selbst (2–40, getrimmt), das Feld beim Anlegen, der Weg über die Nutzer-Metadaten bis ins frisch angelegte Profil, die Maske vor der App für alte Konten samt Ausweg — und dass das Profilfeld ihn nicht mehr leeren kann |
 
 ### Zwei Regeln, die dabei gelernt wurden
 
