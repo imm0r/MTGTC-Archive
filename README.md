@@ -546,6 +546,36 @@ Absender ist das eigene Postfach — dafür gelten dessen Tageslimits (Gmail
 ~500 Mails/Tag), was für eine Spielgruppe reichlich ist. Der `CRON_SECRET`
 gehört wie alle Secrets **nicht** ins Repository.
 
+## Sammlung: was noch frei ist
+
+Neben Suche, Set, Ausführung, Farbidentität und Kartentyp steht in der
+Filterzeile der Haken **„Verbaute ausblenden"**. Er nimmt aus der Liste, was
+schon in Decks steckt — die Frage dahinter ist immer dieselbe: *Was habe ich
+noch übrig?*
+
+**„Verbaut" heißt: alle Exemplare.** Hast du vier Blitzschläge und einer liegt
+in einem Deck, bleibt die Zeile stehen — drei sind ja noch frei. Erst wenn alle
+vier in Decks liegen, verschwindet sie. Das ist keine Auslegungsfrage, sondern
+dieselbe Regel, die der Deckbau seit jeher als **„vergeben"** kennt: Ein
+Exemplar, das schon in einem anderen Deck steckt, lässt sich nicht ein zweites
+Mal verbauen. Zwei Auslegungen desselben Wortes an zwei Stellen liefen
+auseinander, ohne dass irgendetwas rot würde.
+
+Zwei Feinheiten, die man an der Oberfläche nicht sieht:
+
+* **Gezählt wird über alle Decks zusammen.** Ein Exemplar in Deck A und eines in
+  Deck B sind zwei — nicht zweimal eines.
+* **Gezählt wird je Druck, nicht je Zeile.** Dieselbe Karte als Foil und als
+  Normal sind zwei Sammlungszeilen und *ein* Bestand (Set + Sammlernummer,
+  sprach- und zustandsunabhängig — genau wie beim Deck-Kontingent). Sie
+  verschwinden deshalb gemeinsam oder gar nicht.
+
+Der Haken zählt zu den Filtern, die geräumt werden, wenn der Blick auf eine
+bestimmte Zeile springen soll — ein Sprung auf etwas Unsichtbares wäre keiner.
+Gerechnet wird das Kontingent **einmal je Liste**, nicht je Zeile: Bestand und
+Deckvorkommen gehen jeweils über alle Karten bzw. alle Decks, und der Filter
+läuft bei jedem Tastendruck in der Suche.
+
 ## Wunschliste: eingeplant, aber noch nicht besessen
 
 Decks lassen sich mit Karten bauen, die man gar nicht hat — aus den
@@ -1555,6 +1585,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `kartenansicht`  | Klebende Spaltenköpfe (auch im schmalen Fenster), Aufklappen beim Überfahren, kein Aufklappen beim Ziehen |
 | `zugabe`         | „Karte zum Deck“: Ausklappen, gefilterte Trefferliste, Zug in eine Kategorie, volles Deck |
 | `decks`          | Höchstens ein Deck aufgeklappt, Speicher und Baum stimmen überein, Truhe wirft die richtige Karte |
+| `sammlung`       | „Verbaute ausblenden": erst wenn ALLE Exemplare in Decks liegen, über alle Decks zusammen gezählt, je Druck statt je Zeile |
 | `spielrunde`     | Die Matte: Ziehen zwischen den Zonen, Tappen per Klick, die Lebensreihe (vier Kacheln nebeneinander, kein Rollbalken), die drei Laden (Ort, Rahmen, Zahl, immer nur eine offen, auch zugeklappt Ablageziel) und der Würfel (nur W20, blanke Fläche über der ganzen Matte, Zahl aufs Emblem, jeder Wurf anders) |
 
 ### Zwei Regeln, die dabei gelernt wurden
