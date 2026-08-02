@@ -1156,6 +1156,24 @@ body.zieht-gerade .zk:hover,body.zieht-gerade .zk:focus-within{transform:none}
 .mat-steuer .mat-titel{margin-bottom:4px}
 .mat-steuerwert:hover{background:var(--acc);color:#1a1400}
 .mat-steuerwert.leer{border-color:var(--line);color:var(--dim);cursor:default}
+/* ===== Mana in diesem Zug =====
+   Gleiche Bauart wie die Steuer darüber, aber eine ANZEIGE, kein Knopf. Die
+   freie Zahl trägt die Akzentfarbe, das Gesamt steht kleiner daneben — gelesen
+   wird zuerst „was geht noch“, das andere ist Einordnung. cursor:help, weil
+   die Aufschlüsselung im Tooltip steckt. */
+.mat-mana{flex:none}
+.mat-mana .mat-titel{margin-bottom:4px}
+.mat-manawert{width:100%;padding:2px 0;border:1px solid var(--line);border-radius:8px;
+  background:var(--panel);text-align:center;cursor:help;
+  font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}
+.mana-frei{color:var(--acc)}
+.mana-von{color:var(--dim);font-size:13px;font-weight:600}
+.mat-manawert.leer{color:var(--dim);cursor:default}
+/* Im Akkordeon als Marke in der Kopfzeile des Schlachtfelds. flex:none, damit
+   die Miniaturen daneben schrumpfen und nicht die Zahl. */
+.zone-mana{flex:none;font-size:11px;color:var(--txt);border:1px solid var(--line);
+  border-radius:9px;padding:1px 7px;cursor:help;font-variant-numeric:tabular-nums;
+  background:var(--panel2)}
 /* Lebenspunkte aller Mitspieler: die gewohnten Kacheln, NEBENeinander unter den
    Ländern — bis zu vier, so wie die Mitspieler am Tisch sitzen. Die Reihe hat
    eine feste Höhe (--sp-leben), weil die Emblemleiste darüber daraus rechnet;
