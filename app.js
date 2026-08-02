@@ -13144,11 +13144,39 @@ function zoneLibHtml() {
   return `<div class="lib-suchzeile">
       <input type="text" id="lib-suche" value="${esc(libFilter())}" placeholder="${esc(t("sess.trackerSearch"))}">
     </div>
+    <button class="btn ghost sm lib-zufall" id="lib-zufall"${gesamt ? "" : " disabled"}
+      title="${esc(t("lib.randomTitle"))}">&#127922; ${esc(t("lib.random"))}</button>
     <div class="lib-liste">${liste}</div>
     ${f ? "" : `<button class="btn ghost sm lib-alle" id="lib-alle">${
       esc(libAlle ? t("lib.hideAll") : t("lib.showAll", { n: gesamt }))}</button>`}`;
 }
 const libFilter = () => $("#lib-suche")?.value || "";
+
+/* Eine zufällige Karte aus der Bibliothek auf die Hand.
+   Am Tisch zieht man physisch und sagt der App nur, WELCHE Karte es war — dafür
+   ist das Suchfeld darüber da. Wer ohne Karten spielt (Probehand, Testlauf,
+   eine Runde übers Netz), hat niemanden, der für ihn mischt.
+
+   GEZOGEN WIRD ÜBER EXEMPLARE, nicht über Zeilen. Vier Wälder sind vier
+   Chancen, nicht eine. Über die Zeilen gezogen käme aus einem Deck mit
+   38 Ländern und 62 Einzelkarten fast nie ein Land — das wäre keine Bibliothek
+   mehr, sondern eine Namensliste.
+
+   Gibt die gezogene Karte zurück (oder null), damit die Prüfungen nicht am
+   Zufall hängen: Sie können ziehen und danach fragen, WAS gezogen wurde. */
+function zufallsKarteZiehen() {
+  const rest = zoneKarten("lib");
+  const gesamt = rest.reduce((s, x) => s + x.n, 0);
+  if (!gesamt) { toast(t("lib.empty")); return null; }
+  // Ein Los über alle Exemplare, dann von vorn abzählen, bis es aufgebraucht
+  // ist — das ist die Ziehung aus einem gemischten Stapel.
+  let los = Math.floor(Math.random() * gesamt);
+  const treffer = rest.find(x => (los -= x.n) < 0);
+  if (!treffer) return null;
+  zoneMove(treffer.card.id, "lib", "hand");
+  toast(t("lib.drew", { name: trkName(treffer.card) }));
+  return treffer.card;
+}
 
 /* Eine Bibliothekszeile: NUR Name und Anzahl.
    Alles andere — Bild, Manakosten, Typ, Regeltext und die Zielknöpfe — steht in
@@ -13392,6 +13420,7 @@ function wireZonen() {
     if (st) return cmdSteuer(st.dataset.steuer, parseInt(st.dataset.d, 10));
     const alle = e.target.closest("#lib-alle");
     if (alle) { libAlle = !libAlle; return renderZonen(); }
+    if (e.target.closest("#lib-zufall")) return void zufallsKarteZiehen();
     const sw = e.target.closest("[data-schwebe]");
     if (sw) return schwebeUmschalten(sw.dataset.schwebe);
     /* Ein Klick auf eine Karte des Schlachtfelds TAPPT sie. Das war der

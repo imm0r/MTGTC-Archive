@@ -1138,6 +1138,12 @@ body.zieht-gerade .zk:hover,body.zieht-gerade .zk:focus-within{transform:none}
 .lib-nm{flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lib-n{flex:none;min-width:16px;text-align:right;font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
 .lib-alle{margin-top:8px}
+/* „Zufällig ziehen" steht ÜBER der Liste, gleich unter dem Suchfeld: Beides
+   sind Wege, eine Karte aus der Bibliothek auf die Hand zu bekommen — einmal
+   die, die man gerade physisch gezogen hat, einmal eine, die niemand gezogen
+   hat. Über die volle Breite, weil die Mattenspalte 154 px schmal ist und ein
+   Knopf neben dem Suchfeld dort auf zwei Buchstaben zusammenfiele. */
+.lib-zufall{display:block;width:100%;margin-top:8px}
 
 /* ===== Kartenansicht im Spielmodus =====
    Beim Zeigen schwebt sie neben dem Zeiger und ist fuer Klicks durchlaessig;
