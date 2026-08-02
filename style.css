@@ -1169,6 +1169,23 @@ body.zieht-gerade .zk:hover,body.zieht-gerade .zk:focus-within{transform:none}
 .mana-frei{color:var(--acc)}
 .mana-von{color:var(--dim);font-size:13px;font-weight:600}
 .mat-manawert.leer{color:var(--dim);cursor:default}
+/* Die Aufteilung nach Farben unter der Zahl. Nur die Farben, die es gibt —
+   sieben leere Kästchen für ein zweifarbiges Deck wären Lärm. Sie darf
+   umbrechen: In der 154 px schmalen Spalte passen zwei Marken je Zeile, und
+   ein Deck mit fünf Farben plus farblos soll die Bibliothek darunter nicht
+   auffressen. */
+.mana-farben{display:flex;flex-wrap:wrap;gap:3px 5px;justify-content:center;margin-top:5px}
+.mana-chip{display:inline-flex;align-items:center;gap:3px;padding:1px 5px;
+  border:1px solid var(--line);border-radius:8px;background:var(--panel2);
+  font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;cursor:help}
+.mana-chip .ms{font-size:11px;margin:0}
+.mana-chip .mana-von{font-size:10px}
+/* In der Kopfzeile des Akkordeons steht die Reihe NEBEN der Gesamtzahl, ohne
+   eigene Rahmen: Dort ringen schon Name, Anzahl und Miniaturen um eine Zeile,
+   und ein Kasten im Kasten wäre einer zu viel. */
+.mana-farben.kompakt{display:inline-flex;flex-wrap:nowrap;gap:0 6px;margin:0 0 0 7px;
+  vertical-align:-1px}
+.mana-farben.kompakt .mana-chip{border:none;background:none;padding:0;gap:2px}
 /* Im Akkordeon als Marke in der Kopfzeile des Schlachtfelds. flex:none, damit
    die Miniaturen daneben schrumpfen und nicht die Zahl. */
 .zone-mana{flex:none;font-size:11px;color:var(--txt);border:1px solid var(--line);
