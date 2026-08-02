@@ -3131,6 +3131,63 @@ Object.assign(I18N.it, {
   "dlg.histBackGone": "Riportare il mazzo «{name}» a questo stato? {n} carte di allora non sono più nella collezione e mancheranno. Lo stato attuale resta nella cronologia.",
 });
 
+/* ---- Teil 21: Karte direkt auf die Wunschliste ---- */
+Object.assign(I18N.de, {
+  "wish.add": "Karte zur Wunschliste",
+  "wish.addPh": "Kartenname oder „MKM 8“",
+  "wish.addBtn": "Auf die Wunschliste",
+  "wish.addTitle": "Eine Karte auch ohne Deck vormerken — Name oder Setcode und Nummer",
+  "wish.adding": "Suche…",
+  "wish.added": "{name} steht jetzt auf der Wunschliste.",
+  "wish.notFound": "Keine Karte zu „{was}“ gefunden.",
+  "wish.haveIt": "{name} liegt schon in deiner Sammlung.",
+  "wish.already": "{name} steht schon auf der Wunschliste.",
+});
+Object.assign(I18N.en, {
+  "wish.add": "Card for the wishlist",
+  "wish.addPh": "Card name or “MKM 8”",
+  "wish.addBtn": "Add to wishlist",
+  "wish.addTitle": "Note down a card without a deck — by name, or set code and number",
+  "wish.adding": "Searching…",
+  "wish.added": "{name} is on the wishlist now.",
+  "wish.notFound": "No card found for “{was}”.",
+  "wish.haveIt": "{name} is already in your collection.",
+  "wish.already": "{name} is already on the wishlist.",
+});
+Object.assign(I18N.fr, {
+  "wish.add": "Carte pour la liste de souhaits",
+  "wish.addPh": "Nom de carte ou « MKM 8 »",
+  "wish.addBtn": "Ajouter aux souhaits",
+  "wish.addTitle": "Noter une carte sans deck — par son nom, ou code d’édition et numéro",
+  "wish.adding": "Recherche…",
+  "wish.added": "{name} est maintenant dans la liste de souhaits.",
+  "wish.notFound": "Aucune carte trouvée pour « {was} ».",
+  "wish.haveIt": "{name} est déjà dans ta collection.",
+  "wish.already": "{name} est déjà dans la liste de souhaits.",
+});
+Object.assign(I18N.es, {
+  "wish.add": "Carta para la lista de deseos",
+  "wish.addPh": "Nombre de carta o «MKM 8»",
+  "wish.addBtn": "Añadir a deseos",
+  "wish.addTitle": "Apuntar una carta sin mazo — por nombre, o código de edición y número",
+  "wish.adding": "Buscando…",
+  "wish.added": "{name} ya está en la lista de deseos.",
+  "wish.notFound": "No se encontró ninguna carta para «{was}».",
+  "wish.haveIt": "{name} ya está en tu colección.",
+  "wish.already": "{name} ya está en la lista de deseos.",
+});
+Object.assign(I18N.it, {
+  "wish.add": "Carta per la lista dei desideri",
+  "wish.addPh": "Nome della carta o «MKM 8»",
+  "wish.addBtn": "Aggiungi ai desideri",
+  "wish.addTitle": "Segnare una carta senza mazzo — per nome, o codice espansione e numero",
+  "wish.adding": "Ricerca…",
+  "wish.added": "{name} è ora nella lista dei desideri.",
+  "wish.notFound": "Nessuna carta trovata per «{was}».",
+  "wish.haveIt": "{name} è già nella tua collezione.",
+  "wish.already": "{name} è già nella lista dei desideri.",
+});
+
 /* ---- Teil 20: Aufgeräumter Deck-Kopf (Werkzeug-Gruppen + Hinzufügen-Knopf) ---- */
 Object.assign(I18N.de, {
   "deck.addCard": "Karte hinzufügen", "deck.addBtn": "Hinzufügen",
@@ -4103,7 +4160,7 @@ Object.assign(I18N.it, {
 Object.assign(I18N.de, {
   "nav.wishlist": "Wunschliste",
   "th.plannedIn": "Geplant in",
-  "wish.hint": "Diese Karten sind in einem Deck eingeplant, liegen aber noch nicht in deiner Sammlung. Nimm eine Karte in die Sammlung auf, wandert sie von hier ins Deck. Das × streicht den Wunsch — samt seinem Deckplatz.",
+  "wish.hint": "Diese Karten fehlen dir noch: eingeplant in einem Deck oder oben von Hand hinzugefügt. Nimm eine in die Sammlung auf, verschwindet sie von hier — und wandert, war sie eingeplant, ins Deck. Das × streicht den Wunsch samt Deckplatz.",
   "wish.empty": "Noch keine Wunschkarten. Sie entstehen, wenn du eine Karte in ein Deck legst, die du nicht besitzt.",
   "wish.noDeck": "in keinem Deck",
   "wish.sum": "{p} zu kaufen",
@@ -4120,7 +4177,7 @@ Object.assign(I18N.de, {
 Object.assign(I18N.en, {
   "nav.wishlist": "Wishlist",
   "th.plannedIn": "Planned in",
-  "wish.hint": "These cards are planned in a deck but are not in your collection yet. Add one to your collection and it moves from here into the deck. The × drops the wish — along with its deck slot.",
+  "wish.hint": "Cards you don’t have yet: planned in a deck, or added by hand above. Add one to your collection and it disappears from here — moving into the deck if it was planned for one. The × drops the wish along with its deck slot.",
   "wish.empty": "No wishlist cards yet. They appear when you put a card you don't own into a deck.",
   "wish.noDeck": "in no deck",
   "wish.sum": "{p} to buy",
@@ -4137,7 +4194,7 @@ Object.assign(I18N.en, {
 Object.assign(I18N.fr, {
   "nav.wishlist": "Liste de souhaits",
   "th.plannedIn": "Prévue dans",
-  "wish.hint": "Ces cartes sont prévues dans un deck mais ne sont pas encore dans ta collection. Ajoute-en une à ta collection et elle passe d’ici au deck. Le × supprime le souhait — et la place qu’il occupe dans le deck.",
+  "wish.hint": "Les cartes qui te manquent : prévues dans un deck, ou ajoutées à la main ci-dessus. Ajoute-en une à ta collection et elle disparaît d’ici — en passant dans le deck si elle y était prévue. Le × supprime le souhait et sa place dans le deck.",
   "wish.empty": "Aucune carte souhaitée pour l’instant. Elles apparaissent quand tu mets dans un deck une carte que tu ne possèdes pas.",
   "wish.noDeck": "dans aucun deck",
   "wish.sum": "{p} à acheter",
@@ -4154,7 +4211,7 @@ Object.assign(I18N.fr, {
 Object.assign(I18N.es, {
   "nav.wishlist": "Lista de deseos",
   "th.plannedIn": "Prevista en",
-  "wish.hint": "Estas cartas están previstas en un mazo pero aún no están en tu colección. Añade una a tu colección y pasará de aquí al mazo. La × descarta el deseo, junto con su hueco en el mazo.",
+  "wish.hint": "Las cartas que aún te faltan: previstas en un mazo o añadidas a mano arriba. Añade una a tu colección y desaparece de aquí — y pasa al mazo si estaba prevista. La × descarta el deseo junto con su hueco en el mazo.",
   "wish.empty": "Todavía no hay cartas deseadas. Aparecen cuando pones en un mazo una carta que no tienes.",
   "wish.noDeck": "en ningún mazo",
   "wish.sum": "{p} por comprar",
@@ -4171,7 +4228,7 @@ Object.assign(I18N.es, {
 Object.assign(I18N.it, {
   "nav.wishlist": "Lista dei desideri",
   "th.plannedIn": "Prevista in",
-  "wish.hint": "Queste carte sono previste in un mazzo ma non sono ancora nella tua collezione. Aggiungine una alla collezione e passerà da qui al mazzo. La × cancella il desiderio, insieme al suo posto nel mazzo.",
+  "wish.hint": "Le carte che ti mancano ancora: previste in un mazzo o aggiunte a mano qui sopra. Aggiungine una alla collezione e sparisce da qui — passando nel mazzo se era prevista. La × cancella il desiderio insieme al suo posto nel mazzo.",
   "wish.empty": "Ancora nessuna carta desiderata. Nascono quando metti in un mazzo una carta che non possiedi.",
   "wish.noDeck": "in nessun mazzo",
   "wish.sum": "{p} da comprare",

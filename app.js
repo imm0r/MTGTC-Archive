@@ -3061,6 +3061,129 @@ async function reloadMitWunschAbgleich() {
   return erfuellt;
 }
 
+/* ==================== Karte direkt auf die Wunschliste ================
+   Ein Wunsch entstand bisher nur über ein Deck: Man musste eine Karte
+   einplanen, um sie sich zu merken. „Die will ich haben" ist aber keine
+   Aussage über ein Deck — und wer sie doch später einplant, findet sie dann
+   schon in der eigenen Liste.
+
+   Eine Wunschzeile ist eine gewöhnliche Sammlungszeile mit BESTAND 0. Genau
+   das listet die Wunschliste (LISTE.wish), und genau so legt sie
+   add_wish_to_deck an. Hier wird direkt geschrieben statt über eine RPC: Ohne
+   Deck bleibt nichts zu prüfen, was die Datenbank besser wüsste als der
+   Browser — und die Funktion braucht damit KEINE Schemaänderung, sie wirkt
+   sofort. */
+
+/* Was der Nutzer getippt hat, zu einer Scryfall-Karte machen. Zwei Wege, wie
+   bei der Handeingabe der Sammlung: Setcode + Nummer („MKM 8", „FIN 9 T"),
+   sonst der Name. */
+async function wunschKarteFinden(v, lang) {
+  const m = v.match(/^([a-z0-9]{3,5})[\s\-\/·•]+(\d{1,4}[a-z★]?)(?:\s+(t))?$/i);
+  if (m) {
+    let card = await findByCode(m[1], m[2], lang, !!m[3]);
+    // „FIN 9T" ohne Leerzeichen: erst als Nummer „9T" versucht, jetzt als
+    // Nummer 9 mit Token-Zeichen.
+    if (!card && !m[3] && /^\d+t$/i.test(m[2]))
+      card = await findByCode(m[1], m[2].slice(0, -1), lang, true);
+    return card;
+  }
+  return (await findCard(v, lang)).card;
+}
+
+/* Die Zeile. Alle Felder wie beim Zugang zur Sammlung, nur qty 0 — samt der
+   vier Nachträge (faces, color_identity, printed_text, printed_type_line), die
+   der Scan-Weg in einem zweiten Schreibvorgang setzt. Hier steht ohnehin ein
+   direktes insert, also kommen sie gleich mit. */
+function wunschZeile(card) {
+  const price = priceOf(card, false);
+  return {
+    scryfall_id: card.id, oracle_id: card.oracle_id ?? null, name: card.name,
+    printed_name: printedNameOf(card),
+    // Setcode GROSS wie auf allen anderen Wegen: ungewandelt trüge die Zeile
+    // „ltr", wo die gescannte Karte „LTR" trägt — und jeder Vergleich über
+    // Set + Nummer ginge ins Leere.
+    set_code: (card.set || "").toUpperCase(), set_name: card.set_name ?? null,
+    cn: card.collector_number ?? null, img: imgOf(card),
+    // Anders als bei add_wish_to_deck: Die Produkt-ID ist hier bekannt, und
+    // mit ihr zeigt der Kauflink auf genau diese Auflage statt auf eine Suche.
+    cm_id: card.cardmarket_id ?? null,
+    lang: card.lang || "en", condition: "NM", foil: false, qty: 0,
+    price, hist: price == null ? [] : [{ d: today(), v: price }],
+    type_line: card.type_line ?? null, rarity: card.rarity ?? null,
+    mana_cost: manaOf(card), cmc: card.cmc ?? null,
+    released: card.released_at ?? null, colors: farbenOf(card),
+    keywords: keywordsOf(card), oracle_text: oracleOf(card),
+    printed_text: printedTextOf(card), printed_type_line: printedTypeOf(card),
+    faces: facesOf(card), color_identity: farbIdentOf(card),
+  };
+}
+
+/* Steht diese Karte schon irgendwo? Gefragt wird mit selbeKarte(), also über
+   Auflage, Oracle-ID und zuletzt den Namen — dieselbe Frage, die auch der
+   Wunschabgleich stellt.
+
+   Das ist wichtiger als es aussieht: Ein Wunsch für eine Karte, die man in
+   einer ANDEREN Auflage besitzt, würde vom Abgleich beim nächsten Zugang
+   wieder gelöscht (er hält ihn für erfüllt). Ihn anzulegen hieße, eine Zeile
+   zu schreiben, die still wieder verschwindet. Besser gleich sagen, woran es
+   liegt. */
+function wunschSchonDa(card) {
+  const probe = { set: (card.set || "").toUpperCase(), cn: card.collector_number,
+                  oracle_id: card.oracle_id, name: card.name };
+  const treffer = CARDS.filter(c => selbeKarte(c, probe));
+  const besessen = treffer.find(c => c.qty > 0);
+  if (besessen) return { grund: "besitzt", karte: besessen };
+  const wunsch = treffer.find(c => c.qty === 0);
+  if (wunsch) return { grund: "wunsch", karte: wunsch };
+  return null;
+}
+
+/* Steht für sich, damit die Prüfungen eine Attrappe einhängen können — dieselbe
+   Aufteilung wie bei zoneSchreiben() und wurfSpeichern(). */
+async function wunschSchreiben(zeile) {
+  const { error } = await sb.from("cards").insert(zeile);
+  if (error) throw error;
+}
+
+async function wunschHinzufuegen() {
+  const inp = $("#wish-add"), btn = $("#wish-add-btn");
+  if (!inp || !btn) return;
+  const v = (inp.value || "").trim();
+  if (!v) { inp.focus(); return; }
+
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `<span class="syn-spin">&#9881;</span> ${esc(t("wish.adding"))}`;
+  try {
+    // Die Sprache der Handeingabe gilt auch hier: Wer seine Sammlung auf
+    // Deutsch führt, will die Wunschkarte nicht auf Englisch merken.
+    const lang = $("#d-lang")?.value || "en";
+    let card = null;
+    try { card = await wunschKarteFinden(v, lang); } catch { /* unten gemeldet */ }
+    if (!card) { toast(t("wish.notFound", { was: v })); return; }
+
+    const da = wunschSchonDa(card);
+    if (da) {
+      toast(t(da.grund === "besitzt" ? "wish.haveIt" : "wish.already",
+              { name: da.karte.disp || da.karte.name }));
+      // Hin zur Zeile, statt den Nutzer suchen zu lassen, was schon da ist.
+      if (da.grund === "besitzt") zeigeKarteInSammlung(da.karte.id);
+      return;
+    }
+
+    await wunschSchreiben(wunschZeile(card));
+    inp.value = "";
+    delete inp.dataset.picked;
+    await reload(); renderAll();
+    toast(t("wish.added", { name: printedNameOf(card) || card.name }));
+  } catch (e) {
+    toast(dbErr(e));
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+}
+
 /* Meldung über eingelöste Wünsche. Leer, wenn keiner dabei war. */
 function wunschMeldung(erfuellt) {
   const namen = [...new Set(erfuellt || [])];
@@ -14318,6 +14441,21 @@ function wireApp() {
   const wKauf = $("#wish-buy");
   if (wKauf) wKauf.onclick = oeffneKaufWunschliste;
   const wKaufLogo = $("#wish-buy-cm"); if (wKaufLogo) wKaufLogo.innerHTML = CM_LOGO;   // Cardmarket-Logo vor „in Wants übertragen"
+
+  // Karte direkt auf die Wunschliste. Dieselbe Vorschlagsliste wie bei der
+  // Handeingabe der Sammlung (Scryfall-Namenssuche), und Enter tut dasselbe wie
+  // der Knopf — außer die Vorschlagsliste steht offen, dann wählt Enter dort
+  // aus. Ohne diese Ausnahme legte die erste Eingabetaste die Karte an, die
+  // gerade markiert war, statt die gewählte.
+  const wAdd = $("#wish-add");
+  if (wAdd) {
+    attachSuggest(wAdd);
+    wAdd.addEventListener("keydown", e => {
+      if (e.key === "Enter" && !wAdd.parentElement.querySelector("ul")) wunschHinzufuegen();
+    });
+  }
+  const wAddBtn = $("#wish-add-btn");
+  if (wAddBtn) wAddBtn.onclick = wunschHinzufuegen;
 
   // „Deine Combos": komplette Combos quer über den ganzen Bestand. Karten nach
   // Namen dedupliziert (dieselbe Karte in mehreren Auflagen zählt einmal).

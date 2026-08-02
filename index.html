@@ -274,6 +274,22 @@
       </div>
       <div style="flex:none"><button class="btn ghost cm-btn" id="wish-buy" data-i18n-title="wish.buyTitle"><span class="cm-btn-logo" id="wish-buy-cm" aria-hidden="true"></span><span data-i18n="wish.buyBtn">in Wants übertragen</span></button></div>
     </div>
+    <!-- Eine Karte DIREKT auf die Wunschliste setzen, ohne Umweg über ein Deck.
+         Bisher entstand ein Wunsch nur dort: Man musste eine Karte in ein Deck
+         einplanen, um sie sich zu merken. „Die will ich haben" ist aber keine
+         Aussage über ein Deck.
+         Eingabe wie bei der Handeingabe der Sammlung: Kartenname (mit
+         Vorschlägen) oder Setcode und Nummer, wie sie unten links auf der
+         Karte stehen. -->
+    <div class="row" style="margin-bottom:12px">
+      <div style="flex:2">
+        <label data-i18n="wish.add">Karte zur Wunschliste</label>
+        <div class="sugg"><input type="text" id="wish-add" data-i18n-ph="wish.addPh"
+          placeholder="Kartenname oder „MKM 8“"></div>
+      </div>
+      <div style="flex:none;align-self:flex-end"><button class="btn" id="wish-add-btn"
+        data-i18n="wish.addBtn" data-i18n-title="wish.addTitle">Auf die Wunschliste</button></div>
+    </div>
     <div class="row ci-row" style="margin-bottom:12px">
       <div style="flex:none">
         <label data-i18n="coll.colorId">Farbidentität</label>
