@@ -8731,6 +8731,8 @@ function renderDecks() {
                   title="${esc(t("legal.deckTitle"))}">&#9878; ${esc(t("legal.deckBtn"))}</button>
                 <button class="btn ghost" data-histbtn="${d.id}"
                   title="${esc(t("hist.title"))}">&#8634; ${esc(t("hist.btn"))}</button>
+                <button class="btn ghost" data-exportbtn="${d.id}"
+                  title="${esc(t("exp.title", { name: d.name }))}">&#128203; ${esc(t("exp.btn"))}</button>
                 ${fehlt ? `<button class="btn ghost" data-buybtn="${d.id}"
                   title="${esc(t("buy.deckTitle"))}">&#128722; ${esc(t("buy.deckBtn", { n: fehlt }))}</button>` : ""}
               </div>
@@ -9029,6 +9031,7 @@ function renderDecks() {
   synGespeicherteZeigen();
 
   $$("[data-histbtn]").forEach(b => b.onclick = () => deckVerlaufUmschalten(b.dataset.histbtn));
+  $$("[data-exportbtn]").forEach(b => b.onclick = () => deckExportOeffnen(b.dataset.exportbtn));
   // Ein offener Verlauf überlebt das Neuzeichnen. Nach einem Rücksprung baut
   // renderAll() die Kästen neu, und der eben benutzte stünde sonst leer da —
   // ausgerechnet in dem Augenblick, in dem man den neuen Eintrag sehen will.
@@ -11931,6 +11934,94 @@ async function openDeckImport() {
   if (!ok) return;
   const text = $("#imp-text")?.value || "";
   if (text.trim()) deckImportieren(text, $("#deck-import"));
+}
+
+/* ---- Deck ausgeben --------------------------------------------------
+   Der Gegenweg zum Import: eine Deckliste als Text, die anderswo wieder
+   eingelesen werden kann — auf einer Deckseite, in einem Shop, im Chat.
+
+   DIE ZEILE IST DAS FORMAT:
+
+       1x Capricious Hellraiser (ONE) 125
+        │  │                     │     └ Sammlernummer der Auflage
+        │  │                     └────── Setcode, groß
+        │  └──────────────────────────── Kartenname, ENGLISCH
+        └─────────────────────────────── Anzahl im Deck
+
+   ENGLISCH, nicht wie gedruckt. Eine deutsche Auflage heißt hier trotzdem
+   „Capricious Hellraiser“: Der Export ist dafür da, anderswo gelesen zu
+   werden, und der englische Name ist der einzige, den jedes Werkzeug kennt.
+   Set und Nummer stehen daneben, damit genau DIESE Auflage gemeint ist —
+   dieselbe Kombination, mit der die Sammlung ihre Drucke auseinanderhält.
+
+   Fehlt eines von beiden (Altbestand ohne Auflagenangabe), bleibt die Zeile
+   beim Namen. Eine Zeile mit „() “ darin läse kein Werkzeug; ohne die Angabe
+   sucht sich der Empfänger irgendeine Auflage, und das ist besser als nichts.
+
+   ALPHABETISCH nach dem englischen Namen: So sind zwei Ausgaben desselben
+   Decks Zeile für Zeile vergleichbar. Die Reihenfolge der Einträge in der
+   Datenbank ist es nicht — sie folgt dem Zufall des Einbuchens.
+
+   EIN FORMAT, aber als Liste angelegt: Kommt ein zweites dazu, ist es ein
+   Eintrag mehr und eine Auswahl im Dialog. Was diese Fassung NICHT kann:
+   den Commander als solchen kennzeichnen (das Format sieht keine Abschnitte
+   vor) und Kategorien mitgeben. Beides gehört in ein zweites Format, nicht
+   in dieses. */
+const EXPORT_FORMATE = [{
+  key: "nsn",                        // Name (Set) Nummer
+  zeile: (c, n) => `${n}x ${c.name}`
+    + (c.set && c.cn ? ` (${String(c.set).toUpperCase()}) ${c.cn}` : ""),
+}];
+const exportFormat = key => EXPORT_FORMATE.find(f => f.key === key) || EXPORT_FORMATE[0];
+
+/* Der Text zu einem Deck. Rein — keine Datenbank, kein DOM: Daran hängt, dass
+   sich das Format prüfen lässt, ohne eine Partie aufzubauen. */
+function deckExportText(d, key) {
+  const fmt = exportFormat(key);
+  return (d?.entries || [])
+    .map(e => ({ c: CARDS.find(x => x.id === e.cardId), n: e.qty || 1 }))
+    .filter(x => x.c)
+    .sort((a, b) => (a.c.name || "").localeCompare(b.c.name || "", "en"))
+    .map(x => fmt.zeile(x.c, x.n))
+    .join("\n");
+}
+
+/* Ein Dateiname, der auf jedem Dateisystem überlebt: nur Wortzeichen und
+   Bindestriche, dazu das Datum — dieselbe Regel wie bei der Wantlist. */
+const exportDateiname = d =>
+  `deck-${(d?.name || "deck").replace(/[^\w-]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase() || "deck"}-${today()}.txt`;
+
+async function deckExportOeffnen(deckId) {
+  const d = (DECKS || []).find(x => x.id === deckId);
+  if (!d) return;
+  const text = deckExportText(d);
+  if (!text) return toast(t("exp.empty"));
+  const zeilen = text.split("\n").length;
+  const karten = (d.entries || []).reduce((s, e) => s + (e.qty || 1), 0);
+
+  // Das Versprechen NICHT abwarten, sondern zuerst die eigenen Knöpfe
+  // verdrahten: confirmDlg löst erst beim Schließen auf, der Inhalt steht
+  // aber schon.
+  const zu = confirmDlg(`
+    <h3 style="margin:0 0 6px">${esc(t("exp.title", { name: d.name }))}</h3>
+    <p class="hint" style="margin:0 0 8px">${esc(t("exp.hint", { zeilen, karten }))}</p>
+    <textarea id="exp-text" class="imp-text" rows="12" readonly>${esc(text)}</textarea>
+    <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
+      <div style="flex:none"><button class="btn ghost" id="exp-copy">&#128203; ${esc(t("exp.copy"))}</button></div>
+      <div style="flex:none"><button class="btn ghost" id="exp-file">&#11015; ${esc(t("exp.file"))}</button></div>
+    </div>`);
+  const feld = $("#exp-text");
+  $("#exp-copy").onclick = async () => {
+    try { await navigator.clipboard.writeText(text); toast(t("exp.copied", { n: zeilen })); }
+    catch {
+      // Ohne Zwischenablage-Recht bleibt der Weg von Hand — dann wenigstens
+      // alles markieren, damit ein Tastendruck genügt.
+      feld?.select();
+      toast(t("exp.copyFail"));
+    }
+  };
+  $("#exp-file").onclick = () => download(exportDateiname(d), text, "text/plain");
+  await zu;
 }
 
 /* ======================= Spielrunde (live) ==========================
