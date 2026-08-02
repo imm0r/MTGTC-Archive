@@ -10161,6 +10161,12 @@ async function afterLogin(user) {
   // Profil laden (bei Erstanmeldung anlegen). Nicht kritisch: schlägt es fehl
   // (z. B. Tabelle noch nicht angelegt), zeigt die App die E-Mail und läuft weiter.
   try { await ladeProfile(); } catch (e) { PROFILE = null; }
+  // Kein Anzeigename? Dann zuerst einer. Das steht VOR allem anderen: Wer
+  // ohne Namen durchkäme, stünde in der Mitgliederliste als „Ein Mitglied"
+  // und wäre in der Personensuche nicht zu finden. Nur wenn das Profil selbst
+  // fehlt (Tabelle nicht angelegt), wird nicht gefragt — dann gäbe es nichts,
+  // wohin der Name zu schreiben wäre, und die App liefe sonst gar nicht an.
+  if (PROFILE && brauchtNamen()) await nameNachtragen();
   await ladeFlags();   // globale Schalter + Admin-Status, bevor gezeichnet wird
   // Anwesenheit und Postfach: beides nebenher, beides ohne Auswirkung auf den
   // Start. Schlägt es fehl, fehlt höchstens die Zahl am Navigationseintrag.
@@ -10204,10 +10210,21 @@ async function afterLogin(user) {
 function wireAuth() {
   const msg = (t, cls) => { const m = $("#auth-msg"); m.textContent = t; m.className = "msg " + (cls || ""); };
   let mode = "in";
+  /* Das Namensfeld gehört nur zum Anlegen. required wandert MIT der
+     Sichtbarkeit: Ein verstecktes Pflichtfeld lässt der Browser nicht
+     absenden, meldet aber auch nichts — das Formular täte dann einfach
+     nichts, und niemand sähe warum. */
+  const nameFeldZeigen = an => {
+    const feld = $("#auth-name-feld"), eingabe = $("#auth-name");
+    if (feld) feld.hidden = !an;
+    if (eingabe) { eingabe.required = an; if (!an) eingabe.value = ""; }
+  };
+  nameFeldZeigen(false);
   $$("#auth-tabs button").forEach(b => b.onclick = () => {
     mode = b.dataset.mode;
     $$("#auth-tabs button").forEach(x => x.classList.toggle("on", x === b));
     $("#auth-go").textContent = mode === "in" ? t("auth.signin") : t("auth.signup");
+    nameFeldZeigen(mode === "up");
     msg("");
   });
 
@@ -10216,11 +10233,20 @@ function wireAuth() {
     const email = $("#auth-email").value.trim(), pw = $("#auth-pw").value;
     if (!email || !pw) return msg(t("auth.emailPwRequired"), "err");
     if (mode === "up" && pw.length < 8) return msg(t("auth.pwMin8"), "err");
+    // Beim Anlegen ist der Anzeigename Pflicht — dieselbe Regel wie beim
+    // Nachtrag und im Profil, damit sie nicht auseinanderlaufen.
+    const anzeigename = mode === "up" ? nameGeprueft($("#auth-name")?.value) : null;
+    if (mode === "up" && !anzeigename) return msg(t("auth.nameBad", { min: NAME_MIN, max: NAME_MAX }), "err");
     $("#auth-go").disabled = true; msg(t("auth.moment"));
     try {
       const { data, error } = mode === "in"
         ? await sb.auth.signInWithPassword({ email, password: pw })
-        : await sb.auth.signUp({ email, password: pw });
+        // Der Name reist in den Nutzer-Metadaten mit: Muss die Adresse erst
+        // bestätigt werden, gibt es hier noch keine Sitzung, und in `profiles`
+        // ließe sich nichts schreiben. ladeProfile() holt ihn von dort, sobald
+        // das Profil entsteht.
+        : await sb.auth.signUp({ email, password: pw,
+            options: { data: { display_name: anzeigename } } });
       if (error) throw error;
       if (!data.session) {
         msg(t("auth.accountCreated"), "ok");
@@ -10264,7 +10290,14 @@ async function ladeProfile() {
   const { data, error } = await sb.from("profiles").select("*").eq("id", USER.id).maybeSingle();
   if (error) throw error;
   if (data) { PROFILE = data; return; }
-  const ins = await sb.from("profiles").insert({ id: USER.id }).select("*").single();
+  // Beim Anlegen: der Name, den die Registrierung mitgeschickt hat. Er reist
+  // in den Nutzer-Metadaten mit, weil das Profil bei bestätigungspflichtiger
+  // Anmeldung erst NACH der Mail entsteht — bis dahin gibt es keine Sitzung,
+  // in der sich etwas in `profiles` schreiben ließe.
+  const ausAnmeldung = nameGeprueft(USER?.user_metadata?.display_name);
+  const ins = await sb.from("profiles")
+    .insert(ausAnmeldung ? { id: USER.id, display_name: ausAnmeldung } : { id: USER.id })
+    .select("*").single();
   if (ins.error) throw ins.error;
   PROFILE = ins.data;
 }
@@ -10978,12 +11011,68 @@ async function pageSizeSpeichern(n) {
   } catch (e) { toast(dbErr(e)); }
 }
 
+/* ---- Der Anzeigename ist Pflicht -------------------------------------
+   Seit die Mitgliederliste jeden beim Namen nennt, ist „kein Name" keine
+   Einstellung mehr, sondern eine Lücke: In den Kacheln stünde weiter „Ein
+   Mitglied", in der Personensuche fände einen niemand, und am Spieltisch
+   säße jemand ohne Namensschild.
+
+   ZWEI EINGÄNGE, EINE REGEL. Beim Anlegen eines Kontos steht das Feld gleich
+   in der Maske; wer sein Konto vorher hatte, trägt ihn bei der nächsten
+   Anmeldung nach. Beide Wege prüfen mit derselben Funktion — zwei getrennte
+   Prüfungen liefen irgendwann auseinander, und dann hinge es davon ab, WANN
+   jemand sein Konto angelegt hat.
+
+   Zwei Zeichen genügen: Kürzeste echte Namen („Jo", „Al") sollen durchgehen.
+   Vierzig sind das Maximum, dieselbe Schranke wie im Profilfeld. */
+const NAME_MIN = 2, NAME_MAX = 40;
+/* → getrimmter Name oder null. null heißt: taugt nicht. */
+const nameGeprueft = roh => {
+  const n = (roh || "").trim().replace(/\s+/g, " ");
+  return n.length >= NAME_MIN && n.length <= NAME_MAX ? n : null;
+};
+const brauchtNamen = () => !nameGeprueft(PROFILE?.display_name);
+
+/* Der Nachtrag beim Anmelden. Gibt ein Versprechen zurück, das erst aufgeht,
+   wenn ein Name steht — afterLogin wartet darauf, bevor es die App zeigt.
+   Wer abbricht, meldet sich ab; das Versprechen geht dann nie auf, und die
+   Seite lädt ohnehin neu. */
+function nameNachtragen() {
+  return new Promise(fertig => {
+    showGate("name");
+    const feld = $("#name-input"), form = $("#name-form"), knopf = $("#name-go");
+    const msg = (txt, cls) => { const m = $("#name-msg"); if (m) { m.textContent = txt; m.className = "msg " + (cls || ""); } };
+    msg("");
+    if (feld) { feld.value = ""; feld.focus(); }
+    const abmelden = $("#name-logout");
+    if (abmelden) abmelden.onclick = async () => { await sb.auth.signOut(); location.reload(); };
+    if (!form) return;
+    form.onsubmit = async ev => {
+      ev.preventDefault();
+      const name = nameGeprueft(feld?.value);
+      if (!name) return msg(t("auth.nameBad", { min: NAME_MIN, max: NAME_MAX }), "err");
+      if (knopf) knopf.disabled = true;
+      msg(t("auth.moment"));
+      try {
+        const { error } = await sb.from("profiles").update({ display_name: name }).eq("id", USER.id);
+        if (error) throw error;
+        PROFILE.display_name = name;
+        fertig();
+      } catch (e) { msg(dbErr(e), "err"); }
+      finally { if (knopf) knopf.disabled = false; }
+    };
+  });
+}
+
 async function nameSpeichern() {
-  const name = $("#pf-name").value.trim();
+  // Auch hier Pflicht: Sonst nähme man im Profil zurück, was die Anmeldung
+  // eben erst verlangt hat — und stünde wieder ohne Namen da.
+  const name = nameGeprueft($("#pf-name").value);
+  if (!name) return toast(t("auth.nameBad", { min: NAME_MIN, max: NAME_MAX }));
   try {
-    const { error } = await sb.from("profiles").update({ display_name: name || null }).eq("id", USER.id);
+    const { error } = await sb.from("profiles").update({ display_name: name }).eq("id", USER.id);
     if (error) throw error;
-    PROFILE.display_name = name || null;
+    PROFILE.display_name = name;
     renderWho();
     toast(t("toast.nameSaved"));
   } catch (e) { toast(dbErr(e)); }
