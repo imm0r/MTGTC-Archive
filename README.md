@@ -576,7 +576,7 @@ Gerechnet wird das Kontingent **einmal je Liste**, nicht je Zeile: Bestand und
 Deckvorkommen gehen jeweils über alle Karten bzw. alle Decks, und der Filter
 läuft bei jedem Tastendruck in der Suche.
 
-## Wunschliste: eingeplant, aber noch nicht besessen
+## Wunschliste: was dir noch fehlt
 
 Decks lassen sich mit Karten bauen, die man gar nicht hat — aus den
 Synergie-Vorschlägen, aus einem Deck-Import oder von Hand. Diese Karten
@@ -584,8 +584,32 @@ belegen im Deck bereits ihren Platz und erscheinen dort als „fehlen“. Neben
 **Sammlung** und **Decks** listet die dritte Kategorie **Wunschliste** genau
 sie auf.
 
+### Eine Karte direkt vormerken
+
+Über der Liste steht **„Karte zur Wunschliste"**: Kartenname (mit Vorschlägen
+von Scryfall) oder Setcode und Nummer wie bei der Handeingabe der Sammlung —
+`MKM 8`, `FIN 9 T`, `PEMN 1Z`.
+
+Vorher entstand ein Wunsch **nur über ein Deck**: Man musste eine Karte
+einplanen, um sie sich zu merken. „Die will ich haben" ist aber keine Aussage
+über ein Deck. Solche Wünsche stehen dann mit „in keinem Deck" in der Spalte
+*Geplant in*, zählen mit einem Exemplar in die Summe und gehen wie alle anderen
+in die Wants-Liste bei Cardmarket.
+
+**Was schon da ist, kommt nicht noch einmal drauf.** Gefragt wird über Auflage,
+Oracle-ID und zuletzt den Namen — dieselbe Frage, die auch der Wunschabgleich
+stellt. Das ist wichtiger, als es aussieht: Ein Wunsch für eine Karte, die man
+in einer *anderen* Auflage besitzt, würde vom Abgleich beim nächsten Zugang
+wieder gelöscht (er hält ihn für erfüllt). Ihn anzulegen hieße, eine Zeile zu
+schreiben, die still wieder verschwindet — die App sagt stattdessen, woran es
+liegt, und springt zu der Zeile, die man schon hat.
+
+> Geschrieben wird direkt in `cards`, ohne RPC: Ohne Deck bleibt nichts zu
+> prüfen, was die Datenbank besser wüsste als der Browser. Die Funktion braucht
+> deshalb **keine Schemaänderung** und wirkt sofort.
+
 Es ist **keine eigene Tabelle**: Eine Wunschkarte ist eine ganz normale
-Sammlungszeile mit **Bestand 0** — „im Deck eingeplant, aber nicht besessen“.
+Sammlungszeile mit **Bestand 0** — „will ich haben, habe ich nicht“.
 Genau dort gehört sie hin, denn der Deckplatz hängt an ihr wie an jeder
 anderen Karte, und Bild, Preis und Kartendaten sind dieselben. Die Sammlung
 blendet diese Zeilen aus, die Wunschliste zeigt ausschließlich sie. Eine
@@ -1669,6 +1693,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `decks`          | Höchstens ein Deck aufgeklappt, Speicher und Baum stimmen überein, Truhe wirft die richtige Karte |
 | `sammlung`       | „Verbaute ausblenden": erst wenn ALLE Exemplare in Decks liegen, über alle Decks zusammen gezählt, je Druck statt je Zeile |
 | `verlauf`        | Deck-Verlauf: Fingerabdruck unabhängig von der Reihenfolge, der Umbau in Worten, und was ein Rücksprung schreiben würde (fehlende Karten, fehlende Fächer, primäre Einordnung) |
+| `wunschliste`    | Karte direkt vormerken: die Zeile (Bestand 0, Setcode groß, Preis mit erstem Punkt) und die Doppelprüfung — auch gegen eine andere Auflage derselben Karte |
 | `spielrunde`     | Die Matte: Ziehen zwischen den Zonen, Tappen per Klick, die Lebensreihe (vier Kacheln nebeneinander, kein Rollbalken), die drei Laden (Ort, Rahmen, Zahl, immer nur eine offen, auch zugeklappt Ablageziel) und der Würfel (nur W20, blanke Fläche über der ganzen Matte, Zahl aufs Emblem, jeder Wurf anders) |
 
 ### Zwei Regeln, die dabei gelernt wurden
