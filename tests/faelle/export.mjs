@@ -92,12 +92,16 @@ export default async function ({ seite, adresse, stand }) {
   /* Er steht im Deck-KOPF, zwischen „Geteilt“ und „Bearbeiten“ — dort ist er
      auch am zugeklappten Deck erreichbar. In der Werkzeugleiste innerhalb des
      Decks stand er zuerst und war es nicht. */
+  /* „Öffentlich" ist später zwischen „Geteilt" und „Exportieren" dazugekommen:
+     Beide Schalter regeln, WER das Deck sieht, und gehören nebeneinander.
+     Exportieren steht weiterhin zwischen Freigabe und Bearbeiten. */
   stand.gleich("die Kopfleiste steht in der gewünschten Reihenfolge",
     await seite.evaluate(() => [...document.querySelectorAll(".deck-manage button")].map(b =>
-      b.dataset.share ? "geteilt" : b.dataset.exportbtn ? "exportieren"
+      b.dataset.share ? "geteilt" : b.dataset.public ? "öffentlich"
+      : b.dataset.exportbtn ? "exportieren"
       : b.dataset.ded ? "bearbeiten" : b.dataset.histbtn ? "verlauf"
       : b.dataset.dx ? "löschen" : "?")),
-    ["geteilt", "exportieren", "bearbeiten", "verlauf", "löschen"]);
+    ["geteilt", "öffentlich", "exportieren", "bearbeiten", "verlauf", "löschen"]);
   stand.ist("und nicht mehr in der Werkzeugleiste",
     await seite.evaluate(() => !document.querySelector(".deck-tools [data-exportbtn]")));
 

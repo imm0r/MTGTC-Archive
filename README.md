@@ -559,6 +559,59 @@ Jedes Profil wählt eine von drei Stufen (`profiles.community_visibility`):
 Durchgesetzt wird das in der Datenbank, nicht in der Anzeige — `community_feed`
 und `community_highlights` filtern selbst.
 
+### Community-Decks: öffentlich statt nur geteilt
+
+Zwei Schalter am Deck, weil es zwei verschiedene Dinge sind:
+
+| Schalter | wer sieht es |
+| --- | --- |
+| **👥 Geteilt** (`shared`) | die Freunde |
+| **🌍 Öffentlich** (`is_public`) | alle Mitglieder |
+
+Wer nur den einen will, soll nicht den anderen mitbekommen. Öffentliche Decks
+stehen unter **Community → Community-Decks**, mit Suche über Deckname *und*
+Commander, drei Sortierungen und Blättern zu je 12.
+
+> **Bestehende Decks bleiben privat.** Die Migration legt die Spalte mit
+> `default false` an und setzt den Vorgabewert **erst danach** auf `true` — die
+> Reihenfolge *ist* die Aussage. Neue und importierte Decks sind öffentlich, so
+> gewollt; bereits angelegte nicht. „Aus Versehen veröffentlicht" lässt sich
+> nicht zurücknehmen, „muss einmal umgeschaltet werden" schon. Wer will, dass
+> auch der Altbestand mitkommt, braucht ein `update decks set is_public = true`
+> von Hand.
+
+Öffentlich heißt auf **allen fünf Ebenen** lesbar — Deck, Einträge, Fächer,
+Zuordnungen, Karten. Dieselben Policies wie bei `shared`, nur ohne die
+Freundschaftsprüfung: Ein Deck ohne seine Einteilung wäre eine Liste, mit ihr
+ein Bauplan.
+
+### Sterne und Rangliste
+
+Jedes Mitglied vergibt 1 bis 5 Sterne, eine Stimme je Deck, jederzeit änderbar
+oder zurückzunehmen. **Das eigene Deck nicht** — Selbstlob ist keine Auskunft,
+und ohne diese Schranke wäre die Rangliste ein Wettbewerb im
+Fünf-Sterne-Vergeben an sich selbst. Die Datenbank weist es ab, die Oberfläche
+zeigt dort gar keine Knöpfe.
+
+**Die Rangliste glättet** (Bayes). Ein Deck mit einer einzigen 5 stünde sonst
+über einem mit fünfzig 4,8ern, und die Liste zeigte nicht die besten Decks,
+sondern die mit den wenigsten Bewertungen:
+
+```
+rang = (n/(n+m))·schnitt + (m/(n+m))·gesamtschnitt,   m = 3
+```
+
+Wer wenige Stimmen hat, wird zur Mitte gezogen; mit wachsender Zahl zählt der
+eigene Schnitt immer mehr. **Angezeigt wird trotzdem der echte Schnitt** —
+geglättet wird nur sortiert, nicht behauptet. Ohne eine einzige Bewentung
+überhaupt ist der Anker 3, die Mitte der Skala, damit die Formel auch am ersten
+Tag rechnet statt durch null zu teilen.
+
+Eine Bewertung zeichnet **nur ihre eigene Kachel** neu. Die Liste neu zu holen
+risse sie unter dem Finger weg — und bei „Rangliste" spränge das Deck womöglich
+an eine andere Stelle, während man noch darauf zielt. Die neue Reihenfolge
+kommt beim nächsten Laden.
+
 ### Die Mitgliederliste
 
 Unter dem Community-Feed steht eine eigene Karte: **wer hier sonst noch
@@ -2058,6 +2111,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `mitglieder`     | Die Mitgliederliste ohne Stufen: dass die Abfrage das neueste Mitglied aus allen Profilen und mit echtem Namen nimmt, dass Karten und „größte Sammlung“ weiterhin an den Stufen hängen, dass ein leerer Anzeigename die Ersatzbezeichnung behält — und dass die Zusage in allen fünf Sprachen mitgewandert ist |
 | `anzeigename`    | Der Anzeigename als Pflicht: die Regel selbst (2–40, getrimmt), das Feld beim Anlegen, der Weg über die Nutzer-Metadaten bis ins frisch angelegte Profil, die Maske vor der App für alte Konten samt Ausweg — und dass das Profilfeld ihn nicht mehr leeren kann |
 | `mitgliederliste` | Die Mitgliederliste und das öffentliche Profil: dass die Abfrage `findable` achtet, die Gesamtzahl je Zeile mitzählt und das Verhältnis gleich mitliefert; die vier Knöpfe, Blättern und Suchen (samt Rücksprung auf Seite eins und Fokus im Feld) — und dass ein `javascript:`-Ziel kein Verweis wird und Markup im Steckbrief Text bleibt |
+| `communitydecks` | Community-Decks: dass die Migration bestehende Decks NICHT veröffentlicht (Reihenfolge der beiden ALTERs), dass die Rangliste glättet und trotzdem den echten Schnitt zeigt, dass das eigene Deck keine Knöpfe hat und die Datenbank es abweist — dazu Bewerten ohne Neuladen der Liste, Sortieren und Suchen über den Commander |
 
 ### Zwei Regeln, die dabei gelernt wurden
 

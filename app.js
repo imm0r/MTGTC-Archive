@@ -8706,6 +8706,10 @@ function renderDecks() {
         <div class="deck-manage">
           <button class="btn ghost sm" data-share="${d.id}"
             title="${d.shared ? esc(t("deck.unshareTitle")) : esc(t("deck.shareTitle"))}">${d.shared ? "&#128101; " + esc(t("deck.sharedBtn")) : esc(t("deck.share"))}</button>
+          <!-- Eine Ebene weiter als „Geteilt": das gibt nicht den Freunden
+               frei, sondern allen. Deshalb daneben und nicht statt dessen. -->
+          <button class="btn ghost sm${d.is_public ? " an" : ""}" data-public="${d.id}"
+            title="${d.is_public ? esc(t("deck.unpublicTitle")) : esc(t("deck.publicTitle"))}">${d.is_public ? "&#127758; " + esc(t("deck.publicBtn")) : esc(t("deck.public"))}</button>
           <button class="btn ghost sm" data-exportbtn="${d.id}"
             title="${esc(t("exp.title", { name: d.name }))}">&#128203; ${esc(t("exp.btn"))}</button>
           <button class="btn ghost sm" data-ded="${d.id}"
@@ -9069,6 +9073,7 @@ function deckVerlaufKnopf(deckId) {
 
   $$("[data-ded]").forEach(b => b.onclick = () => editDeck(b.dataset.ded));
   $$("[data-share]").forEach(b => b.onclick = () => shareDeck(b.dataset.share));
+  $$("[data-public]").forEach(b => b.onclick = () => publicDeck(b.dataset.public));
 
   $$("[data-dx]").forEach(b => b.onclick = async () => {
     const d = DECKS.find(x => x.id === b.dataset.dx);
@@ -11611,7 +11616,10 @@ function renderCommunity() {
     <!-- Die Mitgliederliste steht als eigene Karte UNTER dem Feed: Der Feed
          beantwortet „was passiert gerade", die Liste „wer ist überhaupt da".
          Zwei Fragen, zwei Karten. -->
-    ${mitgliederKarteHtml()}`;
+    ${mitgliederKarteHtml()}
+    <!-- Und darunter die Decks: „wer ist da" beantwortet die Liste darüber,
+         „was bauen die" diese hier. -->
+    ${communityDecksKarteHtml()}`;
   wireCommunityFeedToggle();
   wireCommunityKartenHover(el);
   wireCommunityHighlights(el);
@@ -11620,6 +11628,9 @@ function renderCommunity() {
   // Beim ersten Öffnen holen; danach steht die Liste und wird nur auf Suche
   // oder Blättern neu geholt.
   if (!MITGLIEDER.zeilen.length && !MITGLIEDER.laedt && !MITGLIEDER.fehler) mitgliederHolen();
+  wireCommunityDecks();
+  wireCommunityDecksListe();
+  if (!CDECKS.zeilen.length && !CDECKS.laedt && !CDECKS.fehler) communityDecksHolen();
   // Beim Login geladen; war das erfolglos oder steht die Ansicht früher, hier
   // nachziehen. Kein Kreislauf: ladeCommunityFoundation() ruft nur zeigeCommunity().
   if (!COMMUNITY_STATS && !COMMUNITY_FEED.length) ladeCommunityFoundation().catch(() => {});
@@ -11833,6 +11844,204 @@ async function mitgliedProfilZeigen(userId) {
     if (body) body.innerHTML = `<div class="empty">${esc(dbErr(e))}</div>`;
   }
   await zu;
+}
+
+
+/* ---- Community-Decks -------------------------------------------------
+   `shared` gibt ein Deck den FREUNDEN frei, `is_public` allen. Zwei Schalter,
+   weil es zwei verschiedene Dinge sind: „meine Runde soll das sehen" und „das
+   darf jeder sehen".
+
+   BESTEHENDE DECKS BLEIBEN PRIVAT — die Migration legt die Spalte mit false an
+   und setzt den Vorgabewert true erst danach. Neue und importierte Decks sind
+   also öffentlich, bereits angelegte nicht. „Aus Versehen veröffentlicht"
+   lässt sich nicht zurücknehmen, „muss einmal umgeschaltet werden" schon.
+
+   DIE RANGLISTE GLÄTTET (in SQL, siehe Migration): Ein Deck mit einer einzigen
+   5 stünde sonst über einem mit fünfzig 4,8ern. Angezeigt wird trotzdem der
+   ECHTE Schnitt — geglättet wird nur sortiert, nicht behauptet. */
+const CDECK_PRO_SEITE = 12;
+const CDECK_SORTEN = ["rang", "neu", "stimmen"];
+let CDECKS = { zeilen: [], gesamt: 0, seite: 0, suche: "", sort: "rang",
+               laedt: false, fehler: null };
+
+/* Abfrage und Bewertung getrennt — dieselbe Naht wie überall, damit die
+   Prüfungen ohne Datenbank auskommen. */
+async function communityDecksLaden(suche, sort, seite) {
+  const { data, error } = await sb.rpc("community_decks", {
+    q: suche || null, p_sort: sort,
+    p_limit: CDECK_PRO_SEITE, p_offset: seite * CDECK_PRO_SEITE,
+  });
+  if (error) throw error;
+  return data || [];
+}
+async function deckBewertenSchreiben(deckId, sterne) {
+  const { data, error } = await sb.rpc("rate_deck", { p_deck: deckId, p_stars: sterne });
+  if (error) throw error;
+  return (data || [])[0] || null;
+}
+
+async function communityDecksHolen() {
+  CDECKS.laedt = true; CDECKS.fehler = null;
+  communityDecksZeichnen();
+  try {
+    const zeilen = await communityDecksLaden(CDECKS.suche, CDECKS.sort, CDECKS.seite);
+    CDECKS.zeilen = zeilen;
+    CDECKS.gesamt = Number(zeilen[0]?.gesamt || 0);
+  } catch (e) {
+    CDECKS.zeilen = []; CDECKS.gesamt = 0; CDECKS.fehler = dbErr(e);
+  }
+  CDECKS.laedt = false;
+  communityDecksZeichnen();
+}
+
+/* Die Sterne einer Kachel. Fünf Knöpfe, dazu einer zum Zurücknehmen — ohne den
+   käme man aus einer versehentlichen Eins nicht mehr heraus.
+   Am EIGENEN Deck sind es keine Knöpfe, sondern nur Zeichen: Selbstlob ist
+   keine Auskunft, und die Datenbank weist es ohnehin ab. */
+function sterneHtml(d, eigenes) {
+  const meine = Number(d.meine || 0);
+  const voll = Math.round(Number(d.schnitt || 0));
+  if (eigenes) {
+    return `<span class="sterne fest" title="${esc(t("cdeck.ownDeck"))}">${
+      [1, 2, 3, 4, 5].map(i => `<span class="stern${i <= voll ? " an" : ""}">&#9733;</span>`).join("")}</span>`;
+  }
+  return `<span class="sterne" role="group" aria-label="${esc(t("cdeck.rateLabel"))}">${
+    [1, 2, 3, 4, 5].map(i => `<button type="button" class="stern${i <= meine ? " meine" : i <= voll ? " an" : ""}"
+        data-sterne="${esc(d.id)}" data-n="${i}"
+        title="${esc(t("cdeck.rateN", { n: i }))}" aria-pressed="${i === meine}">&#9733;</button>`).join("")}${
+    meine ? `<button type="button" class="stern-weg" data-sterne="${esc(d.id)}" data-n="0"
+        title="${esc(t("cdeck.unrate"))}">&times;</button>` : ""}</span>`;
+}
+
+function cdeckKachelHtml(d) {
+  const eigenes = d.owner_id === USER?.id;
+  const schnitt = Number(d.schnitt || 0);
+  const stimmen = Number(d.stimmen || 0);
+  return `<div class="cdeck" data-cdeck="${esc(d.id)}">
+    <div class="cdeck-kopf">
+      ${d.commander_img ? `<img class="cdeck-bild" src="${esc(d.commander_img)}" alt="" loading="lazy">` : ""}
+      <div class="cdeck-txt">
+        <div class="cdeck-name">${esc(d.name || "")}</div>
+        <div class="cdeck-meta">${[
+          d.format ? `<span class="pill fmt">${esc(d.format)}</span>` : "",
+          d.archetype ? `<span class="pill">${esc(d.archetype)}</span>` : "",
+        ].join("")}<span class="hint">${Number(d.karten || 0)} ${esc(t("common.cards"))}</span></div>
+        <button type="button" class="cdeck-wer" data-mitglied="${esc(d.owner_id)}">
+          ${avatarHtml(22, { display_name: d.owner_name, avatar_url: d.owner_avatar })}
+          <span>${esc((d.owner_name || "").trim() || t("community.anonMember"))}</span>
+        </button>
+      </div>
+    </div>
+    <div class="cdeck-fuss">
+      ${sterneHtml(d, eigenes)}
+      <span class="cdeck-wert" title="${esc(t("cdeck.votes", { n: stimmen }))}">${
+        stimmen ? `${schnitt.toFixed(2).replace(".", ",")} <span class="hint">(${stimmen})</span>`
+                : `<span class="hint">${esc(t("cdeck.noVotes"))}</span>`}</span>
+    </div>
+  </div>`;
+}
+
+function communityDecksInnerHtml() {
+  if (CDECKS.fehler) return `<div class="empty">${esc(CDECKS.fehler)}</div>`;
+  if (CDECKS.laedt && !CDECKS.zeilen.length)
+    return `<div class="meta"><span class="syn-spin">&#9881;</span></div>`;
+  if (!CDECKS.zeilen.length)
+    return `<div class="empty">${esc(t(CDECKS.suche ? "cdeck.none" : "cdeck.empty"))}</div>`;
+  const seiten = Math.ceil(CDECKS.gesamt / CDECK_PRO_SEITE);
+  return `<div class="cdeck-gitter">${CDECKS.zeilen.map(cdeckKachelHtml).join("")}</div>
+    ${seiten > 1 ? `<div class="row mitglieder-blaettern">
+      <button class="btn ghost sm" id="cd-zurueck"${CDECKS.seite ? "" : " disabled"}>&#8592;</button>
+      <span class="hint">${esc(t("members.page", { i: CDECKS.seite + 1, n: seiten }))}</span>
+      <button class="btn ghost sm" id="cd-vor"${CDECKS.seite + 1 < seiten ? "" : " disabled"}>&#8594;</button>
+    </div>` : ""}`;
+}
+
+function communityDecksZeichnen() {
+  const el = $("#cdecks-liste");
+  if (!el) return;
+  el.innerHTML = communityDecksInnerHtml();
+  const zahl = $("#cd-gesamt");
+  if (zahl) zahl.innerHTML = "&middot; " + CDECKS.gesamt;
+  wireCommunityDecksListe();
+}
+
+function communityDecksKarteHtml() {
+  return `<div class="card" id="cdecks-karte">
+    <h3 style="margin-top:0">${esc(t("cdeck.title"))}
+      <span class="hint" id="cd-gesamt">&middot; ${CDECKS.gesamt}</span></h3>
+    <p class="hint" style="margin-top:-2px">${esc(t("cdeck.hint"))}</p>
+    <div class="row" style="margin-bottom:8px;gap:8px">
+      <div style="flex:1"><input type="search" id="cd-suche" autocomplete="off"
+        value="${esc(CDECKS.suche)}" placeholder="${esc(t("cdeck.searchPh"))}"></div>
+      <div style="flex:none;min-width:170px"><select id="cd-sort">${
+        CDECK_SORTEN.map(s => `<option value="${s}"${s === CDECKS.sort ? " selected" : ""}>${esc(t("cdeck.sort." + s))}</option>`).join("")
+      }</select></div>
+    </div>
+    <div id="cdecks-liste">${communityDecksInnerHtml()}</div>
+  </div>`;
+}
+
+let cdeckTimer = 0;
+function wireCommunityDecks() {
+  const feld = $("#cd-suche");
+  if (feld) feld.oninput = () => {
+    clearTimeout(cdeckTimer);
+    cdeckTimer = setTimeout(() => {
+      CDECKS.suche = feld.value.trim(); CDECKS.seite = 0; communityDecksHolen();
+    }, 250);
+  };
+  const sort = $("#cd-sort");
+  if (sort) sort.onchange = () => {
+    CDECKS.sort = CDECK_SORTEN.includes(sort.value) ? sort.value : "rang";
+    CDECKS.seite = 0; communityDecksHolen();
+  };
+}
+
+function wireCommunityDecksListe() {
+  $$("#cdecks-liste [data-sterne]").forEach(b =>
+    b.onclick = () => deckBewerten(b.dataset.sterne, +b.dataset.n));
+  $$("#cdecks-liste [data-mitglied]").forEach(b =>
+    b.onclick = () => mitgliedProfilZeigen(b.dataset.mitglied));
+  const zurueck = $("#cd-zurueck"), vor = $("#cd-vor");
+  if (zurueck) zurueck.onclick = () => { CDECKS.seite = Math.max(0, CDECKS.seite - 1); communityDecksHolen(); };
+  if (vor) vor.onclick = () => { CDECKS.seite++; communityDecksHolen(); };
+}
+
+/* Bewerten schreibt und zeichnet NUR diese eine Kachel neu — die Liste neu zu
+   holen risse sie unter dem Finger weg, und bei „Rangliste" spränge das Deck
+   womöglich an eine andere Stelle, während man noch darauf zielt. Die neue
+   Reihenfolge kommt beim nächsten Laden. */
+async function deckBewerten(deckId, sterne) {
+  const i = CDECKS.zeilen.findIndex(x => x.id === deckId);
+  if (i < 0) return;
+  try {
+    const neu = await deckBewertenSchreiben(deckId, sterne);
+    if (neu) Object.assign(CDECKS.zeilen[i], {
+      schnitt: neu.schnitt, stimmen: neu.stimmen, meine: neu.meine });
+    const kachel = $(`#cdecks-liste [data-cdeck="${CSS.escape(deckId)}"]`);
+    if (kachel) {
+      kachel.outerHTML = cdeckKachelHtml(CDECKS.zeilen[i]);
+      wireCommunityDecksListe();
+    }
+    toast(sterne ? t("cdeck.rated", { n: sterne }) : t("cdeck.unrated"));
+  } catch (e) { toast(dbErr(e)); }
+}
+
+/* Der Schalter am Deck. Wie shareDeck, nur eine Ebene weiter. */
+async function publicDeck(id) {
+  const d = DECKS.find(x => x.id === id);
+  if (!d) return;
+  const neu = !d.is_public;
+  try {
+    const { error } = await sb.from("decks").update({ is_public: neu }).eq("id", id);
+    if (error) throw error;
+    d.is_public = neu;
+    toast(neu ? t("toast.deckPublic") : t("toast.deckUnpublic"));
+    renderDecks();
+    // Die Community-Liste zeigt jetzt eines mehr oder weniger.
+    if (CDECKS.zeilen.length || CDECKS.gesamt) communityDecksHolen();
+  } catch (e) { toast(dbErr(e)); }
 }
 
 async function oeffneFreunde() { await ladeFreunde(); renderFriends(); }
