@@ -2408,6 +2408,48 @@ const typAuswahl = bereich => $$(lid(bereich, "type-filter") + " input[data-typ]
 
 /* Gewähltes Set steht je Bereich in listSet ("" = Alle). Kein natives <select>,
    deshalb hält eine Variable den Zustand; renderSetFilter zeichnet ihn. */
+/* ------------------------------------- „In Decks verbaut" für die Sammlung
+   Je Druck: wie viele Exemplare man besitzt und wie viele davon in Decks
+   liegen. Schlüssel ist Set + Sammlernummer, genau wie bei bestandVon() und
+   deckVorkommen() — sprach-, foil- und zustandsunabhängig. Zeilen ohne
+   Set/Nummer (Uralt-Bestand) zählen für sich allein; dort ist die ID der
+   Schlüssel, wieder wie in gleicheKarte().
+
+   EINMAL für die ganze Liste gerechnet, nicht je Zeile: bestandVon() geht über
+   alle Karten, deckVorkommen() über alle Decks — je Zeile aufgerufen wäre das
+   quadratisch, und dieser Filter läuft bei jedem Tastendruck in der Suche. */
+const druckSchluessel = c => (c.set && c.cn) ? `${c.set.toUpperCase()}|${c.cn}` : `#${c.id}`;
+
+function deckKontingent() {
+  const besessen = new Map(), verbaut = new Map();
+  for (const c of CARDS) {
+    const k = druckSchluessel(c);
+    besessen.set(k, (besessen.get(k) || 0) + (c.qty || 0));
+  }
+  const nachId = new Map(CARDS.map(c => [c.id, c]));
+  for (const d of (DECKS || [])) for (const e of (d.entries || [])) {
+    const c = nachId.get(e.cardId);
+    if (!c) continue;
+    const k = druckSchluessel(c);
+    verbaut.set(k, (verbaut.get(k) || 0) + (e.qty || 0));
+  }
+  return { besessen, verbaut };
+}
+
+/* „Verbaut" heißt: ALLE besessenen Exemplare dieses Drucks liegen in Decks.
+   Bei vier Blitzschlägen, von denen einer in einem Deck steckt, bleibt die
+   Zeile also stehen — die anderen drei sind frei, und genau danach sucht, wer
+   diesen Filter setzt. Dieselbe Regel kennt der Deckbau als „vergeben"
+   (zugabeGrund); zwei Auslegungen desselben Wortes liefen auseinander.
+
+   Wunschzeilen (Bestand 0) sind nie verbaut: Sie sind eingeplant, nicht
+   verbraucht — und in der Sammlung stehen sie ohnehin nicht. */
+function vollVerbaut(c, konto) {
+  const k = druckSchluessel(c);
+  const b = konto.besessen.get(k) || 0;
+  return b >= 1 && (konto.verbaut.get(k) || 0) >= b;
+}
+
 function filtered(bereich = "coll") {
   const q = lel(bereich, "q").value.trim().toLowerCase();
   // Die Wunschliste hat keinen Ausführungs-Filter (jede Wunschkarte entsteht
@@ -2418,6 +2460,9 @@ function filtered(bereich = "coll") {
   const ci = ciAuswahl(bereich);
   const set = listSet[bereich];
   const s = listSort[bereich];
+  // Nur die Sammlung hat den Haken: In der Wunschliste steht nichts, was man
+  // besitzt, und ohne Bestand kann auch nichts verbaut sein.
+  const konto = lel(bereich, "f-nodeck")?.checked ? deckKontingent() : null;
   // Welche Hälfte der Zeilen überhaupt in Frage kommt, entscheidet LISTE:
   // besessen (Bestand > 0) für die Sammlung, eingeplant-aber-fehlend
   // (Bestand 0) für die Wunschliste.
@@ -2429,7 +2474,8 @@ function filtered(bereich = "coll") {
     // Typen als ODER-Mehrfachauswahl: eine Karte reicht, wenn sie einen der
     // angehakten Typen trägt ("Artifact Creature" passt zu Artefakt UND Kreatur).
     (!typen.length || typen.some(en => typMatch(c.type_line, en))) &&
-    (!ci.length || farbidentPasst(c, ci))
+    (!ci.length || farbidentPasst(c, ci)) &&
+    (!konto || !vollVerbaut(c, konto))
   ).sort((a, b) => cmpWert(sortWert(s.key, a), sortWert(s.key, b), s.dir));
 }
 
@@ -3377,6 +3423,7 @@ function renderWunschliste() { renderKartenliste("wish"); }
 function sammlungFilterZuruecksetzen() {
   const q = lel("coll", "q"); if (q) q.value = "";
   const foil = lel("coll", "f-foil"); if (foil) foil.value = "";
+  const nodeck = lel("coll", "f-nodeck"); if (nodeck) nodeck.checked = false;
   listSet.coll = "";
   $$(lid("coll", "ci-filter") + " input[data-ci], " +
      lid("coll", "type-filter") + " input[data-typ]").forEach(i => { i.checked = false; });
@@ -13903,6 +13950,8 @@ function wireApp() {
     lel(bereich, "q").oninput = neu;
     const foil = lel(bereich, "f-foil");
     if (foil) foil.onchange = neu;          // die Wunschliste hat keinen
+    const nodeck = lel(bereich, "f-nodeck");
+    if (nodeck) nodeck.onchange = neu;      // ebenso wenig den Deck-Haken
     // Eigenes Set-Dropdown: Trigger klappt auf/zu, Klick auf einen Eintrag setzt
     // den Filter. Klicks liegen delegiert auf dem Menü, weil renderSetFilter die
     // Einträge neu baut. Außenklick schließt (Handler weiter oben).

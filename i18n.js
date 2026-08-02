@@ -2934,35 +2934,45 @@ Object.assign(I18N.it, {
 
 /* ---- Teil 19: Kartentypen (Sammlungsfilter + Deck-Kategorien) ---- */
 Object.assign(I18N.de, {
-  "coll.type": "Kartentyp",
+  "coll.type": "Kartentyp", "coll.decks": "Decks",
+  "coll.hideBuilt": "Verbaute ausblenden",
+  "coll.hideBuiltHint": "Blendet Karten aus, deren Exemplare alle in Decks stecken. Hast du vier und nur eines liegt in einem Deck, bleibt die Zeile stehen — drei sind ja noch frei.",
   "coll.count": "{n} von {total} Karten", "coll.countAll": "{total} Karten",
   "type.creature": "Kreaturen", "type.land": "Länder", "type.instant": "Spontanzauber",
   "type.sorcery": "Hexereien", "type.artifact": "Artefakte", "type.enchantment": "Verzauberungen",
   "type.planeswalker": "Planeswalker", "type.battle": "Schlachten", "type.other": "Sonstige",
 });
 Object.assign(I18N.en, {
-  "coll.type": "Card type",
+  "coll.type": "Card type", "coll.decks": "Decks",
+  "coll.hideBuilt": "Hide cards in decks",
+  "coll.hideBuiltHint": "Hides cards whose copies are all in decks. If you own four and only one sits in a deck, the row stays — three are still free.",
   "coll.count": "{n} of {total} cards", "coll.countAll": "{total} cards",
   "type.creature": "Creatures", "type.land": "Lands", "type.instant": "Instants",
   "type.sorcery": "Sorceries", "type.artifact": "Artifacts", "type.enchantment": "Enchantments",
   "type.planeswalker": "Planeswalkers", "type.battle": "Battles", "type.other": "Other",
 });
 Object.assign(I18N.fr, {
-  "coll.type": "Type de carte",
+  "coll.type": "Type de carte", "coll.decks": "Decks",
+  "coll.hideBuilt": "Masquer celles des decks",
+  "coll.hideBuiltHint": "Masque les cartes dont tous les exemplaires sont dans des decks. Si tu en possèdes quatre et qu'un seul est dans un deck, la ligne reste — trois sont encore libres.",
   "coll.count": "{n} sur {total} cartes", "coll.countAll": "{total} cartes",
   "type.creature": "Créatures", "type.land": "Terrains", "type.instant": "Éphémères",
   "type.sorcery": "Rituels", "type.artifact": "Artefacts", "type.enchantment": "Enchantements",
   "type.planeswalker": "Planeswalkers", "type.battle": "Batailles", "type.other": "Autres",
 });
 Object.assign(I18N.es, {
-  "coll.type": "Tipo de carta",
+  "coll.type": "Tipo de carta", "coll.decks": "Mazos",
+  "coll.hideBuilt": "Ocultar las de mazos",
+  "coll.hideBuiltHint": "Oculta las cartas cuyos ejemplares están todos en mazos. Si tienes cuatro y solo uno está en un mazo, la fila se queda — tres siguen libres.",
   "coll.count": "{n} de {total} cartas", "coll.countAll": "{total} cartas",
   "type.creature": "Criaturas", "type.land": "Tierras", "type.instant": "Instantáneos",
   "type.sorcery": "Conjuros", "type.artifact": "Artefactos", "type.enchantment": "Encantamientos",
   "type.planeswalker": "Planeswalkers", "type.battle": "Batallas", "type.other": "Otros",
 });
 Object.assign(I18N.it, {
-  "coll.type": "Tipo di carta",
+  "coll.type": "Tipo di carta", "coll.decks": "Mazzi",
+  "coll.hideBuilt": "Nascondi quelle nei mazzi",
+  "coll.hideBuiltHint": "Nasconde le carte i cui esemplari sono tutti nei mazzi. Se ne possiedi quattro e solo una è in un mazzo, la riga resta — tre sono ancora libere.",
   "coll.count": "{n} di {total} carte", "coll.countAll": "{total} carte",
   "type.creature": "Creature", "type.land": "Terre", "type.instant": "Istantanei",
   "type.sorcery": "Stregonerie", "type.artifact": "Artefatti", "type.enchantment": "Incantesimi",

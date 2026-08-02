@@ -1846,6 +1846,12 @@ tr.treffer>td{
 .ci-box input:checked ~ .ci-sym{opacity:1;border-color:var(--akt-rand);background:var(--akt-flaeche);
   box-shadow:0 0 0 1px var(--akt-rand) inset}
 .ci-box input:focus-visible ~ .ci-sym{box-shadow:0 0 0 2px var(--acc)}
+/* Ein Filter mit WORT statt Symbol, sonst genau die Kästchen daneben: derselbe
+   Rahmen, dieselbe Höhe, dasselbe Aufleuchten beim Anhaken. Ein Symbol für
+   „was in Decks steckt" gäbe es nicht, das ohne Beschriftung verstanden würde. */
+.haken-sym{width:auto;padding:0 11px;font-size:12px;font-weight:600;
+  letter-spacing:.2px;color:var(--dim);white-space:nowrap}
+.ci-box input:checked ~ .haken-sym{color:var(--acc2)}
 /* In der Detailansicht stehen die Kosten hinter dem Namen (kein flex: so bleibt
    der Name normaler Textfluss und darf umbrechen). In den Tabellen haben sie
    eine eigene, rechtsbündige Spalte — dort sortiert man nach ihnen. */

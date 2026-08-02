@@ -194,6 +194,19 @@
           <label class="ci-box" data-i18n-title="type.battle"><input type="checkbox" data-typ="Battle"><span class="ci-sym"><i class="ms ms-battle" aria-hidden="true"></i></span></label>
         </div>
       </div>
+      <!-- Ausblenden, was schon in Decks steckt. „Verbaut" heißt dabei: ALLE
+           besessenen Exemplare dieses Drucks liegen in Decks — bei vier
+           Blitzschlägen mit einem im Deck bleibt die Zeile also stehen.
+           Dieselbe Regel, die der Deckbau als „vergeben" kennt. -->
+      <div style="flex:none" class="ci-gruppe-abstand">
+        <label data-i18n="coll.decks">Decks</label>
+        <div class="ci-filter">
+          <label class="ci-box" data-i18n-title="coll.hideBuiltHint">
+            <input type="checkbox" id="f-nodeck">
+            <span class="ci-sym haken-sym" data-i18n="coll.hideBuilt">Verbaute ausblenden</span>
+          </label>
+        </div>
+      </div>
     </div>
     <div id="coll-combo-box"></div>
     <!-- Trefferzähler: wie viele Zeilen die aktuellen Filter zeigen, von allen
