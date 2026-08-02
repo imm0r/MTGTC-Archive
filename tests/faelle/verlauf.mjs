@@ -258,6 +258,50 @@ export default async function ({ seite, adresse, stand }) {
   await seite.setViewportSize({ width: 1400, height: 900 });
   await seite.waitForTimeout(300);
 
+  /* --- Der Knopf sitzt im Deck-KOPF und wirkt auch am zugeklappten Deck ---
+     Der Kasten liegt im Inhalt, und der ist am zugeklappten Deck
+     display:none. Klappte der Knopf nicht selbst auf, sähe ein Klick aus, als
+     geschähe nichts — genau die Meldung, die es hier schon einmal gab, damals
+     wegen der Position des Kastens. */
+  await seite.evaluate(() => {
+    verlaufOffen.clear();
+    window.deckVerlaufLaden = async () => ([
+      { id: 1, at: new Date().toISOString(), size: 3, note: null, state: { e: [] } },
+    ]);
+    // Deck zuklappen und den Baum mitziehen — so, wie es der Kopf-Klick täte.
+    if (deckOffen.ist(DECKS[0].id)) {
+      deckOffen.schalte(DECKS[0].id);
+      renderDecks();
+    }
+  });
+  await seite.waitForTimeout(300);
+  stand.ist("der Verlauf-Knopf steht im Deck-Kopf, nicht in der Werkzeugleiste",
+    await seite.evaluate(() => !!document.querySelector(".deck-manage [data-histbtn]")
+      && !document.querySelector(".deck-tools [data-histbtn]")));
+  stand.ist("das Deck ist zugeklappt",
+    await seite.evaluate(() => document.querySelector(".deck-inhalt").style.display === "none"));
+  await seite.locator("[data-histbtn]").first().click();
+  await seite.waitForTimeout(600);
+  const auf = await seite.evaluate(() => {
+    const box = document.querySelector("[data-histbox]");
+    const r = box.getBoundingClientRect();
+    return { inhalt: document.querySelector(".deck-inhalt").style.display,
+             gefuellt: box.childElementCount > 0,
+             sichtbar: r.height > 0 && r.top < innerHeight && r.bottom > 0,
+             pfeil: document.querySelector(".deck-pfeil").textContent.trim() };
+  });
+  stand.ist("ein Klick klappt das Deck auf …", auf.inhalt === "block", auf.inhalt);
+  stand.ist("… samt Pfeil im Kopf", auf.pfeil === "▼", auf.pfeil);
+  stand.ist("… und der Verlauf steht gefüllt im Bild",
+    auf.gefuellt && auf.sichtbar, JSON.stringify(auf));
+
+  /* Zuklappen des VERLAUFS lässt das Deck offen — nur das Aufgehen klappt auf. */
+  await seite.locator("[data-histbtn]").first().click();
+  await seite.waitForTimeout(300);
+  stand.ist("ein zweiter Klick schließt den Verlauf, nicht das Deck",
+    await seite.evaluate(() => document.querySelector(".deck-inhalt").style.display === "block"
+      && document.querySelector("[data-histbox]").childElementCount === 0));
+
   /* Und wenn die Datenbank die Tabelle nicht kennt, steht dort ein Satz, mit
      dem man etwas anfangen kann — nicht der rohe Fehler und schon gar nichts. */
   await seite.evaluate(() => {
