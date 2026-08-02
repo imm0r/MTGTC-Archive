@@ -559,6 +559,54 @@ Jedes Profil wählt eine von drei Stufen (`profiles.community_visibility`):
 Durchgesetzt wird das in der Datenbank, nicht in der Anzeige — `community_feed`
 und `community_highlights` filtern selbst.
 
+### Die Mitgliederliste
+
+Unter dem Community-Feed steht eine eigene Karte: **wer hier sonst noch
+sammelt**. Je Zeile Avatar, Name, Rollen, seit wann dabei — und gleich der
+Knopf, der zum Verhältnis passt:
+
+| Verhältnis | Knopf |
+| --- | --- |
+| noch nichts | Anfrage senden |
+| angefragt | „wartet" |
+| eingehende Anfrage | Annehmen |
+| befreundet | Nachricht schreiben |
+| man selbst | „Du" |
+
+Das Verhältnis kommt aus **derselben Abfrage** mit; ein Nachfragen je Zeile
+wäre eine Anfrage je Mitglied. Dieselbe Überlegung wie bei der Personensuche.
+
+Gesucht wird nach Namen, geblättert zu je 24 — bei tausend Mitgliedern wäre
+eine Liste ohne Ende weder zu lesen noch zu laden. Die Gesamtzahl kommt als
+Spalte je Zeile mit (`count(*) over ()`), nicht als zweite Abfrage: Sonst
+zählte man einen anderen Stand als den, den man zeigt.
+
+> **`findable` wird respektiert.** Wer den Schalter „In der Personensuche
+> auffindbar" ausgeschaltet hat, steht auch hier nicht — die Zusage dazu lautet
+> „nur noch über deinen Freundescode erreichbar", und eine durchsuchbare
+> Mitgliederliste wäre genau das, wovor sie schützt. Das ist der Unterschied
+> zur Sichtbarkeitsstufe: Die regelt, **was** jemand tut; `findable` regelt, ob
+> er **in Listen** auftaucht. Voreingestellt ist er an.
+
+### Das öffentliche Profil
+
+Ein Klick auf einen Namen öffnet es: Avatar, Rollen, Steckbrief, dabei seit,
+zuletzt gesehen, Ort, Lieblingsformat, Website.
+
+Im eigenen Profil ließen sich diese Angaben **längst hinterlegen — zu sehen
+waren sie nirgends**. Ein Formular, dessen Inhalt niemand je zu Gesicht
+bekommt, ist eine Falle: Man füllt es aus und hält sich für vorgestellt.
+
+Die Abfrage `public_profile()` gibt es seit der Rollen-Migration; sie war nur
+nie aufgerufen worden. Sie liefert genau das Öffentliche und nichts weiter —
+keine E-Mail, keinen Freundescode, keine Einstellungen.
+
+> **Die Website wird nur mit `http(s)` davor zum Verweis.** Ein
+> `javascript:`-Ziel im Profil eines Fremden wäre der kürzeste Weg zu fremdem
+> Code im eigenen Fenster. Es verschwindet trotzdem nicht: Es bleibt als Text
+> stehen, damit man sieht, dass dort etwas Unbrauchbares steht, statt sich zu
+> fragen, warum die Zeile fehlt. Verweise tragen `noopener noreferrer`.
+
 ### Der Anzeigename ist Pflicht
 
 Er entsteht an **einer** Stelle und verschwindet an keiner:
@@ -2009,6 +2057,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `export`         | Deck ausgeben: die fünf Zeilen genau so, wie sie dastehen müssen — englischer Name statt gedrucktem, Setcode groß, keine leere Klammer ohne Auflage, alphabetisch sortiert, Deckmenge statt Bestand; dazu Datei, Zwischenablage und der Rückfall „Text markiert“, wenn das Kopieren scheitert |
 | `mitglieder`     | Die Mitgliederliste ohne Stufen: dass die Abfrage das neueste Mitglied aus allen Profilen und mit echtem Namen nimmt, dass Karten und „größte Sammlung“ weiterhin an den Stufen hängen, dass ein leerer Anzeigename die Ersatzbezeichnung behält — und dass die Zusage in allen fünf Sprachen mitgewandert ist |
 | `anzeigename`    | Der Anzeigename als Pflicht: die Regel selbst (2–40, getrimmt), das Feld beim Anlegen, der Weg über die Nutzer-Metadaten bis ins frisch angelegte Profil, die Maske vor der App für alte Konten samt Ausweg — und dass das Profilfeld ihn nicht mehr leeren kann |
+| `mitgliederliste` | Die Mitgliederliste und das öffentliche Profil: dass die Abfrage `findable` achtet, die Gesamtzahl je Zeile mitzählt und das Verhältnis gleich mitliefert; die vier Knöpfe, Blättern und Suchen (samt Rücksprung auf Seite eins und Fokus im Feld) — und dass ein `javascript:`-Ziel kein Verweis wird und Markup im Steckbrief Text bleibt |
 
 ### Zwei Regeln, die dabei gelernt wurden
 
