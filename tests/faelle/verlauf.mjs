@@ -203,4 +203,72 @@ export default async function ({ seite, adresse, stand }) {
   await seite.waitForTimeout(400);
   stand.ist("und überlebt ein Neuzeichnen",
     await seite.evaluate(() => document.querySelectorAll("[data-histbox] .verlauf-zeile").length === 2));
+
+  /* --- Der Kasten muss zu SEHEN sein ------------------------------------
+     Gemeldet als „wenn ich auf Verlauf klicke passiert nichts": Der Kasten
+     stand unter der Kartentabelle. Er füllte sich korrekt — nur eben bei einem
+     großen Deck zweitausend Pixel weiter unten, außerhalb des Bildes. Geprüft
+     wird deshalb mit einem Deck, das lang genug dafür ist. */
+  await seite.goto(adresse, { waitUntil: "domcontentloaded" });
+  await seite.evaluate(AUFBAU, { karten: 60, kategorien: 3, decks: 1 });
+  await seite.waitForTimeout(400);
+  await seite.evaluate(() => {
+    window.deckVerlaufLaden = async () => ([
+      { id: "e1", created: "2026-08-02T10:00:00Z", daten: deckStand(DECKS[0]) },
+    ]);
+    renderDecks();
+  });
+  await seite.waitForTimeout(300);
+  const lage = await seite.evaluate(() => {
+    const box = document.querySelector("[data-histbox]");
+    const karten = document.querySelector(".deck-tbl, .deck-stapel, .stapel-spalten, .deck-inhalt .xscroll");
+    return {
+      hoehe: document.querySelector(".deck-inhalt").getBoundingClientRect().height,
+      vorKarten: !!karten &&
+        !!(box.compareDocumentPosition(karten) & Node.DOCUMENT_POSITION_FOLLOWING),
+    };
+  });
+  stand.ist("das Deck ist lang genug für die Probe", lage.hoehe > 1200, Math.round(lage.hoehe) + " px hoch");
+  stand.ist("der Verlaufskasten steht VOR den Karten, nicht darunter", lage.vorKarten);
+
+  /* Und im schmalen Fenster reicht die Platzierung allein nicht: Dort bricht
+     die Werkzeugleiste auf viele Zeilen um, und der Kasten liegt gemessen bei
+     879 px — hinter dem unteren Rand eines 720 px hohen Fensters. Der Klick
+     muss ihn also auch heranholen. */
+  await seite.setViewportSize({ width: 420, height: 720 });
+  await seite.waitForTimeout(400);
+  const vorher = await seite.evaluate(() => {
+    const r = document.querySelector("[data-histbox]").getBoundingClientRect();
+    return { oben: Math.round(r.top), fenster: innerHeight };
+  });
+  stand.ist("im schmalen Fenster liegt er zunächst hinter dem unteren Rand",
+    vorher.oben > vorher.fenster, `oben ${vorher.oben}, Fenster ${vorher.fenster}`);
+
+  await seite.locator("[data-histbtn]").first().click();
+  await seite.waitForTimeout(800);          // sanftes Scrollen abwarten
+  stand.ist("nach dem Klick steht er im Bild",
+    await seite.evaluate(() => {
+      const r = document.querySelector("[data-histbox]").getBoundingClientRect();
+      return r.height > 0 && r.top < innerHeight && r.bottom > 0;
+    }),
+    await seite.evaluate(() => {
+      const r = document.querySelector("[data-histbox]").getBoundingClientRect();
+      return `oben ${Math.round(r.top)}, Fenster ${innerHeight}`;
+    }));
+  await seite.setViewportSize({ width: 1400, height: 900 });
+  await seite.waitForTimeout(300);
+
+  /* Und wenn die Datenbank die Tabelle nicht kennt, steht dort ein Satz, mit
+     dem man etwas anfangen kann — nicht der rohe Fehler und schon gar nichts. */
+  await seite.evaluate(() => {
+    verlaufOffen.clear();
+    window.deckVerlaufLaden = async () => {
+      throw { code: "42P01", message: 'relation "public.deck_history" does not exist' };
+    };
+  });
+  await seite.locator("[data-histbtn]").first().click();
+  await seite.waitForTimeout(400);
+  const fehlt = await seite.evaluate(() => document.querySelector("[data-histbox]").textContent.trim());
+  stand.ist("fehlt die Tabelle, sagt der Kasten was zu tun ist",
+    /deck_history/.test(fehlt) && /supabase-schema/.test(fehlt), fehlt);
 }
