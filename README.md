@@ -1116,6 +1116,48 @@ Zwei Dinge erzwingt die Datenbank, nicht die Anwendung:
 > verlustfrei — jede vorhandene Zuordnung wird zur **primären** der neuen
 > Tabelle, denn eine einzige ist immer auch die erste.
 
+## Synergie-Vorschläge: aufgehoben statt weggeworfen
+
+Am Deck stehen zwei Wege zu Vorschlägen: die **heuristische Suche** (Haken aus
+den Deckkarten → Scryfall) und die **KI-Suche** (die Deckliste als Kontext an
+Claude, jeder Vorschlag gegen Scryfall geprüft). Beide schreiben in denselben
+Kasten.
+
+**Das Ergebnis bleibt jetzt liegen.** Vorher war es beim nächsten Neuzeichnen
+weg — und ein Neuzeichnen löst schon aus, wer eine der vorgeschlagenen Karten
+ins Deck legt. Genau der Handgriff, für den man die Vorschläge geholt hat, warf
+sie also fort. Ein Lauf kostet: die heuristische Suche mehrere Anfragen an
+Scryfall, die KI-Variante Tokens und damit Kontingent.
+
+Aufgehoben wird **eine Zeile je Deck** (`deck_synergies`, Primärschlüssel ist
+die `deck_id`): Gezeigt wird immer der letzte Lauf, ein neuer überschreibt ihn.
+Ein Verlauf der Vorschläge wäre etwas anderes als ein Vorschlag.
+
+Über dem wiederhergestellten Lauf steht, **wann** er entstand — und, wenn sich
+das Deck seither geändert hat, dass er womöglich überholt ist. Verglichen wird
+über denselben **Fingerabdruck**, den auch der Deck-Verlauf führt. Ohne diesen
+Hinweis läse man alte Vorschläge als aktuelle; das ist der Fehler, den ein
+Gedächtnis leicht macht. Daneben steht „Verwerfen“.
+
+Zwei Feinheiten:
+
+* **Gespeichert wird nur, was gebraucht wird.** Je Vorschlag die Scryfall-Karte
+  auf die Felder eingedampft, die die Kachel zeichnet und der „+“-Knopf
+  schreibt — eine ganze Scryfall-Antwort besteht zu neun Zehnteln aus Dingen,
+  die keine Kachel ansieht.
+* **Der Schnitt-Vorschlag** („dafür könnte X weichen“) wird beim Anzeigen *neu*
+  gerechnet. Er gilt fürs jetzige Deck, nicht für das von damals; vom Modell
+  kommt nur der Name der Karte, die es ersetzen wollte.
+
+Ein Lauf zu einer **einzelnen Karte** wird nicht aufgehoben — er hängt an keinem
+Deck. Und geteilte Decks zeigen ihre Karten, nicht die Überlegungen, die noch
+nicht darin stehen: für `deck_synergies` gibt es keine Freigabe an Freunde.
+
+> Fehlt der Datenbank die Tabelle `deck_synergies`, laufen die Vorschläge wie
+> bisher, nur ohne Gedächtnis — `supabase-schema.sql` erneut im SQL Editor
+> ausführen (oder `supabase/migrations/20260802120000_deck_synergien.sql`
+> einzeln).
+
 ## Verlauf je Deck: zurück auf einen älteren Stand
 
 Jedes Deck führt einen **Verlauf**. Der Knopf „↺ Verlauf" in der Werkzeugleiste
@@ -1694,6 +1736,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `sammlung`       | „Verbaute ausblenden": erst wenn ALLE Exemplare in Decks liegen, über alle Decks zusammen gezählt, je Druck statt je Zeile |
 | `verlauf`        | Deck-Verlauf: Fingerabdruck unabhängig von der Reihenfolge, der Umbau in Worten, und was ein Rücksprung schreiben würde (fehlende Karten, fehlende Fächer, primäre Einordnung) |
 | `wunschliste`    | Karte direkt vormerken: die Zeile (Bestand 0, Setcode groß, Preis mit erstem Punkt) und die Doppelprüfung — auch gegen eine andere Auflage derselben Karte |
+| `synergien`      | Aufgehobene Vorschläge: die eingedampfte Karte, der Fingerabdruck als Warnung vor Überholtem, und dass ein frisches Ergebnis nicht überschrieben wird |
 | `spielrunde`     | Die Matte: Ziehen zwischen den Zonen, Tappen per Klick, die Lebensreihe (vier Kacheln nebeneinander, kein Rollbalken), die drei Laden (Ort, Rahmen, Zahl, immer nur eine offen, auch zugeklappt Ablageziel) und der Würfel (nur W20, blanke Fläche über der ganzen Matte, Zahl aufs Emblem, jeder Wurf anders) |
 
 ### Zwei Regeln, die dabei gelernt wurden

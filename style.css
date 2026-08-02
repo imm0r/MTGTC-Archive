@@ -430,6 +430,17 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 
 /* Synergie-Vorschläge (Kartendetail + Deck): Kachelraster mit Bild, Name,
    „Warum"-Chips und Preis. */
+/* Kopfzeile über einem AUFGEHOBENEN Lauf: wann er entstand und der Weg, ihn
+   loszuwerden. Ein frischer Lauf trägt sie nicht — dort ist die Antwort auf
+   „von wann" gerade eben. */
+.syn-gespeichert{display:flex;align-items:center;justify-content:space-between;
+  gap:10px;flex-wrap:wrap;margin-bottom:8px;padding:6px 10px;
+  border:1px dashed var(--line);border-radius:8px;font-size:12px;color:var(--dim)}
+.syn-gespeichert-txt{min-width:0}
+/* Hat sich das Deck seither geändert, sind die Vorschläge womöglich überholt.
+   Ohne diesen Hinweis läse man sie als aktuelle — genau der Fehler, den ein
+   Gedächtnis leicht macht. */
+.syn-veraltet{color:var(--err)}
 .syn-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(138px,1fr));gap:10px;margin-top:4px}
 .syn-card{display:flex;flex-direction:column;gap:6px;padding:8px;border:1px solid var(--line);
   border-radius:10px;background:var(--panel2);transition:border-color .12s}

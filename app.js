@@ -226,7 +226,7 @@ async function reload() {
   // erlaubt die RLS auch das Lesen geteilter Freundes-Decks/-Karten — die
   // dürfen hier aber nicht in die eigene Sammlung/Deckliste sickern. Fremdes
   // wird nur gezielt beim Ansehen eines Freundes geladen.
-  const [c, d, e, k, z, v] = await Promise.all([
+  const [c, d, e, k, z, v, sy] = await Promise.all([
     sb.from("cards").select("*").eq("user_id", USER.id).order("name"),
     sb.from("decks").select("*").eq("user_id", USER.id).order("created"),
     sb.from("deck_entries").select("*").eq("user_id", USER.id),
@@ -243,7 +243,11 @@ async function reload() {
     // geändert". Die Stände (jeweils einige Kilobyte) holt erst, wer den
     // Verlauf aufklappt.
     sb.from("deck_history").select("deck_id, stand")
-      .eq("user_id", USER.id).order("created", { ascending: false })
+      .eq("user_id", USER.id).order("created", { ascending: false }),
+    // Aufgehobene Synergie-Läufe: eine Zeile je Deck, gezeigt wird sie erst,
+    // wenn das Deck aufgeklappt ist. Klein genug, um sie gleich mitzunehmen —
+    // ein Nachladen je Deck wären bei dreißig Decks dreißig Anfragen.
+    sb.from("deck_synergies").select("*").eq("user_id", USER.id)
   ]);
   for (const r of [c, d, e]) if (r.error) throw r.error;
   // Die Kategorien werden NICHT mitgeworfen: Wer das Schema noch nicht
@@ -292,6 +296,12 @@ async function reload() {
     if (!deckVerlaufStand.has(r.deck_id)) deckVerlaufStand.set(r.deck_id, r.stand);
   // Ohne await: Ein neuer Stand darf die Anzeige nicht aufhalten.
   verlaufNachtragen().catch(() => {});
+
+  // Aufgehobene Synergie-Läufe. Fehlt die Tabelle, bleibt die Funktion aus —
+  // wie bei den Kategorien und dem Verlauf soll das den Rest nicht aufhalten.
+  DECK_SYN_FEHLT = !!sy.error;
+  DECK_SYN.clear();
+  for (const r of (sy.error ? [] : sy.data)) DECK_SYN.set(r.deck_id, r);
 }
 
 /* ============================== Scryfall ============================== */
@@ -5155,6 +5165,132 @@ function numVal(input) {
   return isFinite(n) && n > 0 ? n : null;
 }
 
+/* ================ Synergie-Vorschläge je Deck aufheben ================
+   Ein Lauf kostet: die heuristische Suche mehrere Anfragen an Scryfall, die
+   KI-Variante Tokens und damit Kontingent. Bisher war das Ergebnis beim
+   nächsten Neuzeichnen weg — und ein Neuzeichnen löst schon aus, wer eine der
+   vorgeschlagenen Karten ins Deck legt. Genau der Handgriff, für den man die
+   Vorschläge geholt hat, warf sie also fort.
+
+   EINE ZEILE JE DECK. Gezeigt wird immer der letzte Lauf; ein neuer
+   überschreibt ihn. Ein Verlauf der Vorschläge wäre etwas anderes als ein
+   Vorschlag.
+
+   NUR DIE FELDER, DIE GEBRAUCHT WERDEN. Eine ganze Scryfall-Antwort wiegt ein
+   Vielfaches und besteht zu neun Zehnteln aus Dingen, die keine Kachel ansieht.
+   Was hier steht, ist genau das, was synKachel() zeichnet und was
+   wunschkarteZumDeck() beim „+" schreibt.
+
+   NICHT MITGESPEICHERT wird der Schnitt-Vorschlag („dafür könnte X weichen").
+   Er hängt am JETZIGEN Deck, nicht am Deck von damals — beim Anzeigen wird er
+   neu gerechnet. Vom Modell kommt dabei nur der Name der Karte, die es
+   ersetzen wollte; ob die noch im Deck liegt, entscheidet schnittAusModell()
+   beim Zeichnen. */
+const DECK_SYN = new Map();     // deckId → { art, created, stand, daten }
+let DECK_SYN_FEHLT = false;     // Tabelle nicht angelegt → Funktion aus
+
+function synKarteSchlank(c) {
+  const bild = u => (u ? { small: u.small || null, normal: u.normal || null } : null);
+  return {
+    id: c.id, oracle_id: c.oracle_id ?? null, name: c.name,
+    type_line: c.type_line ?? null, oracle_text: c.oracle_text ?? null,
+    mana_cost: c.mana_cost ?? null, cmc: c.cmc ?? null,
+    colors: c.colors ?? null, color_identity: c.color_identity ?? null,
+    keywords: c.keywords ?? null, rarity: c.rarity ?? null,
+    set: c.set ?? null, set_name: c.set_name ?? null,
+    collector_number: c.collector_number ?? null, lang: c.lang ?? null,
+    released_at: c.released_at ?? null, cardmarket_id: c.cardmarket_id ?? null,
+    scryfall_uri: c.scryfall_uri ?? null, edhrec_rank: c.edhrec_rank ?? null,
+    // Nur die beiden Preise, die synPreis() liest.
+    prices: { eur: c.prices?.eur ?? null, eur_foil: c.prices?.eur_foil ?? null },
+    image_uris: bild(c.image_uris),
+    // Zweiseitige Karten: Bild und Text der Vorderseite reichen der Kachel.
+    card_faces: Array.isArray(c.card_faces)
+      ? c.card_faces.slice(0, 2).map(f => ({
+          name: f.name ?? null, type_line: f.type_line ?? null,
+          oracle_text: f.oracle_text ?? null, mana_cost: f.mana_cost ?? null,
+          image_uris: bild(f.image_uris),
+        }))
+      : null,
+  };
+}
+
+/* Steht für sich, damit die Prüfungen eine Attrappe einhängen können. */
+async function synErgebnisSchreiben(zeile) {
+  const { error } = await sb.from("deck_synergies").upsert(zeile, { onConflict: "deck_id" });
+  if (error) throw error;
+}
+
+/* Nach einem Lauf aufheben. Ohne deckId (Vorschläge zu EINER Karte) gibt es
+   nichts zu speichern — die hängen an keinem Deck. */
+async function synErgebnisSpeichern(deckId, art, eintraege, extra = {}) {
+  if (!deckId || DECK_SYN_FEHLT || !USER || !eintraege.length) return;
+  const d = DECKS.find(x => x.id === deckId);
+  const zeile = {
+    deck_id: deckId, user_id: USER.id, art,
+    stand: d ? fingerabdruck(JSON.stringify(deckStand(d))) : null,
+    daten: { eintraege, ...extra },
+  };
+  try {
+    await synErgebnisSchreiben(zeile);
+    DECK_SYN.set(deckId, { ...zeile, created: new Date().toISOString() });
+  } catch { DECK_SYN_FEHLT = true; }
+}
+
+async function synErgebnisVerwerfen(deckId) {
+  DECK_SYN.delete(deckId);
+  const box = $(`.deck-syn[data-synbox="${deckId}"]`);
+  if (box) box.innerHTML = "";
+  try { await sb.from("deck_synergies").delete().eq("deck_id", deckId); }
+  catch (e) { toast(dbErr(e)); }
+}
+
+/* Die Kopfzeile über einem aufgehobenen Lauf: wann, woher — und die Warnung,
+   wenn das Deck sich seither geändert hat. Ohne sie läse man alte Vorschläge
+   als aktuelle, und genau das ist der Fehler, den ein Gedächtnis leicht macht. */
+function synGespeichertKopf(deckId, eintrag) {
+  const d = DECKS.find(x => x.id === deckId);
+  const jetzt = d ? fingerabdruck(JSON.stringify(deckStand(d))) : null;
+  const alt = eintrag.stand && jetzt && eintrag.stand !== jetzt;
+  const zeit = verlaufZeit(eintrag.created);
+  return `<div class="syn-gespeichert">
+    <span class="syn-gespeichert-txt">${esc(t(eintrag.art === "ki" ? "syn.savedAi" : "syn.saved", { zeit }))}${
+      alt ? ` <span class="syn-veraltet">${esc(t("syn.savedStale"))}</span>` : ""}</span>
+    <button class="btn ghost sm" data-synweg="${esc(deckId)}"
+      title="${esc(t("syn.dropTitle"))}">${esc(t("syn.drop"))}</button>
+  </div>`;
+}
+
+/* Einen aufgehobenen Lauf in seinen Kasten zeichnen. Dieselben Kacheln wie
+   frisch — die Kachel baut sich aus der Karte, und die steht in der Zeile. */
+function synGespeichertZeichnen(deckId) {
+  const e = DECK_SYN.get(deckId);
+  const box = $(`.deck-syn[data-synbox="${deckId}"]`);
+  if (!e || !box || box.innerHTML.trim()) return;
+  const eintraege = e.daten?.eintraege || [];
+  if (!eintraege.length) return;
+  let kopf = "";
+  if (e.daten?.budget) {
+    const summe = eintraege.reduce((s, x) => s + (synPreis(x.card) || 0), 0);
+    kopf = `<div class="meta">${esc(t("syn.budgetLine",
+      { sum: eur(summe), budget: eur(e.daten.budget) }))}</div>`;
+  }
+  const kacheln = eintraege.map(x =>
+    synKachel(x.card, x.grund || "", deckId,
+      // Der Schnitt-Vorschlag wird NEU gerechnet: Er gilt fürs jetzige Deck.
+      x.ersetzt ? schnittAusModell(deckId, { replaces: x.ersetzt }, x.card) : undefined));
+  box.innerHTML = synGespeichertKopf(deckId, e) + kopf
+    + `<div class="syn-grid">${kacheln.join("")}</div>`;
+}
+
+/* Nach jedem Zeichnen der Deckliste: aufgehobene Läufe zurück in ihre Kästen.
+   Nur in LEERE Kästen — ein gerade laufender oder frisch fertiger Lauf steht
+   dort schon und darf nicht von einem älteren überschrieben werden. */
+function synGespeicherteZeigen() {
+  $$("[data-synbox]").forEach(box => synGespeichertZeichnen(box.dataset.synbox));
+  $$("[data-synweg]").forEach(b => b.onclick = () => synErgebnisVerwerfen(b.dataset.synweg));
+}
+
 let synergyLauf = 0;   // gegen veraltete Antworten bei schnellem erneuten Klick
 
 /* Für eine Hakenliste die besten passenden Karten holen und mischen.
@@ -5403,6 +5539,11 @@ async function synergieAnzeigen(box, hooks, opts = {}) {
     kopf = `<div class="meta">${esc(t("syn.budgetLine", { sum: eur(summe), budget: eur(opts.totalBudget) }))}</div>`;
   }
   box.innerHTML = kopf + `<div class="syn-grid">${res.map(e => synergyCardHtml(e, opts.deckId)).join("")}</div>`;
+  // Aufheben, damit das nächste Neuzeichnen den Lauf nicht fortwirft. Ohne
+  // await: Ein Schreibfehler darf die eben gezeigten Vorschläge nicht abräumen.
+  synErgebnisSpeichern(opts.deckId, "syn",
+    res.map(e => ({ card: synKarteSchlank(e.card), grund: synergyErklaerung(e) })),
+    opts.totalBudget ? { budget: opts.totalBudget } : {});
 }
 
 /* KI-Synergien: die Edge Function „card-synergy" fragt Claude nach — auch
@@ -5561,7 +5702,7 @@ async function kiSynergieLauf(box, cfg) {
   const selfLower = (cfg.selfName || "").toLowerCase();
   const farbSet = cfg.colors ? new Set(cfg.colors.replace(/c/gi, "").toUpperCase().split("").filter(Boolean)) : null;
   const gesehen = new Set();
-  const treffer = [];
+  const treffer = [], behalten = [];
   const lim = prefWert("synLimit");   // Profil-Einstellung „max. Vorschläge"
   for (const s of sugg) {                       // Reihenfolge des Modells behalten
     const c = byName.get(s.name.toLowerCase());
@@ -5573,6 +5714,11 @@ async function kiSynergieLauf(box, cfg) {
     if (suchPrefs().onlyOwned && !besessenAnzahl(c)) continue;   // Einstellung „nur eigene Sammlung"
     gesehen.add(c.oracle_id);
     treffer.push(vorschlagCardHtml(c, s.reason, cfg.deckId, schnittAusModell(cfg.deckId, s, c)));
+    // Für das Aufheben: die Karte schlank, die Begründung des Modells und der
+    // NAME der Karte, die es ersetzen wollte. Aus dem Namen rechnet die Anzeige
+    // den Schnitt-Vorschlag später neu — er gilt fürs jeweils jetzige Deck.
+    behalten.push({ card: synKarteSchlank(c), grund: s.reason || "",
+                    ersetzt: s.replaces || null });
     if (lim && treffer.length >= lim) break;
   }
   // Erst hier zählen: „treffer" ist, was tatsächlich angezeigt wird — nach
@@ -5583,6 +5729,9 @@ async function kiSynergieLauf(box, cfg) {
   box.innerHTML = treffer.length
     ? `<div class="meta">${esc(t("syn.aiNote"))}</div>${kosten}<div class="syn-grid">${treffer.join("")}</div>`
     : `${kosten}<div class="empty">${esc(t("syn.none"))}</div>`;
+  // Aufheben — bei der KI-Suche wiegt das schwerer als bei der heuristischen:
+  // Der Lauf hat Tokens und damit Kontingent gekostet.
+  synErgebnisSpeichern(cfg.deckId, "ki", behalten);
 }
 
 /* Haken eines ganzen Decks: über alle Karten sammeln, dann nach Häufigkeit MAL
@@ -8869,6 +9018,11 @@ function renderDecks() {
       renderDecks();
     });
   });
+
+  // Aufgehobene Synergie-Läufe zurück in ihre Kästen — sonst wäre der Lauf
+  // beim nächsten Neuzeichnen fort, und ein Neuzeichnen löst schon aus, wer
+  // eine der vorgeschlagenen Karten ins Deck legt.
+  synGespeicherteZeigen();
 
   $$("[data-histbtn]").forEach(b => b.onclick = () => deckVerlaufUmschalten(b.dataset.histbtn));
   // Ein offener Verlauf überlebt das Neuzeichnen. Nach einem Rücksprung baut
