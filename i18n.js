@@ -3188,6 +3188,43 @@ Object.assign(I18N.it, {
   "wish.already": "{name} è già nella lista dei desideri.",
 });
 
+/* ---- Teil 22: Aufgehobene Synergie-Läufe ---- */
+Object.assign(I18N.de, {
+  "syn.saved": "Aufgehobener Vorschlag vom {zeit}",
+  "syn.savedAi": "Aufgehobener KI-Vorschlag vom {zeit}",
+  "syn.savedStale": "· das Deck hat sich seither geändert",
+  "syn.drop": "Verwerfen",
+  "syn.dropTitle": "Diese aufgehobenen Vorschläge löschen",
+});
+Object.assign(I18N.en, {
+  "syn.saved": "Saved suggestions from {zeit}",
+  "syn.savedAi": "Saved AI suggestions from {zeit}",
+  "syn.savedStale": "· the deck has changed since",
+  "syn.drop": "Discard",
+  "syn.dropTitle": "Delete these saved suggestions",
+});
+Object.assign(I18N.fr, {
+  "syn.saved": "Suggestions conservées du {zeit}",
+  "syn.savedAi": "Suggestions IA conservées du {zeit}",
+  "syn.savedStale": "· le deck a changé depuis",
+  "syn.drop": "Écarter",
+  "syn.dropTitle": "Supprimer ces suggestions conservées",
+});
+Object.assign(I18N.es, {
+  "syn.saved": "Sugerencias guardadas del {zeit}",
+  "syn.savedAi": "Sugerencias de IA guardadas del {zeit}",
+  "syn.savedStale": "· el mazo ha cambiado desde entonces",
+  "syn.drop": "Descartar",
+  "syn.dropTitle": "Borrar estas sugerencias guardadas",
+});
+Object.assign(I18N.it, {
+  "syn.saved": "Suggerimenti conservati del {zeit}",
+  "syn.savedAi": "Suggerimenti IA conservati del {zeit}",
+  "syn.savedStale": "· il mazzo è cambiato da allora",
+  "syn.drop": "Scarta",
+  "syn.dropTitle": "Elimina questi suggerimenti conservati",
+});
+
 /* ---- Teil 20: Aufgeräumter Deck-Kopf (Werkzeug-Gruppen + Hinzufügen-Knopf) ---- */
 Object.assign(I18N.de, {
   "deck.addCard": "Karte hinzufügen", "deck.addBtn": "Hinzufügen",
