@@ -1648,8 +1648,26 @@ html[data-ki-global="off"] .syn-ai-btn{display:none}
    * Das Bild wird auf volle Breite gezogen und um 3,5 % SEINER EIGENEN HÖHE
      nach oben geschoben. Prozentwerte in translateY beziehen sich auf das
      Element selbst — genau deshalb geht das ohne eine einzige Pixelangabe. */
+/* Die Spaltenbreite ist die DARSTELLUNGSGRÖSSE der Karten: Eine Spalte trägt
+   die Menge (20 px) und daneben das Bild über die restliche Breite. Wer den
+   Regler zieht, verstellt deshalb genau diese eine Zahl.
+
+   min(…, 100%) begrenzt sie auf die Breite des Kastens. Ohne das liefe eine
+   Spalte, die breiter eingestellt ist als das Fenster, seitlich hinaus — und
+   zwar ohne Rollbalken, weil das Raster selbst nicht rollt.
+
+   Die Variable hängt am Wurzelelement und nicht am Deck: Der Regler soll für
+   ALLE Decks gelten (eine Frage der Augen, nicht des Decks), und beim Ziehen
+   wird dadurch nichts neu gezeichnet — sonst risse jede Bewegung die Liste
+   unter dem Finger weg und verlöre die Scrollposition. */
 .deck-stapel{display:grid;gap:12px;margin-top:12px;align-items:start;
-  grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+  grid-template-columns:repeat(auto-fill,minmax(min(var(--stapel-breite,210px),100%),1fr))}
+
+/* Der Regler in der Leiste über den Karten. */
+.stapel-groesse{display:flex;align-items:center;gap:7px}
+.stapel-groesse input[type=range]{width:132px;accent-color:var(--acc);cursor:pointer}
+.stapel-groesse output{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums;
+  min-width:38px;text-align:right}
 
 /* Die schwebende Deckleiste: links der Zugang zur Sammlung, rechts der
    Deckname. Sie klebt unter der Kopfzeile der Seite, steht also nach dem ersten
