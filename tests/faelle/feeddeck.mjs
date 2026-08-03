@@ -175,4 +175,64 @@ export default async function ({ seite, adresse, stand, wurzel }) {
     await seite.evaluate(() => window.GEFRAGT), [{ was: "inhalt", id: "d-a" }]);
   await seite.keyboard.press("Escape");
   await seite.waitForTimeout(250);
+
+  /* --- Dasselbe in der Meldung ----------------------------------------
+     Die Meldung, die beim Eintreffen kurz oben erscheint, sagte „hat ein Deck
+     mit der Community geteilt" — ohne Namen, ohne Weg hinein. Sie baut ihren
+     Satz über dieselbe Funktion wie der Feed, bekam aber nur die ROHZEILE aus
+     Realtime: Die trägt die Kennung, aber keinen Namen. Den holt erst der
+     Verbund der Feed-Abfrage dazu, und der steht beim Melden schon bereit —
+     ladeCommunityFoundation() läuft davor.
+
+     Nachgeschlagen wird über die Kennung des Ereignisses, nicht über die
+     Person: Eine Person kann in derselben Runde mehrere Dinge getan haben. */
+  await seite.evaluate(() => {
+    window.GEFRAGT = [];
+    communityToastSchlange = []; communityToastLaeuft = false;
+    communityEventPuffer = [{ id: 4, kind: "deck_public", actor_id: "u1",
+                              metadata: { deck_id: "d-a" } }];
+    meldeCommunityEreignisse();
+  });
+  await seite.waitForTimeout(300);
+  const meldung = await seite.evaluate(() => {
+    const el = document.querySelector("#community-toast");
+    const knopf = el.querySelector("[data-cf-deck]");
+    return { an: el.classList.contains("on"), text: el.textContent.trim(),
+             id: knopf?.dataset.cfDeck ?? null,
+             // Der Toast ist als Ganzes klickdurchlässig; der Knopf darf es nicht sein.
+             zeiger: knopf ? getComputedStyle(knopf).pointerEvents : null };
+  });
+  stand.ist("die Meldung steht", meldung.an, meldung.text);
+  stand.gleich("sie nennt das Deck beim Namen und ist anklickbar",
+    [meldung.id, /Reyhan & Ikra/.test(meldung.text)], ["d-a", true]);
+  stand.gleich("und der Knopf nimmt Klicks an, obwohl die Meldung sie durchlässt",
+    meldung.zeiger, "auto");
+
+  /* Der Klick führt in dieselbe Ansicht — und räumt die Meldung sofort weg.
+     Ohne das zählte sie hinter dem Dialog weiter und käme beim Schließen als
+     Rest zurück. */
+  await seite.click('#community-toast [data-cf-deck="d-a"]');
+  await seite.waitForTimeout(400);
+  stand.gleich("ein Klick in der Meldung öffnet dasselbe Deck",
+    await seite.evaluate(() => window.GEFRAGT), [{ was: "inhalt", id: "d-a" }]);
+  stand.ist("und die Meldung ist dabei weg",
+    await seite.evaluate(() => !document.querySelector("#community-toast").classList.contains("on")));
+  await seite.keyboard.press("Escape");
+  await seite.waitForTimeout(250);
+
+  /* Ohne Namen im Feed bleibt auch die Meldung beim alten Satz. Das ist der
+     Fall „schon aus den zwanzig Zeilen herausgerutscht" und zugleich der Fall
+     „inzwischen wieder privat". */
+  await seite.evaluate(() => {
+    communityToastSchlange = []; communityToastLaeuft = false;
+    communityEventPuffer = [{ id: 3, kind: "deck_public", actor_id: "u2",
+                              metadata: { deck_id: "d-weg" } }];
+    meldeCommunityEreignisse();
+  });
+  await seite.waitForTimeout(300);
+  stand.gleich("ohne Namen im Feed bleibt die Meldung namenlos und ohne Knopf",
+    await seite.evaluate(() => {
+      const el = document.querySelector("#community-toast");
+      return [el.querySelectorAll("[data-cf-deck]").length, /Deck/.test(el.textContent)];
+    }), [0, true]);
 }
