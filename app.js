@@ -13609,6 +13609,13 @@ const zRest    = id => Math.max(0, trkTotal(id) - zVon(id, "hand") - zVon(id, "f
    der Bibliothek — dort starten sie und dorthin kehren sie zurück. */
 const istCmdKarte = id => { const d = trkDeck(); return !!d && (d.main_card_id === id || d.second_card_id === id); };
 const hatCmdZone  = () => { const d = trkDeck(); return !!(d && (d.main_card_id || d.second_card_id)); };
+/* Die Commander des Decks — in der Reihenfolge, in der sie gewählt wurden, und
+   UNABHÄNGIG davon, wo sie gerade liegen. Für die Steuer ist genau das der
+   Unterschied: Ein gewirkter Commander steht auf dem Schlachtfeld und ist aus
+   der Kommandozone verschwunden, schuldet aber ab da Steuer. */
+const cmdKarten = () => { const d = trkDeck(); return !d ? []
+  : [d.main_card_id, d.second_card_id].filter(Boolean)
+      .map(id => CARDS.find(c => c.id === id)).filter(Boolean); };
 
 function zAnzahl(id, zone) {
   if (zone === "lib") return istCmdKarte(id) ? 0 : zRest(id);
@@ -14122,8 +14129,7 @@ function matInnerHtml() {
     : `<div class="zone-leer">${esc(t("zone.empty"))}</div>`;
   const summe = liste => liste.reduce((s, x) => s + x.n, 0);
 
-  const cmdKarte = zoneKarten("cmd")[0]?.card;
-  const steuer = cmdKarte ? (zStand(cmdKarte.id).cast || 0) : 0;
+  const cmds = cmdKarten();
   const getappt = feldKarten.some(({ card }) => feldListe(card.id).some(x => x.t));
 
   return `
@@ -14144,11 +14150,13 @@ function matInnerHtml() {
       </section>
     </div>
     <div class="mat-mitte">
+      <!-- JE COMMANDER eine Zeile. Ein Deck mit Partnern hat zwei, und jeder
+           zahlt seine eigene Steuer: Wer den einen dreimal gewirkt hat und den
+           anderen nie, schuldet +6 und +0, nicht zweimal dieselbe Zahl. -->
       <section class="mat-feld mat-steuer">
         <div class="mat-titel">${esc(t("mat.tax"))}</div>
-        <div class="mat-korb">${cmdKarte
-          ? `<button class="mat-steuerwert" data-steuer="${esc(cmdKarte.id)}" data-d="-1"
-               title="${esc(t("sess.cmdTaxTitle", { mana: steuer * 2, n: steuer }))}">+${steuer * 2}</button>`
+        <div class="mat-korb">${cmds.length
+          ? cmds.map(c => matSteuerHtml(c, cmds.length > 1)).join("")
           : `<span class="mat-steuerwert leer">&ndash;</span>`}</div>
       </section>
       <!-- Die Bibliothek stand hier und ist in die schwebenden Laden gewandert
@@ -14164,6 +14172,21 @@ function matInnerHtml() {
       </section>` : ""}
     </div>
     ${schwebeLeisteHtml()}${fremdBuehneHtml()}`;
+}
+
+/* Eine Steuerzeile: Name (nur bei zweien) und der Wert als Knopf, der um zwei
+   Mana zurückzählt. Der Name steht bei einem einzelnen Commander NICHT dabei —
+   die Überschrift des Kastens sagt dann schon alles, und die schmale Spalte
+   ist 154 px breit, bevor sie ab 1200 px auf 268 wächst. */
+function matSteuerHtml(c, mitName) {
+  const n = zStand(c.id).cast || 0;
+  const titel = t("sess.cmdTaxTitle", { mana: n * 2, n });
+  const nm = trkName(c);
+  return `<div class="mat-steuerzeile">
+    ${mitName ? `<span class="mat-steuername" title="${esc(nm)}">${esc(nm)}</span>` : ""}
+    <button class="mat-steuerwert" data-steuer="${esc(c.id)}" data-d="-1"
+      title="${esc(titel)}" aria-label="${esc(nm)} &middot; ${esc(titel)}">+${n * 2}</button>
+  </div>`;
 }
 
 /* ---- Schwebende Laden: Würfel, Hand, Exil, Friedhof ------------------
@@ -14369,8 +14392,12 @@ function fremdInhaltHtml() {
   const bleibend = feld.filter(k => !istLand(k));
   const laender  = feld.filter(k => istLand(k));
   const summe = liste => liste.reduce((s, k) => s + k.field, 0);
-  const cmdKarte = fremdZone("cmd")[0];
-  const steuer = (FREMD.karten || []).filter(k => k.cmd).reduce((s, k) => s + k.cast, 0);
+  /* JE COMMANDER eine Zahl, nicht die Summe über alle. Zwei Partner zahlen
+     getrennt; addiert stand dort eine Zahl, die keiner der beiden schuldet.
+     Und gezählt wird über alle Commander-Karten, nicht über die in der
+     Kommandozone: Ein gewirkter Commander liegt auf dem Schlachtfeld — genau
+     dann steht seine Steuer. */
+  const fremdCmds = (FREMD.karten || []).filter(k => k.cmd);
   const feldHtml = (titel, zone, n, inhalt, extra = "") => `
     <section class="mat-feld${extra}">
       <div class="mat-titel">${zoneDef(zone)?.icon || ""} ${esc(titel)}<span class="mat-n">${n}</span></div>
@@ -14384,7 +14411,9 @@ function fremdInhaltHtml() {
     </div>
     <div class="fremd-rechts">
       ${feldHtml(t("zone.cmd"), "cmd", fremdSumme("cmd"),
-        `${cmdKarte ? `<div class="fremd-steuer" title="${esc(t("sess.cmdTaxTitle", { mana: steuer * 2, n: steuer }))}">+${steuer * 2}</div>` : ""}
+        `${fremdCmds.length ? `<div class="fremd-steuern">${fremdCmds.map(k => `
+           <div class="fremd-steuer" title="${esc(trkName(k))} &middot; ${esc(t("sess.cmdTaxTitle", { mana: k.cast * 2, n: k.cast }))}">${
+             fremdCmds.length > 1 ? `<span class="fremd-steuername">${esc(trkName(k))}</span>` : ""}+${k.cast * 2}</div>`).join("")}</div>` : ""}
          ${fremdGitterHtml("cmd", fremdZone("cmd"))}`)}
       ${feldHtml(t("zone.grave"), "grave", fremdSumme("grave"), fremdGitterHtml("grave", fremdZone("grave")))}
       ${feldHtml(t("zone.exile"), "exile", fremdSumme("exile"), fremdGitterHtml("exile", fremdZone("exile")))}
@@ -14566,7 +14595,12 @@ function zoneFeldHtml(karten) {
    das Bild gedreht, wenn getappt, und trägt seine Marken als Abzeichen. */
 function zoneKarteHtml(c, zone, n, st) {
   const nm = trkName(c);
-  const steuer = zone === "cmd" ? (zStand(c.id).cast || 0) : 0;
+  /* Die Steuer hängt an der KARTE, nicht an der Zone: Sie steht am Commander,
+     wo immer er liegt. In der Kommandozone auch bei null (dort erwartet man
+     sie), auf dem Schlachtfeld nur, wenn wirklich etwas zu zahlen ist —
+     sonst trüge jede gelegte Kreatur ein „+0". */
+  const steuer = istCmdKarte(c.id) ? (zStand(c.id).cast || 0) : 0;
+  const steuerDa = !MAT_AN && istCmdKarte(c.id) && (zone === "cmd" || (zone === "field" && steuer > 0));
   const idx = st ? st.idx : 0;
   return `<div class="zk${st?.t ? " getappt" : ""}" tabindex="0" data-id="${esc(c.id)}" data-zone="${esc(zone)}"
        data-idx="${idx}" data-spk="${esc(c.id)}" data-spk-zone="${esc(zone)}"
@@ -14576,8 +14610,8 @@ function zoneKarteHtml(c, zone, n, st) {
             : `<div class="zk-ohnebild">${esc(nm)}</div>`}
     ${n > 1 ? `<span class="zk-n">&times;${n}</span>` : ""}
     ${st?.c ? `<span class="zk-marke" title="${esc(t("zone.counters", { n: st.c }))}">+${st.c}/+${st.c}</span>` : ""}
-    ${zone === "cmd" && !MAT_AN ? `<button class="zk-steuer" data-steuer="${esc(c.id)}" data-d="-1"
-         title="${esc(t("sess.cmdTaxTitle", { mana: steuer * 2, n: steuer }))}">+${steuer * 2}</button>` : ""}
+    ${steuerDa ? `<button class="zk-steuer" data-steuer="${esc(c.id)}" data-d="-1"
+         title="${esc(nm)} &middot; ${esc(t("sess.cmdTaxTitle", { mana: steuer * 2, n: steuer }))}">+${steuer * 2}</button>` : ""}
     ${zone === "field" ? `<div class="zk-akt"><div class="zk-akt-reihe">
         <button class="btn ghost sm" data-marke="${esc(c.id)}" data-idx="${idx}" data-d="1"
           title="${esc(t("zone.counterAdd"))}">&plus;</button>

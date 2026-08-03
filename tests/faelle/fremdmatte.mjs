@@ -229,6 +229,31 @@ export default async function ({ seite, adresse, stand, wurzel }) {
   stand.gleich("der Zug des Mitspielers steht da (Bär vom Feld ins Grab)",
     nach.zahlen, ["0", "3", "1", "3", "1"]);
 
+  /* --- Zwei Commander: zwei Steuern ------------------------------------
+     Ein Deck mit Partnern hat zwei, und jeder zahlt seine eigene. Addiert
+     stand dort vorher EINE Zahl, die keiner der beiden schuldet — bei 2 und 3
+     Würfen „+10" statt „+4" und „+6". Die Partnerin liegt ausdrücklich auf dem
+     SCHLACHTFELD: Gewirkt ist sie aus der Kommandozone verschwunden, und genau
+     ab da schuldet sie Steuer. Der Takt oben holt die Änderung von selbst. */
+  await seite.evaluate(() => {
+    window.ANTWORT = [...window.ANTWORT, {
+      card_id: "f-cmd2", field: 1, graveyard: 0, exile: 0, cast_count: 3, field_state: [],
+      name: "Fremde Partnerin", printed_name: null, lang: "en", img: "",
+      type_line: "Legendary Creature — Elf", is_cmd: true, cmd_qty: 1 }];
+  });
+  await seite.waitForTimeout(4600);
+  const zwei = await seite.evaluate(() => ({
+    steuern: [...document.querySelectorAll("#fremd-buehne .fremd-steuer")]
+      .map(e => [e.querySelector(".fremd-steuername")?.textContent.trim() || null,
+                 e.lastChild.textContent.trim()]),
+    zahlen: [...document.querySelectorAll("#fremd-buehne .mat-n")].map(x => x.textContent),
+  }));
+  stand.gleich("jeder Commander trägt seine eigene Steuer, mit Namen daran",
+    zwei.steuern, [["Fremder Anführer", "+4"], ["Fremde Partnerin", "+6"]]);
+  stand.gleich("und die Partnerin liegt dabei auf dem Feld, nicht in der Kommandozone",
+    // Schlachtfeld 1 (Partnerin), Länder 3, Kommandozone 1, Friedhof 3, Exil 1
+    zwei.zahlen, ["1", "3", "1", "3", "1"]);
+
   /* --- Umschalten auf einen anderen Mitspieler ------------------------ */
   await seite.click('#v-session [data-matte="u2"]');
   await seite.waitForTimeout(250);

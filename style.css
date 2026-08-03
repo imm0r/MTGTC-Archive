@@ -926,11 +926,11 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
    werden aber fast nur nachgeschlagen. Den Platz bekommt das Schlachtfeld, das
    man ständig ansieht.
 
-   --rechte-spalten ist die Breite ALLES RECHTS von der linken Spalte, Lücken
-   eingerechnet. Die schwebende Leiste hängt sich daran auf, damit sie am
-   rechten Rand des Schlachtfelds sitzt statt an dem der ganzen Matte. Sie steht
-   hier und nicht dort, weil sie aus DIESEN Zahlen folgt: ändert sich eine
-   Spaltenbreite, muss die Variable mitgehen. */
+   --feld-mitte ist die Mittellinie des SCHLACHTFELDS, nicht die der Matte: Die
+   Ladenspalte links und die schmale Spalte rechts sind verschieden breit, und
+   der Handfächer soll über dem Feld stehen, nicht zwischen den Rändern der
+   ganzen Matte. Sie steht hier und nicht dort, weil sie aus DIESEN Zahlen
+   folgt: ändert sich eine Spaltenbreite, muss die Variable mitgehen. */
 /* DIE LEBENSPUNKTE stehen unter den Ländern über deren volle Breite, mit bis zu
    vier Kacheln nebeneinander — so wie die Mitspieler am Tisch nebeneinander
    sitzen. Damit entfällt die dritte Spalte: rechts stand nichts anderes darin.
@@ -940,18 +940,18 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
    plus Luft; darunter rollte die Reihe innen. */
 .mat{display:grid;gap:8px;margin-top:10px;
   --sp-luecke:8px; --sp-mitte:154px; --sp-leben:88px;
-  /* Ganz rechts die schmale Spalte für die senkrechte Emblemleiste. Sie ist
+  /* Ganz LINKS die schmale Spalte für die senkrechte Emblemleiste. Sie ist
      im Raster reserviert und nicht bloß darübergelegt: Sonst lägen die Embleme
-     über der schmalen Spalte und verdeckten Kommandozone und Kartenvorschau. */
+     über dem Schlachtfeld und verdeckten dessen linken Rand. */
   --sp-laden:68px;
-  grid-template-columns:minmax(0,1fr) var(--sp-mitte) var(--sp-laden);
+  grid-template-columns:var(--sp-laden) minmax(0,1fr) var(--sp-mitte);
   /* Höher als früher (500–720): Kopf, Deckwahl und Verlassen stehen jetzt
      UNTER der Matte und schieben sie nicht mehr nach unten; die Lebensreihe
      ist von 120 auf 88 px geschrumpft, seit ihre Kacheln einzeilig sind.
      Beides zusammen sind rund 145 px, die dem Schlachtfeld zugutekommen. */
   grid-template-rows:clamp(560px,76vh,860px);
-  grid-template-areas:"links mitte laden";
-  --rechte-spalten:calc(var(--sp-mitte) + var(--sp-laden) + var(--sp-luecke) * 2);
+  grid-template-areas:"laden links mitte";
+  --feld-mitte:calc((100% + var(--sp-laden) - var(--sp-mitte)) / 2);
   /* Bezugsrahmen der schwebenden Laden. */
   position:relative}
 /* Ab 1200 px eine dritte Spalte ueber die volle Hoehe: die angezeigte Karte
@@ -975,30 +975,36 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
    und die Bühne muss sich trotzdem an etwas aufhängen können. */
 .zonen{position:relative}
 /* ===== Schwebende Laden: Würfel, Hand, Exil, Friedhof =====
-   Eine SENKRECHTE Leiste rechts neben der Matte, von oben nach unten: Hand,
-   Bibliothek, Exil, Friedhof, Würfel. Sie hat dafür eine eigene schmale Spalte
-   im Raster — als waagerechte Reihe über den Lebenspunkten lag sie vorher über
-   dem Schlachtfeld und nahm ihm gerade dort die Sicht, wo am meisten liegt.
+   Eine SENKRECHTE Leiste links UNTEN neben der Matte, von oben nach unten:
+   Hand, Bibliothek, Exil, Friedhof, Würfel. Sie hat dafür eine eigene schmale
+   Spalte im Raster — als waagerechte Reihe über den Lebenspunkten lag sie
+   vorher über dem Schlachtfeld und nahm ihm gerade dort die Sicht, wo am
+   meisten liegt.
 
    Die Reihenfolge ist die des Handgriffs: Was man am häufigsten aufmacht,
    steht oben. Der Würfel ist keine Zone und steht deshalb zuletzt.
 
-   Ihre Körbe klappen nach LINKS auf, zur Matte hin — nicht nach oben wie
-   früher. Nach oben hätten die unteren gegen die Deckenkante gedrückt, und
-   rechts von der Leiste ist ohnehin nichts mehr.
+   UNTEN VERANKERT, nicht oben: Der Block steht damit auf Höhe von Ländern
+   und Lebenspunkten, dort, wo am Tisch die eigene Seite liegt — und die
+   Emblemzahl darf wachsen, ohne dass sich die untersten verschieben.
+
+   Ihre Körbe klappen nach RECHTS auf, zur Matte hin. Nach oben ginge nicht:
+   Die Leiste steht senkrecht, die oberen drückten dann gegen die Deckenkante;
+   links von der Leiste ist ohnehin nichts mehr.
 
    Gerechnet wird aus --sz-schritt; ändert sich die Emblemgröße, geht die
    Leiste mit. Zwei Zahlen an zwei Stellen liefen auseinander. */
 .mat{--sz-schritt:70px;                       /* 60 px Emblem + 10 px Luft */
-     --sz-oben:6px}
-.schwebe-zone{position:absolute;right:0;z-index:40;pointer-events:none}
-.sz-hand   {top:var(--sz-oben)}
-.sz-lib    {top:calc(var(--sz-oben) + var(--sz-schritt))}
-.sz-exile  {top:calc(var(--sz-oben) + var(--sz-schritt) * 2)}
-.sz-grave  {top:calc(var(--sz-oben) + var(--sz-schritt) * 3)}
-/* Der Korb steht LINKS neben seiner Schaltfläche, auf gleicher Höhe. */
-.schwebe-zone[data-schwebe-fach] .schwebe-korb{right:calc(100% + 10px);bottom:auto;top:0;
-  transform:translateX(14px)}
+     --sz-unten:6px}
+.schwebe-zone{position:absolute;left:0;z-index:40;pointer-events:none}
+.sz-hand   {bottom:calc(var(--sz-unten) + var(--sz-schritt) * 4)}
+.sz-lib    {bottom:calc(var(--sz-unten) + var(--sz-schritt) * 3)}
+.sz-exile  {bottom:calc(var(--sz-unten) + var(--sz-schritt) * 2)}
+.sz-grave  {bottom:calc(var(--sz-unten) + var(--sz-schritt))}
+/* Der Korb steht RECHTS neben seiner Schaltfläche und wächst nach OBEN: Die
+   unteren Laden stünden sonst mit einem hohen Korb unter der Mattenkante. */
+.schwebe-zone[data-schwebe-fach] .schwebe-korb{left:calc(100% + 10px);right:auto;top:auto;bottom:0;
+  transform:translateX(-14px)}
 .schwebe-zone[data-schwebe-fach].offen .schwebe-korb{transform:none}
 /* Die Bibliothek: Ihr Korb ist eine Suchzeile mit Trefferliste und braucht
    deshalb eine feste Breite — anders als bei Friedhof und Exil bestimmt hier
@@ -1010,7 +1016,8 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
    Matte als Bezugsrahmen — an der 60 px breiten Schaltfläche gemessen ließe
    sich „mittig über dem Schlachtfeld" nicht ausdrücken. */
 .sz-hand{inset:0}
-.sz-hand .schwebe-knopf{position:absolute;top:var(--sz-oben);right:0}
+.sz-hand .schwebe-knopf{position:absolute;left:0;right:auto;
+  bottom:calc(var(--sz-unten) + var(--sz-schritt) * 4);top:auto}
 /* Die Lade ist nur die Klammer um Korb und Schaltfläche und bleibt für
    Zeigereignisse durchlässig: Sonst läge ein unsichtbares Rechteck über der
    Matte und finge Klicks ab, die dem Schlachtfeld gelten. Bei der Hand wäre
@@ -1077,7 +1084,7 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
    schwebend nahm der Fächer dem Schlachtfeld die untersten 230 px — jetzt
    liegt er über der Reihe, die er verdeckt, solange er offen ist. */
 .schwebe-zone.sz-hand .schwebe-korb{right:auto;top:auto;bottom:6px;
-  left:calc((100% - var(--rechte-spalten)) / 2);
+  left:var(--feld-mitte);
   transform:translate(-50%,14px);
   max-height:none;overflow:visible}
 .schwebe-zone.sz-hand.offen .schwebe-korb{transform:translate(-50%,0)}
@@ -1104,8 +1111,8 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
    eine Lade offen steht. Der eigene Knopf steht im DOM hinter der Fläche und
    liegt damit ohnehin darüber. */
 .mat .sz-wuerfel{position:absolute;inset:0;z-index:30}
-.mat .sz-wuerfel .schwebe-knopf{position:absolute;right:0;
-  top:calc(var(--sz-oben) + var(--sz-schritt) * 4);bottom:auto}
+.mat .sz-wuerfel .schwebe-knopf{position:absolute;left:0;right:auto;
+  bottom:var(--sz-unten);top:auto}
 .mat .sz-wuerfel .wuerfel-buehne{position:absolute;inset:0}
 /* Der Würfel liegt nicht dauerhaft da: Er verdeckte sonst genau die Karten,
    für die man gewürfelt hat. Er rollt, bleibt einen Moment liegen und blendet
@@ -1125,15 +1132,20 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
    darunter wäre genau der Rahmen, der hier weg sollte; lesbar über hellen wie
    dunklen Kartenbildern bleibt sie durch den Schatten, dieselbe Lösung wie bei
    den Emblemen.
-   Sie steht LINKS NEBEN DER EMBLEMLEISTE, auf deren Höhe: Dort schaut man
-   ohnehin hin, wenn die Zahl am Würfel erscheint, und dort liegt der Streifen
-   der Länder statt einer Überschrift. Oben links stand sie über „Schlachtfeld",
-   und beides war übereinander nicht zu lesen. */
+   Sie steht RECHTS NEBEN DER EMBLEMLEISTE, über der Lebensreihe: Dort schaut
+   man ohnehin hin, wenn die Zahl am Würfel erscheint, und dort liegt der
+   Streifen der Länder statt einer Überschrift. Oben links stand sie über
+   „Schlachtfeld", und beides war übereinander nicht zu lesen.
+
+   Die Regel für die Matte rechnete früher mit --sz-boden und --sz-rand. Die
+   gibt es seit dem Umbau auf die senkrechte Leiste nicht mehr; ein var() ohne
+   Rückfall auf eine unbekannte Eigenschaft macht die ganze Erklärung ungültig,
+   und die Zeile stand still auf „auto". Gemessen, nicht vermutet. */
 .wuerfel-kopf{position:absolute;bottom:20px;right:96px;
   text-shadow:0 1px 3px #000,0 0 10px #000;
   font-size:13px;color:var(--txt);display:flex;align-items:center;gap:9px}
-.mat .wuerfel-kopf{bottom:calc(var(--sz-boden) + 16px);
-  right:calc(var(--sz-rand) + var(--sz-schritt) * 4)}
+.mat .wuerfel-kopf{bottom:calc(var(--sp-leben) + 16px);right:auto;
+  left:calc(var(--sp-laden) + var(--sp-luecke) + 10px)}
 .wuerfel-erg{font-size:26px;font-weight:800;color:var(--acc);line-height:1;
   font-variant-numeric:tabular-nums}
 
@@ -1189,11 +1201,15 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .fremd-lade{padding:22px 4px;font-size:13px;color:var(--dim)}
 .fremd-lade.fehler{color:var(--err)}
 /* Die Commander-Steuer als Zahl, nicht als Knopf: Auf einer fremden Matte
-   zählt niemand etwas hoch. */
-.fremd-steuer{display:inline-flex;align-items:center;justify-content:center;
-  min-width:38px;height:24px;margin-bottom:6px;padding:0 8px;border-radius:12px;
+   zählt niemand etwas hoch. Bei zwei Partnern steht je eine da — addiert
+   ergäbe sich eine Zahl, die keiner der beiden schuldet. */
+.fremd-steuern{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.fremd-steuer{display:inline-flex;align-items:center;justify-content:center;gap:5px;
+  min-width:38px;max-width:100%;height:24px;padding:0 8px;border-radius:12px;
   background:var(--panel2);border:1px solid var(--line);
   font-size:13px;font-weight:700;color:var(--acc);font-variant-numeric:tabular-nums}
+.fremd-steuername{min-width:0;font-size:11px;font-weight:600;color:var(--dim);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* Der Satz zu Hand und Bibliothek steht da, statt bloß zu fehlen: Wer eine
    fremde Matte ansieht, soll wissen, dass beides verdeckt IST — und dass die
    eigene bei den anderen genauso aussieht. */
@@ -1259,9 +1275,17 @@ body.zieht-gerade .schwebe-knopf{pointer-events:auto}
 /* Das Schlachtfeld bekommt den Platz, den es auf der Matte auch hat; die
    Laender darunter einen festen Streifen. */
 .mat-gross{flex:1;min-height:0}
-/* Hoch genug fuer eine Kartenreihe SAMT der Leiste darunter (103 px Karte,
-   Titel, Polster) — sonst rollt der Streifen und schneidet die Knoepfe ab. */
-.mat-laender{flex:none;height:178px}
+/* Eine Kartenreihe SAMT der Leiste darunter braucht 178 px (28 Titel, 8 und
+   30 Polster, 103 Karte) — darunter rollte der Streifen und schnitte die
+   Knöpfe ab. Das war lange die Höhe, und ab der elften Ländergasse fing die
+   zweite Reihe genau an der Unterkante an: Man sah, dass da etwas ist, und
+   nichts davon.
+   230 px zeigen von der zweiten Reihe gemessen 83 der 103 px — genug, um die
+   Karten zu erkennen und gezielt nachzurollen. Zwei VOLLE Reihen wären 298;
+   die kosteten das Schlachtfeld 120 px (von 402 auf 282) und damit eine
+   eigene Reihe. Der Streifen bleibt fest: Wüchse er mit dem Inhalt, spränge
+   das Schlachtfeld darüber bei jedem gelegten Land. */
+.mat-laender{flex:none;height:230px}
 /* Die Kommandozone nimmt die Höhe, die vorher die Bibliothek hatte — die ist
    in die schwebenden Laden gewandert. Sie bekommt aber nur, was sie braucht:
    Darunter steht die angezeigte Karte, und die ist das Größere von beiden. */
@@ -1333,6 +1357,16 @@ body.zieht-gerade .zk:hover,body.zieht-gerade .zk:focus-within{transform:none}
 .mat-steuer .mat-titel{margin-bottom:4px}
 .mat-steuerwert:hover{background:var(--acc);color:#1a1400}
 .mat-steuerwert.leer{border-color:var(--line);color:var(--dim);cursor:default}
+/* JE COMMANDER eine Zeile. Bei einem einzelnen steht nur der Wert da und
+   nimmt die volle Breite — genau wie vorher. Bei zweien tritt der Name davor
+   und schrumpft mit der Spalte; die Zahl behält ihre Breite, sie ist das,
+   worauf man zielt. */
+.mat-steuerzeile{display:flex;align-items:center;gap:6px}
+.mat-steuerzeile + .mat-steuerzeile{margin-top:5px}
+.mat-steuername{flex:1;min-width:0;font-size:11px;color:var(--dim);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mat-steuerzeile .mat-steuername + .mat-steuerwert{flex:none;width:auto;min-width:52px;padding:2px 8px;
+  font-size:16px}
 /* ===== Mana in diesem Zug =====
    Eine ANZEIGE, kein Knopf, und sie steht in der Kopfzeile des
    Länderstreifens — bei den Quellen, aus denen die Zahl entsteht. Als eigene
