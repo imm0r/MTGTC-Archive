@@ -1,5 +1,11 @@
 [
  {
+  "am": "2026-08-03T22:05:00+02:00",
+  "art": "verbessert",
+  "text": "Die Karte in der Detailansicht neigt sich zum Mauszeiger und fängt dabei das Licht. Foils bekommen zusätzlich den Regenbogenschimmer, den sie im Regal auch haben — normale Karten bleiben matt.",
+  "pr": 201
+ },
+ {
   "am": "2026-08-03T19:05:00+02:00",
   "art": "neu",
   "text": "Die App hat ein Changelog: Ein Klick auf die Versionsnummer oben rechts zeigt, was sich wann geändert hat — rückwirkend bis Ende Juli.",

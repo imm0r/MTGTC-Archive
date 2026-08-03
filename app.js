@@ -5109,6 +5109,48 @@ async function bildDlg(c) {
   showCardDetail(c.id);
 }
 
+/* ------------------------------------------------- Karte unter dem Zeiger ---
+   Das Kartenbild liegt in der Detailansicht auf einer Bühne, die sich zum
+   Zeiger neigt, und trägt zwei Lichtschichten darüber: einen Glanzpunkt, der
+   dem Zeiger folgt, und — nur bei Foils — den Regenbogenschimmer.
+
+   WARUM DREI VERSCHACHTELTE KÄSTEN und nicht alles am Bild selbst:
+
+   * `.karte3d` hält die perspective. Die muss am ELTERN-Element stehen, nicht
+     am gedrehten: Auf dem gedrehten selbst wäre sie eine Eigenschaft des
+     Objekts statt des Betrachters, und die Neigung sähe flach aus.
+   * `.karte3d-buehne` trägt die Drehung. Sie bekommt durch den transform einen
+     eigenen Stapelkontext — und genau der hält die Blendmodi der beiden
+     Lichtschichten INNEN. Ohne ihn mischte sich der Glanz mit dem Dialog
+     dahinter statt mit dem Kartenbild.
+   * `.karte3d-blatt` ist das Blatt Papier: Es hält Bild und Lichtschichten
+     deckungsgleich übereinander und trägt den Schlagschatten.
+
+   Der Schatten ist ein box-shadow und KEIN eigenes Element mit negativem
+   inset. Ein solches Element vergrößerte den Überlauf des Dialogs, und der
+   steht auf overflow:auto — es erschienen Rollbalken für ein Leuchten.
+
+   Das Umdrehen zweiseitiger Karten überlebt das: `.detail-flip` bringt seine
+   eigene perspective mit, `.detail-flip-inner` seinen eigenen 3D-Raum. Die
+   Neigung legt sich darüber, statt sie zu ersetzen.
+
+   Was NICHT hierher gehört: die Hover-Vorschau. Dort huscht der Zeiger über
+   die Zeile, nicht über die Karte — ein Effekt, der dem Zeiger folgt, hätte
+   dort nur Zappeln zu bieten. */
+function karte3dHtml(bild, c) {
+  // Foil ist eine Eigenschaft des EXEMPLARS, nicht des Bildes: Die App weiß,
+  // ob die Karte im Regal glänzt, und nur dann glänzt sie auch hier.
+  return `<div class="karte3d${c.foil ? " karte3d-foil" : ""}" id="dt-karte3d">
+      <div class="karte3d-buehne">
+        <div class="karte3d-blatt">
+          ${bild}
+          <div class="karte3d-glanz" aria-hidden="true"></div>
+          <div class="karte3d-holo" aria-hidden="true"></div>
+        </div>
+      </div>
+    </div>`;
+}
+
 /* Kartenbild samt Werkzeugleiste darunter.
 
    Die Leiste sitzt in DERSELBEN Spalte wie das Bild und rechtsbündig, damit
@@ -5118,13 +5160,15 @@ async function bildDlg(c) {
 
    In der Hover-Vorschau entfällt sie — dort wird nichts bearbeitet. Fehlt das
    Bild ganz, bleibt ein leerer Rahmen stehen: genau dann will man ja eines
-   nachtragen können, und ohne Rahmen hinge der Knopf im Nichts. */
+   nachtragen können, und ohne Rahmen hinge der Knopf im Nichts. Der leere
+   Rahmen bekommt KEINE Bühne: Ein gekipptes Nichts mit Glanzpunkt darauf wäre
+   nur die Behauptung, hier läge eine Karte. */
 function bildSpalteHtml(c, faced, gross, hover) {
   const bild = faced ? flipHtml(c)
              : (gross ? `<img class="detail-img" src="${esc(gross)}" alt="">` : "");
   if (hover) return bild;
   return `<div class="detail-bildspalte">
-    ${bild || `<div class="detail-img detail-img-leer" aria-hidden="true"></div>`}
+    ${bild ? karte3dHtml(bild, c) : `<div class="detail-img detail-img-leer" aria-hidden="true"></div>`}
     <div class="detail-bildtools">
       <button class="btn ghost sm" id="dt-bild" title="${esc(t("img.replaceTitle"))}">${
         esc(t("img.replace"))}</button>
@@ -5229,6 +5273,9 @@ function showCardDetail(id) {
 function renderDetail(c, id, fremd) {
   $("#detail-body").innerHTML = detailHtml(c, false);
   wireFlip(c, id);
+  // Vor dem Abzweig für fremde Karten: Die Neigung gehört zum Bild, nicht zum
+  // Besitz — eine Community-Karte darf sich genauso im Licht drehen.
+  wireKarte3d();
 
   // Fremde Karte (Community-Kachel): Bearbeiten und Preis-Aktualisieren
   // gehören dem Besitzer, nicht dem Betrachter. Synergien und Combos bleiben —
@@ -5340,6 +5387,73 @@ function wireDetailSynergien(c) {
   // Deck-Zugehörigkeit: Klick auf eine Deck-Nennung springt zum Deck.
   $$("#detail-body .deck-chip[data-godeck]").forEach(ch =>
     ch.onclick = () => zeigeDeck(ch.dataset.godeck));
+}
+
+/* Die Neigung ans Zeigegerät hängen (Aufbau siehe karte3dHtml).
+
+   Ausschlag in Grad. Zehn klingt nach wenig und ist bei einer 230 px breiten
+   Karte schon deutlich; darüber kippt der Eindruck von „liegt schräg im Licht"
+   zu „steht auf der Kante", und der Text auf der Karte wird unleserlich.
+
+   NUR FÜR ECHTE ZEIGEGERÄTE. Auf einem Finger gibt es kein Schweben: Jede
+   Berührung begänne mit einem Sprung der Karte an die Fingerspitze, und das
+   Wischen zum Scrollen sähe aus wie ein Wackeln. `(hover: hover)` schließt
+   auch den Stift aus, der nur beim Aufsetzen meldet — richtig so.
+
+   PRO BILD EIN NEUZEICHNEN. pointermove feuert so oft, wie das Gerät abtastet
+   (bei 120-Hz-Mäusen deutlich öfter als der Schirm zeichnet). Jedes Ereignis
+   sofort in Stilwerte zu schreiben hieße, mehrfach je Bild ein Layout
+   anzustoßen. Gemerkt wird deshalb nur das letzte Ereignis; geschrieben wird
+   einmal, wenn der Browser ohnehin zeichnet.
+
+   Beim Verlassen werden die Werte zurückgesetzt UND die Klasse entfernt: Die
+   Klasse schaltet von der kurzen Nachführung (90 ms) auf das lange Zurücksinken
+   (500 ms) um — ohne sie schnappte die Karte in die Waagerechte zurück. */
+const KARTE3D_GRAD = 10;
+
+function wireKarte3d() {
+  const el = $("#dt-karte3d");
+  if (!el || !matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+
+  let angefordert = 0, letztes = null;
+  const schreibe = () => {
+    angefordert = 0;
+    const e = letztes;
+    if (!e) return;
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    // 0 … 1 innerhalb der Karte. Geklemmt, weil pointermove auch noch ein
+    // paar Pixel außerhalb eintreffen kann, während der Zeiger hinausfährt.
+    const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    const y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+    const s = el.style;
+    s.setProperty("--kmx", (x * 100).toFixed(1) + "%");
+    s.setProperty("--kmy", (y * 100).toFixed(1) + "%");
+    // Oben ziehen heißt: obere Kante weg vom Betrachter, also POSITIVES rotateX
+    // bei kleinem y — daher (0.5 − y). Bei rotateY ist es andersherum: rechts
+    // ziehen dreht die rechte Kante nach hinten.
+    s.setProperty("--kx", ((0.5 - y) * 2 * KARTE3D_GRAD).toFixed(2) + "deg");
+    s.setProperty("--ky", ((x - 0.5) * 2 * KARTE3D_GRAD).toFixed(2) + "deg");
+    // Das Lichtband und der Schimmer laufen GEGEN den Zeiger und über einen
+    // größeren Weg als die Karte breit ist (background-size in der CSS-Datei).
+    // Beides zusammen ergibt den Eindruck, dass sich die Karte unter einer
+    // festen Lampe dreht, statt eine Lampe mit sich zu führen.
+    s.setProperty("--kbx", ((1 - x) * 100).toFixed(1) + "%");
+    s.setProperty("--kby", ((1 - y) * 100).toFixed(1) + "%");
+  };
+
+  el.onpointerenter = e => { letztes = e; el.classList.add("zeigt"); schreibe(); };
+  el.onpointermove = e => {
+    letztes = e;
+    if (!angefordert) angefordert = requestAnimationFrame(schreibe);
+  };
+  el.onpointerleave = () => {
+    letztes = null;
+    if (angefordert) { cancelAnimationFrame(angefordert); angefordert = 0; }
+    el.classList.remove("zeigt");
+    for (const n of ["--kx", "--ky", "--kmx", "--kmy", "--kbx", "--kby"])
+      el.style.removeProperty(n);
+  };
 }
 
 /* Umdrehen verdrahten. Sind die Seiten bekannt, schaltet ein Klick (oder
