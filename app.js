@@ -6430,6 +6430,31 @@ let TAUSCH_FEHLT = false;
 const istFunktionFehltFehler = e =>
   e?.code === "PGRST202" || /Could not find the function/i.test(e?.message || "");
 
+/* Der Lade-Zustand für eine Suche, die DAUERT: eine Schiene mit durchlaufendem
+   Licht, darunter der Satz, was gerade passiert.
+
+   Das kleine Zahnrad (syn-spin) bleibt, wo es hingehört — in Knöpfen und bei
+   allem, was in einem Wimpernschlag da ist. Für die KI-Synergien reicht es
+   nicht: Die haben bei einem vollen Deck viel zu tun, und ein Zeichen von zehn
+   Pixeln übersieht man. Wer nichts sieht, hält es für kaputt — und klickt noch
+   einmal. Genau das verwirft den laufenden, bei der KI bezahlten Lauf
+   (synergyLauf zählt hoch, die alte Antwort fällt weg).
+
+   UNBESTIMMT, NICHT MESSEND. Wie lange die KI braucht, weiß vorher niemand.
+   Ein Balken, der sich füllt und bei 90 % stehenbleibt, behauptet ein Wissen,
+   das es nicht gibt; ein durchlaufendes Licht sagt nur „es geht weiter" — und
+   das ist genau die Auskunft, die hier zu haben ist.
+
+   hinweis: eine zweite, leisere Zeile für den Fall, dass die Wartezeit selbst
+   erklärungsbedürftig ist. */
+function ladeBalken(text, hinweis) {
+  return `<div class="ladebalken" role="status">
+    <div class="ladebalken-schiene"><div class="ladebalken-licht"></div></div>
+    <div class="ladebalken-txt">${esc(text)}</div>${
+      hinweis ? `<div class="ladebalken-hinweis">${esc(hinweis)}</div>` : ""}
+  </div>`;
+}
+
 /* Synergie-Knopf in den Ladezustand versetzen: Lupe → drehendes Zahnrad,
    Knopf gesperrt. Zurück auf die Lupe, wenn die Suche fertig ist. */
 function synBtnBusy(btn, label, busy, icon) {
@@ -6508,7 +6533,7 @@ async function synergieAnzeigen(box, hooks, opts = {}) {
   if (!box) return;
   const lauf = ++synergyLauf;
   if (!hooks.length) { box.innerHTML = `<div class="empty">${esc(t("syn.noHooks"))}</div>`; return; }
-  box.innerHTML = `<div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("syn.loading"))}</div>`;
+  box.innerHTML = ladeBalken(t("syn.loading"));
   const res = await synergieSuchen(hooks, opts);
   if (lauf !== synergyLauf) return;                  // ein neuerer Lauf hat übernommen
   if (!res.length) { box.innerHTML = `<div class="empty">${esc(t("syn.none"))}</div>`; return; }
@@ -6639,7 +6664,7 @@ function kiKostenHtml(usage) {
 async function kiSynergieLauf(box, cfg) {
   if (!box) return;
   const lauf = ++synergyLauf;
-  box.innerHTML = `<div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("syn.aiLoading"))}</div>`;
+  box.innerHTML = ladeBalken(t("syn.aiLoading"), t("syn.aiLoadingHint"));
 
   let data, error;
   try {
@@ -7153,7 +7178,7 @@ let combosLauf = 0;
 async function deckCombosAnzeigen(box, cards, deckId) {
   if (!box) return;
   const lauf = ++combosLauf;
-  box.innerHTML = `<div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("combo.loading"))}</div>`;
+  box.innerHTML = ladeBalken(t("combo.loading"));
   let data;
   try {
     data = await combosApi({ mode: "find-my-combos", cards: cards.map(c => ({ card: c.name, quantity: 1 })) });
@@ -7212,7 +7237,7 @@ async function deckCombosAnzeigen(box, cards, deckId) {
 async function sammlungCombosAnzeigen(box, cards) {
   if (!box) return;
   const lauf = ++combosLauf;
-  box.innerHTML = `<div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("combo.loading"))}</div>`;
+  box.innerHTML = ladeBalken(t("combo.loading"));
   let data;
   try {
     data = await combosApi({ mode: "find-my-combos", cards: cards.map(c => ({ card: c.name, quantity: 1 })) });
@@ -7245,7 +7270,7 @@ async function sammlungCombosAnzeigen(box, cards) {
 async function karteCombosAnzeigen(box, card) {
   if (!box) return;
   const lauf = ++combosLauf;
-  box.innerHTML = `<div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("combo.loading"))}</div>`;
+  box.innerHTML = ladeBalken(t("combo.loading"));
   let data;
   try {
     // Anführungszeichen im Namen raus, sonst bricht die CSB-Suche card:"…".
@@ -7279,7 +7304,7 @@ async function karteCombosAnzeigen(box, card) {
 async function deckAnalyseAnzeigen(box, cards, colors, deckId) {
   if (!box) return;
   const lauf = ++synergyLauf;   // teilt den Lauf-Zähler mit der Synergiesuche
-  box.innerHTML = `<div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("an.loading"))}</div>`;
+  box.innerHTML = ladeBalken(t("an.loading"));
   const analyse = deckAnalyse(cards);
 
   const zeilen = analyse.map(a => {

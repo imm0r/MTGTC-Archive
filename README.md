@@ -1759,6 +1759,31 @@ nicht darin stehen: für `deck_synergies` gibt es keine Freigabe an Freunde.
 > ausführen (oder `supabase/migrations/20260802120000_deck_synergien.sql`
 > einzeln).
 
+## Warten sichtbar machen: der Ladebalken
+
+Die KI-Synergien haben bei einem vollen Deck viel zu tun, und angezeigt wurde
+das durch ein drehendes Zahnrad von zehn Pixeln. Wer nichts sieht, hält es für
+kaputt — und klickt noch einmal. **Genau das verwirft den laufenden Lauf**
+(`synergyLauf` zählt hoch, die alte Antwort fällt weg), und bei der KI-Variante
+war er bezahlt. Die Anzeige war also nicht nur unhöflich, sie kostete Geld.
+
+An seiner Stelle steht jetzt eine Schiene über die volle Breite, auf der ein
+Licht durchläuft — dieselbe Farbe wie der Rest der App, nicht die der Vorlage.
+Darunter der Satz, was gerade passiert; bei der KI zusätzlich eine leisere
+Zeile, dass die Wartezeit bei einem vollen Deck normal ist.
+
+**Unbestimmt, nicht messend.** Wie lange die KI braucht, weiß vorher niemand.
+Ein Balken, der sich füllt und bei 90 % stehenbleibt, behauptet ein Wissen, das
+es nicht gibt; ein durchlaufendes Licht sagt nur „es geht weiter" — und das ist
+genau die Auskunft, die hier zu haben ist.
+
+**Bei `prefers-reduced-motion` wird er langsamer, nicht angehalten.** Ein
+stehender Ladebalken sieht genau nach dem aus, wovor er bewahren soll.
+
+Das Zahnrad bleibt, wo es hingehört: in Knöpfen und bei allem, was in einem
+Wimpernschlag da ist. Den Balken bekommen die vier Suchen, auf die man wartet —
+Synergien, KI-Synergien, Combos und die Deck-Analyse.
+
 ## Tauschen: den Schnitt-Vorschlag ausführen
 
 Ist ein Commander-Deck voll, sagt die Kachel schon länger, welche Karte dafür
@@ -2821,6 +2846,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `verlauf`        | Deck-Verlauf: Fingerabdruck unabhängig von der Reihenfolge, der Umbau in Worten, und was ein Rücksprung schreiben würde (fehlende Karten, fehlende Fächer, primäre Einordnung) |
 | `wunschliste`    | Karte direkt vormerken: die Zeile (Bestand 0, Setcode groß, Preis mit erstem Punkt) und die Doppelprüfung — auch gegen eine andere Auflage derselben Karte |
 | `synergien`      | Aufgehobene Vorschläge: die eingedampfte Karte, der Fingerabdruck als Warnung vor Überholtem, und dass ein frisches Ergebnis nicht überschrieben wird |
+| `ladebalken`     | Der lange Lade-Zustand: dass die Animation nicht nur deklariert ist, sondern das Licht bei acht Messungen tatsächlich wandert — von links außerhalb der Bahn über mehr als deren halbe Breite; dass er bei `prefers-reduced-motion` langsamer wird statt stehenzubleiben; und an der Quelle, dass alle vier langen Suchen ihn zeigen, das Zahnrad aber für die kurzen Fälle bleibt |
 | `decktausch`     | „Tauschen“ am vollen Deck: dass der Knopf nur mit Deck-Bezug erscheint, der Commander nie zum Schneiden vorgeschlagen wird, EIN Aufruf mit dem vollen Wunsch-Parametersatz hinausgeht und das Deck gleich groß bleibt — dazu die Nachbarkacheln, die nach dem Tausch neu rechnen (und dabei nie die eben aufgenommene Karte vorschlagen), und die erklärte Absage bei einem veralteten Schnitt |
 | `spielrunde`     | Die Matte: Ziehen zwischen den Zonen (die Lade geht dabei zu und danach wieder auf), Tappen per Klick, die Lebensreihe (vier einzeilige Kacheln nebeneinander, Regler links neben der Zahl, kein Rollbalken), der Länderstreifen (mehr als die halbe zweite Reihe sichtbar), die Kartenspalte (kein Rollbalken, das Bild gibt nach), der Kopfkasten unter der Matte, die fünf Laden links unten neben der Matte (senkrechte Reihenfolge, unten verankert, eigene Spalte statt darübergelegt, nach rechts aufklappend, immer nur eine offen, auch zugeklappt Ablageziel) samt der Bibliothekssuche in ihrem Korb, der Würfel (nur W20, blanke Fläche über der ganzen Matte UND über allem darin, Zahl aufs Emblem, jeder Wurf anders) und „Zufällig ziehen" (gewichtet über Exemplare, leere Bibliothek) |
 | `fremdmatte`     | Die Matte eines Mitspielers: dass die Abfrage die Spalte `hand` nicht führt und Zeilen ohne offene Zone überspringt, dass die Anzeige ein doch geliefertes `hand` gar nicht erst übernimmt, dass fremde Karten keine Handgriffe tragen, dass die Lebensreihe frei und anklickbar bleibt und dass der Takt nach dem Schließen samt Intervall verschwindet; dazu, dass die Lade hochkant im Blickfeld statt weit unten aufklappt und dass ein Zuschauer ohne eigenes Deck die Mitspieler samt Auge überhaupt sieht |
