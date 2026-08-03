@@ -2677,6 +2677,20 @@ Index umzustellen ist ein eigenes Vorhaben: Eine Karte trägt im Mittel sechs
 Themen, darunter Kuriositäten wie `alliteration`, und die ungefiltert als
 Synergie-Haken zu nehmen ergäbe schlechtere Vorschläge als heute.
 
+## Changelog
+
+Ein Klick auf die Versionsnummer oben rechts zeigt, was sich wann geändert hat:
+Datum/Uhrzeit, eine Art (**Neu** / **Verbessert** / **Behoben**) und zwei bis
+drei Zeilen aus Nutzersicht.
+
+Quelle ist `changelog.json` im Wurzelverzeichnis — eine von Hand gepflegte
+Liste, je Pull Request ein Eintrag vorn (die Regel steht in CLAUDE.md, die
+Prüfung `changelog` wacht über Form und Reihenfolge). Bewusst **keine**
+GitHub-API: die ist für anonyme Zugriffe auf 60 Anfragen je Stunde gedeckelt,
+und eine statische Datei im selben Verzeichnis kann nicht ausfallen. Der
+Rückgriff reicht bis Ende Juli (#156); die reine Arbeitsumgebung — Hooks, CI —
+bleibt draußen, weil kein Nutzer sie sehen oder spüren kann.
+
 ## Prüfungen
 
 ```bash
