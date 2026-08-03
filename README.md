@@ -1810,12 +1810,12 @@ und ob sie ein Land ist, weiß die App aus der Typzeile.
 
 ### Zwei Anordnungen
 
-Ab **820 px Breite** liegen die Felder wie auf der offiziellen Spielmatte:
-Schlachtfeld groß links, Länder als Streifen darunter, die Lebenspunkte als
-Reihe unter beiden; daneben eine schmale Spalte (Commander-Steuer,
-Kommandozone, ab 1200 px darunter die angezeigte Karte) und ganz rechts die
-senkrechte Emblemleiste. Ein quer gehaltenes Handy erreicht diese Breite und
-bekommt die Matte automatisch.
+Ab **820 px Breite** liegen die Felder wie auf der offiziellen Spielmatte: ganz
+links unten die senkrechte Emblemleiste, daneben das Schlachtfeld groß, die
+Länder als Streifen darunter, die Lebenspunkte als Reihe unter beiden; rechts
+eine schmale Spalte (Commander-Steuer, Kommandozone, ab 1200 px darunter die
+angezeigte Karte). Ein quer gehaltenes Handy erreicht diese Breite und bekommt
+die Matte automatisch.
 
 > **Was wo NICHT mehr steht.** Die **Bibliothek** stand als schmale Spalte in
 > der Matte und ist eine Lade geworden: zugeklappt eine Zahl, aufgeklappt eine
@@ -1854,8 +1854,17 @@ und schoben sie um ihre Höhe nach unten — für drei Dinge, die man einmal zu
 Beginn braucht und danach nicht mehr. Die Matte ist dafür von 500–720 px auf
 560–860 gewachsen (64vh → 76vh).
 
-**Fünf Embleme** stehen als **senkrechte Leiste rechts neben der Matte**, von
-oben nach unten:
+**Der Länderstreifen ist 230 px hoch.** Eine Kartenreihe samt der Leiste
+darunter braucht 178 — genau so hoch war er lange, und sobald die Länder
+umbrachen, fing die zweite Reihe exakt an der Unterkante an: Man sah, dass da
+etwas ist, und nichts davon. Von 230 aus sind gemessen 65 der 103 px der
+zweiten Reihe zu sehen. Zwei **volle** Reihen wären 298 gewesen und hätten dem
+Schlachtfeld 120 px genommen — eine eigene Reihe. Fest bleibt die Höhe, weil
+ein mitwachsender Streifen das Schlachtfeld darüber bei jedem gelegten Land
+verschöbe.
+
+**Fünf Embleme** stehen als **senkrechte Leiste links unten neben der Matte**,
+von oben nach unten:
 
 | | Bild | |
 | --- | --- | --- |
@@ -1869,13 +1878,17 @@ Jedes trägt unten rechts eine Zahl — bei den vier Zonen die Kartenzahl, beim
 Würfel den letzten Wurf.
 
 Die Leiste hat eine **eigene reservierte Spalte** im Raster. Nur darübergelegt
-verdeckte sie Kommandozone und Kartenvorschau. Als waagerechte Reihe über den
-Lebenspunkten lag sie vorher über dem Schlachtfeld und nahm ihm die Sicht
-gerade dort, wo am meisten liegt.
+verdeckte sie das Schlachtfeld. Als waagerechte Reihe über den Lebenspunkten
+lag sie vorher über dem Schlachtfeld und nahm ihm die Sicht gerade dort, wo am
+meisten liegt.
+
+**Unten verankert**, nicht oben: Der Block steht damit auf Höhe von Ländern und
+Lebenspunkten — dort, wo am Tisch die eigene Seite liegt. Und die Zahl der
+Embleme darf wachsen, ohne dass sich die untersten verschieben.
 
 **Hand, Bibliothek, Exil und Friedhof sind Laden.** Ein Klick klappt sie **nach
-links** auf, zur Matte hin; Escape oder ein zweiter Klick schließt wieder. Nach
-oben ginge nicht mehr: Die Leiste steht senkrecht, die unteren drückten dann
+rechts** auf, zur Matte hin; Escape oder ein zweiter Klick schließt wieder.
+Nach oben ginge nicht: Die Leiste steht senkrecht, die oberen drückten dann
 gegen die Deckenkante. Der **Würfel** ist keine Lade — ein Klick würfelt sofort
 (siehe „Der Würfel").
 
@@ -2038,9 +2051,22 @@ Bibliothek hat schnell 90 Zeilen — jede mit Bild, Set und vier Knöpfen zu
 bestücken machte sie in der schmalen Mattenspalte unlesbar.
 
 **Commander-Steuer.** Wanderst du deinen Commander aus der Kommandozone aufs
-Feld, zählt die App das Wirken mit und zeigt am Kartenbild, was das nächste Mal
-extra kostet (`+2`, `+4`, …). Verzählt? Das Abzeichen selbst nimmt ein Wirken
-zurück.
+Feld, zählt die App das Wirken mit und zeigt, was das nächste Mal extra kostet
+(`+2`, `+4`, …) — in der Matte im eigenen Kasten, hochkant als Abzeichen am
+Kartenbild. Verzählt? Ein Klick darauf nimmt ein Wirken zurück.
+
+Die Steuer hängt an der **Karte**, nicht an der Zone:
+
+* Ein Deck mit **Partnern hat zwei Commander**, und jeder zahlt für sich. Wer
+  den einen dreimal gewirkt hat und den anderen nie, schuldet `+6` und `+0`.
+  Der Kasten trägt dann zwei Zeilen mit Namen; bei einem einzelnen bleibt es
+  bei der einen Zahl, denn die Überschrift sagt schon, worum es geht.
+* Sie steht auch da, wenn der Commander **auf dem Schlachtfeld liegt** — genau
+  dann ist sie ja fällig. (Vorher las die Anzeige die erste Karte *in der
+  Kommandozone*: Gewirkt war der Commander dort verschwunden, und der Kasten
+  zeigte einen Strich. Bei zwei Commandern sprang die Zahl beim Wirken des
+  ersten stillschweigend auf den zweiten über.)
+* Auf einer **fremden Matte** steht sie als Zahl je Commander statt als Summe.
 
 **Gespeichert** werden nur vier Zahlen je Karte (`session_played.hand`, `.field`,
 `.graveyard`, `.exile`). Bibliothek und Kommandozone sind der **Rest** aus der
@@ -2185,8 +2211,9 @@ Das **Auge am Avatar** einer Spielerkachel klappt die Matte dieses Mitspielers
 über die eigene: Schlachtfeld, Länder, Kommandozone, Friedhof, Exil — in
 derselben Anordnung wie die eigene, damit man beim Hinübersehen nicht umlernt.
 Getappte Karten stehen gedreht, Marken tragen ihr Abzeichen, die
-Commander-Steuer steht als Zahl. Ein zweites Auge schaltet um, dasselbe noch
-einmal macht zu, Escape ebenfalls.
+Commander-Steuer steht als Zahl — bei einem Deck mit Partnern je eine mit Namen
+statt einer Summe, die keiner der beiden schuldet. Ein zweites Auge schaltet
+um, dasselbe noch einmal macht zu, Escape ebenfalls.
 
 **Hand und Bibliothek bleiben verdeckt.** Das steht nicht in der Anzeige,
 sondern in der Abfrage: `session_board` wählt die Spalte `hand` **gar nicht
@@ -2459,8 +2486,9 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `verlauf`        | Deck-Verlauf: Fingerabdruck unabhängig von der Reihenfolge, der Umbau in Worten, und was ein Rücksprung schreiben würde (fehlende Karten, fehlende Fächer, primäre Einordnung) |
 | `wunschliste`    | Karte direkt vormerken: die Zeile (Bestand 0, Setcode groß, Preis mit erstem Punkt) und die Doppelprüfung — auch gegen eine andere Auflage derselben Karte |
 | `synergien`      | Aufgehobene Vorschläge: die eingedampfte Karte, der Fingerabdruck als Warnung vor Überholtem, und dass ein frisches Ergebnis nicht überschrieben wird |
-| `spielrunde`     | Die Matte: Ziehen zwischen den Zonen, Tappen per Klick, die Lebensreihe (vier Kacheln nebeneinander, kein Rollbalken), die fünf Laden rechts neben der Matte (senkrechte Reihenfolge, eigene Spalte statt darübergelegt, nach links aufklappend, immer nur eine offen, auch zugeklappt Ablageziel) samt der Bibliothekssuche in ihrem Korb, der Würfel (nur W20, blanke Fläche über der ganzen Matte, Zahl aufs Emblem, jeder Wurf anders) und „Zufällig ziehen" (gewichtet über Exemplare, leere Bibliothek) |
+| `spielrunde`     | Die Matte: Ziehen zwischen den Zonen, Tappen per Klick, die Lebensreihe (vier einzeilige Kacheln nebeneinander, Regler links neben der Zahl, kein Rollbalken), der Länderstreifen (mehr als die halbe zweite Reihe sichtbar), der Kopfkasten unter der Matte, die fünf Laden links unten neben der Matte (senkrechte Reihenfolge, unten verankert, eigene Spalte statt darübergelegt, nach rechts aufklappend, immer nur eine offen, auch zugeklappt Ablageziel) samt der Bibliothekssuche in ihrem Korb, der Würfel (nur W20, blanke Fläche über der ganzen Matte, Zahl aufs Emblem, jeder Wurf anders) und „Zufällig ziehen" (gewichtet über Exemplare, leere Bibliothek) |
 | `fremdmatte`     | Die Matte eines Mitspielers: dass die Abfrage die Spalte `hand` nicht führt und Zeilen ohne offene Zone überspringt, dass die Anzeige ein doch geliefertes `hand` gar nicht erst übernimmt, dass fremde Karten keine Handgriffe tragen, dass die Lebensreihe frei und anklickbar bleibt und dass der Takt nach dem Schließen samt Intervall verschwindet; dazu, dass die Lade hochkant im Blickfeld statt weit unten aufklappt und dass ein Zuschauer ohne eigenes Deck die Mitspieler samt Auge überhaupt sieht |
+| `steuer`         | Die Commander-Steuer: je Commander eine eigene Zeile mit Namen, Wirken erhöht nur die des gewirkten, der Rücknahme-Knopf trifft nur seine Karte — und beides steht auch dann noch da, wenn der Commander längst auf dem Schlachtfeld liegt und die Kommandozone leer ist |
 | `mana`           | Mana in diesem Zug: der Übersetzer an einer Mustertabelle (Signet netto, Selbstopfer ja, fremdes Opfer nein, „for each“ variabel, CR 305.6 ohne Text), die Summen frei/gesamt je Exemplar, Tappen senkt frei, die Hand zählt nie mit, und ohne Quellen Strich statt Null — dazu die Farbaufteilung: feste Reihenfolge, Summe der Marken gleich der Gesamtzahl, Tappen kommt in der Farbe an, und alle sieben Marken brechen in der 154-px-Spalte um, statt hinauszulaufen |
 | `export`         | Deck ausgeben: die fünf Zeilen genau so, wie sie dastehen müssen — englischer Name statt gedrucktem, Setcode groß, keine leere Klammer ohne Auflage, alphabetisch sortiert, Deckmenge statt Bestand; dazu Datei, Zwischenablage und der Rückfall „Text markiert“, wenn das Kopieren scheitert |
 | `mitglieder`     | Die Mitgliederliste ohne Stufen: dass die Abfrage das neueste Mitglied aus allen Profilen und mit echtem Namen nimmt, dass Karten und „größte Sammlung“ weiterhin an den Stufen hängen, dass ein leerer Anzeigename die Ersatzbezeichnung behält — und dass die Zusage in allen fünf Sprachen mitgewandert ist |

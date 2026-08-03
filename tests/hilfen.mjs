@@ -182,3 +182,27 @@ export const PUNKT = (sel) => {
   }
   return null;
 };
+
+/* ---------------------------------------------------- Der Hinweis am Element
+   `el.title` zu lesen ist eine FALLE. Die App zeigt eigene Tooltips und hängt
+   dafür den nativen Hinweis AUS, solange der Zeiger über dem Element steht
+   (app.js, initTooltip → aushaengen: `el.dataset.aaTitle = txt;
+   el.removeAttribute("title")`). Beim Verlassen hängt sie ihn wieder ein.
+   Steht der Zeiger vom letzten Klick zufällig darüber — nach einem Wechsel der
+   Fenstergröße liegt er plötzlich woanders im Layout —, misst man einen leeren
+   Text und hält ihn für einen fehlenden Tooltip.
+
+   Genau so wurde „mana: und der Aufschlüsselung im Tooltip" rot, und zwar NUR
+   auf dem Prüfrechner: Hier scheitert der Aufbau vorher an der fehlenden
+   Supabase-Bibliothek vom CDN (`connect()` wirft, wireApp() läuft nie), und
+   ohne wireApp() gibt es initTooltip() gar nicht. Auf einem Läufer mit Netz
+   lädt das CDN, der Tooltip ist da — und der Fehler auch. Sichtbar wurde das
+   erst, als die Prüfung den gemessenen Text mitschrieb: "" statt der
+   Aufschlüsselung, also gar kein Attribut.
+
+   Diese Funktion liest beide Orte. Sie wird über addInitScript in JEDE Seite
+   gelegt (lauf.mjs), damit kein Fall sie vergessen kann. */
+export const HINWEIS_HELFER = () => {
+  window.titelVon = (el) => !el ? null
+    : (el.getAttribute("title") ?? el.dataset?.aaTitle ?? "");
+};

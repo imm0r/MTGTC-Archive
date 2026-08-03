@@ -16,7 +16,7 @@ import { chromium } from "playwright-core";
 import { readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
-import { browserPfad, serverStarten, pruefstand } from "./hilfen.mjs";
+import { browserPfad, serverStarten, pruefstand, HINWEIS_HELFER } from "./hilfen.mjs";
 
 const HIER = dirname(fileURLToPath(import.meta.url));
 const WURZEL = resolve(HIER, "..");
@@ -42,6 +42,8 @@ for (const datei of dateien) {
   // Prüfungen ist die zuverlässigste Art, sich grüne Läufe einzubilden.
   const kontext = await browser.newContext({ viewport: { width: 1600, height: 900 } });
   const seite = await kontext.newPage();
+  // titelVon() in jede Seite legen — siehe HINWEIS_HELFER in hilfen.mjs.
+  await seite.addInitScript(HINWEIS_HELFER);
   const seitenfehler = [];
   seite.on("pageerror", e => seitenfehler.push(e.message));
 

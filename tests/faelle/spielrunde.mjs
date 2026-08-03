@@ -336,6 +336,57 @@ export default async function ({ seite, adresse, stand }) {
   await seite.evaluate(() => { lebenSetzen("u1", 39); });
   await seite.waitForTimeout(500);
 
+  /* --- Der Länderstreifen ist hoch genug für mehr als eine Reihe --------- */
+  /* Er hatte lange die Höhe für GENAU eine Kartenreihe samt der Leiste
+     darunter. Sobald die Länder umbrachen, fing die zweite Reihe exakt an der
+     Unterkante an: Man sah, dass da etwas ist, und nichts davon.
+
+     Gemessen wird an echten Karten in einem echten Umbruch, nicht an einer
+     Zahl im Stylesheet — bei 820 px passen vier Ländergassen nebeneinander,
+     sieben brauchen also zwei Reihen. Danach wird alles zurückgestellt. */
+  await seite.setViewportSize({ width: 820, height: 900 });
+  await seite.evaluate(() => {
+    // Alles, was danach wieder genau so dastehen muss: Die folgenden Fälle
+    // messen Zonenzahlen, und eine hier liegengebliebene Karte verschöbe sie.
+    window.VORHER = JSON.stringify(SESSION_ZONEN);
+    const ids = DECKS[0].entries.map(e => e.cardId).slice(1, 8);
+    const leer = { hand: 0, field: 0, grave: 0, exile: 0, cast: 0 };
+    ids.forEach(id => {
+      CARDS.find(c => c.id === id).type_line = "Basic Land — Forest";
+      SESSION_ZONEN[id] = { ...leer, field: 1 };
+    });
+    renderZonen();
+  });
+  await seite.waitForTimeout(350);
+  const streifen = await seite.evaluate(() => {
+    const korb = document.querySelector(".mat-laender .mat-korb");
+    const karten = [...document.querySelectorAll(".mat-laender .zk")].map(e => e.getBoundingClientRect());
+    if (!korb || karten.length < 2) return null;
+    const kr = korb.getBoundingClientRect();
+    const reihen = [...new Set(karten.map(r => Math.round(r.top)))].sort((a, b) => a - b);
+    const zweite = karten.find(r => Math.round(r.top) === reihen[1]);
+    return {
+      karten: karten.length, reihen: reihen.length,
+      hoch: Math.round(document.querySelector(".mat-laender").getBoundingClientRect().height),
+      // Wie viel der ZWEITEN Reihe innerhalb des sichtbaren Korbs liegt.
+      sichtbar: zweite ? Math.round(Math.min(zweite.bottom, kr.bottom) - zweite.top) : 0,
+      karteHoch: zweite ? Math.round(zweite.height) : 0,
+    };
+  });
+  stand.ist("bei 820 px brechen sieben Länder in zwei Reihen um",
+    streifen?.reihen === 2, JSON.stringify(streifen));
+  stand.ist("und von der zweiten Reihe ist mehr als die Hälfte zu sehen",
+    streifen && streifen.sichtbar > streifen.karteHoch / 2,
+    `${streifen?.sichtbar} von ${streifen?.karteHoch} px, Streifen ${streifen?.hoch} px hoch`);
+  await seite.setViewportSize({ width: 1600, height: 900 });
+  await seite.evaluate(() => {
+    DECKS[0].entries.map(e => e.cardId).slice(1, 8)
+      .forEach(id => { CARDS.find(c => c.id === id).type_line = "Artifact"; });
+    SESSION_ZONEN = JSON.parse(window.VORHER);
+    renderZonen();
+  });
+  await seite.waitForTimeout(350);
+
   /* --- Kopf, Deckwahl und Verlassen stehen UNTER der Matte --------------- */
   /* Sie standen darüber und schoben sie um ihre Höhe nach unten — für drei
      Dinge, die man einmal zu Beginn braucht. Unten sind sie genauso
@@ -361,11 +412,11 @@ export default async function ({ seite, adresse, stand }) {
   stand.ist("und die Matte ist dadurch höher als nach der alten Formel (64vh)",
     kopf && kopf.matteHoch > Math.round(0.64 * 900), kopf?.matteHoch + " px");
 
-  /* --- Die fünf Laden rechts neben der Matte ---------------------------- */
+  /* --- Die fünf Laden links UNTEN neben der Matte ------------------------ */
   /* Hand, Bibliothek, Exil, Friedhof und Würfel stehen als Embleme in einer
-     SENKRECHTEN Leiste rechts neben der Matte, von oben nach unten in dieser
-     Reihenfolge. Sieben Dinge können daran still schiefgehen, und alle sieben
-     sind hier festgehalten.
+     SENKRECHTEN Leiste links neben der Matte, unten verankert, von oben nach
+     unten in dieser Reihenfolge. Acht Dinge können daran still schiefgehen,
+     und alle acht sind hier festgehalten.
 
      Als waagerechte Reihe über den Lebenspunkten lagen sie vorher ÜBER dem
      Schlachtfeld und nahmen ihm die Sicht — deshalb die eigene Spalte. */
@@ -381,14 +432,19 @@ export default async function ({ seite, adresse, stand }) {
       ziele: zonen.map(z => z.dataset.zonedrop ?? null),
       alteReihen: document.querySelectorAll(
         '.mat-hand, .mat-rechts [data-zone="grave"], .mat-mitte [data-zone="exile"], #dice-box').length,
-      // Rechts von BEIDEN Spalten — und innerhalb der Matte, nicht daneben.
-      rechtsDaneben: reihe.every(z => kn(z).left >= mitte.right - 1 && kn(z).right <= matte.right + 1),
-      // Und über keiner der beiden: Sie hätten sonst die Kommandozone verdeckt.
-      freiVonSpalten: reihe.every(z => kn(z).left >= links.right && kn(z).left >= mitte.right - 1),
+      // Links von BEIDEN Spalten — und innerhalb der Matte, nicht daneben.
+      linksDaneben: reihe.every(z => kn(z).right <= links.left + 1 && kn(z).left >= matte.left - 1),
+      // Und über keiner der beiden: Sie verdeckten sonst Schlachtfeld oder
+      // Kommandozone.
+      freiVonSpalten: reihe.every(z => kn(z).right <= links.left + 1 && kn(z).right <= mitte.left + 1),
       // Von oben nach unten: Hand, Bibliothek, Exil, Friedhof, Würfel.
       vonOben: reihe.every((z, i) => i === 0 || kn(z).top >= kn(reihe[i - 1]).bottom - 1),
-      // Alle in derselben Spalte, also gleich weit rechts.
-      eineSpalte: new Set(reihe.map(z => Math.round(kn(z).right))).size === 1,
+      // Alle in derselben Spalte, also gleich weit links.
+      eineSpalte: new Set(reihe.map(z => Math.round(kn(z).left))).size === 1,
+      /* UNTEN VERANKERT: Der Würfel als letztes Emblem steht am Fuß der Matte,
+         nicht in ihrer Mitte. Oben angeheftet stand die Leiste vorher über dem
+         Schlachtfeld statt bei Ländern und Lebenspunkten. */
+      untenVerankert: Math.round(matte.bottom - kn("wuerfel").bottom),
       // Die Klammer muss durchlässig sein, sonst finge sie Klicks ab, die dem
       // Schlachtfeld darunter gelten. Bei Hand und Würfel wäre das die GANZE Matte.
       klammer: zonen.map(z => getComputedStyle(z).pointerEvents),
@@ -408,10 +464,13 @@ export default async function ({ seite, adresse, stand }) {
     [["wuerfel", "hand", "exile", "grave", "lib"], 0]);
   stand.gleich("die vier Zonen sind Ablageziel, der Würfel nicht",
     leiste.ziele, [null, "hand", "exile", "grave", "lib"]);
-  stand.ist("alle fünf stehen rechts neben der Matte", leiste.rechtsDaneben);
+  stand.ist("alle fünf stehen links neben der Matte", leiste.linksDaneben);
   stand.ist("und über keiner der beiden Spalten", leiste.freiVonSpalten);
   stand.ist("von oben nach unten: Hand, Bibliothek, Exil, Friedhof, Würfel", leiste.vonOben);
-  stand.ist("alle in einer Spalte, gleich weit rechts", leiste.eineSpalte);
+  stand.ist("alle in einer Spalte, gleich weit links", leiste.eineSpalte);
+  stand.ist("und der Block sitzt unten, nicht oben",
+    leiste.untenVerankert >= 0 && leiste.untenVerankert <= 12,
+    leiste.untenVerankert + " px über der Unterkante");
   /* Und die Bibliothek steht NICHT mehr als Spalte in der Matte. Ohne diese
      Zeile bliebe „auch dort noch" unbemerkt — eine Lade zusätzlich sieht nicht
      falsch aus. */
@@ -481,10 +540,10 @@ export default async function ({ seite, adresse, stand }) {
       // Der Friedhof bekommt Rahmen UND Grund — anders als die Hand.
       rahmen: getComputedStyle(korb).borderTopWidth,
       grund: getComputedStyle(korb).backgroundColor,
-      // Er klappt nach LINKS aus, zur Matte hin, und bleibt dabei in ihr.
-      // Nach oben ginge nicht mehr: Die Leiste steht senkrecht, die unteren
-      // Laden drückten dann gegen die Deckenkante.
-      linksVomKnopf: Math.round(knopf.left - kr.right) >= 0,
+      // Er klappt nach RECHTS aus, zur Matte hin, und bleibt dabei in ihr.
+      // Nach oben ginge nicht: Die Leiste steht senkrecht, die oberen Laden
+      // drückten dann gegen die Deckenkante.
+      rechtsVomKnopf: Math.round(kr.left - knopf.right) >= 0,
       inDerMatte: Math.round(kr.left - mat.left) >= 0 && Math.round(mat.bottom - kr.bottom) >= 0
                   && Math.round(kr.top - mat.top) >= 0,
     };
@@ -493,7 +552,7 @@ export default async function ({ seite, adresse, stand }) {
   stand.ist("die Friedhofskarten liegen darin", friedhof.karten === 1, friedhof.karten);
   stand.ist("er trägt Rahmen und Grund", friedhof.rahmen !== "0px" && friedhof.grund !== "rgba(0, 0, 0, 0)",
     `${friedhof.rahmen} / ${friedhof.grund}`);
-  stand.ist("und klappt nach links aus, zur Matte hin", friedhof.linksVomKnopf)
+  stand.ist("und klappt nach rechts aus, zur Matte hin", friedhof.rechtsVomKnopf)
   stand.ist("dabei bleibt er innerhalb der Matte", friedhof.inDerMatte);
 
   /* Das Exil teilt sich die Mechanik mit dem Friedhof — geprüft wird deshalb
@@ -687,7 +746,7 @@ export default async function ({ seite, adresse, stand }) {
       // Der Weg, den auch das Echo der Datenbank nimmt.
       logHinzu({ id: 1, user_id: "u1", kind: "dice", data: { sides: 20, result: 13 } });
       logHinzu({ id: 2, user_id: "u0", kind: "dice", data: { sides: 20, result: 7 } });
-      return document.querySelector("#dice-roll").title.split("\n");
+      return titelVon(document.querySelector("#dice-roll")).split("\n");
     }),
     ["Würfeln", "Ich: 7", "Mira: 13"]);
   stand.ist("jeder Wurf nennt Werfer und Ergebnis",

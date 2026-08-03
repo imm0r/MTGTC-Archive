@@ -97,7 +97,7 @@ const ABLESEN = () => {
   if (!w) return null;
   return { frei: w.querySelector(".mana-frei")?.textContent,
            von: (w.querySelector(".mana-von")?.textContent || "").replace(/[\s /]+/g, ""),
-           titel: k.title };
+           titel: titelVon(k) };
 };
 
 export default async function ({ seite, adresse, stand }) {
@@ -205,13 +205,56 @@ export default async function ({ seite, adresse, stand }) {
   /* --- Das Akkordeon trägt die Marke in der Kopfzeile ------------------ */
   await seite.setViewportSize({ width: 560, height: 860 });
   await seite.waitForTimeout(350);
+
+  /* MIT DEM ZEIGER DARAUF gemessen — und das ist kein Beiwerk, sondern der
+     schwere Fall. Die App zeigt eigene Tooltips und hängt dafür den nativen
+     Hinweis AUS, solange man auf dem Element steht (initTooltip → aushaengen).
+     `el.title` ist dann leer, und die Messung hielte das für einen fehlenden
+     Tooltip. Auf dem Prüfrechner ist genau das passiert: Nach dem Wechsel der
+     Fenstergröße lag der Zeiger vom letzten Klick plötzlich auf der Marke, und
+     die Zeile wurde rot — mit "" als gemessenem Text.
+
+     Hier blieb sie grün, weil ohne Netz die Supabase-Bibliothek vom CDN nicht
+     lädt: Der Aufbau bricht vor wireApp() ab, und initTooltip() läuft nie.
+     Deshalb wird er VON HAND gestartet und der Zeiger ABSICHTLICH daraufgelegt
+     — aus dem Zufall auf dem Läufer wird ein fester Zustand, und titelVon()
+     (hilfen.mjs) muss ihn aushalten. */
+  await seite.evaluate(() => initTooltip());
+  const stelle = await seite.evaluate(() => {
+    // Auf die ZAHL zielen, nicht auf die Farbmarken daneben: Die tragen einen
+    // eigenen title, und dann hinge deren Hinweis aus statt dem der Marke.
+    const el = document.querySelector('.zone[data-zone="field"] .zone-kopf .zone-mana');
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    const p = { x: Math.round(r.left + 6), y: Math.round(r.top + r.height / 2) };
+    return document.elementFromPoint(p.x, p.y) === el ? p : null;
+  });
+  stand.ist("die Zahl der Marke ist mit dem Zeiger erreichbar", !!stelle, JSON.stringify(stelle));
+  // Erst weg, dann hin: „pointerover" entsteht beim ÜBERTRETEN einer Grenze.
+  // Stünde der Zeiger schon dort, löste die Bewegung auf dieselbe Stelle gar
+  // nichts aus — und die Prüfung wäre grün, ohne je gemessen zu haben.
+  await seite.mouse.move(2, 2);
+  await seite.waitForTimeout(60);
+  if (stelle) await seite.mouse.move(stelle.x, stelle.y);
+  await seite.waitForTimeout(400);
+
   const marke = await seite.evaluate(() => {
     const el = document.querySelector('.zone[data-zone="field"] .zone-kopf .zone-mana');
-    return el ? { text: el.textContent.trim(), titel: el.title } : null;
+    return el ? { text: el.textContent.trim(), titel: titelVon(el),
+                  roh: el.getAttribute("title") } : null;
   });
   stand.ist("die Marke steht am Schlachtfeld-Kopf", !!marke, marke?.text);
   stand.ist("mit denselben Zahlen", /9\+\/9\+/.test(marke?.text || ""), marke?.text);
-  stand.ist("und der Aufschlüsselung im Tooltip", /Sol Ring/.test(marke?.titel || ""));
+  stand.ist("der Zeiger hängt den nativen Hinweis aus", marke?.roh === null,
+    JSON.stringify(marke?.roh ?? null).slice(0, 60));
+  /* Der gemessene Text steht IMMER dabei. Ohne ihn war beim Fehlschlag nicht
+     zu sehen, WAS statt der Aufschlüsselung dort stand — und damit auch nicht,
+     woran es lag. Erst der Hinweis „" machte den ausgehängten Tooltip
+     sichtbar; die Zeile allein sah nach einem Fehler im Mana-Text aus. */
+  stand.ist("und die Aufschlüsselung ist trotzdem zu lesen", /Sol Ring/.test(marke?.titel || ""),
+    JSON.stringify(marke?.titel ?? null).slice(0, 200));
+  await seite.mouse.move(2, 2);
+  await seite.waitForTimeout(250);
 
   /* --- Die Farbreihe auf der Matte ------------------------------------
      Sieben Mana sind wertlos, wenn der Zauber zwei blaue verlangt und kein
