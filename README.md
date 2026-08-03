@@ -773,6 +773,13 @@ ist der einzige Hinweis darauf, dass etwas wartet.
 > Null darin: zwei gelbe Punkte in der Kopfzeile, die nichts bedeuteten.
 > Dieselbe Falle bei `.gate-usercount`/`.gate-deckcount`. Ein globales
 > `[hidden]{display:none !important}` nimmt sie für alle weg.
+>
+> Das war die **erste** Regel dieser Datei mit einer Priorität — und prompt
+> meldete `css-gueltig` sie als verworfen. Zu Unrecht: `setProperty()` nimmt
+> die Priorität als eigenes Argument und weist alles zurück, was sie im Wert
+> mitbringt. Der Prüffall trennt sie jetzt ab; seine Selbstprobe läuft
+> zusätzlich mit einer nachweislich ungültigen Anweisung **samt**
+> `!important`, damit die Priorität kein Freibrief wird.
 
 ### Der Weg dorthin: Kacheln, die führen
 
