@@ -2799,6 +2799,12 @@ function vollVerbaut(c, konto) {
   return b >= 1 && (konto.verbaut.get(k) || 0) >= b;
 }
 
+/* Der Themen-Filter der Sammlung. filtered() ist synchron, die Kartenmenge
+   eines Themas kommt asynchron aus der Datenbank — deshalb hält dieser Merker
+   das GELADENE Set und filtered() liest nur. Gesetzt wird er in
+   themaFilterSetzen: erst laden, dann Merker, dann neu zeichnen. */
+let themaFilter = null;   // { slug, label, ids: Set<oracle_id> } oder null
+
 function filtered(bereich = "coll") {
   const q = lel(bereich, "q").value.trim().toLowerCase();
   // Die Wunschliste hat keinen Ausführungs-Filter (jede Wunschkarte entsteht
@@ -2815,6 +2821,12 @@ function filtered(bereich = "coll") {
   // Welche Hälfte der Zeilen überhaupt in Frage kommt, entscheidet LISTE:
   // besessen (Bestand > 0) für die Sammlung, eingeplant-aber-fehlend
   // (Bestand 0) für die Wunschliste.
+  // Der Themen-Filter gilt nur in der Sammlung (die Wunschliste hat das
+  // Dropdown nicht). Karten ohne oracle_id (uralter Bestand) fallen bei
+  // gesetztem Thema heraus — ohne Kennung lässt sich die Frage „trägt sie das
+  // Thema?" schlicht nicht beantworten, und „vielleicht" anzuzeigen wäre
+  // gelogen.
+  const thema = bereich === "coll" ? themaFilter : null;
   return LISTE[bereich].karten().filter(c =>
     (!q || c.name.toLowerCase().includes(q) || c.disp.toLowerCase().includes(q) ||
            (c.set_name || "").toLowerCase().includes(q)) &&
@@ -2824,7 +2836,8 @@ function filtered(bereich = "coll") {
     // angehakten Typen trägt ("Artifact Creature" passt zu Artefakt UND Kreatur).
     (!typen.length || typen.some(en => typMatch(c.type_line, en))) &&
     (!ci.length || farbidentPasst(c, ci)) &&
-    (!konto || !vollVerbaut(c, konto))
+    (!konto || !vollVerbaut(c, konto)) &&
+    (!thema || (c.oracle_id && thema.ids.has(c.oracle_id)))
   ).sort((a, b) => cmpWert(sortWert(s.key, a), sortWert(s.key, b), s.dir));
 }
 
@@ -5146,6 +5159,9 @@ function detailHtml(c, hover) {
         <details class="legal-det" id="dt-legal"><summary>&#9878; ${esc(t("legal.title"))}</summary>
           <div id="dt-legal-body"><div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("legal.loading"))}</div></div>
         </details>
+        <details class="legal-det" id="dt-themen"><summary>&#127991; ${esc(t("themen.title"))}</summary>
+          <div id="dt-themen-body"><div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("themen.loading"))}</div></div>
+        </details>
         <div class="sec-sep"></div>
         <div class="tool-group"><span class="tool-label">${esc(t("detail.groupTools"))}</span>
           <div class="tool-row">
@@ -5223,7 +5239,7 @@ function renderDetail(c, id, fremd) {
   // Das Bild gehört zur Karte des Besitzers — bei einer fremden Karte
   // (Community-Kachel) verschwindet der Knopf wie Bearbeiten und Preis.
   if (bb) bb.hidden = !!fremd;
-  if (fremd) return wireDetailSynergien(c);
+  if (fremd) { wireDetailThemen(c); return wireDetailSynergien(c); }
 
   // Erst schließen, dann den Bild-Dialog — wie bei „Bearbeiten": zwei
   // gestapelte Dialoge wären fragil. bildDlg öffnet die Detailansicht danach
@@ -5249,6 +5265,34 @@ function renderDetail(c, id, fremd) {
 /* Alles, was nur die Karte selbst braucht und keinen Besitz voraussetzt:
    Synergien, KI-Synergien, Combos, Legalität, Deck-Sprünge. Eigener Abschnitt,
    damit auch die Ansicht einer fremden Karte ihn bekommt. */
+/* Die Themen-Chips einer Karte. Direkte Themen voll, geerbte (Ober-Themen aus
+   der Hierarchie) gedimmt und hinter einem Trenner — beides zu mischen sähe
+   nach doppelter Verschlagwortung aus, wo in Wahrheit eine Hierarchie steckt.
+   Der title trägt die Beschreibung, sofern der Tagger eine führt (29 %). */
+function themenChipsHtml(themen) {
+  if (!themen.length) return `<div class="empty">${esc(t("themen.none"))}</div>`;
+  const chip = th => `<span class="thema-chip${th.direkt ? "" : " geerbt"}"${
+    th.description ? ` title="${esc(th.description)}"` : ""}>${esc(th.label)}<i>${th.cards}</i></span>`;
+  const direkt = themen.filter(th => th.direkt), geerbt = themen.filter(th => !th.direkt);
+  return `<div class="thema-chips">${direkt.map(chip).join("")}${
+    geerbt.length ? `<span class="thema-trenner" title="${esc(t("themen.inheritedHint"))}">${esc(t("themen.inherited"))}</span>` + geerbt.map(chip).join("") : ""}</div>
+    <p class="hint" style="margin:6px 0 0">${t("themen.source")}</p>`;
+}
+
+/* Themen erst beim ersten Aufklappen laden — dasselbe Muster wie die
+   Legalität. Kommt nichts zurück (Karte ohne Tags, Tabelle leer oder noch
+   nicht eingespielt), sagt der Kasten das, statt ewig zu drehen. */
+function wireDetailThemen(c) {
+  const det = $("#dt-themen");
+  if (!det) return;
+  det.addEventListener("toggle", async () => {
+    if (!det.open || det.dataset.geladen) return;
+    det.dataset.geladen = "1";
+    const body = $("#dt-themen-body");
+    body.innerHTML = themenChipsHtml(await themenVonKarte(c.oracle_id));
+  });
+}
+
 function wireDetailSynergien(c) {
   // Synergien: passende Karten zu dieser Karte (nur die Karte selbst raus).
   const yb = $("#dt-syn");
@@ -5290,6 +5334,8 @@ function wireDetailSynergien(c) {
     try { body.innerHTML = legalGridHtml(await kartenLegalitaet(c.scryfall_id)); }
     catch { body.innerHTML = `<div class="empty">${esc(t("legal.error"))}</div>`; }
   });
+  // Themen: gleiches Muster — erst beim ersten Aufklappen aus der Datenbank.
+  wireDetailThemen(c);
 
   // Deck-Zugehörigkeit: Klick auf eine Deck-Nennung springt zum Deck.
   $$("#detail-body .deck-chip[data-godeck]").forEach(ch =>
@@ -5404,6 +5450,139 @@ function zeigeCmdHover(img, name, x, y, zusatz) {
   el.style.left = l + "px"; el.style.top = o + "px";
 }
 function versteckeCmdHover() { if (cmdHoverEl) cmdHoverEl.style.display = "none"; }
+
+/* ============================ Themen-Index ============================
+   Was eine Karte INHALTLICH tut — sacrifice-outlet, mana-rock, ramp. Die
+   Daten stammen aus Scryfalls Tagger (Gemeinschaftsprojekt, von Hand
+   verschlagwortet) und liegen umgedreht in unserer Datenbank: tags und
+   card_tags, täglich frisch über .github/workflows/themen.yml. Umgedreht,
+   weil Scryfalls Such-API nur „welche Karten hat Thema X" beantwortet —
+   die Gegenrichtung, die die Detailansicht braucht, gibt es nur bei uns.
+
+   Fehlt die Tabelle (Migration noch nicht eingespielt) oder ist sie leer
+   (erster Lauf steht aus), verschwinden die Themen einfach aus der
+   Oberfläche — wie beim Deck-Verlauf hält das den Rest der App nicht auf. */
+
+/* Alle Themen einer Karte, Ober-Themen eingeschlossen. tags_of_card rollt
+   die Hierarchie in der Datenbank hoch und markiert je Thema, ob es direkt
+   an der Karte hängt oder geerbt ist. Cache je oracle_id für die Sitzung:
+   Themen ändern sich täglich, nicht während man die Detailansicht öffnet. */
+const themenCache = new Map();
+async function themenVonKarte(oracleId) {
+  if (!oracleId) return [];
+  if (themenCache.has(oracleId)) return themenCache.get(oracleId);
+  let liste = [];
+  try {
+    const { data, error } = await sb.rpc("tags_of_card", { p_oracle_id: oracleId });
+    if (!error && Array.isArray(data)) liste = data;
+  } catch { /* Tabelle fehlt oder Netz weg — dann eben ohne Themen */ }
+  themenCache.set(oracleId, liste);
+  return liste;
+}
+
+/* Das Themen-Vokabular fürs Filter-Dropdown: einmal je Sitzung, absteigend
+   nach Größe. Nur Themen ab MIN Karten — der Median liegt bei fünf, ein
+   Viertel hat vier oder weniger, und ein Filter voller Einzelfälle wie
+   „hate-typal-giant" (1 Karte) wäre keine Auswahl, sondern ein Heuhaufen.
+   In der Detailansicht gilt die Schwelle bewusst NICHT: Dort sind die
+   seltenen Themen einer Karte gerade die interessanten. */
+const THEMEN_FILTER_MIN = 20;
+let themenVokabularP = null;
+function themenVokabular() {
+  return (themenVokabularP = themenVokabularP || (async () => {
+    try {
+      const { data, error } = await sb.from("tags")
+        .select("slug,label,description,cards")
+        .gte("cards", THEMEN_FILTER_MIN)
+        .order("cards", { ascending: false });
+      return error ? [] : (data || []);
+    } catch { return []; }
+  })());
+}
+
+/* Alle oracle_ids zu einem Thema, Unter-Themen eingeschlossen (die Funktion
+   steigt in der Datenbank hinab — sacrifice-outlet selbst trägt keine einzige
+   Karte, seine acht Kinder tragen 1500). Als Set fürs Filtern. */
+const themenKartenCache = new Map();
+async function kartenZuThema(slug) {
+  if (themenKartenCache.has(slug)) return themenKartenCache.get(slug);
+  let ids = new Set();
+  try {
+    const { data, error } = await sb.rpc("cards_with_tag", { p_slug: slug });
+    if (!error && Array.isArray(data))
+      ids = new Set(data.map(r => r.oracle_id));
+  } catch { /* ohne Daten filtert das Thema schlicht nichts */ }
+  themenKartenCache.set(slug, ids);
+  return ids;
+}
+
+/* Themen-Filter setzen: Kartenmenge laden, Merker stellen, neu zeichnen.
+   Während des Ladens zeigt der Trigger das gewählte Thema schon an — die
+   Liste folgt, sobald die Menge da ist (Punktabruf, gemessen 37 ms in der
+   Datenbank; das Netz obendrauf bleibt unter einer Sekunde). */
+async function themaFilterSetzen(slug, label) {
+  const inner = $("#thema-trigger-inner");
+  if (!slug) {
+    themaFilter = null;
+    if (inner) inner.textContent = t("coll.all");
+  } else {
+    if (inner) inner.textContent = label;
+    themaFilter = { slug, label, ids: await kartenZuThema(slug) };
+  }
+  listPage.coll = 0;
+  renderCollection();
+}
+
+/* Das Dropdown: Vokabular beim ersten Öffnen laden (einmal je Sitzung), das
+   Suchfeld grenzt die ~1100 Themen ein. Aufbau wie das Set-Dropdown daneben —
+   Trigger, .open-Klasse, Außenklick schließt über den .set-select-Handler in
+   wireApp. Ist der Index leer (Migration nicht eingespielt, erster Lauf steht
+   aus), bleibt die ganze Gruppe versteckt statt ein totes Menü zu zeigen. */
+function wireThemaFilter() {
+  const gruppe = $("#thema-gruppe"), sel = $("#thema-select"),
+        trg = $("#thema-trigger"), liste = $("#thema-liste"),
+        suche = $("#thema-suche");
+  if (!gruppe || !sel) return;
+
+  // Sichtbarkeit: erst zeigen, wenn der Index wirklich Themen hat.
+  themenVokabular().then(v => { if (v.length) gruppe.hidden = false; });
+
+  const eintrag = th => `<li class="set-item" data-thema="${esc(th.slug)}" data-label="${esc(th.label)}"${
+    th.description ? ` title="${esc(th.description)}"` : ""}>${esc(th.label)}<i class="thema-anzahl">${th.cards}</i></li>`;
+
+  const fuellen = async filter => {
+    const alle = await themenVokabular();
+    const f = norm(filter || "");
+    const treffer = f ? alle.filter(th => norm(th.label).includes(f)) : alle;
+    // Deckel gegen 1100 DOM-Zeilen auf einmal: ungefiltert die 60 größten —
+    // wer mehr will, tippt. Der Hinweis darunter sagt, dass da mehr ist.
+    const zeigen = treffer.slice(0, 60);
+    liste.innerHTML = `<li class="set-item" data-thema="">${esc(t("coll.all"))}</li>` +
+      zeigen.map(eintrag).join("") +
+      (treffer.length > zeigen.length
+        ? `<li class="thema-mehr">${esc(t("coll.themeMore", { n: treffer.length - zeigen.length }))}</li>` : "");
+  };
+
+  trg.onclick = async ev => {
+    ev.stopPropagation();
+    const offen = sel.classList.toggle("open");
+    trg.setAttribute("aria-expanded", offen);
+    if (offen) { await fuellen(suche.value); suche.focus(); }
+  };
+  suche.oninput = () => fuellen(suche.value);
+  // Klick ins Suchfeld darf das Menü nicht schließen (der Menü-Klick-Handler
+  // unten reagiert nur auf Einträge, aber stopPropagation hält auch den
+  // Außenklick-Handler fern, falls jemand das Feld erneut fokussiert).
+  suche.onclick = ev => ev.stopPropagation();
+
+  liste.onclick = ev => {
+    const li = ev.target.closest("[data-thema]");
+    if (!li) return;
+    sel.classList.remove("open");
+    trg.setAttribute("aria-expanded", "false");
+    themaFilterSetzen(li.dataset.thema, li.dataset.label || "");
+  };
+}
 
 /* ============================ Synergien ==============================
    Zu einer Karte (oder einem Deck) passende Karten über Fähigkeits-Synergien
@@ -16615,6 +16794,8 @@ function wireApp() {
     $$(lid(bereich, "ci-filter") + " input[data-ci], " +
        lid(bereich, "type-filter") + " input[data-typ]").forEach(inp => inp.onchange = neu);
   }
+  // Themen-Filter — nur die Sammlung hat ihn, deshalb außerhalb der Schleife.
+  wireThemaFilter();
   $("#upd").onclick = updatePrices;
   // Einkaufszettel über die ganze Wunschliste — derselbe Dialog wie „Fehlende
   // Karten kaufen" am einzelnen Deck.
