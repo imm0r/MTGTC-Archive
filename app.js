@@ -15905,9 +15905,27 @@ function onLangChange() {
   if ($("#sell-dlg")?.open) renderVerkauf();
 }
 
+/* Sinnbilder der obersten Navigation: fehlt eine Datei, bleibt es beim Wort.
+   Ein <img> mit leerem alt und fester Größe verschwindet nicht, wenn es nicht
+   lädt — es bleibt als 32 px breites Loch im Knopf stehen, gemessen im
+   Prüfbrowser. Das sieht nach einem kaputten Knopf aus, obwohl er tut, was er
+   soll.
+   Beide Reihenfolgen abfangen: Ist das Bild beim Aufruf schon durch, meldet
+   sich `error` nie mehr — dann verrät `complete` ohne `naturalWidth`, dass es
+   danebenging. Nur ausblenden, nicht entfernen: Kommt die Datei nach, ist beim
+   nächsten Laden alles an seinem Platz. */
+function navSymboleAbsichern() {
+  $$(".nav-sym").forEach(im => {
+    const aus = () => im.classList.add("fehlt");
+    if (im.complete && !im.naturalWidth) aus();
+    im.addEventListener("error", aus);
+  });
+}
+
 /* ================================ Start =============================== */
 (async () => {
   applyI18n();          // statische Oberfläche in der gewählten Sprache
+  navSymboleAbsichern();
   synModusAnwenden();   // Synergie-Modus (welche Knöpfe sichtbar sind) früh setzen
   wireSetup();
   const c = cfg();
