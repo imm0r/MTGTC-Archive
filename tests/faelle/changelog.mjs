@@ -128,20 +128,34 @@ export default async function ({ seite, adresse, stand, wurzel }) {
   stand.gleich("eine leere Angabe zählt nie als Änderung",
     [vergleich.leerA, vergleich.leerB], [false, false]);
 
-  /* --- Was die Kopfzeile daraus macht ------------------------------------ */
+  /* --- Was die Kopfzeile daraus macht ------------------------------------
+     DREI Fälle, nicht zwei. „Keine gemerkte Fassung" heißt nämlich zweierlei:
+     wirklich zum ersten Mal hier — oder schon lange dabei, aber zuletzt eine
+     Fassung VOR dieser Anzeige gesehen. Beim Ausliefern von 0.76.0 traf das
+     auf JEDEN bestehenden Nutzer zu, und alle bekamen die Behandlung für
+     Neulinge: still merken, nicht färben. Die gesamte Nutzerschaft verpasste
+     damit genau eine Meldung, nämlich die erste — unbemerkt, denn es sieht
+     nicht nach einem Fehler aus, es passiert nur nichts.
+
+     Diese Prüfung hat es nicht gefangen, weil sie den Unterschied gar nicht
+     kannte: Sie räumte nur den einen Schlüssel weg und ließ alle anderen
+     Spuren stehen. Jetzt wird beides gebaut. */
   const faelle = await seite.evaluate(() => {
     const el = document.getElementById("header-version");
-    const lauf = (gemerkt) => {
-      if (gemerkt === null) localStorage.removeItem("mtg-version-gesehen");
-      else localStorage.setItem("mtg-version-gesehen", gemerkt);
+    const lauf = (gemerkt, spuren) => {
+      localStorage.clear();
+      if (spuren) localStorage.setItem("mtg-lang", "de");   // war schon mal da
+      if (gemerkt) localStorage.setItem("mtg-version-gesehen", gemerkt);
       zeigeKopfVersion();
       return { neu: el.classList.contains("neu"), titel: el.title,
-               farbe: getComputedStyle(el).color, gemerkt: localStorage.getItem("mtg-version-gesehen") };
+               farbe: getComputedStyle(el).color,
+               gemerkt: localStorage.getItem("mtg-version-gesehen") };
     };
-    const alt = lauf("0.0.1");
-    const gleich = lauf(APP_VERSION);
-    const erst = lauf(null);
-    return { alt, gleich, erst, version: APP_VERSION };
+    const alt = lauf("0.0.1", true);
+    const gleich = lauf(APP_VERSION, true);
+    const umstieg = lauf(null, true);    // Spuren, aber nichts gemerkt
+    const erst = lauf(null, false);      // blanker Browser
+    return { alt, gleich, umstieg, erst, version: APP_VERSION };
   });
   stand.ist("nach einer neuen Fassung ist die Nummer hervorgehoben",
     faelle.alt.neu, faelle.alt.titel);
@@ -153,6 +167,18 @@ export default async function ({ seite, adresse, stand, wurzel }) {
   stand.ist("die Farbe unterscheidet sich wirklich, nicht nur die Klasse",
     faelle.alt.farbe !== faelle.gleich.farbe,
     `${faelle.alt.farbe} statt ${faelle.gleich.farbe}`);
+
+  // Der Fall, an dem es beim Ausliefern gescheitert ist.
+  stand.ist("wer schon da war, aber noch nichts gemerkt hat, bekommt Farbe",
+    faelle.umstieg.neu, faelle.umstieg.titel);
+  stand.ist("und einen Hinweis ohne leere Klammer",
+    !faelle.umstieg.titel.includes("()") && !/statt\s+beim/.test(faelle.umstieg.titel),
+    faelle.umstieg.titel);
+  // Nicht gleich merken: Sonst wäre die Farbe nach dem nächsten Neuladen weg,
+  // ohne dass jemand hineingesehen hätte.
+  stand.ist("gemerkt wird dabei noch nichts", !faelle.umstieg.gemerkt,
+    String(faelle.umstieg.gemerkt));
+
   // Wer noch nie hier war, hat nichts verpasst. Ohne diese Ausnahme leuchtete
   // die Nummer jedem Neuling entgegen und bedeutete nichts.
   stand.ist("beim allerersten Besuch ist sie nicht hervorgehoben",
