@@ -114,8 +114,53 @@ export default async function ({ seite, adresse, stand }) {
       tappen: document.querySelectorAll(".spk [data-tap]").length,
       marken: document.querySelectorAll(".spk [data-marke]").length })),
     { ziele: 4, tappen: 1, marken: 2 });
-  await seite.evaluate(() => versteckeSpielKarte(true));
-  await seite.waitForTimeout(150);
+
+  /* --- Und sie ROLLT NICHT ---------------------------------------------
+     Vorher rollte die Spalte, und an Typzeile und Zielknöpfe kam man nur,
+     indem man erst am Kartenbild vorbeirollte — bei einer Karte, die man im
+     Spiel im Vorbeigehen ansieht, ist das eine Zumutung. Jetzt gibt das BILD
+     nach: Es nimmt seine natürliche Höhe, schrumpft aber, wenn der Platz nicht
+     reicht. Geprüft wird bei beiden Spaltenbreiten (268 px ab 1200, darunter
+     154) und mit einer langen Typzeile, denn die ist der schwere Fall. */
+  await seite.evaluate(([id]) => {
+    const c = CARDS.find(x => x.id === id);
+    c.type_line = "Legendary Artifact Creature — Phyrexian Horror Wizard Advisor";
+  }, [k.feld[0]]);
+  for (const breite of [1600, 1200, 900]) {
+    await seite.setViewportSize({ width: breite, height: 900 });
+    await seite.waitForTimeout(300);
+    await seite.evaluate(([id]) => zeigeSpielKarte(id, 300, 300, "field", true, 0), [k.feld[0]]);
+    await seite.waitForTimeout(300);
+    const spalte = await seite.evaluate(() => {
+      const f = document.querySelector("#spk-feld");
+      if (!f) return null;
+      const r = f.getBoundingClientRect();
+      const letzte = f.lastElementChild;
+      const bild = f.querySelector(".spk-bild");
+      return { rollt: f.scrollHeight - f.clientHeight,
+               // Das letzte Element (die Knopfreihe) endet INNERHALB der Fläche.
+               unten: Math.round(letzte.getBoundingClientRect().bottom - r.bottom),
+               bild: bild ? Math.round(bild.getBoundingClientRect().height) : 0,
+               hoch: Math.round(r.height) };
+    });
+    // Unter 1200 px gibt es die Spalte nicht (SPK_SPALTE) — dort schwebt die
+    // Karte wie bisher am Zeiger, und ein Rollbalken ist gar nicht möglich.
+    if (breite >= 1200) {
+      stand.ist(`bei ${breite} px rollt die Kartenspalte nicht`,
+        spalte && spalte.rollt === 0 && spalte.unten <= 0, JSON.stringify(spalte));
+      stand.ist(`… und das Bild bleibt dabei ansehnlich groß`,
+        spalte && spalte.bild >= 150, JSON.stringify(spalte));
+    } else {
+      stand.ist("unter 1200 px gibt es die feste Spalte nicht", spalte === null, JSON.stringify(spalte));
+    }
+    // NOCH IN DIESER BREITE wegräumen: Unter 1200 px landet die Karte im
+    // schwebenden Fenster, und das bekäme man nach dem Umschalten nicht mehr
+    // zu fassen — es stünde bis zum nächsten Klick über dem Feld.
+    await seite.evaluate(() => versteckeSpielKarte(true));
+    await seite.waitForTimeout(150);
+  }
+  await seite.setViewportSize({ width: 1600, height: 900 });
+  await seite.waitForTimeout(300);
 
   /* --- Ein Klick tappt, ein Zug nicht ----------------------------------- */
   const kl = await seite.evaluate(PUNKT, '.zk[data-zone="field"]');
@@ -647,6 +692,16 @@ export default async function ({ seite, adresse, stand }) {
       stand.ist("und die Schaltfläche zählt herunter",
         await seite.evaluate(() => document.querySelector('.schwebe-zone[data-zone="hand"] .schwebe-n')
           .textContent) === "1");
+      /* … und die Lade steht DANACH WIEDER OFFEN. Zugegangen ist sie nur für
+         den Zug, weil sie über den Zielzonen läge; danach ist der Grund weg.
+         Man spielt selten genau eine Karte, und sie jedes Mal neu aufzuklappen
+         ist ein Handgriff für nichts. Das Ablegen zeichnet die Zonen neu und
+         baut die Laden dabei zugeklappt auf — die Prüfung misst also, dass das
+         Wiederaufklappen NACH dem Neuzeichnen passiert. */
+      stand.gleich("und die Lade steht danach wieder offen",
+        await seite.evaluate(() => [schwebeOffen,
+          getComputedStyle(document.querySelector(".sz-hand .schwebe-korb")).visibility]),
+        ["hand", "visible"]);
     }
   }
 
@@ -734,6 +789,34 @@ export default async function ({ seite, adresse, stand }) {
     wuerfe.every(w => JSON.stringify(w.deckt) === "[0,0,0,0]"),
     JSON.stringify(wuerfe[0].deckt));
   stand.ist("der echte 3D-Würfel steht bereit", wuerfe.every(w => w.dreiD));
+
+  /* … und ÜBER ALLEM, was in der Matte liegt. Er lag darunter (z-index 30),
+     damit eine offene Lade vorn bleibt — gewürfelt wird aber gerade dann oft,
+     und dann sah man vom Wurf nichts.
+
+     Gemessen wird die Stapelordnung, und zwar an den z-index-Werten: Die Bühne
+     ist für Zeiger durchlässig, und elementsFromPoint hittestet — es überginge
+     sie also und meldete fröhlich, sie liege nirgends. Damit der Vergleich
+     überhaupt etwas heißt, wird MITGEPRÜFT, dass alle Beteiligten in derselben
+     Stapelebene liegen: Die Spalten tragen gar keinen z-index (sie werden im
+     normalen Fluss gemalt, also unter jedem positionierten Nachbarn mit einem
+     positiven), und die Matte selbst spannt keine eigene Ebene auf, in der die
+     Zahlen wieder bedeutungslos wären. */
+  const ebenen = await seite.evaluate(() => {
+    const z = s => { const el = document.querySelector(s); return el ? getComputedStyle(el).zIndex : "fehlt"; };
+    return {
+      wuerfel: z(".mat .sz-wuerfel"),
+      laden: [...document.querySelectorAll(".schwebe-zone[data-schwebe-fach]")]
+        .map(e => getComputedStyle(e).zIndex),
+      spalten: [z(".mat-links"), z(".mat-mitte")],
+      matte: z(".mat"),
+    };
+  });
+  stand.ist("der Würfel liegt über allen Laden",
+    Number(ebenen.wuerfel) > Math.max(...ebenen.laden.map(Number)),
+    `Würfel ${ebenen.wuerfel}, Laden ${ebenen.laden.join("/")}`);
+  stand.gleich("und über beiden Spalten, die gar keine eigene Ebene haben",
+    [ebenen.spalten, ebenen.matte], [["auto", "auto"], "auto"]);
   stand.ist("die gewürfelte Zahl steht auf dem Symbol",
     wuerfe.every(w => w.aufSymbol === String(w.erg) && !w.symbolMatt),
     wuerfe.map(w => w.aufSymbol).join(", "));

@@ -1106,11 +1106,15 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .sz-wuerfel{position:fixed;inset:auto;z-index:70}
 .sz-wuerfel .schwebe-knopf{position:fixed;right:14px;bottom:14px}
 .sz-wuerfel .wuerfel-buehne{position:fixed;inset:12px}
-/* UNTER den drei Laden (z-index 40): Der Würfel fliegt über die Matte, aber
-   ein offener Handfächer oder Friedhof gehört davor — man würfelt oft, während
-   eine Lade offen steht. Der eigene Knopf steht im DOM hinter der Fläche und
-   liegt damit ohnehin darüber. */
-.mat .sz-wuerfel{position:absolute;inset:0;z-index:30}
+/* ÜBER ALLEM in der Matte (Laden 40, Spalten ohne eigenen z-index): Der Würfel
+   soll zu sehen sein, wo immer er hinrollt — auch über der angezeigten Karte
+   und über einem offenen Handfächer. Er lag vorher darunter (30), damit eine
+   offene Lade vorn bleibt; gewürfelt wird aber gerade dann oft, und dann sah
+   man vom Wurf nichts. Er blendet ohnehin nach ein paar Sekunden aus, und die
+   Zahl bleibt am Emblem.
+   EINE Ausnahme bleibt darüber: die Matte eines Mitspielers (60). Die legt man
+   bewusst über die eigene, und Escape räumt ab, was obenauf liegt. */
+.mat .sz-wuerfel{position:absolute;inset:0;z-index:50}
 .mat .sz-wuerfel .schwebe-knopf{position:absolute;left:0;right:auto;
   bottom:var(--sz-unten);top:auto}
 .mat .sz-wuerfel .wuerfel-buehne{position:absolute;inset:0}
@@ -1350,23 +1354,19 @@ body.zieht-gerade .zk:hover,body.zieht-gerade .zk:focus-within{transform:none}
 .mat-mitte .lib-nm{font-size:12px}
 /* Commander-Steuer: was das naechste Wirken aus der Kommandozone extra kostet.
    Zugleich der Knopf, um ein zu viel gezaehltes Wirken zurueckzunehmen. */
-.mat-steuer{flex:none}
-.mat-steuerwert{width:100%;padding:2px 0;border:1px solid var(--acc);border-radius:8px;
+/* Die Commander-Steuer sitzt in der KOPFZEILE der Kommandozone, wie das Mana
+   in der der Länder. Als eigener Kasten darüber kostete sie Titelzeile, Korb
+   und Abstand — gemessen rund 70 px, die jetzt die angezeigte Karte bekommt.
+   Je Commander eine Marke; der Name steht im Kurztext, nicht daneben. */
+.mat-steuern{margin-left:auto;display:flex;align-items:center;gap:4px;flex:none}
+.mat-steuerwert{padding:1px 7px;border:1px solid var(--acc);border-radius:9px;
   background:var(--panel);color:var(--acc);cursor:pointer;
-  font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}
-.mat-steuer .mat-titel{margin-bottom:4px}
+  font-size:13px;font-weight:800;line-height:1.35;font-variant-numeric:tabular-nums}
 .mat-steuerwert:hover{background:var(--acc);color:#1a1400}
-.mat-steuerwert.leer{border-color:var(--line);color:var(--dim);cursor:default}
-/* JE COMMANDER eine Zeile. Bei einem einzelnen steht nur der Wert da und
-   nimmt die volle Breite — genau wie vorher. Bei zweien tritt der Name davor
-   und schrumpft mit der Spalte; die Zahl behält ihre Breite, sie ist das,
-   worauf man zielt. */
-.mat-steuerzeile{display:flex;align-items:center;gap:6px}
-.mat-steuerzeile + .mat-steuerzeile{margin-top:5px}
-.mat-steuername{flex:1;min-width:0;font-size:11px;color:var(--dim);
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.mat-steuerzeile .mat-steuername + .mat-steuerwert{flex:none;width:auto;min-width:52px;padding:2px 8px;
-  font-size:16px}
+/* Zwei Marken plus Zeichen, Wort und Anzahl sprengen die 154-px-Kopfzeile
+   unter 1200 px. Umbrechen statt hinauslaufen — dieselbe Lösung wie bei den
+   Länderfarben. */
+.mat-cmd .mat-titel{flex-wrap:wrap;row-gap:4px}
 /* ===== Mana in diesem Zug =====
    Eine ANZEIGE, kein Knopf, und sie steht in der Kopfzeile des
    Länderstreifens — bei den Quellen, aus denen die Zahl entsteht. Als eigene
@@ -1463,10 +1463,24 @@ body.zieht-gerade .zk:hover,body.zieht-gerade .zk:focus-within{transform:none}
   box-shadow:0 12px 38px #000d}
 .spk.fest{pointer-events:auto;border-color:var(--acc)}
 /* Dieselbe Ansicht in der festen Spalte: kein schwebendes Fenster mehr,
-   sondern der Inhalt der Flaeche — ohne Rahmen, Schatten und Position. */
-#spk-feld{position:static;display:block;pointer-events:auto;width:auto;max-width:none;
+   sondern der Inhalt der Flaeche — ohne Rahmen, Schatten und Position.
+
+   OHNE ROLLBALKEN. Vorher rollte die Fläche, und man kam an Typzeile und
+   Knöpfe nur, indem man erst am Bild vorbeirollte — bei einer Karte, die man
+   im Spiel im Vorbeigehen ansieht, ist das eine Zumutung. Jetzt ist sie eine
+   Flex-Spalte, in der ALLES außer dem Bild seine Höhe behält und das BILD
+   nachgibt (siehe .spk-bild). Der Rollbalken bleibt als letzte Reserve für
+   den Fall, dass Text und Knöpfe allein schon höher sind als die Spalte. */
+#spk-feld{position:static;display:flex;flex-direction:column;pointer-events:auto;
+  width:auto;max-width:none;
   background:none;border:none;border-radius:0;padding:0;box-shadow:none;
   flex:1;min-height:0;overflow-y:auto}
+#spk-feld > *{flex:none}
+/* Das Bild gibt nach: `0 1 auto` heißt „nimm deine natürliche Höhe, schrumpfe
+   aber, wenn der Platz nicht reicht". object-fit hält dabei das Seitenverhältnis
+   — die Karte wird kleiner, nicht gequetscht. Ohne min-height:0 schrumpfte ein
+   Flex-Kind nie unter seinen Inhalt, und genau das erzwang den Rollbalken. */
+#spk-feld .spk-bild{flex:0 1 auto;min-height:0;object-fit:contain;object-position:center top}
 #spk-feld .spk-zu{display:none}
 .spk-leer{font-size:12px;color:var(--dim);padding:10px 2px;text-align:center}
 .spk-bild{display:block;width:100%;border-radius:8px}
