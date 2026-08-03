@@ -82,12 +82,12 @@ nav button.on,nav button.on:hover{background:var(--akt-flaeche);color:var(--acc2
    beim aktiven Punkt und beim Überfahren. Das ist dieselbe Aussage, die die
    Knöpfe ohnehin machen ("hier bin ich"), nur mit einem zweiten Mittel — und
    es hält die Aufmerksamkeit bei dem einen Punkt, der gerade zählt.
-   32 px, nicht 22: Bei zweiundzwanzig war von einer gemalten Illustration
+   35 px, nicht 22: Bei zweiundzwanzig war von einer gemalten Illustration
    nichts mehr zu erkennen — ein brauner Fleck, der auch ein Kaffeefleck sein
    könnte. Der Knopf wird dadurch höher als der Text ihn machen würde, und das
    ist der Preis: Die Kopfzeile wächst um rund zehn Pixel. Dafür sieht man,
    was da abgebildet ist. */
-.nav-sym{flex:none;width:32px;height:32px;object-fit:contain;
+.nav-sym{flex:none;width:35px;height:35px;object-fit:contain;
   filter:saturate(.45) brightness(.85);transition:filter .15s ease-out;
   -webkit-user-drag:none;user-drag:none}
 nav button:hover .nav-sym,nav button.on .nav-sym{filter:none}
@@ -114,14 +114,17 @@ nav button:hover .nav-sym,nav button.on .nav-sym{filter:none}
    einer bestimmten Breite das WORT weichen — das Bild trägt die Aussage
    ohnehin, es ist bloß größer als eine Schriftzeile.
 
-   WO GENAU, sagt die längste Sprache und nicht die eigene. Gemessen, was die
-   volle Beschriftung an Fensterbreite verlangt:
+   WO GENAU, sagt die längste Sprache im ungünstigsten Zustand — nicht die
+   eigene im bequemsten. Gemessen mit BEIDEN Zählern (offene Wünsche, offene
+   Einladung), die zusammen rund 40 px kosten:
 
-     de 1353    en 1361    es 1401    it 1402    fr 1420
+     de 1378    en 1385    es 1425    it 1427    fr 1444
 
-   Deshalb 1440 und nicht 1360: Bei 1366 (ein sehr verbreiteter Laptop) ginge
-   es auf Deutsch gerade eben auf — und auf Französisch nicht. Eine Schwelle,
-   die nur in der eigenen Sprache stimmt, ist keine.
+   Deshalb 1460: Bei 1366 (ein sehr verbreiteter Laptop) ginge es auf Deutsch
+   gerade eben auf und auf Französisch nicht — eine Schwelle, die nur in der
+   eigenen Sprache stimmt, ist keine. Und ohne die Zähler zu messen wären es
+   1381 statt 1444 gewesen: Die Leiste bräche dann genau dem auf, der eine
+   Einladung offen hat.
 
    Damit der Punkt ohne Wort ansprechbar bleibt, trägt jeder Knopf ein
    data-i18n-title; applyI18n() füllt es und wechselt es mit der Sprache. Das
@@ -131,18 +134,18 @@ nav button:hover .nav-sym,nav button.on .nav-sym{filter:none}
    Unter 600 px darf sie umbrechen. Dort wäre der nächste Schritt, Avatar und
    Name zu opfern, und das ist der Punkt, an dem man nicht mehr sieht, als wer
    man angemeldet ist. */
-@media (max-width:1440px){
+@media (max-width:1460px){
   /* Nur der Beschriftungs-span. Die Zahl daneben (Wunschliste, live Partie)
      ist KEIN Beschriftungs-span und bleibt — sie ist der einzige Hinweis
      darauf, dass etwas auf einen wartet. */
   nav > button > span[data-i18n]{display:none}
   nav{gap:4px}
   nav button{padding:6px 10px}
-  .nav-sym{width:30px;height:30px}
+  .nav-sym{width:33px;height:33px}
 }
 @media (max-width:820px){
   nav button{padding:5px 7px}
-  .nav-sym{width:24px;height:24px}
+  .nav-sym{width:26px;height:26px}
   /* Der Name schrumpft mit, der Avatar bleibt: Ein Gesicht erkennt man auch
      schmal, eine abgeschnittene Zeile liest man nicht. */
   #who{max-width:112px}
