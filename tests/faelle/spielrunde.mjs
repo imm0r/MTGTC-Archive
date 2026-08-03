@@ -266,32 +266,39 @@ export default async function ({ seite, adresse, stand }) {
   stand.ist("und die Namen sind nicht auf null zusammengefallen",
     leben.namen.every(([b, ab]) => b >= 40 && ab === 0), JSON.stringify(leben.namen));
 
-  /* --- Die vier Laden über den Lebenspunkten ---------------------------- */
-  /* Würfel, Hand, Exil und Friedhof stehen als Embleme in einer Leiste am
-     rechten unteren Rand des Schlachtfelds. Sieben Dinge können daran still
-     schiefgehen, und alle sieben sind hier festgehalten. */
+  /* --- Die fünf Laden rechts neben der Matte ---------------------------- */
+  /* Hand, Bibliothek, Exil, Friedhof und Würfel stehen als Embleme in einer
+     SENKRECHTEN Leiste rechts neben der Matte, von oben nach unten in dieser
+     Reihenfolge. Sieben Dinge können daran still schiefgehen, und alle sieben
+     sind hier festgehalten.
+
+     Als waagerechte Reihe über den Lebenspunkten lagen sie vorher ÜBER dem
+     Schlachtfeld und nahmen ihm die Sicht — deshalb die eigene Spalte. */
   const leiste = await seite.evaluate(() => {
     const zonen = [...document.querySelectorAll("#zonen .schwebe-zone")];
     const kn = z => document.querySelector(`.sz-${z} .schwebe-knopf`).getBoundingClientRect();
     const links = document.querySelector(".mat-links").getBoundingClientRect();
-    const lebenOben = document.querySelector(".mat-leben").getBoundingClientRect().top;
-    const reihe = ["wuerfel", "hand", "exile", "grave"];
+    const mitte = document.querySelector(".mat-mitte").getBoundingClientRect();
+    const matte = document.querySelector(".mat").getBoundingClientRect();
+    const reihe = ["hand", "lib", "exile", "grave", "wuerfel"];
     return {
       reihenfolge: zonen.map(z => [...z.classList].find(c => c.startsWith("sz-"))?.slice(3)),
       ziele: zonen.map(z => z.dataset.zonedrop ?? null),
       alteReihen: document.querySelectorAll(
         '.mat-hand, .mat-rechts [data-zone="grave"], .mat-mitte [data-zone="exile"], #dice-box').length,
-      // Alle vier im Streifen des Schlachtfelds, keiner unter der schmalen Spalte.
-      inLinks: reihe.every(z => kn(z).left > links.left && kn(z).right < links.right),
-      // Von links nach rechts: Würfel, Hand, Exil, Friedhof.
-      vonLinks: reihe.every((z, i) => i === 0 || kn(z).left > kn(reihe[i - 1]).right),
-      // ÜBER den Lebenspunkten, nicht darauf.
-      ueberLeben: reihe.map(z => Math.round(lebenOben - kn(z).bottom)),
+      // Rechts von BEIDEN Spalten — und innerhalb der Matte, nicht daneben.
+      rechtsDaneben: reihe.every(z => kn(z).left >= mitte.right - 1 && kn(z).right <= matte.right + 1),
+      // Und über keiner der beiden: Sie hätten sonst die Kommandozone verdeckt.
+      freiVonSpalten: reihe.every(z => kn(z).left >= links.right && kn(z).left >= mitte.right - 1),
+      // Von oben nach unten: Hand, Bibliothek, Exil, Friedhof, Würfel.
+      vonOben: reihe.every((z, i) => i === 0 || kn(z).top >= kn(reihe[i - 1]).bottom - 1),
+      // Alle in derselben Spalte, also gleich weit rechts.
+      eineSpalte: new Set(reihe.map(z => Math.round(kn(z).right))).size === 1,
       // Die Klammer muss durchlässig sein, sonst finge sie Klicks ab, die dem
       // Schlachtfeld darunter gelten. Bei Hand und Würfel wäre das die GANZE Matte.
       klammer: zonen.map(z => getComputedStyle(z).pointerEvents),
       knopf: getComputedStyle(zonen[0].querySelector(".schwebe-knopf")).pointerEvents,
-      // Körbe haben nur die drei Zonen — der Würfel ist keine Lade.
+      // Körbe haben nur die Zonen — der Würfel ist keine Lade.
       koerbeZu: zonen.filter(z => z.dataset.zonedrop)
         .every(z => getComputedStyle(z.querySelector(".schwebe-korb")).visibility === "hidden"),
       zahlen: zonen.filter(z => z.dataset.zonedrop).map(z => z.querySelector(".schwebe-n").textContent),
@@ -301,22 +308,26 @@ export default async function ({ seite, adresse, stand }) {
       wuerfelMatt: document.querySelector(".sz-wuerfel .schwebe-n")?.classList.contains("null"),
     };
   });
-  stand.gleich("vier Laden statt Reihen auf der Matte",
+  stand.gleich("fünf Laden statt Reihen auf der Matte",
     [leiste.reihenfolge, leiste.alteReihen],
-    [["wuerfel", "hand", "exile", "grave"], 0]);
-  stand.gleich("die drei Zonen sind Ablageziel, der Würfel nicht",
-    leiste.ziele, [null, "hand", "exile", "grave"]);
-  stand.ist("alle vier stehen im Streifen des Schlachtfelds", leiste.inLinks);
-  stand.ist("von links nach rechts: Würfel, Hand, Exil, Friedhof", leiste.vonLinks);
-  stand.ist("und alle über den Lebenspunkten",
-    leiste.ueberLeben.every(a => a >= 0 && a <= 24),
-    leiste.ueberLeben.join(", ") + " px darüber");
+    [["wuerfel", "hand", "exile", "grave", "lib"], 0]);
+  stand.gleich("die vier Zonen sind Ablageziel, der Würfel nicht",
+    leiste.ziele, [null, "hand", "exile", "grave", "lib"]);
+  stand.ist("alle fünf stehen rechts neben der Matte", leiste.rechtsDaneben);
+  stand.ist("und über keiner der beiden Spalten", leiste.freiVonSpalten);
+  stand.ist("von oben nach unten: Hand, Bibliothek, Exil, Friedhof, Würfel", leiste.vonOben);
+  stand.ist("alle in einer Spalte, gleich weit rechts", leiste.eineSpalte);
+  /* Und die Bibliothek steht NICHT mehr als Spalte in der Matte. Ohne diese
+     Zeile bliebe „auch dort noch" unbemerkt — eine Lade zusätzlich sieht nicht
+     falsch aus. */
+  stand.ist("die Bibliothek ist aus der Matte heraus",
+    await seite.evaluate(() => !document.querySelector('.mat-mitte [data-zone="lib"], .mat-lib')));
   stand.ist("zugeklappt sind alle Körbe weggenommen", leiste.koerbeZu);
   stand.gleich("die Klammern lassen Klicks durch, die Schaltflächen nicht",
-    [leiste.klammer, leiste.knopf], [["none", "none", "none", "none"], "auto"]);
+    [leiste.klammer, leiste.knopf], [["none", "none", "none", "none", "none"], "auto"]);
   stand.gleich("die Zonen nennen ihre Anzahl, der Würfel den letzten Wurf",
     [leiste.zahlen, leiste.wuerfelZahl, leiste.wuerfelMatt],
-    [["2", "0", "1"], "–", true]);
+    [["2", "0", "1", "4"], "–", true]);
 
   /* Jede Schaltfläche IST ihr Emblem: kein Beiwort daneben, und die Zahl steht
      unten rechts darauf statt daneben. */
@@ -337,13 +348,19 @@ export default async function ({ seite, adresse, stand }) {
       beschriftung: z.querySelector(".schwebe-knopf").getAttribute("aria-label"),
     };
   }));
-  stand.ist("alle Schaltflächen tragen ihr Emblem", sym.every(x => x.geladen),
-    sym.map(x => x.quelle).join(" · "));
+  stand.gleich("alle Schaltflächen zeigen auf ein Emblem in assets/",
+    sym.filter(x => !/^assets\/.+\.(png|PNG)$/.test(x.quelle || "")).map(x => x.zone), []);
   stand.ist("auch der Würfel, mit eigenem Bild",
     await seite.evaluate(() => { const b = document.querySelector(".sz-wuerfel .schwebe-bild");
       return !!b && b.complete && b.naturalWidth > 0 && /roll-the-dice/i.test(b.getAttribute("src")); }),
     await seite.evaluate(() => document.querySelector(".sz-wuerfel .schwebe-bild")?.getAttribute("src")));
-  stand.ist("die Ersatzzeichen bleiben dabei versteckt", sym.every(x => x.ersatzVersteckt));
+  /* Das Ersatzzeichen steht GENAU DANN da, wenn das Bild nicht lud. Nur
+     „versteckt" zu prüfen ginge rot, sobald eine Bilddatei noch nicht
+     hochgeladen ist — und nur „vorhanden" ließe ein totes Bild durchgehen.
+     Geprüft wird deshalb der Zusammenhang. */
+  stand.gleich("das Ersatzzeichen erscheint genau dort, wo das Bild fehlt",
+    sym.filter(x => x.geladen !== x.ersatzVersteckt).map(x => x.zone + (x.geladen ? " (geladen)" : " (fehlt)")),
+    []);
   stand.ist("die Zahl steht jeweils unten rechts auf dem Symbol", sym.every(x => x.untenRechts));
   stand.ist("und erschlägt es nicht", sym.every(x => x.anteil <= 40),
     sym.map(x => x.zone + ": " + x.anteil + " %").join(", "));
@@ -369,8 +386,10 @@ export default async function ({ seite, adresse, stand }) {
       // Der Friedhof bekommt Rahmen UND Grund — anders als die Hand.
       rahmen: getComputedStyle(korb).borderTopWidth,
       grund: getComputedStyle(korb).backgroundColor,
-      // Er klappt nach oben aus und bleibt dabei in der Matte.
-      ueberDemKnopf: Math.round(knopf.top - kr.bottom) >= 0,
+      // Er klappt nach LINKS aus, zur Matte hin, und bleibt dabei in ihr.
+      // Nach oben ginge nicht mehr: Die Leiste steht senkrecht, die unteren
+      // Laden drückten dann gegen die Deckenkante.
+      linksVomKnopf: Math.round(knopf.left - kr.right) >= 0,
       inDerMatte: Math.round(kr.left - mat.left) >= 0 && Math.round(mat.bottom - kr.bottom) >= 0
                   && Math.round(kr.top - mat.top) >= 0,
     };
@@ -379,7 +398,7 @@ export default async function ({ seite, adresse, stand }) {
   stand.ist("die Friedhofskarten liegen darin", friedhof.karten === 1, friedhof.karten);
   stand.ist("er trägt Rahmen und Grund", friedhof.rahmen !== "0px" && friedhof.grund !== "rgba(0, 0, 0, 0)",
     `${friedhof.rahmen} / ${friedhof.grund}`);
-  stand.ist("und klappt nach oben aus", friedhof.ueberDemKnopf);
+  stand.ist("und klappt nach links aus, zur Matte hin", friedhof.linksVomKnopf)
   stand.ist("dabei bleibt er innerhalb der Matte", friedhof.inDerMatte);
 
   /* Das Exil teilt sich die Mechanik mit dem Friedhof — geprüft wird deshalb
@@ -672,8 +691,10 @@ export default async function ({ seite, adresse, stand }) {
       // Die Mattenspalte ist 154–172 px schmal. Ein Knopf, dessen Aufschrift
       // dort nicht hineinpasst, sieht nicht kaputt aus — er ist nur
       // abgeschnitten, und das fällt keinem Fehler auf.
+      // Gemessen am eigenen KORB, seit die Bibliothek eine schwebende Lade
+      // ist — früher war es die schmale Mattenspalte.
       passt: (() => { const b = document.querySelector("#lib-zufall");
-        const sp = document.querySelector(".mat-mitte").getBoundingClientRect();
+        const sp = document.querySelector(".sz-lib .schwebe-korb").getBoundingClientRect();
         const r = b.getBoundingClientRect();
         return b.scrollWidth <= b.clientWidth && r.left >= sp.left - 1 && r.right <= sp.right + 1; })(),
     })),
@@ -740,6 +761,38 @@ export default async function ({ seite, adresse, stand }) {
     renderZonen();
   });
   await seite.waitForTimeout(200);
+
+  /* --- Die Bibliothek als Lade: Suchen im Korb ------------------------- */
+  /* Der Handgriff, an dem der Umzug aus der Matte am ehesten stillschweigend
+     kaputtginge: renderLibListe() sucht seinen Korb über
+     `[data-zone="lib"] .lib-liste` und tauscht NUR Trefferliste und
+     „ganze Bibliothek"-Knopf — das Suchfeld selbst bleibt stehen, damit Fokus
+     und Schreibmarke nicht bei jedem Zeichen wegspringen. Der Korb heißt jetzt
+     .schwebe-korb statt .mat-korb; griffe der Selektor daneben, tippte man ins
+     Leere und die Liste bliebe stehen. */
+  await seite.locator('[data-schwebe="lib"]').click();
+  await seite.waitForTimeout(300);
+  stand.ist("die Bibliothek klappt als Lade auf",
+    await seite.evaluate(() =>
+      getComputedStyle(document.querySelector(".sz-lib .schwebe-korb")).visibility === "visible"));
+
+  const name = await seite.evaluate(() => trkName(zoneKarten("lib")[0].card));
+  await seite.locator("#lib-suche").fill(name.slice(0, 5));
+  await seite.waitForTimeout(300);
+  const gesucht = await seite.evaluate(() => ({
+    treffer: document.querySelectorAll(".sz-lib .lib-liste .lib-zeile").length,
+    imKorb: !!document.querySelector(".sz-lib .schwebe-korb .lib-liste"),
+    feldDa: document.activeElement?.id === "lib-suche",
+    wert: document.querySelector("#lib-suche")?.value,
+  }));
+  stand.ist("die Suche im Korb findet die Karte", gesucht.treffer > 0, JSON.stringify(gesucht));
+  stand.ist("die Liste steht dabei IM Korb der Lade", gesucht.imKorb);
+  stand.gleich("und das Suchfeld behält Inhalt und Fokus",
+    [gesucht.wert, gesucht.feldDa], [name.slice(0, 5), true]);
+
+  await seite.locator("#lib-suche").fill("");
+  await seite.locator('[data-schwebe="lib"]').click();
+  await seite.waitForTimeout(250);
 
   /* Danach räumt er sich selbst weg. Bliebe er liegen, verdeckte er genau die
      Karten, für die man gewürfelt hat — die Zahl bleibt am Emblem stehen. */

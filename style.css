@@ -938,56 +938,75 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
    darüber und nicht darauf steht. */
 .mat{display:grid;gap:8px;margin-top:10px;
   --sp-luecke:8px; --sp-mitte:154px; --sp-leben:120px;
-  /* Platz RECHTS der schmalen Spalte — unter 1200 px keiner. */
-  --sp-danach:0px;
-  grid-template-columns:minmax(0,1fr) var(--sp-mitte);
+  /* Ganz rechts die schmale Spalte für die senkrechte Emblemleiste. Sie ist
+     im Raster reserviert und nicht bloß darübergelegt: Sonst lägen die Embleme
+     über der schmalen Spalte und verdeckten Kommandozone und Kartenvorschau. */
+  --sp-laden:68px;
+  grid-template-columns:minmax(0,1fr) var(--sp-mitte) var(--sp-laden);
   /* Höher als früher (390–640): Die linke Spalte trägt jetzt drei Blöcke statt
      zwei, und die 120 px der Lebensreihe dürfen nicht vom Schlachtfeld kommen. */
   grid-template-rows:clamp(500px,64vh,720px);
-  grid-template-areas:"links mitte";
-  --rechte-spalten:calc(var(--sp-mitte) + var(--sp-luecke) + var(--sp-danach));
+  grid-template-areas:"links mitte laden";
+  --rechte-spalten:calc(var(--sp-mitte) + var(--sp-laden) + var(--sp-luecke) * 2);
   /* Bezugsrahmen der schwebenden Laden. */
   position:relative}
 /* Ab 1200 px eine dritte Spalte ueber die volle Hoehe: die angezeigte Karte
    erscheint immer DORT, statt als Fenster ueber dem Spielfeld. Darunter fehlt
    der Platz — dann schwebt sie wie bisher am Zeiger (app.js: SPK_SPALTE). */
+/* Ab 1200 px hat die schmale Spalte Platz für die angezeigte Karte: Sie steht
+   unter der Kommandozone statt in einer EIGENEN dritten Spalte. Zwei schmale
+   Spalten nebeneinander kosteten das Schlachtfeld Breite für Dinge, die
+   untereinander genauso gut stehen — die Spalte wird dafür so breit, wie die
+   Vorschau vorher allein war, und das Schlachtfeld gewinnt die Differenz.
+   Darunter fehlt der Platz; dann schwebt die Karte wie bisher am Zeiger
+   (app.js: SPK_SPALTE). */
 @media (min-width:1200px){
-  .mat{--sp-mitte:172px; --sp-vorschau:268px;
-       --sp-danach:calc(var(--sp-vorschau) + var(--sp-luecke));
-       grid-template-columns:minmax(0,1fr) var(--sp-mitte) var(--sp-vorschau);
-       grid-template-areas:"links mitte vorschau"}
+  .mat{--sp-mitte:268px}
 }
-.mat-vorschau{grid-area:vorschau}
+.mat-vorschau{flex:1;min-height:0;display:flex;flex-direction:column}
+.mat-vorschau .spk{flex:1;min-height:0}
 .mat-links{grid-area:links;display:flex;flex-direction:column;gap:8px;min-width:0}
 .mat-mitte{grid-area:mitte;display:flex;flex-direction:column;gap:8px}
 /* Das Akkordeon ist Bezugsrahmen der Würfelbühne — dort gibt es keine Matte,
    und die Bühne muss sich trotzdem an etwas aufhängen können. */
 .zonen{position:relative}
 /* ===== Schwebende Laden: Würfel, Hand, Exil, Friedhof =====
-   Eine Leiste aus vier Emblemen am rechten unteren Rand des Schlachtfelds,
-   ÜBER den Lebenspunkten. Nicht am Rand der ganzen Matte: Dort lägen sie unter
-   der schmalen Spalte, zu der sie nicht gehören — und nicht am Mattenboden,
-   denn dort stehen jetzt die Lebenspunkte.
+   Eine SENKRECHTE Leiste rechts neben der Matte, von oben nach unten: Hand,
+   Bibliothek, Exil, Friedhof, Würfel. Sie hat dafür eine eigene schmale Spalte
+   im Raster — als waagerechte Reihe über den Lebenspunkten lag sie vorher über
+   dem Schlachtfeld und nahm ihm gerade dort die Sicht, wo am meisten liegt.
 
-   Sie klappen nach OBEN aus, nicht zur Seite wie der Zugang zur Sammlung im
-   Deckbau: Am Tisch liegen sie vor einem, und das Bild bleibt erhalten, wenn
-   sie von dort aufgehen.
+   Die Reihenfolge ist die des Handgriffs: Was man am häufigsten aufmacht,
+   steht oben. Der Würfel ist keine Zone und steht deshalb zuletzt.
 
-   Gerechnet wird aus den Spaltenbreiten und --sp-leben oben; ändert sich eine
-   davon, geht die Leiste mit. Zwei Zahlen an zwei Stellen liefen auseinander. */
+   Ihre Körbe klappen nach LINKS auf, zur Matte hin — nicht nach oben wie
+   früher. Nach oben hätten die unteren gegen die Deckenkante gedrückt, und
+   rechts von der Leiste ist ohnehin nichts mehr.
+
+   Gerechnet wird aus --sz-schritt; ändert sich die Emblemgröße, geht die
+   Leiste mit. Zwei Zahlen an zwei Stellen liefen auseinander. */
 .mat{--sz-schritt:70px;                       /* 60 px Emblem + 10 px Luft */
-     --sz-rand:calc(var(--rechte-spalten) + 18px);
-     --sz-boden:calc(var(--sp-leben) + 12px)}
-.schwebe-zone{position:absolute;bottom:var(--sz-boden);z-index:40;pointer-events:none}
-.sz-grave{right:var(--sz-rand)}
-.sz-exile{right:calc(var(--sz-rand) + var(--sz-schritt))}
+     --sz-oben:6px}
+.schwebe-zone{position:absolute;right:0;z-index:40;pointer-events:none}
+.sz-hand   {top:var(--sz-oben)}
+.sz-lib    {top:calc(var(--sz-oben) + var(--sz-schritt))}
+.sz-exile  {top:calc(var(--sz-oben) + var(--sz-schritt) * 2)}
+.sz-grave  {top:calc(var(--sz-oben) + var(--sz-schritt) * 3)}
+/* Der Korb steht LINKS neben seiner Schaltfläche, auf gleicher Höhe. */
+.schwebe-zone[data-schwebe-fach] .schwebe-korb{right:calc(100% + 10px);bottom:auto;top:0;
+  transform:translateX(14px)}
+.schwebe-zone[data-schwebe-fach].offen .schwebe-korb{transform:none}
+/* Die Bibliothek: Ihr Korb ist eine Suchzeile mit Trefferliste und braucht
+   deshalb eine feste Breite — anders als bei Friedhof und Exil bestimmt hier
+   nicht der Inhalt, wie breit es wird (leer wäre er sonst schmaler als das
+   Suchfeld). */
+.sz-lib .schwebe-korb{width:min(420px,44vw);max-width:none}
 /* Hand und Würfel spannen sich über die GANZE Matte: Ihre Schaltflächen stehen
    in der Leiste, ihr Inhalt liegt mittig bzw. über allem. Beides braucht die
    Matte als Bezugsrahmen — an der 60 px breiten Schaltfläche gemessen ließe
    sich „mittig über dem Schlachtfeld" nicht ausdrücken. */
-.sz-hand{inset:0;bottom:0}
-.sz-hand .schwebe-knopf{position:absolute;bottom:var(--sz-boden);
-  right:calc(var(--sz-rand) + var(--sz-schritt) * 2)}
+.sz-hand{inset:0}
+.sz-hand .schwebe-knopf{position:absolute;top:var(--sz-oben);right:0}
 /* Die Lade ist nur die Klammer um Korb und Schaltfläche und bleibt für
    Zeigereignisse durchlässig: Sonst läge ein unsichtbares Rechteck über der
    Matte und finge Klicks ab, die dem Schlachtfeld gelten. Bei der Hand wäre
@@ -1040,19 +1059,19 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
   max-height:min(60vh,330px);overflow:auto}
 .schwebe-zone.offen .schwebe-korb{visibility:visible;opacity:1;transform:none}
 /* Der Handfächer liegt MITTIG über dem Schlachtfeld und TIEF, dicht über dem
-   unteren Mattenrand — nicht rechts oben über seiner Schaltfläche, wo er die
-   halbe Matte verdeckte. Die Mitte des Schlachtfelds ist die halbe Mattenbreite
+   unteren Mattenrand — nicht links neben seiner Schaltfläche, wo er die halbe
+   Matte verdeckte. Die Mitte des Schlachtfelds ist die halbe Mattenbreite
    ohne die schmalen Spalten.
    Er ROLLT NICHT: Ein Rollbereich schnitte die gedrehten Ränder ab und die
    beim Zeigen angehobene Karte gleich mit — und einen Rollbalken unter der Hand
    will ohnehin niemand. Der Fächer wird bei vielen Karten von selbst schmaler
    (app.js rechnet den sichtbaren Anteil je Karte aus), er läuft also nicht
    davon. */
-.sz-hand .schwebe-korb{right:auto;bottom:calc(var(--sp-leben) + 14px);
+.schwebe-zone.sz-hand .schwebe-korb{right:auto;top:auto;bottom:calc(var(--sp-leben) + 14px);
   left:calc((100% - var(--rechte-spalten)) / 2);
   transform:translate(-50%,14px);
   max-height:none;overflow:visible}
-.sz-hand.offen .schwebe-korb{transform:translate(-50%,0)}
+.schwebe-zone.sz-hand.offen .schwebe-korb{transform:translate(-50%,0)}
 .sz-hand .hand-fan{overflow:visible}
 @media(prefers-reduced-motion:reduce){ .schwebe-korb{transition:none} }
 
@@ -1075,9 +1094,9 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
    ein offener Handfächer oder Friedhof gehört davor — man würfelt oft, während
    eine Lade offen steht. Der eigene Knopf steht im DOM hinter der Fläche und
    liegt damit ohnehin darüber. */
-.mat .sz-wuerfel{position:absolute;inset:0;bottom:0;z-index:30}
-.mat .sz-wuerfel .schwebe-knopf{position:absolute;right:calc(var(--sz-rand) + var(--sz-schritt) * 3);
-  bottom:var(--sz-boden);top:auto}
+.mat .sz-wuerfel{position:absolute;inset:0;z-index:30}
+.mat .sz-wuerfel .schwebe-knopf{position:absolute;right:0;
+  top:calc(var(--sz-oben) + var(--sz-schritt) * 4);bottom:auto}
 .mat .sz-wuerfel .wuerfel-buehne{position:absolute;inset:0}
 /* Der Würfel liegt nicht dauerhaft da: Er verdeckte sonst genau die Karten,
    für die man gewürfelt hat. Er rollt, bleibt einen Moment liegen und blendet
@@ -1234,7 +1253,26 @@ body.zieht-gerade .schwebe-knopf{pointer-events:auto}
 /* Hoch genug fuer eine Kartenreihe SAMT der Leiste darunter (103 px Karte,
    Titel, Polster) — sonst rollt der Streifen und schneidet die Knoepfe ab. */
 .mat-laender{flex:none;height:178px}
-.mat-lib{flex:1;min-height:0}
+/* Die Kommandozone nimmt die Höhe, die vorher die Bibliothek hatte — die ist
+   in die schwebenden Laden gewandert. Sie bekommt aber nur, was sie braucht:
+   Darunter steht die angezeigte Karte, und die ist das Größere von beiden. */
+.mat-cmd{flex:none}
+/* Das Mana als Marke in der Kopfzeile des Länderstreifens — dieselbe Stelle
+   wie im Akkordeon, nur mit den Farbmarken daneben. margin-left:auto schiebt
+   es an das rechte Ende der Zeile, weg von Zeichen, Wort und Anzahl. */
+.mat-titel .mat-mana{margin-left:auto;display:inline-flex;align-items:center;gap:6px;
+  font-variant-numeric:tabular-nums;color:var(--txt);font-weight:600;white-space:nowrap}
+.mat-titel .mat-manawert{font-size:13px}
+/* Die volle Farbreihe (mit Gesamtzahl je Farbe), nicht die kompakte des
+   Akkordeons: Die Kopfzeile der Länder läuft über die ganze Breite des
+   Schlachtfelds, dort ist Platz dafür. Kompakt ließe je Farbe die Gesamtzahl
+   weg — das wäre weniger, als vorher dastand. */
+.mat-titel .mana-farben{margin:0;flex-wrap:nowrap}
+/* Im schmalen Fenster passt die Marke neben Zeichen, Wort und Anzahl nicht
+   mehr in eine Zeile — dann rückt sie als GANZES in die zweite. Umbräche
+   stattdessen die Farbreihe in sich, stünden zwei Marken unter der Zahl und
+   fünf daneben; so bleibt der Block zusammen. */
+.mat-laender .mat-titel{flex-wrap:wrap;row-gap:4px}
 /* overflow:hidden an den Spalten, damit nie ein Feld ueber den Mattenrand
    quillt; erreichbar bleibt alles, weil jeder Korb innen rollt. */
 .mat-links,.mat-mitte{min-height:0;overflow:hidden}
@@ -1287,23 +1325,18 @@ body.zieht-gerade .zk:hover,body.zieht-gerade .zk:focus-within{transform:none}
 .mat-steuerwert:hover{background:var(--acc);color:#1a1400}
 .mat-steuerwert.leer{border-color:var(--line);color:var(--dim);cursor:default}
 /* ===== Mana in diesem Zug =====
-   Gleiche Bauart wie die Steuer darüber, aber eine ANZEIGE, kein Knopf. Die
-   freie Zahl trägt die Akzentfarbe, das Gesamt steht kleiner daneben — gelesen
-   wird zuerst „was geht noch“, das andere ist Einordnung. cursor:help, weil
-   die Aufschlüsselung im Tooltip steckt. */
-.mat-mana{flex:none}
-.mat-mana .mat-titel{margin-bottom:4px}
-.mat-manawert{width:100%;padding:2px 0;border:1px solid var(--line);border-radius:8px;
-  background:var(--panel);text-align:center;cursor:help;
-  font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}
+   Eine ANZEIGE, kein Knopf, und sie steht in der Kopfzeile des
+   Länderstreifens — bei den Quellen, aus denen die Zahl entsteht. Als eigene
+   Kachel stand sie vorher in der schmalen Spalte, also getrennt von dem, was
+   sie zählt.
+   Die freie Zahl trägt die Akzentfarbe, das Gesamt steht kleiner daneben:
+   gelesen wird zuerst „was geht noch", das andere ist Einordnung. cursor:help,
+   weil die Aufschlüsselung im Tooltip steckt. */
+.mat-manawert{font-weight:800;font-variant-numeric:tabular-nums}
 .mana-frei{color:var(--acc)}
 .mana-von{color:var(--dim);font-size:13px;font-weight:600}
-.mat-manawert.leer{color:var(--dim);cursor:default}
-/* Die Aufteilung nach Farben unter der Zahl. Nur die Farben, die es gibt —
-   sieben leere Kästchen für ein zweifarbiges Deck wären Lärm. Sie darf
-   umbrechen: In der 154 px schmalen Spalte passen zwei Marken je Zeile, und
-   ein Deck mit fünf Farben plus farblos soll die Bibliothek darunter nicht
-   auffressen. */
+/* Die Aufteilung nach Farben. Nur die Farben, die es gibt — sieben leere
+   Kästchen für ein zweifarbiges Deck wären Lärm. */
 .mana-farben{display:flex;flex-wrap:wrap;gap:3px 5px;justify-content:center;margin-top:5px}
 .mana-chip{display:inline-flex;align-items:center;gap:3px;padding:1px 5px;
   border:1px solid var(--line);border-radius:8px;background:var(--panel2);

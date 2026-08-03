@@ -1812,10 +1812,19 @@ und ob sie ein Land ist, weiß die App aus der Typzeile.
 
 Ab **820 px Breite** liegen die Felder wie auf der offiziellen Spielmatte:
 Schlachtfeld groß links, Länder als Streifen darunter, die Lebenspunkte als
-Reihe unter beiden, und rechts eine schmale Spalte (Commander-Steuer,
-Kommandozone, Bibliothek). Ein quer gehaltenes Handy erreicht diese Breite und
-bekommt die Matte automatisch. Ab **1200 px** kommt rechts eine dritte Spalte
-über die volle Höhe dazu: die Kartenansicht (siehe unten).
+Reihe unter beiden; daneben eine schmale Spalte (Commander-Steuer,
+Kommandozone, ab 1200 px darunter die angezeigte Karte) und ganz rechts die
+senkrechte Emblemleiste. Ein quer gehaltenes Handy erreicht diese Breite und
+bekommt die Matte automatisch.
+
+> **Was wo NICHT mehr steht.** Die **Bibliothek** stand als schmale Spalte in
+> der Matte und ist eine Lade geworden: zugeklappt eine Zahl, aufgeklappt eine
+> Suchzeile — genau der Fall, für den es die Laden gibt. Das **Mana** stand als
+> eigene Kachel daneben und steht jetzt in der Kopfzeile des Länderstreifens,
+> bei den Quellen, aus denen die Zahl entsteht. Die **angezeigte Karte** hatte
+> eine eigene dritte Spalte und rückt unter die Kommandozone; zwei schmale
+> Spalten nebeneinander kosteten das Schlachtfeld rund 180 px für Dinge, die
+> untereinander genauso gut stehen.
 
 **Die Lebenspunkte laufen unter den Ländern über deren volle Breite**, bis zu
 vier Kacheln nebeneinander — so wie die Mitspieler am Tisch nebeneinander
@@ -1826,23 +1835,34 @@ stehen deshalb unter Name und Zahl statt daneben. Nebeneinander rangen sie mit
 dem Namen um dieselbe Breite, und der verlor: Bei vier Mitspielern auf einer
 820-px-Matte blieben für ihn gemessen **null Pixel**.
 
-**Vier Embleme** stehen als Leiste am rechten unteren Rand des Schlachtfelds,
-gleich über den Lebenspunkten: von links nach rechts `assets/roll-the-dice.PNG`,
-`assets/cards-on-hand.PNG`, `assets/cards-at-exil.PNG` und
-`assets/cards-on-graveyard.PNG`. Jedes trägt unten rechts eine Zahl — bei den
-drei Zonen die Kartenzahl, beim Würfel den letzten Wurf.
+**Fünf Embleme** stehen als **senkrechte Leiste rechts neben der Matte**, von
+oben nach unten:
 
-**Hand, Friedhof und Exil sind Laden.** Ein Klick klappt nach oben aus, Escape
-oder ein zweiter Klick wieder zu. Nach oben, weil am Tisch alle drei vor einem
-liegen — zur Seite auszufahren löste dieses Bild auf. Der **Würfel** ist keine:
-Ein Klick würfelt sofort (siehe „Der Würfel").
+| | Bild | |
+| --- | --- | --- |
+| Hand | `assets/cards-on-hand.PNG` | Lade |
+| Bibliothek | `assets/sym_library.PNG` | Lade |
+| Exil | `assets/cards-at-exil.PNG` | Lade |
+| Friedhof | `assets/cards-on-graveyard.PNG` | Lade |
+| Würfel | `assets/roll-the-dice.PNG` | ein Klick würfelt |
 
-Die Abstände der Leiste rechnen aus den Spaltenbreiten und der Höhe der
-Lebensreihe, damit sie mitgehen, wenn sich eine davon ändert.
+Jedes trägt unten rechts eine Zahl — bei den vier Zonen die Kartenzahl, beim
+Würfel den letzten Wurf.
 
-**Immer nur eine offen.** Die Schaltflächen stehen nebeneinander, ihre Körbe
-sind breiter als sie selbst — offen lägen sie übereinander. Dieselbe Regel wie
-im Akkordeon, aus demselben Grund.
+Die Leiste hat eine **eigene reservierte Spalte** im Raster. Nur darübergelegt
+verdeckte sie Kommandozone und Kartenvorschau. Als waagerechte Reihe über den
+Lebenspunkten lag sie vorher über dem Schlachtfeld und nahm ihm die Sicht
+gerade dort, wo am meisten liegt.
+
+**Hand, Bibliothek, Exil und Friedhof sind Laden.** Ein Klick klappt sie **nach
+links** auf, zur Matte hin; Escape oder ein zweiter Klick schließt wieder. Nach
+oben ginge nicht mehr: Die Leiste steht senkrecht, die unteren drückten dann
+gegen die Deckenkante. Der **Würfel** ist keine Lade — ein Klick würfelt sofort
+(siehe „Der Würfel").
+
+**Immer nur eine offen.** Die Körbe sind breiter als die Schaltflächen und
+lägen offen übereinander. Dieselbe Regel wie im Akkordeon, aus demselben
+Grund.
 
 **Rahmen bei Friedhof und Exil.** Ihre Gitter sind lose Reihen kleiner Bilder
 und bräuchten sonst eine Fläche, um nicht über dem Schlachtfeld zu schwimmen.
@@ -2068,16 +2088,22 @@ hochkant gehaltenen Handy gar keinen Wurf mehr.
 
 ### Mana in diesem Zug
 
-Unter der Commander-Steuer zeigt eine Kachel, wieviel Mana das eigene
+In der **Kopfzeile des Länderstreifens** steht, wieviel Mana das eigene
 Schlachtfeld hergibt — **über alle Karten, nicht nur die Länder**: Sol Ring,
 Signets und Elfen sind genau der Grund, warum Zählen auf den Fingern irgendwann
-nicht mehr reicht. Zwei Zahlen: **frei** (was ungetappte Quellen noch geben
+nicht mehr reicht. Dort und nicht als eigene Kachel in der schmalen Spalte,
+weil die Länder die Quellen sind, aus denen die Zahl entsteht — sie
+danebenzustellen trennte zwei Dinge, die man immer zusammen liest.
+
+Ohne Quellen bleibt sie **ganz weg**, wie im Akkordeon. Als eigene Kachel stand
+dort ein matter Strich, weil ein Platz zu füllen war; in einer Kopfzeile wäre
+eine „0/0" neben jedem leeren Länderstreifen nur Lärm. Zwei Zahlen: **frei** (was ungetappte Quellen noch geben
 können) und **gesamt** (alle Quellen, als wäre nichts getappt). Der Tooltip
 schlüsselt auf, welche Karte wieviel beiträgt. Im Akkordeon steht dieselbe
 Zahl als Marke in der Kopfzeile des Schlachtfelds — die ist auch zugeklappt zu
 sehen.
 
-**Aufgeschlüsselt nach Farben.** Unter den beiden Zahlen steht je eine Marke
+**Aufgeschlüsselt nach Farben.** Neben den beiden Zahlen steht je eine Marke
 für jede Farbe, die tatsächlich vorkommt — in der festen Reihenfolge WUBRG,
 farblos, wählbar. Sieben Mana sind wertlos, wenn der Zauber zwei blaue verlangt
 und kein blaues darunter ist. Die Marken tragen dieselben zwei Zahlen wie oben
@@ -2411,7 +2437,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `verlauf`        | Deck-Verlauf: Fingerabdruck unabhängig von der Reihenfolge, der Umbau in Worten, und was ein Rücksprung schreiben würde (fehlende Karten, fehlende Fächer, primäre Einordnung) |
 | `wunschliste`    | Karte direkt vormerken: die Zeile (Bestand 0, Setcode groß, Preis mit erstem Punkt) und die Doppelprüfung — auch gegen eine andere Auflage derselben Karte |
 | `synergien`      | Aufgehobene Vorschläge: die eingedampfte Karte, der Fingerabdruck als Warnung vor Überholtem, und dass ein frisches Ergebnis nicht überschrieben wird |
-| `spielrunde`     | Die Matte: Ziehen zwischen den Zonen, Tappen per Klick, die Lebensreihe (vier Kacheln nebeneinander, kein Rollbalken), die drei Laden (Ort, Rahmen, Zahl, immer nur eine offen, auch zugeklappt Ablageziel), der Würfel (nur W20, blanke Fläche über der ganzen Matte, Zahl aufs Emblem, jeder Wurf anders) und „Zufällig ziehen" (gewichtet über Exemplare, leere Bibliothek) |
+| `spielrunde`     | Die Matte: Ziehen zwischen den Zonen, Tappen per Klick, die Lebensreihe (vier Kacheln nebeneinander, kein Rollbalken), die fünf Laden rechts neben der Matte (senkrechte Reihenfolge, eigene Spalte statt darübergelegt, nach links aufklappend, immer nur eine offen, auch zugeklappt Ablageziel) samt der Bibliothekssuche in ihrem Korb, der Würfel (nur W20, blanke Fläche über der ganzen Matte, Zahl aufs Emblem, jeder Wurf anders) und „Zufällig ziehen" (gewichtet über Exemplare, leere Bibliothek) |
 | `fremdmatte`     | Die Matte eines Mitspielers: dass die Abfrage die Spalte `hand` nicht führt und Zeilen ohne offene Zone überspringt, dass die Anzeige ein doch geliefertes `hand` gar nicht erst übernimmt, dass fremde Karten keine Handgriffe tragen, dass die Lebensreihe frei und anklickbar bleibt und dass der Takt nach dem Schließen samt Intervall verschwindet; dazu, dass die Lade hochkant im Blickfeld statt weit unten aufklappt und dass ein Zuschauer ohne eigenes Deck die Mitspieler samt Auge überhaupt sieht |
 | `mana`           | Mana in diesem Zug: der Übersetzer an einer Mustertabelle (Signet netto, Selbstopfer ja, fremdes Opfer nein, „for each“ variabel, CR 305.6 ohne Text), die Summen frei/gesamt je Exemplar, Tappen senkt frei, die Hand zählt nie mit, und ohne Quellen Strich statt Null — dazu die Farbaufteilung: feste Reihenfolge, Summe der Marken gleich der Gesamtzahl, Tappen kommt in der Farbe an, und alle sieben Marken brechen in der 154-px-Spalte um, statt hinauszulaufen |
 | `export`         | Deck ausgeben: die fünf Zeilen genau so, wie sie dastehen müssen — englischer Name statt gedrucktem, Setcode groß, keine leere Klammer ohne Auflage, alphabetisch sortiert, Deckmenge statt Bestand; dazu Datei, Zwischenablage und der Rückfall „Text markiert“, wenn das Kopieren scheitert |
