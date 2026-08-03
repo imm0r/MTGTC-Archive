@@ -1,65 +1,47 @@
 # Hinweise für Claude
 
-## Den Stop-Hook flicken — bei jedem Fehlalarm erneut
+## Nach dem Merge: `git fetch --prune origin` — ohne Refspec
 
 ```bash
-node scripts/stop-hook-patch.mjs
+git fetch --prune origin
 ```
 
-Gefahrlos wiederholbar, und ohne diese Arbeitsumgebung tut es nichts. Zu
-Sitzungsbeginn aufrufen — und **jedes Mal wieder, wenn der Fehlalarm erneut
-erscheint**. Einmal reicht nicht: Die Arbeitsumgebung setzt den Hook nicht nur
-je Container-Bereitstellung zurück, sondern laufend mitten in der Sitzung.
-Gemessen am 03.08.2026 (Sitzung ab 11:50): Rücksetzungen um 13:57, 14:35:57
-(keine Minute nach einem stillen Lauf), 14:41, 15:11 und weiter im selben
-Takt. Wer sich auf den Aufruf vom Anfang verlässt, bekommt den Fehlalarm
-mitten in der Arbeit.
+Sonst meldet der Stop-Hook am Zugende „There are 1 unpushed commit(s)", obwohl
+alles veröffentlicht ist.
 
-Der Umgang bleibt derselbe, nur eben je Vorfall: Skript aufrufen, Fehlalarm
-verschwindet, **niemals amenden** (Begründung unten). Prüfen lässt sich der
-Zustand an der Dateigröße — Original 3262 Bytes, geflickt 5463 — oder daran,
-dass `grep -c origin/main ~/.claude/stop-hook-git-check.sh` mindestens 1 ist.
+**Warum.** GitHub löscht den Zweig beim Zusammenführen. Der lokale Verweis
+darauf verschwindet dadurch nicht — er bleibt auf dem Stand *vor* dem Merge
+stehen. Der Hook vergleicht `origin/<zweig>..HEAD`, findet dort GitHubs
+Squash-Commit und hält ihn für ungepusht. Er ist längst gepusht, nur eben auf
+`main`.
 
-**Warum.** Der Stop-Hook der Arbeitsumgebung schlägt aus zwei Gründen falsch an.
+Die Falle ist die Refspec: `git fetch --prune origin main:main` prunt **nur
+innerhalb** der angegebenen Refspec und räumt den Zweig-Verweis nicht ab. Genau
+so ist der Fehlalarm am 03.08.2026 entstanden. Also ohne Refspec fetchen (oder
+zusätzlich).
 
-*Erstens der Bereich.* Er prüft `origin/<zweig>..HEAD`. Nach einem Squash-Merge
-stimmt der nicht mehr: Der Fernzweig zeigt weiter auf den Stand *vor* dem Merge,
-der lokale Zweig wird auf `main` zurückgesetzt (so verlangt es die Anleitung für
-Folgearbeit) — und GitHubs Merge-Commit landet dadurch im geprüften Bereich.
-Dort sieht er aus wie lokale Arbeit, die weder signiert noch gepusht ist. Er ist
-beides nicht: gepusht längst, und signiert von GitHub statt von diesem Rechner.
+Nachgemessen: `git ls-remote --heads origin <zweig>` liefert nichts (der Zweig
+ist wirklich weg), `git rev-list HEAD --not --remotes --count` liefert 0 (nichts
+ist wirklich offen) — und trotzdem meldete der Hook, bis der veraltete Verweis
+weg war.
 
-Der Hook rät dann zu `git commit --amend`. **Nicht befolgen** — das schriebe
-veröffentlichte Geschichte um, auf dem Zweig, von dem Pages und Vercel
-ausliefern.
+**Was der Hook rät, wenn er doch einmal ausschlägt.** Bei einem
+Unverified-Befund schlägt er `git commit --amend` vor. Trifft es GitHubs
+Merge-Commit, **nicht befolgen** — das schriebe veröffentlichte Geschichte um,
+auf dem Zweig, von dem Pages und Vercel ausliefern. Bei einem echten eigenen
+Commit ist der Rat richtig.
 
-*Zweitens die Signaturfrage.* Er liest `%G?`, und das **verifiziert**. Bei
-SSH-Signaturen braucht das `gpg.ssh.allowedSignersFile`; die ist hier nicht
-eingerichtet (die Schlüsseldatei ist sogar leer), also meldet git `N` — dasselbe
-wie für einen gar nicht signierten Commit. Jeder frisch erzeugte Commit sieht
-damit unsigniert aus, sobald er am Zugende noch nicht gepusht ist, obwohl die
-Signatur im Objekt steht und GitHub ihn als verified zeigt.
+**Der alte Fehlalarm ist behoben.** Bis zum 03.08.2026 lag hier ein Flick-Skript
+(`scripts/stop-hook-patch.mjs`) gegen zwei Fehler des Hooks: Er prüfte
+`origin/<zweig>..HEAD` statt „was auf keinem Fernzweig liegt", und er las die
+Signatur über `%G?`, was ohne `gpg.ssh.allowedSignersFile` jeden SSH-signierten
+Commit als unsigniert meldete. Beides ist in der Fassung vom 03.08.2026
+(6395 Bytes) behoben — sie nutzt `HEAD --not --remotes` und liest den rohen
+`gpgsig`-Header. Skript und Anleitung dazu sind entfallen; gemeldet war es
+unter `b5746b94-aef0-4d56-a8c4-22684b591659`.
 
-Das Skript nimmt beide Ursachen weg: Die Prüfungen klammern aus, was schon auf
-`main` liegt, und fragen für die Signatur das Commit-Objekt selbst statt `%G?`.
-Nachgemessen bleiben beide echten Fälle erhalten — ein unsignierter Commit und
-einer mit falscher Identität werden weiterhin gemeldet.
-
-Das ist ein Notnagel, und er hält kürzer als zuerst gedacht. Nachgewiesen am
-29.07.2026: Container neu aufgesetzt (08:48:20), Hook im Original zurück,
-prompt wieder der Fehlalarm. Nachgemessen am 03.08.2026: Es braucht nicht
-einmal eine Neubereitstellung — der Hook kam **mehrfach je Stunde** im
-Original zurück, mitten in der laufenden Sitzung (Zeiten oben). Deshalb liegt
-der Flicken hier statt im Container, und deshalb gilt „bei jedem Fehlalarm
-erneut" statt „einmal zu Beginn".
-
-**Schon gemeldet — nicht noch einmal melden.** Beide Fehlalarme sind bei
-Anthropic eingegangen, Referenz-ID
-`b5746b94-aef0-4d56-a8c4-22684b591659`. Behoben gehört der Hook dort, wo er
-herkommt; hier ist nichts weiter zu tun, als das Skript laufen zu lassen,
-sooft er anspringt. Trägt eine künftige Fassung den Fehler nicht mehr, sagt
-das Skript das von selbst („sieht anders aus als erwartet") und ändert nichts —
-dann kann dieser Abschnitt samt `scripts/stop-hook-patch.mjs` weg.
+Bleibt nur die Prüfung auf ungepushte Commits, die weiterhin gegen
+`origin/<zweig>` vergleicht — und dagegen hilft das Prunen oben.
 
 ## Pull Requests selbst zusammenführen
 
