@@ -1813,18 +1813,20 @@ und ob sie ein Land ist, weiß die App aus der Typzeile.
 Ab **820 px Breite** liegen die Felder wie auf der offiziellen Spielmatte: ganz
 links unten die senkrechte Emblemleiste, daneben das Schlachtfeld groß, die
 Länder als Streifen darunter, die Lebenspunkte als Reihe unter beiden; rechts
-eine schmale Spalte (Commander-Steuer, Kommandozone, ab 1200 px darunter die
-angezeigte Karte). Ein quer gehaltenes Handy erreicht diese Breite und bekommt
-die Matte automatisch.
+eine schmale Spalte (Kommandozone, ab 1200 px darunter die angezeigte Karte).
+Ein quer gehaltenes Handy erreicht diese Breite und bekommt die Matte
+automatisch.
 
 > **Was wo NICHT mehr steht.** Die **Bibliothek** stand als schmale Spalte in
 > der Matte und ist eine Lade geworden: zugeklappt eine Zahl, aufgeklappt eine
 > Suchzeile — genau der Fall, für den es die Laden gibt. Das **Mana** stand als
 > eigene Kachel daneben und steht jetzt in der Kopfzeile des Länderstreifens,
-> bei den Quellen, aus denen die Zahl entsteht. Die **angezeigte Karte** hatte
-> eine eigene dritte Spalte und rückt unter die Kommandozone; zwei schmale
-> Spalten nebeneinander kosteten das Schlachtfeld rund 180 px für Dinge, die
-> untereinander genauso gut stehen.
+> bei den Quellen, aus denen die Zahl entsteht. Die **Commander-Steuer** stand
+> als eigener Kasten über der Kommandozone und ist aus demselben Grund in deren
+> Kopfzeile gerückt — die rund 70 px bekommt die Karte darunter. Die
+> **angezeigte Karte** hatte eine eigene dritte Spalte und rückt unter die
+> Kommandozone; zwei schmale Spalten nebeneinander kosteten das Schlachtfeld
+> rund 180 px für Dinge, die untereinander genauso gut stehen.
 
 **Die Lebenspunkte laufen unter den Ländern über deren volle Breite**, bis zu
 vier Kacheln nebeneinander — so wie die Mitspieler am Tisch nebeneinander
@@ -1896,6 +1898,14 @@ gegen die Deckenkante. Der **Würfel** ist keine Lade — ein Klick würfelt sof
 lägen offen übereinander. Dieselbe Regel wie im Akkordeon, aus demselben
 Grund.
 
+**Nach einem Zug geht die Lade wieder auf.** Während des Ziehens ist sie zu —
+sie läge über den Zonen, auf die man zielt —, danach nicht mehr: Man spielt
+selten genau eine Karte, und sie jedes Mal neu aufzuklappen ist ein Handgriff
+für nichts. Das gilt für alle vier Laden und auch dann, wenn der Zug ins Leere
+ging (die Karte liegt dann noch dort, wo sie war) oder die Lade danach leer ist.
+Nur ein **Abbruch mit Escape** lässt sie zu — Escape heißt abbrechen, und es ist
+dieselbe Taste, die Laden schließt.
+
 **Rahmen bei Friedhof und Exil.** Ihre Gitter sind lose Reihen kleiner Bilder
 und bräuchten sonst eine Fläche, um nicht über dem Schlachtfeld zu schwimmen.
 Der Handfächer trägt seine Form selbst: Seine Karten liegen gestaffelt und
@@ -1913,9 +1923,13 @@ nicht, denn der Fächer wird bei vielen Karten von selbst schmaler — der sicht
 Anteil je Karte schrumpft mit ihrer Zahl, gemessen in Kartenbreiten statt in
 Pixeln, damit er auf schmalen Schirmen mitschrumpft.
 
-**Der Würfel rollt über die ganze Matte** — er ist keine Zone und trägt deshalb
-kein Ablageziel. Seine Fläche liegt *unter* den drei anderen Emblemen: Man
-würfelt oft, während eine Lade offen steht, und die gehört dann davor.
+**Der Würfel rollt über die ganze Matte und über alles darin** — er ist keine
+Zone und trägt deshalb kein Ablageziel. Seine Fläche liegt *über* den Laden,
+über der angezeigten Karte und über dem Schlachtfeld: Gewürfelt wird oft,
+während eine Lade offen steht, und darunter sah man vom Wurf nichts. Er blendet
+ohnehin nach ein paar Sekunden aus, und die Zahl bleibt am Emblem. Eine einzige
+Anzeige bleibt darüber — die **Matte eines Mitspielers**, die man bewusst über
+die eigene legt.
 
 Das Emblem trägt die Schaltfläche jeweils allein: kein Kasten darum, kein
 Beiwort daneben; lesbar über hellen wie dunklen Kartenbildern bleibt es durch
@@ -2052,8 +2066,14 @@ bestücken machte sie in der schmalen Mattenspalte unlesbar.
 
 **Commander-Steuer.** Wanderst du deinen Commander aus der Kommandozone aufs
 Feld, zählt die App das Wirken mit und zeigt, was das nächste Mal extra kostet
-(`+2`, `+4`, …) — in der Matte im eigenen Kasten, hochkant als Abzeichen am
-Kartenbild. Verzählt? Ein Klick darauf nimmt ein Wirken zurück.
+(`+2`, `+4`, …) — in der Matte als Marke in der **Kopfzeile der Kommandozone**,
+hochkant als Abzeichen am Kartenbild. Verzählt? Ein Klick darauf nimmt ein
+Wirken zurück.
+
+Die Marke sitzt dort aus demselben Grund wie das Mana in der Kopfzeile der
+Länder: bei dem, worauf sie sich bezieht. Als eigener Kasten darüber kostete sie
+Titelzeile, Korb und Abstand — gemessen rund 70 px, die jetzt die **angezeigte
+Karte** darunter bekommt.
 
 Die Steuer hängt an der **Karte**, nicht an der Zone:
 
@@ -2486,9 +2506,9 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `verlauf`        | Deck-Verlauf: Fingerabdruck unabhängig von der Reihenfolge, der Umbau in Worten, und was ein Rücksprung schreiben würde (fehlende Karten, fehlende Fächer, primäre Einordnung) |
 | `wunschliste`    | Karte direkt vormerken: die Zeile (Bestand 0, Setcode groß, Preis mit erstem Punkt) und die Doppelprüfung — auch gegen eine andere Auflage derselben Karte |
 | `synergien`      | Aufgehobene Vorschläge: die eingedampfte Karte, der Fingerabdruck als Warnung vor Überholtem, und dass ein frisches Ergebnis nicht überschrieben wird |
-| `spielrunde`     | Die Matte: Ziehen zwischen den Zonen, Tappen per Klick, die Lebensreihe (vier einzeilige Kacheln nebeneinander, Regler links neben der Zahl, kein Rollbalken), der Länderstreifen (mehr als die halbe zweite Reihe sichtbar), der Kopfkasten unter der Matte, die fünf Laden links unten neben der Matte (senkrechte Reihenfolge, unten verankert, eigene Spalte statt darübergelegt, nach rechts aufklappend, immer nur eine offen, auch zugeklappt Ablageziel) samt der Bibliothekssuche in ihrem Korb, der Würfel (nur W20, blanke Fläche über der ganzen Matte, Zahl aufs Emblem, jeder Wurf anders) und „Zufällig ziehen" (gewichtet über Exemplare, leere Bibliothek) |
+| `spielrunde`     | Die Matte: Ziehen zwischen den Zonen (die Lade geht dabei zu und danach wieder auf), Tappen per Klick, die Lebensreihe (vier einzeilige Kacheln nebeneinander, Regler links neben der Zahl, kein Rollbalken), der Länderstreifen (mehr als die halbe zweite Reihe sichtbar), die Kartenspalte (kein Rollbalken, das Bild gibt nach), der Kopfkasten unter der Matte, die fünf Laden links unten neben der Matte (senkrechte Reihenfolge, unten verankert, eigene Spalte statt darübergelegt, nach rechts aufklappend, immer nur eine offen, auch zugeklappt Ablageziel) samt der Bibliothekssuche in ihrem Korb, der Würfel (nur W20, blanke Fläche über der ganzen Matte UND über allem darin, Zahl aufs Emblem, jeder Wurf anders) und „Zufällig ziehen" (gewichtet über Exemplare, leere Bibliothek) |
 | `fremdmatte`     | Die Matte eines Mitspielers: dass die Abfrage die Spalte `hand` nicht führt und Zeilen ohne offene Zone überspringt, dass die Anzeige ein doch geliefertes `hand` gar nicht erst übernimmt, dass fremde Karten keine Handgriffe tragen, dass die Lebensreihe frei und anklickbar bleibt und dass der Takt nach dem Schließen samt Intervall verschwindet; dazu, dass die Lade hochkant im Blickfeld statt weit unten aufklappt und dass ein Zuschauer ohne eigenes Deck die Mitspieler samt Auge überhaupt sieht |
-| `steuer`         | Die Commander-Steuer: je Commander eine eigene Zeile mit Namen, Wirken erhöht nur die des gewirkten, der Rücknahme-Knopf trifft nur seine Karte — und beides steht auch dann noch da, wenn der Commander längst auf dem Schlachtfeld liegt und die Kommandozone leer ist |
+| `steuer`         | Die Commander-Steuer: je Commander eine eigene Marke in der Kopfzeile der Kommandozone (der alte Kasten darüber darf nicht zurückkommen), Wirken erhöht nur die des gewirkten, der Rücknahme-Knopf trifft nur seine Karte — und beides steht auch dann noch da, wenn der Commander längst auf dem Schlachtfeld liegt und die Kommandozone leer ist |
 | `mana`           | Mana in diesem Zug: der Übersetzer an einer Mustertabelle (Signet netto, Selbstopfer ja, fremdes Opfer nein, „for each“ variabel, CR 305.6 ohne Text), die Summen frei/gesamt je Exemplar, Tappen senkt frei, die Hand zählt nie mit, und ohne Quellen Strich statt Null — dazu die Farbaufteilung: feste Reihenfolge, Summe der Marken gleich der Gesamtzahl, Tappen kommt in der Farbe an, und alle sieben Marken brechen in der 154-px-Spalte um, statt hinauszulaufen |
 | `export`         | Deck ausgeben: die fünf Zeilen genau so, wie sie dastehen müssen — englischer Name statt gedrucktem, Setcode groß, keine leere Klammer ohne Auflage, alphabetisch sortiert, Deckmenge statt Bestand; dazu Datei, Zwischenablage und der Rückfall „Text markiert“, wenn das Kopieren scheitert |
 | `mitglieder`     | Die Mitgliederliste ohne Stufen: dass die Abfrage das neueste Mitglied aus allen Profilen und mit echtem Namen nimmt, dass Karten und „größte Sammlung“ weiterhin an den Stufen hängen, dass ein leerer Anzeigename die Ersatzbezeichnung behält — und dass die Zusage in allen fünf Sprachen mitgewandert ist |

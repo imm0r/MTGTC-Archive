@@ -7793,7 +7793,11 @@ function katZiehBewegt(e) {
     if (a.art === "zone") versteckeSpielKarte(true);
     // Die Handlade schwebt über der Matte und läge über den Zonen, auf die man
     // zielt. Die Karte hängt am Zeiger, gesehen hat man sie also weiterhin.
-    if (a.art === "zone") schwebeSchliessen();
+    // Sie geht nach dem Loslassen WIEDER AUF (katZiehLos): Man spielt selten
+    // genau eine Karte, und sie jedes Mal neu aufzuklappen ist ein Handgriff
+    // für nichts. Gemerkt wird hier, WELCHE Lade offen war — die Regel gilt
+    // für alle vier, nicht nur für die Hand.
+    if (a.art === "zone") { schwebeZurueck = schwebeOffen; schwebeSchliessen(); }
     // Die Trefferliste hat ihren Dienst getan und läge jetzt im Weg: Seit die
     // Deckleiste NEBEN dem Raster steht statt darüber, hängt sie genau über der
     // ersten Spaltenreihe. Sie verschwände zwar von selbst, wenn die Eingabe
@@ -7818,15 +7822,26 @@ function katZiehLos(e) {
   if (!zug) return;                                   // war doch nur ein Klick
   const feld = katFeldUnter(e.clientX, e.clientY);
   const art = zugArtVon(zug);        // VOR dem Aufräumen — danach ist ziehKat leer
+  const wieder = schwebeZurueck; schwebeZurueck = null;
   katZiehAus();
   // Ein Klick, der aus einem Zug entstand, darf die Detailansicht nicht öffnen.
   katKlickSchlucken();
   if (feld && art) art.ab(zug, feld.dataset[art.ziel], e.ctrlKey || e.metaKey);
+  /* Die Lade, die für den Zug zugegangen ist, geht wieder auf — NACH dem
+     Ablegen, denn das zeichnet die Zonen neu und baut die Laden dabei
+     zugeklappt wieder auf. Auch wenn der Zug ins Leere ging: Dann liegt die
+     Karte noch dort, wo sie war, und die Lade zuzulassen wäre die Strafe für
+     einen Fehlgriff. Leer bleibt sie ebenfalls offen — „nicht automatisch
+     schließen" heißt nicht „außer wenn". */
+  if (wieder && !schwebeOffen) schwebeUmschalten(wieder);
 }
 
 function katZiehAus() {
   ziehKat = null;
   ziehAnsatz = null;
+  // Abgebrochen (Escape, pointercancel) heißt abgebrochen: Dann geht auch die
+  // Lade nicht wieder auf. katZiehLos() liest den Merker VOR diesem Aufruf.
+  schwebeZurueck = null;
   document.body.classList.remove("zieht-gerade");
   // Nicht nur Tabellenzeilen: In der Kartenansicht zieht man einen Stapelstreifen.
   $$(".zieht").forEach(el => el.classList.remove("zieht"));
@@ -13587,6 +13602,7 @@ const zoneDef = k => ZONEN.find(z => z.key === k);
 
 let ZONE_OFFEN = "hand";        // welche Zone gerade aufgeklappt ist
 let schwebeOffen = null;        // welche schwebende Zone der Matte offen ist ("hand"/"grave"/null)
+let schwebeZurueck = null;      // … und welche nach einem Zug wieder aufgehen soll
 let letzterWurf = null;         // letzter Wurf der Runde (steht auf dem Würfelemblem)
 let wurfEnde = null;            // blendet den Würfel nach dem Liegenbleiben aus
 let zoneZeigerArt = "mouse";    // womit zuletzt in den Zonen angefasst wurde
@@ -14150,22 +14166,17 @@ function matInnerHtml() {
       </section>
     </div>
     <div class="mat-mitte">
-      <!-- JE COMMANDER eine Zeile. Ein Deck mit Partnern hat zwei, und jeder
-           zahlt seine eigene Steuer: Wer den einen dreimal gewirkt hat und den
-           anderen nie, schuldet +6 und +0, nicht zweimal dieselbe Zahl. -->
-      <section class="mat-feld mat-steuer">
-        <div class="mat-titel">${esc(t("mat.tax"))}</div>
-        <div class="mat-korb">${cmds.length
-          ? cmds.map(c => matSteuerHtml(c, cmds.length > 1)).join("")
-          : `<span class="mat-steuerwert leer">&ndash;</span>`}</div>
-      </section>
       <!-- Die Bibliothek stand hier und ist in die schwebenden Laden gewandert
            (SCHWEBEZONEN), das Mana in den Länderbereich. Übrig bleiben die
            Kommandozone und darunter die angezeigte Karte — die stand vorher in
            einer eigenen dritten Spalte. Zwei schmale Spalten nebeneinander
            kosteten das Schlachtfeld Breite für Dinge, die untereinander
-           genauso gut stehen. -->
-      ${feld("cmd", t("zone.cmd"), { n: zoneSumme("cmd"), html: zoneKorbHtml("cmd") }, " mat-cmd")}
+           genauso gut stehen.
+           DIE STEUER STEHT IN DER KOPFZEILE, wie das Mana in der der Länder:
+           bei dem, worauf sie sich bezieht. Als eigener Kasten darüber kostete
+           sie rund 70 px, die jetzt der angezeigten Karte zugutekommen. -->
+      ${feld("cmd", t("zone.cmd"), { n: zoneSumme("cmd"), html: zoneKorbHtml("cmd") },
+             " mat-cmd", matSteuerHtml(cmds))}
       ${SPK_SPALTE ? `<section class="mat-feld mat-vorschau">
         <div class="mat-titel">${esc(t("spk.slot"))}</div>
         <div class="spk" id="spk-feld"><div class="spk-leer">${esc(t("spk.slotEmpty"))}</div></div>
@@ -14174,19 +14185,27 @@ function matInnerHtml() {
     ${schwebeLeisteHtml()}${fremdBuehneHtml()}`;
 }
 
-/* Eine Steuerzeile: Name (nur bei zweien) und der Wert als Knopf, der um zwei
-   Mana zurückzählt. Der Name steht bei einem einzelnen Commander NICHT dabei —
-   die Überschrift des Kastens sagt dann schon alles, und die schmale Spalte
-   ist 154 px breit, bevor sie ab 1200 px auf 268 wächst. */
-function matSteuerHtml(c, mitName) {
-  const n = zStand(c.id).cast || 0;
-  const titel = t("sess.cmdTaxTitle", { mana: n * 2, n });
-  const nm = trkName(c);
-  return `<div class="mat-steuerzeile">
-    ${mitName ? `<span class="mat-steuername" title="${esc(nm)}">${esc(nm)}</span>` : ""}
-    <button class="mat-steuerwert" data-steuer="${esc(c.id)}" data-d="-1"
-      title="${esc(titel)}" aria-label="${esc(nm)} &middot; ${esc(titel)}">+${n * 2}</button>
-  </div>`;
+/* Die Commander-Steuer als Marke IN DER KOPFZEILE der Kommandozone — dieselbe
+   Stelle wie das Mana in der Kopfzeile der Länder, und aus demselben Grund: Sie
+   gehört zu dem, worauf sie sich bezieht. Als eigener Kasten darüber nahm sie
+   der angezeigten Karte rund 70 px, und die brauchte jede davon.
+
+   JE COMMANDER eine Marke: Ein Deck mit Partnern hat zwei, und jeder zahlt
+   seine eigene. Wer den einen dreimal gewirkt hat und den anderen nie,
+   schuldet +6 und +0 — nicht zweimal dieselbe Zahl und erst recht nicht ihre
+   Summe. Der NAME steht im Kurztext, nicht daneben: In der Kopfzeile ringen
+   schon Zeichen, Wort und Anzahl um 268 px (unter 1200 px sind es 154).
+
+   Ein Knopf, kein Schild: Er zählt ein zu viel gezähltes Wirken zurück. */
+function matSteuerHtml(cmds) {
+  if (!cmds.length) return "";
+  return `<span class="mat-steuern">${cmds.map(c => {
+    const n = zStand(c.id).cast || 0;
+    const nm = trkName(c);
+    const titel = `${nm} · ${t("sess.cmdTaxTitle", { mana: n * 2, n })}`;
+    return `<button class="mat-steuerwert" data-steuer="${esc(c.id)}" data-d="-1"
+      title="${esc(titel)}" aria-label="${esc(titel)}">+${n * 2}</button>`;
+  }).join("")}</span>`;
 }
 
 /* ---- Schwebende Laden: Würfel, Hand, Exil, Friedhof ------------------

@@ -51,15 +51,24 @@ const PARTIE = () => {
   return { eins: ids[0], zwei: ids[1], drei: ids[2] };
 };
 
-/* Was im Kasten steht: je Zeile der angezeigte Wert und die Karte, an der er
-   hängt. Ohne das zweite Feld ließe sich „zwei Zeilen mit +0" nicht von „zwei
-   Zeilen für dieselbe Karte" unterscheiden. */
+/* Was in der KOPFZEILE der Kommandozone steht: je Marke der angezeigte Wert und
+   die Karte, an der er hängt. Ohne das zweite Feld ließe sich „zwei Marken mit
+   +0" nicht von „zwei Marken für dieselbe Karte" unterscheiden.
+
+   Der Kasten darüber ist weg — die Steuer steht dort, wo das Mana im
+   Länderstreifen steht: in der Kopfzeile dessen, worauf sie sich bezieht. Die
+   rund 70 px bekommt die angezeigte Karte darunter. */
 const ABLESEN = () => ({
-  zeilen: [...document.querySelectorAll(".mat-steuer .mat-steuerwert")]
+  zeilen: [...document.querySelectorAll(".mat-cmd .mat-titel .mat-steuerwert")]
     .map(e => [e.textContent.trim(), e.dataset.steuer || null]),
-  namen: [...document.querySelectorAll(".mat-steuer .mat-steuername")].map(e => e.textContent.trim()),
-  cast: [...document.querySelectorAll(".mat-steuer .mat-steuerwert")]
+  // Der Name steht im Kurztext, nicht als eigener Text daneben.
+  namen: [...document.querySelectorAll(".mat-cmd .mat-titel .mat-steuerwert")]
+    .map(e => (titelVon(e) || "").split(" \u00b7 ")[0]),
+  cast: [...document.querySelectorAll(".mat-cmd .mat-titel .mat-steuerwert")]
     .map(e => (SESSION_ZONEN[e.dataset.steuer] || {}).cast || 0),
+  // Der alte Kasten darf NICHT zurückkommen: Er stand über der Kommandozone
+  // und nahm der Karte darunter die Höhe.
+  alterKasten: document.querySelectorAll(".mat-steuer").length,
 });
 
 export default async function ({ seite, adresse, stand }) {
@@ -77,7 +86,9 @@ export default async function ({ seite, adresse, stand }) {
   const anfang = await seite.evaluate(ABLESEN);
   stand.gleich("jeder Commander bekommt eine eigene Zeile",
     anfang.zeilen, [["+0", k.eins], ["+0", k.zwei]]);
-  stand.gleich("und jede trägt den Namen ihrer Karte", anfang.namen, ["Karte 0-0", "Karte 0-1"]);
+  stand.gleich("und jede nennt im Kurztext ihre Karte", anfang.namen, ["Karte 0-0", "Karte 0-1"]);
+  stand.ist("der eigene Steuerkasten über der Kommandozone ist weg",
+    anfang.alterKasten === 0, anfang.alterKasten);
 
   /* --- Der eine wird gewirkt, der andere nicht -------------------------- */
   /* Der Weg, den die Steuer in einer Partie wirklich nimmt: aus der
@@ -111,7 +122,7 @@ export default async function ({ seite, adresse, stand }) {
   /* Der Knopf ist da, weil sich am Tisch jemand verzählt. Träfe er beide,
      wäre er schlimmer als gar keiner. */
   await seite.evaluate(() => { window.GESCHRIEBEN = []; });
-  await seite.click(`.mat-steuer [data-steuer="${k.eins}"]`);
+  await seite.click(`.mat-cmd [data-steuer="${k.eins}"]`);
   await seite.waitForTimeout(300);
   stand.gleich("ein Klick nimmt genau ein Wirken zurück — bei dieser Karte",
     (await seite.evaluate(ABLESEN)).zeilen, [["+2", k.eins], ["+2", k.zwei]]);
@@ -144,20 +155,24 @@ export default async function ({ seite, adresse, stand }) {
   await seite.waitForTimeout(350);
 
   /* --- Ein Deck mit nur EINEM Commander -------------------------------- */
-  /* Dann steht kein Name dabei: Die Überschrift des Kastens sagt schon alles,
-     und die schmale Spalte ist unter 1200 px nur 154 px breit. */
   await seite.evaluate(() => { DECKS[0].second_card_id = null; renderSession(); });
   await seite.waitForTimeout(300);
   const einer = await seite.evaluate(ABLESEN);
-  stand.gleich("bei einem einzelnen Commander bleibt es bei einer Zeile ohne Namen",
-    [einer.zeilen, einer.namen], [[["+2", k.eins]], []]);
+  stand.gleich("bei einem einzelnen Commander bleibt genau eine Marke",
+    [einer.zeilen, einer.namen], [[["+2", k.eins]], ["Karte 0-0"]]);
 
   /* --- Gar kein Commander ---------------------------------------------- */
+  /* Dann steht in der Kopfzeile GAR NICHTS — kein Knopf, keine Null und auch
+     nicht der matte Strich von früher. Der stand nur da, weil der eigene Kasten
+     einen Platz zu füllen hatte; eine Kopfzeile hat nichts zu füllen.
+     Das Feld selbst bleibt: Die Matte zeigt ihre Zonen fest, anders als das
+     Akkordeon, das die Kommandozone ohne Commander ganz auslässt. */
   await seite.evaluate(() => { DECKS[0].main_card_id = null; renderSession(); });
   await seite.waitForTimeout(300);
-  stand.gleich("ohne Commander steht dort ein matter Strich, kein Knopf",
+  stand.gleich("ohne Commander steht keine Steuer in der Kopfzeile",
     await seite.evaluate(() => ({
-      werte: document.querySelectorAll(".mat-steuer .mat-steuerwert:not(.leer)").length,
-      leer:  document.querySelectorAll(".mat-steuer .mat-steuerwert.leer").length,
-    })), { werte: 0, leer: 1 });
+      feld:   document.querySelectorAll(".mat-cmd").length,
+      steuer: document.querySelectorAll("[data-steuer]").length,
+      marken: document.querySelectorAll(".mat-steuern").length,
+    })), { feld: 1, steuer: 0, marken: 0 });
 }
