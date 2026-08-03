@@ -136,7 +136,10 @@
        damit Ansicht und Markierung dieselbe Verdrahtung nutzen (wireApp). -->
   <div class="header-meta">
     <button type="button" class="header-status" id="header-status" data-i18n="nav.status">Site Status</button>
-    <span class="header-version" id="header-version" hidden></span>
+    <!-- Ein Knopf, kein Span: Die Version öffnet das Changelog. Dass sie
+         anklickbar ist, verrät der title (gesetzt in zeigeKopfVersion) —
+         mehr Schmuck braucht eine Versionsnummer nicht. -->
+    <button type="button" class="header-version" id="header-version" hidden></button>
   </div>
   <nav>
     <!-- Die obersten Punkte tragen ein Sinnbild. Der Text steht dabei in
@@ -544,6 +547,15 @@
 <dialog id="detail-dlg"><div id="detail-body"></div>
   <div class="row" style="margin-top:12px;justify-content:flex-end">
     <div style="flex:none"><button class="btn" id="detail-close" data-i18n="dlg.close">Schließen</button></div>
+  </div>
+</dialog>
+
+<!-- Changelog: Was hat sich wann geändert. Gefüllt aus changelog.json — eine
+     Zeile je Pull Request, gepflegt von Hand beim Öffnen des PR (siehe
+     CLAUDE.md). Bewusst schlicht: Datum/Uhrzeit, Art, zwei bis drei Zeilen. -->
+<dialog id="changelog-dlg"><div id="changelog-body"></div>
+  <div class="row" style="margin-top:12px;justify-content:flex-end">
+    <div style="flex:none"><button class="btn" id="changelog-close" data-i18n="dlg.close">Schließen</button></div>
   </div>
 </dialog>
 

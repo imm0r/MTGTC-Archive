@@ -166,7 +166,31 @@ nav button:hover .nav-sym,nav button.on .nav-sym{filter:none}
 .header-status.ok:hover{color:var(--ok)}
 .header-status.warn:hover{color:var(--acc2)}
 .header-status.err:hover{color:var(--err)}
-.header-version{font-size:12px;color:var(--dim);opacity:.7;white-space:nowrap}
+/* Ein Knopf ohne Knopf-Optik: Die Version soll aussehen wie bisher und nur
+   beim Überfahren verraten, dass sie das Changelog öffnet. */
+.header-version{font-size:12px;color:var(--dim);opacity:.7;white-space:nowrap;
+  background:none;border:0;padding:0;cursor:pointer;font:inherit;font-size:12px}
+.header-version:hover{opacity:1;text-decoration:underline;text-underline-offset:2px}
+
+/* ------------------------------------------------------------ Changelog
+   Eine Zeile je Änderung: Datum/Uhrzeit gedimmt, die Art als kleines farbiges
+   Etikett (grün = neu, blau = verbessert, rot = behoben — dieselbe Ampellogik
+   wie überall), darunter der Text. Die Liste rollt im Dialog. */
+#changelog-dlg{width:min(680px,92vw)}
+.cl-liste{max-height:min(62vh,640px);overflow-y:auto;display:flex;flex-direction:column;gap:12px;
+  padding-right:6px}
+.cl-zeile{border-bottom:1px solid var(--line);padding-bottom:10px}
+.cl-zeile:last-child{border-bottom:0}
+.cl-kopf{display:flex;align-items:baseline;gap:8px;margin-bottom:3px}
+.cl-zeit{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+.cl-art{font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+  padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--dim)}
+.cl-neu{color:var(--ok);border-color:var(--ok)}
+.cl-verbessert{color:var(--acc2);border-color:var(--acc2)}
+.cl-behoben{color:var(--err);border-color:var(--err)}
+.cl-pr{margin-left:auto;font-size:12px;color:var(--dim);text-decoration:none}
+.cl-pr:hover{color:var(--acc);text-decoration:underline}
+.cl-text{font-size:13.5px;line-height:1.5}
 /* Statistiken auf dem Login-Screen, mittig unter dem Logo */
 .gate-stats{text-align:center}
 .gate-usercount,.gate-deckcount{color:var(--dim);font-size:14px;margin:2px 0 12px;display:block}

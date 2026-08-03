@@ -10723,7 +10723,79 @@ function zeigeKopfVersion() {
   el.hidden = !APP_VERSION;
   if (!APP_VERSION) return;
   el.textContent = t("header.version", { v: APP_VERSION });
-  el.title = t("settings.version", { v: APP_VERSION });
+  // Der title sagt jetzt, dass hinter der Nummer das Changelog steckt — die
+  // Nummer selbst bleibt die Beschriftung, ein „Changelog"-Schriftzug im Kopf
+  // wäre ein weiteres Wort für etwas, das einmal im Monat jemand öffnet.
+  el.title = t("changelog.open", { v: APP_VERSION });
+  el.onclick = zeigeChangelog;
+}
+
+/* ============================ Changelog ===============================
+   Was hat sich wann geändert — eine Zeile je Pull Request, aus
+   changelog.json. Die Datei wird von Hand gepflegt (beim Öffnen jedes PR,
+   siehe CLAUDE.md) und hier nur gelesen: Datum/Uhrzeit, Art, zwei bis drei
+   Zeilen Text. Bewusst KEIN Abruf der GitHub-API: die ist für anonyme
+   Zugriffe auf 60 Anfragen je Stunde gedeckelt, und eine statische Datei
+   im selben Verzeichnis kann nicht ausfallen.
+
+   Geladen einmal je Sitzung, beim ersten Öffnen. Ein ?v= trägt die Datei
+   nicht (die Hashes in index.html gelten nur für href/src) — GitHub Pages
+   liefert mit max-age=600, ein bis zu zehn Minuten alter Stand ist für ein
+   Changelog belanglos. */
+let changelogP = null;
+function ladeChangelog() {
+  return (changelogP = changelogP || (async () => {
+    const r = await fetch("changelog.json");
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const d = await r.json();
+    if (!Array.isArray(d)) throw new Error("kein Feld");
+    return d;
+  })().catch(e => { changelogP = null; throw e; }));
+}
+
+/* Datum/Uhrzeit einer Änderung, in der Sprache der Oberfläche. Eigene
+   Formatierung statt dtShort: dort hängt „Uhr"-Logik für die Sammlung dran,
+   hier reicht die Ortskonvention des Browsers. */
+function changelogZeit(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  return d.toLocaleString(undefined, { day: "2-digit", month: "2-digit",
+    year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+const CHANGELOG_ART = {
+  neu:        { key: "changelog.neu",        klasse: "cl-neu" },
+  verbessert: { key: "changelog.verbessert", klasse: "cl-verbessert" },
+  behoben:    { key: "changelog.behoben",    klasse: "cl-behoben" },
+};
+
+async function zeigeChangelog() {
+  const dlg = $("#changelog-dlg"), body = $("#changelog-body");
+  if (!dlg || !body) return;
+  body.innerHTML = `<h3 style="margin:0 0 10px">${esc(t("changelog.title"))}</h3>
+    <div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("changelog.loading"))}</div>`;
+  dlg.showModal();
+  let eintraege;
+  try { eintraege = await ladeChangelog(); }
+  catch {
+    body.innerHTML = `<h3 style="margin:0 0 10px">${esc(t("changelog.title"))}</h3>
+      <div class="empty">${esc(t("changelog.error"))}</div>`;
+    return;
+  }
+  // Unbekannte Arten (Tippfehler in der Datei, künftige Kategorien) erscheinen
+  // neutral statt zu verschwinden — dieselbe Vorsicht wie bei den Zustands-
+  // Badges der Sammlung.
+  const zeile = e => {
+    const art = CHANGELOG_ART[e.art] || { key: null, klasse: "" };
+    return `<div class="cl-zeile">
+      <div class="cl-kopf"><span class="cl-zeit">${esc(changelogZeit(e.am))}</span>
+        <span class="cl-art ${art.klasse}">${esc(art.key ? t(art.key) : e.art)}</span>
+        ${Number.isInteger(e.pr) ? `<a class="cl-pr" href="https://github.com/imm0r/MTGTC-Archive/pull/${e.pr}" target="_blank" rel="noopener noreferrer">#${e.pr}</a>` : ""}</div>
+      <div class="cl-text">${esc(e.text || "")}</div>
+    </div>`;
+  };
+  body.innerHTML = `<h3 style="margin:0 0 10px">${esc(t("changelog.title"))}</h3>
+    <div class="cl-liste">${eintraege.map(zeile).join("")}</div>`;
 }
 
 /* Der Verweis im Kopf traegt die Gesamtlage als Beschriftung — „Alle Systeme
@@ -16873,6 +16945,8 @@ function wireApp() {
     try { await importJson(f); } catch (err) { toast(t("toast.importFailed", { msg: err.message })); }
   };
   $("#detail-close").onclick = () => $("#detail-dlg").close();
+  const clSchliessen = $("#changelog-close");
+  if (clSchliessen) clSchliessen.onclick = () => $("#changelog-dlg").close();
   // Beim Scrollen (auch innerhalb der Tabelle) verrutscht die Vorschau —
   // lieber ausblenden. capture:true erwischt auch innere Scroller.
   addEventListener("scroll", hideHover, true);

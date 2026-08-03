@@ -113,6 +113,28 @@ Das überstimmt bewusst die Voreinstellung der Arbeitsumgebung („create as
 draft"). Die Absicherung liegt hier nicht im Draft-Status, sondern davor: vor
 dem Push prüfen, und der Merge-Knopf bleibt ohnehin beim Eigentümer.
 
+## Jeder Pull Request trägt sich ins Changelog ein
+
+`changelog.json` (Wurzelverzeichnis) ist das Changelog der App — der Klick auf
+die Versionsnummer im Kopf zeigt es an. Vor dem Push einen Eintrag **vorn**
+anfügen:
+
+```json
+{ "am": "<jetzt, ISO mit Zeitzone>", "art": "neu|verbessert|behoben",
+  "text": "Zwei bis drei Zeilen, aus Nutzersicht.", "pr": <PR-Nummer> }
+```
+
+* **Aus Nutzersicht schreiben**, nicht aus Code-Sicht: „Karten lassen sich
+  nach Thema filtern", nicht „cards_with_tag in filtered() verdrahtet".
+* **`art`**: `neu` = konnte die App vorher nicht; `verbessert` = Bestehendes
+  besser oder umgebaut; `behoben` = ein Fehler. Im Zweifel `verbessert`.
+* **Weglassen**, was kein Nutzer sehen oder spüren kann (reine
+  Arbeitsumgebung: Hooks, CI, CLAUDE.md selbst). Die Prüfungen zählen als
+  spürbar, wenn sie eine sichtbare Änderung absichern — dann gehört der
+  Eintrag zur Änderung, nicht zur Prüfung.
+* Die PR-Nummer ist beim Schreiben noch nicht vergeben; die nächste freie
+  nehmen (letzter PR + 1) und beim Anlegen des PR gegenprüfen.
+
 ## Jeder Pull Request braucht eine Versionsstufe im Titel
 
 **Zwingend.** In den Titel jedes Pull Requests gehört genau eine der Angaben
