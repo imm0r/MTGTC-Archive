@@ -585,6 +585,57 @@ Zuordnungen, Karten. Dieselben Policies wie bei `shared`, nur ohne die
 Freundschaftsprüfung: Ein Deck ohne seine Einteilung wäre eine Liste, mit ihr
 ein Bauplan.
 
+### Ein Community-Deck ansehen und übernehmen
+
+Eine Kachel war bis dahin ein Bild, ein Name und fünf Sterne — bewerten ließ
+sich das Deck, hineinsehen nicht. Ein Klick auf den Namen (oder irgendwo sonst
+auf die Kachel) öffnet jetzt die **Kartenliste in der Einteilung des
+Erbauers**, mit seinen Fächern und einer Gruppe „Ohne Kategorie" für alles,
+was er nirgends einsortiert hat. Von dort führt ein Knopf ins eigene Regal.
+
+Gelesen wird **direkt aus den Tabellen**, nicht über eine eigene RPC: Die
+SELECT-Policies für öffentliche Decks liegen seit den Community-Decks vor. Eine
+zweite Stelle, die dieselbe Sichtbarkeitsfrage beantwortet, wäre die, die man
+beim Ändern vergisst.
+
+Übernommen wird über `import_shared_deck` — dieselbe Funktion wie beim
+geteilten Freundes-Deck, jetzt mit **zwei** Zugangswegen statt einem
+(`is_public` **oder** geteilt-und-befreundet). Ein öffentliches Deck erfüllte
+die alte Bedingung nie: Mit dem Erbauer ist man ja gerade nicht befreundet.
+
+Drei Dinge daran sind Entscheidungen, keine Nebensachen:
+
+* **Die Kopie bleibt privat.** Der Vorgabewert von `decks.is_public` steht auf
+  true, und der INSERT nannte die Spalte nicht — jede Übernahme hätte das Deck
+  eines *anderen* sofort unter eigenem Namen weiterveröffentlicht. Nichts wäre
+  fehlgeschlagen. Der Bestätigungstext verspricht seit jeher „als neues,
+  privates Deck", in allen fünf Sprachen; Text und Verhalten müssen dasselbe
+  sagen. Selbst angelegte und aus einer Textliste eingelesene Decks bleiben
+  davon unberührt — die sind weiterhin von sich aus öffentlich.
+* **Die Einteilung kommt mit.** Wer die Liste in Fächern gesehen hat und danach
+  eine Karten*liste* bekommt, hat etwas anderes übernommen als das, was er sich
+  angesehen hat. Übersetzt werden dafür zwei Sätze von IDs (fremde Karten auf
+  eigene, fremde Fächer auf frisch angelegte); übernommen wird nur, wofür
+  **beide** Übersetzungen vorliegen.
+* **Ein Dialog aus dem Dialog heraus ist erlaubt.** Die Rückfrage
+  „übernehmen?" und das Profil des Erbauers laufen über dasselbe `<dialog>`.
+  `confirmDlg()` tauscht dabei einfach den Inhalt; `showModal()` auf einem
+  schon offenen Dialog ist in Chromium ein **Leerlauf** und wirft nicht
+  (nachgemessen — die alte Fassung der Spezifikation verlangte einen Fehler).
+  Wer stattdessen erst schließt und dann öffnet, baut sich eine Falle: Das
+  `close`-Ereignis kommt als eigene Aufgabe und trifft den Zuhörer der
+  **neuen** Frage, die damit mit „nein" beantwortet ist, bevor jemand sie
+  gelesen hat. Genau so verschwand die Übernahme beim ersten Anlauf — der Knopf
+  tat nichts, und nichts meldete einen Fehler.
+
+Die Kachel ist als Ganzes anklickbar, **außer dort, wo schon ein Knopf sitzt**
+(Sterne, Erbauer, der Name selbst). Ohne diese Ausnahme bewertete ein Klick auf
+den dritten Stern das Deck *und* risse den Dialog auf, über einer Kachel, die
+darunter gerade neu gezeichnet wird. Der Name ist ein echter `<button>` und
+nicht die ganze Kachel mit `role="button"`: In der Kachel stecken schon Knöpfe,
+und ein Knopf im Knopf ist weder gültiges HTML noch mit der Tastatur zu
+bedienen.
+
 ### Community steht jetzt oben
 
 Sie war ein Eintrag im Benutzermenü hinter Avatar und Name — einer Klappe, die
@@ -2192,6 +2243,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `anzeigename`    | Der Anzeigename als Pflicht: die Regel selbst (2–40, getrimmt), das Feld beim Anlegen, der Weg über die Nutzer-Metadaten bis ins frisch angelegte Profil, die Maske vor der App für alte Konten samt Ausweg — und dass das Profilfeld ihn nicht mehr leeren kann |
 | `mitgliederliste` | Die Mitgliederliste und das öffentliche Profil: dass die Abfrage `findable` achtet, die Gesamtzahl je Zeile mitzählt und das Verhältnis gleich mitliefert; die vier Knöpfe, Blättern und Suchen (samt Rücksprung auf Seite eins und Fokus im Feld) — und dass ein `javascript:`-Ziel kein Verweis wird und Markup im Steckbrief Text bleibt |
 | `communitydecks` | Community-Decks: dass die Migration bestehende Decks NICHT veröffentlicht (Reihenfolge der beiden ALTERs), dass die Rangliste glättet und trotzdem den echten Schnitt zeigt, dass das eigene Deck keine Knöpfe hat und die Datenbank es abweist — dazu Bewerten ohne Neuladen der Liste, Sortieren und Suchen über den Commander; dazu die beiden führenden Kacheln (und dass die übrigen keine sind), der Sprung im niedrigen Fenster samt Aufleuchten, und der Feed-Trigger, der beim Anlegen genau EINE der beiden Zeilen schreibt |
+| `deckansehen`    | Ein Community-Deck ansehen und übernehmen: dass der Name ein Knopf ist und die Kachel daneben auch klickt, ein Stern aber NICHT das Deck öffnet; dass der Dialog die Einteilung des Erbauers zeigt und die Deckmenge nennt; dass Bewerten im Dialog auch auf der Kachel dahinter ankommt; dass das eigene Deck keinen Übernehmen-Knopf trägt — und an der Migration, dass ein öffentliches Deck Zugang genug ist, die Kopie ausdrücklich privat entsteht und die Fächer mitkommen |
 | `navigation`     | Die oberste Leiste: dass Community dort steht (und nicht doppelt im Benutzermenü), dass das Wort in einem eigenen `<span>` sitzt und die fünf Sinnbilder einen Sprachwechsel überstehen, dass der Klick die Ansicht öffnet und genau einen Punkt markiert — und der Rückfall für eine fehlende Bilddatei in beiden Reihenfolgen, samt Gegenprobe, dass ein vorhandenes Sinnbild stehen bleibt |
 | `migrationen`    | Migrationen, die eine frühere Fassung fortschreiben: dass die Liste der Feed-Arten nie schrumpft, dass Tabellen-Constraint und Schreibweg dieselbe führen — und dass keine spätere Fassung die Sichtbarkeitsprüfung wieder herausnimmt (der Fall, den kein Datenbankfehler meldet) |
 
