@@ -1,5 +1,11 @@
 [
  {
+  "am": "2026-08-03T23:30:00+02:00",
+  "art": "neu",
+  "text": "Ist ein Commander-Deck voll, sagt der Synergie-Vorschlag nicht mehr nur, welche Karte dafür weichen könnte — ein Klick auf „Tauschen“ erledigt beides auf einmal: die genannte Karte raus, die vorgeschlagene rein, bei Bedarf als Wunschkarte. Das Deck bleibt dabei immer bei 100 Karten.",
+  "pr": 205
+ },
+ {
   "am": "2026-08-03T22:45:00+02:00",
   "art": "verbessert",
   "text": "Die Synergie-Suche nutzt jetzt die Karten-Themen aus dem Scryfall Tagger statt zehn grober Textmuster. Rhystic Study findet damit Draw-Engines, Elvish Archdruid Elfen-Verstärker — vorher fanden beide fast nichts.",

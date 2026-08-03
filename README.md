@@ -1759,6 +1759,57 @@ nicht darin stehen: für `deck_synergies` gibt es keine Freigabe an Freunde.
 > ausführen (oder `supabase/migrations/20260802120000_deck_synergien.sql`
 > einzeln).
 
+## Tauschen: den Schnitt-Vorschlag ausführen
+
+Ist ein Commander-Deck voll, sagt die Kachel schon länger, welche Karte dafür
+weichen könnte („✂ dafür raus: X“). Ausführen musste man es von Hand: Deck
+aufklappen, X suchen, herauswerfen, zurück zu den Vorschlägen, „+“. Der Knopf
+**„⇆ Tauschen“** an derselben Zeile ist der eine Handgriff dazu.
+
+**Beides zusammen, in der Datenbank** (`swap_in_deck`). Aus dem Browser wären
+es zwei Aufrufe, und beide Reihenfolgen sind falsch:
+
+| Reihenfolge | Was passiert |
+| --- | --- |
+| erst aufnehmen | 101 Karten — der 100-Karten-Trigger sagt ab, getauscht wurde nichts |
+| erst herausnehmen | bricht der zweite Aufruf ab, hat das Deck 99 Karten, und niemand sagt es |
+
+In einer Transaktion gibt es beides nicht: Das Deck ist vorher und nachher
+gleich groß, und schlägt irgendetwas fehl, bleibt alles, wie es war. Dieselbe
+Überlegung wie bei `fulfil_wish_in_deck`. Das Aufnehmen selbst macht weiterhin
+`add_wish_to_deck` — eigene Auflage verknüpfen, sonst dieselbe Karte über die
+`oracle_id`, sonst **mit Bestand 0 anlegen**. Das ist der Weg über die
+Wunschliste, und er ist derselbe wie beim bloßen „+“.
+
+**Ohne Rückfrage.** Die Zeile nennt die Karte, die weicht, im Klartext, und der
+[Deck-Verlauf](#verlauf-je-deck-zurück-auf-einen-älteren-stand) hat den Stand
+davor. Ein Bestätigungsdialog für etwas, das direkt daneben schon geschrieben
+steht, wäre nur ein zweiter Klick.
+
+Drei Dinge, die dabei nicht offensichtlich sind:
+
+* **Der Commander bleibt liegen.** `decks.main_card_id` zeigt auf einen ganz
+  normalen Deck-Eintrag; nähme man den heraus, zeigte das Deck auf einen
+  Commander, der nicht mehr darin steckt. Die Oberfläche schlägt ihn nie vor —
+  die Funktion weist ihn zusätzlich ab, auch für einen direkten API-Aufruf.
+* **Die Nachbarn rechnen neu.** Nach einem Tausch nennen die übrigen Kacheln
+  womöglich dieselbe, nun herausgenommene Karte; wer dort weiterklickte, liefe
+  in eine Absage. Neu gerechnet wird **heuristisch**, auch wo vorher ein Modell
+  den Schnitt vorschlug: Dessen Begründung galt für die alte Karte und wäre für
+  die neue erfunden.
+* **Nie die Karte, die gerade kam.** Sie liegt als Wunsch mit Bestand 0 im
+  Deck, und „nicht besessen“ ist das erste Argument der Schnitt-Heuristik —
+  ohne Sperre schlüge der nächste Vorschlag vor, die eben gewählte Karte wieder
+  herauszunehmen.
+
+Der Rest der Kachel bleibt stehen: Ein Lauf kostet Anfragen (die KI-Variante
+Kontingent), und ein Neuzeichnen nach jedem Tausch wäre genau das Wegwerfen,
+gegen das der Abschnitt darüber angeht.
+
+> Fehlt der Datenbank die Funktion `swap_in_deck`, bleibt die Schnitt-Zeile ein
+> Hinweis wie bisher, und der Knopf meldet den Fehler —
+> `supabase/migrations/20260803210000_deck_tausch.sql` im SQL Editor ausführen.
+
 ## Deck ausgeben: die Deckliste als Text
 
 Der Knopf **„📋 Exportieren"** in der Kopfleiste jedes Decks öffnet die
@@ -2770,6 +2821,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `verlauf`        | Deck-Verlauf: Fingerabdruck unabhängig von der Reihenfolge, der Umbau in Worten, und was ein Rücksprung schreiben würde (fehlende Karten, fehlende Fächer, primäre Einordnung) |
 | `wunschliste`    | Karte direkt vormerken: die Zeile (Bestand 0, Setcode groß, Preis mit erstem Punkt) und die Doppelprüfung — auch gegen eine andere Auflage derselben Karte |
 | `synergien`      | Aufgehobene Vorschläge: die eingedampfte Karte, der Fingerabdruck als Warnung vor Überholtem, und dass ein frisches Ergebnis nicht überschrieben wird |
+| `decktausch`     | „Tauschen“ am vollen Deck: dass der Knopf nur mit Deck-Bezug erscheint, der Commander nie zum Schneiden vorgeschlagen wird, EIN Aufruf mit dem vollen Wunsch-Parametersatz hinausgeht und das Deck gleich groß bleibt — dazu die Nachbarkacheln, die nach dem Tausch neu rechnen (und dabei nie die eben aufgenommene Karte vorschlagen), und die erklärte Absage bei einem veralteten Schnitt |
 | `spielrunde`     | Die Matte: Ziehen zwischen den Zonen (die Lade geht dabei zu und danach wieder auf), Tappen per Klick, die Lebensreihe (vier einzeilige Kacheln nebeneinander, Regler links neben der Zahl, kein Rollbalken), der Länderstreifen (mehr als die halbe zweite Reihe sichtbar), die Kartenspalte (kein Rollbalken, das Bild gibt nach), der Kopfkasten unter der Matte, die fünf Laden links unten neben der Matte (senkrechte Reihenfolge, unten verankert, eigene Spalte statt darübergelegt, nach rechts aufklappend, immer nur eine offen, auch zugeklappt Ablageziel) samt der Bibliothekssuche in ihrem Korb, der Würfel (nur W20, blanke Fläche über der ganzen Matte UND über allem darin, Zahl aufs Emblem, jeder Wurf anders) und „Zufällig ziehen" (gewichtet über Exemplare, leere Bibliothek) |
 | `fremdmatte`     | Die Matte eines Mitspielers: dass die Abfrage die Spalte `hand` nicht führt und Zeilen ohne offene Zone überspringt, dass die Anzeige ein doch geliefertes `hand` gar nicht erst übernimmt, dass fremde Karten keine Handgriffe tragen, dass die Lebensreihe frei und anklickbar bleibt und dass der Takt nach dem Schließen samt Intervall verschwindet; dazu, dass die Lade hochkant im Blickfeld statt weit unten aufklappt und dass ein Zuschauer ohne eigenes Deck die Mitspieler samt Auge überhaupt sieht |
 | `steuer`         | Die Commander-Steuer: je Commander eine eigene Marke in der Kopfzeile der Kommandozone (der alte Kasten darüber darf nicht zurückkommen), Wirken erhöht nur die des gewirkten, der Rücknahme-Knopf trifft nur seine Karte — und beides steht auch dann noch da, wenn der Commander längst auf dem Schlachtfeld liegt und die Kommandozone leer ist |
