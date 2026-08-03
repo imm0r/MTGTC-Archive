@@ -2833,6 +2833,27 @@ Zwei Feinheiten:
   Ohne diese Ausnahme leuchtete die Nummer jedem Neuling entgegen und
   bedeutete nichts.
 
+**„Keine gemerkte Fassung" heißt zweierlei**, und das ist beim Ausliefern von
+0.76.0 schiefgegangen: Den Schlüssel gibt es erst seit dieser Fassung, also
+sah **jeder bestehende Nutzer** wie ein Neuling aus und bekam dessen
+Behandlung — still merken, nicht färben. Die gesamte Nutzerschaft verpasste
+damit genau eine Meldung, nämlich die erste. Unbemerkt: Es sieht nicht nach
+einem Fehler aus, es passiert nur nichts.
+
+Unterschieden wird deshalb an den **Spuren im `localStorage`** — irgendein
+anderer Schlüssel unter `mtg-` (Sprache, Synergie-Modus, aufgeklappte Decks,
+Kartengröße). Wer die App benutzt hat, hat davon etwas; wer den Browser frisch
+aufgemacht hat, nicht:
+
+| gemerkte Fassung | andere Spuren | Nummer |
+| --- | --- | --- |
+| ja | — | gefärbt, wenn sie eine andere ist |
+| nein | ja | gefärbt (letzte Fassung unbekannt, geändert hat sich sicher etwas) |
+| nein | nein | grau, Fassung wird still gemerkt |
+
+Im mittleren Fall wird **noch nichts gemerkt**: Sonst wäre die Farbe nach dem
+nächsten Neuladen weg, ohne dass jemand hineingesehen hätte.
+
 ## Prüfungen
 
 ```bash

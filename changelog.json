@@ -1,5 +1,11 @@
 [
  {
+  "am": "2026-08-04T01:46:00+02:00",
+  "art": "behoben",
+  "text": "Die goldene Versionsnummer blieb ausgerechnet bei der Fassung aus, die sie eingeführt hat: Wer schon vorher da war, sah für die App wie ein Neuling aus und bekam keinen Hinweis. Jetzt erkennt sie den Unterschied.",
+  "pr": 211
+ },
+ {
   "am": "2026-08-04T01:35:00+02:00",
   "art": "neu",
   "text": "Ist seit deinem letzten Besuch eine neue Fassung der App da, steht die Versionsnummer oben rechts in Gold statt in Grau — der Hinweis, dass es im Changelog etwas zu lesen gibt. Ein Blick hinein nimmt die Farbe wieder weg.",

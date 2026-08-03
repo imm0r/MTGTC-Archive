@@ -11348,6 +11348,32 @@ function versionGesehenSetzen(v) {
    — und genau das soll die Farbe sagen. */
 const versionAnders = (a, b) => !!a && !!b && a !== b;
 
+/* Hat dieser Browser schon einmal mit der App gearbeitet?
+
+   Gefragt wird das nur in EINEM Fall: Es liegt keine gemerkte Fassung vor.
+   Dahinter stecken dann zwei ganz verschiedene Leute mit demselben leeren
+   Feld — wer wirklich zum ersten Mal hier ist, und wer lange dabei ist, aber
+   zuletzt eine Fassung VOR dieser Anzeige gesehen hat. Für den zweiten hat
+   sich sehr wohl etwas geändert.
+
+   Ohne die Unterscheidung verpasst die gesamte Nutzerschaft genau EINE
+   Meldung: die erste. Und zwar unbemerkt — es sieht nicht nach einem Fehler
+   aus, es passiert nur nichts. Genau so ist es beim Ausliefern von 0.76.0
+   aufgefallen, und zwar dem Eigentümer, nicht der Prüfung.
+
+   Erkennungszeichen ist irgendeine ANDERE Einstellung unter „mtg-": Sprache,
+   Synergie-Modus, aufgeklappte Decks, Kartengröße. Wer die App benutzt hat,
+   hat davon etwas; wer den Browser frisch aufgemacht hat, nicht. */
+function schonDagewesen() {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith("mtg-") && k !== VERSION_GESEHEN) return true;
+    }
+  } catch { /* gesperrt — dann eben als Neuling behandeln */ }
+  return false;
+}
+
 /* Versionsnummer im Kopf, unter dem Verweis auf die Statusseite. Quelle ist
    APP_VERSION aus dem <meta name="app-version"> in index.html; fehlt sie oder
    ist sie unbrauchbar, bleibt die Zeile weg statt „—“ zu zeigen. Läuft beim
@@ -11359,23 +11385,36 @@ function zeigeKopfVersion() {
   if (!APP_VERSION) return;
   el.textContent = t("header.version", { v: APP_VERSION });
 
-  // BEIM ERSTEN BESUCH NICHT hervorheben. Wer noch nie hier war, hat nichts
-  // verpasst; gemerkt wird die Fassung trotzdem, damit die NÄCHSTE auffällt.
-  // Ohne diese Ausnahme leuchtete die Nummer jedem Neuling entgegen und
-  // bedeutete nichts — und die Farbe verlöre genau die Aussage, für die es
-  // sie gibt.
+  // Drei Fälle, nicht zwei:
+  //
+  //   gemerkte Fassung da   → färben, wenn sie eine andere ist
+  //   keine, aber Spuren    → färben. Das ist jemand, der vor dieser Anzeige
+  //                           schon hier war; seine letzte Fassung ist
+  //                           unbekannt, geändert hat sich seither aber
+  //                           bestimmt etwas.
+  //   keine und keine Spur  → NICHT färben. Wer noch nie hier war, hat nichts
+  //                           verpasst; gemerkt wird die Fassung trotzdem,
+  //                           damit die NÄCHSTE auffällt. Ohne diese Ausnahme
+  //                           leuchtete die Nummer jedem Neuling entgegen und
+  //                           bedeutete nichts.
   const gesehen = versionGesehen();
-  if (!gesehen) versionGesehenSetzen(APP_VERSION);
-  const neu = versionAnders(APP_VERSION, gesehen);
+  const neu = gesehen ? versionAnders(APP_VERSION, gesehen) : schonDagewesen();
+  // Nur beim echten Neuling gleich merken. Wer die Farbe bekommt, soll sie
+  // behalten, bis er hineingesehen hat — schriebe man hier, wäre der Hinweis
+  // nach dem nächsten Neuladen weg, ohne dass ihn jemand gelesen hätte.
+  if (!gesehen && !neu) versionGesehenSetzen(APP_VERSION);
   el.classList.toggle("neu", neu);
 
   // Der title sagt jetzt, dass hinter der Nummer das Changelog steckt — die
   // Nummer selbst bleibt die Beschriftung, ein „Changelog"-Schriftzug im Kopf
   // wäre ein weiteres Wort für etwas, das einmal im Monat jemand öffnet.
   // Ist sie hervorgehoben, nennt er auch die Fassung von vorher: Sonst steht
-  // dort Farbe ohne Grund.
-  el.title = neu ? t("changelog.openNeu", { v: APP_VERSION, alt: gesehen })
-                 : t("changelog.open", { v: APP_VERSION });
+  // dort Farbe ohne Grund. Im Übergangsfall — Spuren da, aber keine gemerkte
+  // Fassung — gibt es keine zu nennen, und der Satz sagt es ohne sie. Mit
+  // leerem {alt} stünde dort „Version 0.76.0 statt  beim letzten Besuch".
+  el.title = !neu   ? t("changelog.open", { v: APP_VERSION })
+           : gesehen ? t("changelog.openNeu", { v: APP_VERSION, alt: gesehen })
+                     : t("changelog.openNeuOhne", { v: APP_VERSION });
   el.onclick = zeigeChangelog;
 }
 
