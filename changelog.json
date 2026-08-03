@@ -1,5 +1,11 @@
 [
  {
+  "am": "2026-08-04T00:12:00+02:00",
+  "art": "verbessert",
+  "text": "Suchen, die dauern, zeigen jetzt einen Ladebalken über die volle Breite statt eines kleinen drehenden Zahnrads — bei den KI-Synergien steht zusätzlich dabei, dass die Wartezeit bei einem vollen Deck normal ist. Vorher sah es leicht so aus, als wäre etwas schiefgegangen.",
+  "pr": 207
+ },
+ {
   "am": "2026-08-03T23:50:00+02:00",
   "art": "behoben",
   "text": "Beim Überfahren des „Tauschen“-Knopfes standen zwei Hinweisfenster übereinander: das der App und zusätzlich das des Browsers mit der Schnitt-Begründung. Jetzt ist es wieder eines.",
