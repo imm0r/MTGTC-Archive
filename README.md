@@ -423,7 +423,7 @@ lässt sich das jederzeit nachrechnen statt schätzen.
 Im Benutzermenü unter **Regelfrage** lässt sich eine unklare Spielsituation in
 ein paar Sätzen schildern; die App klärt sie gegen das **offizielle erweiterte
 Regelwerk** (Comprehensive Rules) auf und zitiert die einschlägigen Regeln
-wörtlich. Gedacht für die Live-Spielrunde, wenn am Tisch diskutiert wird, wie
+wörtlich. Gedacht für die live Partie, wenn am Tisch diskutiert wird, wie
 eine Situation regeltechnisch ausgeht.
 
 Der Kernpunkt gegen „klingt plausibel, ist aber falsch": Das Modell **rät nur,
@@ -481,7 +481,7 @@ allein durch die Anmeldung geschützt. Für den **Verlauf** kommt die Tabelle
 
 **Kosten.** Zwei Modell-Aufrufe je Frage: die günstige Triage und das eigentliche
 Urteil (Modelle stehen als `MODEL_TRIAGE`/`MODEL_JUDGE` oben in `index.ts`). In
-Summe rund **2–3 ct pro Frage** — für eine Spielrunde mit einem Dutzend
+Summe rund **2–3 ct pro Frage** — für eine live Partie mit einem Dutzend
 Streitfällen ein paar Cent. Jede Antwort meldet unter `usage` die verbrauchten
 Tokens; die Kostenzeile im Ergebnis rechnet sie vor.
 
@@ -585,6 +585,52 @@ Zuordnungen, Karten. Dieselben Policies wie bei `shared`, nur ohne die
 Freundschaftsprüfung: Ein Deck ohne seine Einteilung wäre eine Liste, mit ihr
 ein Bauplan.
 
+### Übernommen heißt noch nicht eigen
+
+Ein übernommenes Deck lässt sich **nicht veröffentlichen**, solange es dem
+Original noch zu ähnlich ist. Ohne diese Sperre entstünde aus einem beliebten
+Deck in kurzer Zeit ein Dutzend Kopien in der Community-Liste — dieselbe
+Kartenliste unter zwölf Namen, und die Rangliste wäre eine Liste desselben
+Decks. Der Erbauer stünde daneben.
+
+**Gemessen wird gegen einen Schnappschuss**, nicht gegen das Quelldeck. Das
+darf sich später ändern oder verschwinden; hinge die Frage „wie weit bist du
+davon weg" daran, wäre sie plötzlich anders beantwortet, ohne dass jemand
+etwas getan hätte. Beim Übernehmen wandert die Zusammensetzung der Quelle als
+`decks.import_baseline` mit.
+
+**Der Schlüssel ist die Oracle-Identität, nicht die Auflage.** Wer dieselbe
+Karte in einer schöneren Ausgabe einsetzt, hat das Deck nicht geändert — er
+hat es neu gekauft. Gezählt werden Exemplare über die *Vereinigung* beider
+Kartenmengen: Ein Tausch (eine raus, eine rein) zählt zwei. Liefe man nur über
+die Karten von heute, zählte das Entfernte nicht mit, und ein komplett
+ausgetauschtes Deck käme auf null.
+
+| Deckgröße | Schwelle | entspricht |
+| --- | --- | --- |
+| 100 Karten | 10 | fünf Tausche |
+| 60 Karten | 6 | drei Tausche |
+| kleiner | 4 | zwei Tausche |
+
+Ein Zehntel, weil es mit der Deckgröße mitwächst; die Untergrenze, damit ein
+Deck aus zehn Karten nicht mit einem einzigen Tausch durchrutscht.
+
+Zwei Dinge, die dabei bewusst so und nicht anders sind:
+
+* **Geprüft wird nur der Übergang privat → öffentlich.** Wer die Schwelle
+  erreicht, veröffentlicht und danach zurückbaut, bleibt öffentlich. Ein Deck,
+  das von sich aus wieder verschwindet, weil man zwei Karten herausgenommen
+  hat, wäre schlimmer als die Lücke. **Privat stellen geht immer** — sonst
+  säße fest, wer ein übernommenes Deck versehentlich gezeigt hat.
+* **Die Zahlen stehen an zwei Stellen.** Maßgeblich ist der Trigger in der
+  Datenbank; `app.js` rechnet dieselbe Regel noch einmal, um *sagen* zu können,
+  wie viel noch fehlt („übernommen · noch 4 Karten", und der Knopf ist
+  gesperrt). Ein Knopf, der erst beim Drücken verrät, dass er nicht darf, ist
+  ein schlechter Knopf. Laufen beide je auseinander, gewinnt die Datenbank —
+  dann trifft man auf eine abgewiesene Änderung statt auf ein ungewolltes
+  Veröffentlichen. Der Prüffall `uebernommen` misst beide gegen dieselbe
+  Tabelle.
+
 ### Ein Community-Deck ansehen und übernehmen
 
 Eine Kachel war bis dahin ein Bild, ein Name und fünf Sterne — bewerten ließ
@@ -636,16 +682,35 @@ nicht die ganze Kachel mit `role="button"`: In der Kachel stecken schon Knöpfe,
 und ein Knopf im Knopf ist weder gültiges HTML noch mit der Tastatur zu
 bedienen.
 
-### Community steht jetzt oben
+### Was oben steht
 
-Sie war ein Eintrag im Benutzermenü hinter Avatar und Name — einer Klappe, die
-man erst aufmachen muss. Für einen Nebenraum war das richtig. Inzwischen hängen
-Mitgliederliste, Community-Decks und der Live-Feed daran, und dann ist es keiner
-mehr: **Community ist der fünfte Punkt der obersten Navigation**, hinter „Card
-Management", mit `assets/community.PNG` als Sinnbild.
+Drei Punkte sind aus dem Benutzermenü in die oberste Leiste gewandert — aus
+demselben Grund: Ein Menü, das man erst aufklappen muss, ist der richtige Ort
+für einen Nebenraum, und keiner von den dreien ist einer.
 
-Und **nur** dort. Der alte Eintrag im Benutzermenü ist weg; zwei Wege zur selben
-Ansicht sind zweimal dieselbe Frage, wo man jetzt eigentlich hindrückt.
+| Punkt | Sinnbild | warum oben |
+| --- | --- | --- |
+| **Community** | `assets/community.PNG` | trägt Mitgliederliste, Community-Decks und den Live-Feed |
+| **Regelfrage** | `assets/rules.PNG` | braucht man mitten im Spiel |
+| **live Partie** | `assets/livepartie.PNG` | dito — dazu hängt die Zahl der offenen Einladungen daran |
+
+Damit stehen sieben Punkte oben: Sammlung, Decks, Wunschliste, Card Management,
+Community, Regelfrage, live Partie.
+
+Und jeder **nur** dort. Die alten Einträge im Benutzermenü sind weg; zwei Wege
+zur selben Ansicht sind zweimal dieselbe Frage, wo man jetzt eigentlich
+hindrückt. Der Prüffall zählt sie deshalb im ganzen Dokument und nicht nur in
+der Leiste — ein Eintrag, der oben dazukam und unten stehen blieb, fiele
+niemandem auf, weil beide funktionieren.
+
+> **„Spielrunde" heißt auf Deutsch jetzt „live Partie".** Umbenannt sind alle
+> deutschen Zeichenketten, nicht nur der Navigationspunkt: ein Wort, das an
+> einer Stelle wechselt und an fünf anderen stehen bleibt, sind zwei Namen für
+> dieselbe Sache. Der Prüffall geht dafür über `I18N.de` als Ganzes. Die
+> anderen vier Sprachen behalten ihre Bezeichnung — gefragt war die deutsche.
+> Die internen Namen (`nav.session`, `terminSpielrunde`, Tabelle
+> `game_sessions`) bleiben ebenfalls: Sie stehen in keiner Oberfläche, und ein
+> Umbenennen quer durch Code und Datenbank wäre Bewegung ohne Wirkung.
 
 Zwei Dinge, die an dieser Leiste schon still danebengingen und die der Prüffall
 `navigation` seither festhält:
@@ -663,11 +728,58 @@ Zwei Dinge, die an dieser Leiste schon still danebengingen und die der Prüffall
   jemand hinsah, meldet sich `error` nie mehr; dann verrät `complete` ohne
   `naturalWidth`, was los ist.
 
-> Die Kopfzeile bricht dadurch etwas früher um: mit fünf Punkten unterhalb von
-> rund 980 px Fensterbreite statt vorher 860 px, und wächst dabei von 67 auf
-> 125 px. Das ist der Preis dafür, dass die Leiste seit den Sinnbildern 32 px
-> hohe Knöpfe trägt — `nav` bricht von sich aus um, ein eigener Umbruchpunkt
-> kam nicht dazu.
+#### Die Leiste bleibt eine Zeile
+
+Mit sieben Punkten passt sie nicht mehr überall. Eine zweite Kopfzeile ist
+dabei kein Schönheitsfehler: Die Leiste klebt oben (`position:sticky`) und
+nimmt dem Inhalt die Höhe **dauerhaft** weg — bei 560 px waren es 229 statt
+67 px, ein Drittel eines Telefonschirms.
+
+**Skalieren allein reicht nicht**, und das ist keine Meinung. Angemeldet
+gemessen (Avatar und Name kosten rund 190 px):
+
+| Fensterbreite | 1600 | 1366 | 1280 | 1200 | 1100 | 1024 |
+| --- | --- | --- | --- | --- | --- | --- |
+| verfügbar | 1372 | 1138 | 1052 | 972 | 872 | 796 |
+| gebraucht (mit Wort, deutsch) | 1125 | 1125 | 1125 | 1125 | 1125 | 1125 |
+
+Bei 1100 px fehlen 253 px. Sieben Bilder von 32 auf 20 zu schrumpfen bringt
+7 × 12 = 84. Selbst ganz **ohne** Bilder blieben die Wörter zu breit. Unter
+einer bestimmten Breite muss also das Wort weichen — das Bild trägt die
+Aussage ohnehin, es ist bloß größer als eine Schriftzeile.
+
+**Wo genau, sagt die längste Sprache und nicht die eigene.** Was die volle
+Beschriftung an Fensterbreite verlangt:
+
+| de | en | es | it | fr |
+| --- | --- | --- | --- | --- |
+| 1353 | 1361 | 1401 | 1402 | **1420** |
+
+Deshalb **1440** und nicht 1360: Bei 1366 — einem sehr verbreiteten Laptop —
+ginge es auf Deutsch gerade eben auf und auf Französisch nicht. Eine Schwelle,
+die nur in der eigenen Sprache stimmt, ist keine. Der Prüffall misst deshalb
+in Französisch.
+
+Ohne Wort trägt die Leiste bis **768 px** eine Zeile à 67 px; darunter darf
+sie umbrechen. Damit ein Punkt ohne Wort ansprechbar bleibt, trägt jeder Knopf
+ein `data-i18n-title` — `applyI18n()` füllt es und wechselt es mit der Sprache.
+Die **Zahl** an Wunschliste und live Partie bleibt in jeder Breite stehen: Sie
+ist der einzige Hinweis darauf, dass etwas wartet.
+
+> **Dabei aufgefallen:** `[hidden]` wirkt nur über die Vorgabe des Browsers
+> (`display:none`), und die verliert gegen **jede** Klassenregel mit `display`
+> — Klasse schlägt Element. `.menu-badge` trug `display:inline-flex`, also
+> standen die Zähler an Wunschliste und live Partie **immer** da, mit einer
+> Null darin: zwei gelbe Punkte in der Kopfzeile, die nichts bedeuteten.
+> Dieselbe Falle bei `.gate-usercount`/`.gate-deckcount`. Ein globales
+> `[hidden]{display:none !important}` nimmt sie für alle weg.
+>
+> Das war die **erste** Regel dieser Datei mit einer Priorität — und prompt
+> meldete `css-gueltig` sie als verworfen. Zu Unrecht: `setProperty()` nimmt
+> die Priorität als eigenes Argument und weist alles zurück, was sie im Wert
+> mitbringt. Der Prüffall trennt sie jetzt ab; seine Selbstprobe läuft
+> zusätzlich mit einer nachweislich ungültigen Anweisung **samt**
+> `!important`, damit die Priorität kein Freibrief wird.
 
 ### Der Weg dorthin: Kacheln, die führen
 
@@ -1608,9 +1720,9 @@ Geteilte Decks zeigen ihren **aktuellen** Stand, nicht die Umwege dorthin — f�
 > ausführen (oder `supabase/migrations/20260802090000_deck_verlauf.sql`
 > einzeln).
 
-## Live-Spielrunde: die eigenen Karten am Tisch
+## live Partie: die eigenen Karten am Tisch
 
-In der Spielrunde wählt jeder sein Deck; darunter steht der **private
+In der live Partie wählt jeder sein Deck; darunter steht der **private
 Kartenüberblick** — nur der Spieler selbst sieht ihn, Mitspieler sehen lediglich
 den Decknamen und den Commander.
 
@@ -1709,7 +1821,7 @@ Text entfällt, nennt die Beschriftung für Vorleseprogramme Zone und Anzahl mit
 > der Hand deckt die ganze Matte, damit ihr Fächer mittig aufgehen kann, und
 > jeder Punkt des Schlachtfelds wäre sonst ein Handziel.
 
-Die Spielrunde darf dabei **breiter werden als der Rest der App** (1800 statt
+Die live Partie darf dabei **breiter werden als der Rest der App** (1800 statt
 1100 px): die Mattenspalten sind fest, alles Zusätzliche geht ans Schlachtfeld
 und an die Länder. Auf einem 3440-px-Monitor wächst das Schlachtfeld damit von
 628 auf 1328 px.
@@ -2243,6 +2355,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `anzeigename`    | Der Anzeigename als Pflicht: die Regel selbst (2–40, getrimmt), das Feld beim Anlegen, der Weg über die Nutzer-Metadaten bis ins frisch angelegte Profil, die Maske vor der App für alte Konten samt Ausweg — und dass das Profilfeld ihn nicht mehr leeren kann |
 | `mitgliederliste` | Die Mitgliederliste und das öffentliche Profil: dass die Abfrage `findable` achtet, die Gesamtzahl je Zeile mitzählt und das Verhältnis gleich mitliefert; die vier Knöpfe, Blättern und Suchen (samt Rücksprung auf Seite eins und Fokus im Feld) — und dass ein `javascript:`-Ziel kein Verweis wird und Markup im Steckbrief Text bleibt |
 | `communitydecks` | Community-Decks: dass die Migration bestehende Decks NICHT veröffentlicht (Reihenfolge der beiden ALTERs), dass die Rangliste glättet und trotzdem den echten Schnitt zeigt, dass das eigene Deck keine Knöpfe hat und die Datenbank es abweist — dazu Bewerten ohne Neuladen der Liste, Sortieren und Suchen über den Commander; dazu die beiden führenden Kacheln (und dass die übrigen keine sind), der Sprung im niedrigen Fenster samt Aufleuchten, und der Feed-Trigger, der beim Anlegen genau EINE der beiden Zeilen schreibt |
+| `uebernommen`    | Die Sperre für übernommene Decks: eine Entscheidungstabelle für die Abweichung (Tausch zählt doppelt, komplett ausgetauscht kommt auf das Doppelte der Deckgröße, eine andere AUFLAGE derselben Karte auf null), die Schwelle samt Untergrenze, der gesperrte Knopf mit der fehlenden Zahl im Titel — und dass der Weg selbst abweist, aber privat stellen immer geht; an der Migration, dass die Übernahme den Schnappschuss der QUELLE mitschreibt (ohne ihn greift die Sperre nie) und der Trigger nur den Übergang prüft |
 | `deckansehen`    | Ein Community-Deck ansehen und übernehmen: dass der Name ein Knopf ist und die Kachel daneben auch klickt, ein Stern aber NICHT das Deck öffnet; dass der Dialog die Einteilung des Erbauers zeigt und die Deckmenge nennt; dass Bewerten im Dialog auch auf der Kachel dahinter ankommt; dass das eigene Deck keinen Übernehmen-Knopf trägt — und an der Migration, dass ein öffentliches Deck Zugang genug ist, die Kopie ausdrücklich privat entsteht und die Fächer mitkommen |
 | `navigation`     | Die oberste Leiste: dass Community dort steht (und nicht doppelt im Benutzermenü), dass das Wort in einem eigenen `<span>` sitzt und die fünf Sinnbilder einen Sprachwechsel überstehen, dass der Klick die Ansicht öffnet und genau einen Punkt markiert — und der Rückfall für eine fehlende Bilddatei in beiden Reihenfolgen, samt Gegenprobe, dass ein vorhandenes Sinnbild stehen bleibt |
 | `migrationen`    | Migrationen, die eine frühere Fassung fortschreiben: dass die Liste der Feed-Arten nie schrumpft, dass Tabellen-Constraint und Schreibweg dieselbe führen — und dass keine spätere Fassung die Sichtbarkeitsprüfung wieder herausnimmt (der Fall, den kein Datenbankfehler meldet) |

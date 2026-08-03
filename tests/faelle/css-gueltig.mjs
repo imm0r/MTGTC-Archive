@@ -54,15 +54,24 @@ export default async function ({ seite, adresse, stand }) {
         const trenner = stueck.indexOf(":");
         if (trenner < 1) continue;
         const eigenschaft = stueck.slice(0, trenner).trim();
-        const wert = stueck.slice(trenner + 1).trim();
-        if (!wert) continue;
+        const roheWert = stueck.slice(trenner + 1).trim();
+        if (!roheWert) continue;
         if (eigenschaft.startsWith("--")) continue;          // Custom Property
-        if (/var\(/.test(wert)) { mitVar.push(eigenschaft); continue; }
+        if (/var\(/.test(roheWert)) { mitVar.push(eigenschaft); continue; }
+
+        /* „!important" gehört NICHT in den Wert. setProperty() nimmt die
+           Priorität als eigenes Argument und weist alles zurück, was sie im
+           Wert mitbringt — die Prüfung meldete dann eine gültige Anweisung
+           als verworfen. Genau das ist bei [hidden]{display:none !important}
+           passiert, der ersten Regel dieser Datei mit einer Priorität. */
+        const wichtig = /!\s*important$/i.test(roheWert);
+        const wert = roheWert.replace(/!\s*important$/i, "").trim();
+        if (!wert) continue;
 
         geprueft++;
         probe.style.cssText = "";
-        probe.style.setProperty(eigenschaft, wert);
-        if (probe.style.length === 0) verdacht.push({ eigenschaft, wert });
+        probe.style.setProperty(eigenschaft, wert, wichtig ? "important" : "");
+        if (probe.style.length === 0) verdacht.push({ eigenschaft, wert: roheWert });
         else angenommen.add(grundname(eigenschaft));
       }
 
@@ -82,11 +91,18 @@ export default async function ({ seite, adresse, stand }) {
        Prüfung fröhlich "alles gut". Diese beiden MÜSSEN als ungültig
        erkennbar sein — es sind genau die Fehler, die hier schon gemacht
        wurden. */
-    const merktEsNoch = ["font: 600 13px/1.2 inherit", "background: rgba(1,2,3,.5), rgba(4,5,6,.5)"]
+    const merktEsNoch = ["font: 600 13px/1.2 inherit",
+                         "background: rgba(1,2,3,.5), rgba(4,5,6,.5)",
+                         // Mit Priorität muss sie ebenso greifen: Sonst wäre
+                         // ein „!important" ein Freibrief für jeden Unsinn.
+                         "font: 600 13px/1.2 inherit !important"]
       .every(z => {
         const i = z.indexOf(":");
+        const roh = z.slice(i + 1).trim();
+        const w = /!\s*important$/i.test(roh);
         probe.style.cssText = "";
-        probe.style.setProperty(z.slice(0, i).trim(), z.slice(i + 1).trim());
+        probe.style.setProperty(z.slice(0, i).trim(), roh.replace(/!\s*important$/i, "").trim(),
+                                w ? "important" : "");
         return probe.style.length === 0;
       });
 

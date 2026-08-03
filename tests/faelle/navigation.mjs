@@ -1,6 +1,6 @@
 /* Die oberste Navigation.
 
-   Sie besteht aus fünf Knöpfen mit gemaltem Sinnbild, und an ihr sind schon
+   Sie besteht aus sieben Knöpfen mit gemaltem Sinnbild, und an ihr sind schon
    zwei Dinge still danebengegangen — beide sehen nicht wie ein Fehler aus:
 
    * DER TEXT DARF NICHT AM KNOPF HÄNGEN. `applyI18n()` setzt `textContent`,
@@ -13,8 +13,9 @@
      im Prüfbrowser nachgemessen. Der Knopf tut, was er soll, und sieht
      trotzdem kaputt aus. Dagegen steht navSymboleAbsichern().
 
-   Dazu die Frage, wo „Community“ wohnt: seit sie Mitgliederliste,
-   Community-Decks und Live-Feed trägt, oben — und NUR oben. Ein zweiter
+   Dazu die Frage, wer oben wohnt. „Community“ trägt Mitgliederliste,
+   Community-Decks und Live-Feed; „Regelfrage“ und „live Partie“ braucht man
+   MITTEN IM SPIEL. Alle drei stehen deshalb oben — und NUR oben. Ein zweiter
    Eintrag im Benutzermenü wäre ein zweiter Ort für dieselbe Frage. */
 
 import { AUFBAU } from "../hilfen.mjs";
@@ -30,12 +31,17 @@ export default async function ({ seite, adresse, stand }) {
   stand.gleich("die obersten Punkte stehen in dieser Reihenfolge",
     await seite.evaluate(() =>
       [...document.querySelectorAll("nav > button[data-v]")].map(b => b.dataset.v)),
-    ["coll", "decks", "wish", "more", "community"]);
+    ["coll", "decks", "wish", "more", "community", "rules", "session"]);
 
-  stand.ist("Community steht genau einmal im ganzen Dokument",
-    await seite.evaluate(() => document.querySelectorAll('[data-v="community"]').length) === 1);
-  stand.ist("und nicht mehr im Benutzermenü",
-    await seite.evaluate(() => !document.querySelector('#who-menu [data-v="community"]')));
+  /* Jeder der drei Umzügler steht GENAU EINMAL da. Ein Eintrag, der oben
+     dazukam und unten stehen blieb, ist zweimal derselbe Ort für dieselbe
+     Frage — und fiele niemandem auf, weil beide funktionieren. */
+  stand.gleich("jeder umgezogene Punkt steht genau einmal im Dokument",
+    await seite.evaluate(() => ["community", "rules", "session"]
+      .map(v => document.querySelectorAll(`[data-v="${v}"]`).length)), [1, 1, 1]);
+  stand.gleich("und keiner mehr im Benutzermenü",
+    await seite.evaluate(() => ["community", "rules", "session"]
+      .filter(v => document.querySelector(`#who-menu [data-v="${v}"]`))), []);
 
   /* --- Aufbau eines Punktes -------------------------------------------- */
   const bau = await seite.evaluate(() => {
@@ -58,7 +64,7 @@ export default async function ({ seite, adresse, stand }) {
   stand.ist("und die Übersetzungsmarke NICHT am Knopf", !bau.markeAmKnopf);
 
   /* --- Der Sprachwechsel ----------------------------------------------- */
-  /* Der eigentliche Grund für die span-Regel. Gemessen wird an ALLEN fünf
+  /* Der eigentliche Grund für die span-Regel. Gemessen wird an ALLEN sieben
      Punkten, nicht nur am neuen: Der Fehler träfe sie alle gleichzeitig.
      Der Text wird dabei am KNOPF abgelesen und nicht am span — sonst misst
      dieser Block mit, WO das Wort steht, und liefe bei falscher Auszeichnung
@@ -73,14 +79,38 @@ export default async function ({ seite, adresse, stand }) {
   await seite.evaluate(() => setLang("en"));
   await seite.waitForTimeout(200);
   const nachher = await seite.evaluate(stand5);
-  stand.gleich("vor dem Sprachwechsel tragen fünf Punkte ein Sinnbild", vorher.bilder, 5);
-  stand.gleich("danach immer noch", nachher.bilder, 5);
+  stand.gleich("vor dem Sprachwechsel tragen sieben Punkte ein Sinnbild", vorher.bilder, 7);
+  stand.gleich("danach immer noch", nachher.bilder, 7);
   stand.ist("und der Text ist wirklich umgestellt worden",
     vorher.sammlung === "Sammlung" && nachher.sammlung === "Collection",
     `${vorher.sammlung} → ${nachher.sammlung}`);
   stand.gleich("Community heißt in jeder Sprache Community", nachher.community, "Community");
   await seite.evaluate(() => setLang("de"));
   await seite.waitForTimeout(200);
+
+  /* --- Die Umbenennung ------------------------------------------------- */
+  /* „Spielrunde" heißt auf Deutsch jetzt „live Partie". Geprüft an ALLEN
+     deutschen Zeichenketten und nicht nur am Navigationspunkt: Ein Wort,
+     das an einer Stelle umbenannt wird und an fünf anderen stehen bleibt,
+     ist keine Umbenennung, sondern zwei Namen für dieselbe Sache.
+     Die anderen Sprachen sind ausdrücklich NICHT betroffen — gefragt war
+     die deutsche Bezeichnung. */
+  const worte = await seite.evaluate(() => ({
+    reste: Object.entries(I18N.de).filter(([, v]) => /Spielrunde/.test(String(v))).map(([k]) => k),
+    punkt: document.querySelector('nav > button[data-v="session"] span[data-i18n]')?.textContent,
+    englisch: I18N.en["nav.session"],
+  }));
+  stand.gleich("im Deutschen steht nirgends mehr „Spielrunde“", worte.reste, []);
+  stand.gleich("der Punkt heißt „live Partie“", worte.punkt, "live Partie");
+  stand.ist("die anderen Sprachen bleiben, wie sie waren",
+    !!worte.englisch && !/live Partie/.test(worte.englisch), worte.englisch);
+
+  /* Die Zahl der offenen Einladungen hängt am Knopf und muss den Umzug
+     mitgemacht haben — ohne sie erführe man von einer Einladung erst, wenn
+     man von sich aus nachsieht. */
+  stand.ist("die Einladungszahl sitzt im Punkt „live Partie“",
+    await seite.evaluate(() =>
+      !!document.querySelector('nav > button[data-v="session"] #sess-badge')));
 
   /* --- Der Klick -------------------------------------------------------- */
   /* Die Verdrahtung läuft im Start nur MIT Datenbankzugang — hier von Hand,
@@ -103,6 +133,85 @@ export default async function ({ seite, adresse, stand }) {
   stand.gleich("der Klick öffnet die Community-Ansicht", nachKlick.ansicht, ["v-community"]);
   stand.gleich("und markiert genau diesen einen Punkt", nachKlick.an, ["community"]);
   stand.gleich("die Ansicht wird dabei einmal aufgebaut", nachKlick.gerufen, 1);
+
+  /* --- Die Leiste bleibt eine Zeile ------------------------------------ */
+  /* Sieben Punkte mit Wort passen nicht mehr überall. Bricht die Kopfzeile um,
+     ist das kein Schönheitsfehler: Sie klebt oben (position:sticky) und nimmt
+     dem Inhalt die Höhe dauerhaft weg — gemessen 229 statt 67 px bei 560.
+
+     Gemessen wird in FRANZÖSISCH, der breitesten der fünf Sprachen (volle
+     Beschriftung verlangt dort 1420 px Fensterbreite, auf Deutsch 1353). Eine
+     Schwelle, die nur in der eigenen Sprache stimmt, ist keine — genau das
+     wäre bei 1360 passiert. */
+  /* WIE IM ECHTEN BETRIEB messen, nicht wie in der Attrappe: Rechts stehen
+     Avatar und Name, und die kosten rund 190 px. Ohne sie fiele die Messung um
+     genau diese Breite zu günstig aus — eine Schwelle, die nur im
+     abgemeldeten Zustand hält, hilft niemandem.
+     Dazu eine Zahl an der Wunschliste, damit sich prüfen lässt, dass sie beim
+     Ausblenden der Wörter STEHEN bleibt. */
+  await seite.evaluate(() => {
+    const who = document.querySelector("#who");
+    who.innerHTML = `<span style="width:26px;height:26px;border-radius:50%;background:#444;display:inline-block"></span><span>Sturmprophet</span><span class="who-caret">&#9662;</span>`;
+    const z = document.querySelector("#wish-badge");
+    z.textContent = "3"; z.hidden = false;
+  });
+  await seite.evaluate(() => setLang("fr"));
+  const kopfhoehe = async (breite) => {
+    await seite.setViewportSize({ width: breite, height: 800 });
+    await seite.waitForTimeout(250);
+    return seite.evaluate(() => {
+      const k = [...document.querySelectorAll("nav > button")];
+      return {
+        kopf: Math.round(document.querySelector("header").getBoundingClientRect().height),
+        zeilen: new Set(k.map(b => Math.round(b.getBoundingClientRect().top))).size,
+        wort: getComputedStyle(k[0].querySelector("span[data-i18n]")).display !== "none",
+        titel: k.every(b => (b.title || "").trim().length > 0),
+        // Die Zahl an Wunschliste/live Partie ist KEIN Beschriftungs-span und
+        // muss bleiben — sie ist der einzige Hinweis, dass etwas wartet.
+        zahlDa: getComputedStyle(document.querySelector("#wish-badge")).display !== "none",
+      };
+    });
+  };
+  const breit = await kopfhoehe(1600);
+  stand.gleich("breit: eine Zeile, 67 px, mit Wort",
+    [breit.kopf, breit.zeilen, breit.wort], [67, 1, true]);
+
+  for (const b of [1440, 1366, 1200, 1024, 900, 768]) {
+    const m = await kopfhoehe(b);
+    stand.gleich(`bei ${b} px bleibt es eine Zeile à 67 px`, [m.kopf, m.zeilen], [67, 1]);
+  }
+
+  const schmal = await kopfhoehe(1200);
+  stand.ist("dort steht das Wort nicht mehr da", !schmal.wort);
+  stand.ist("dafür trägt JEDER Knopf einen Titel — sonst wäre er ein Rätsel", schmal.titel);
+  stand.ist("und die Zahl der offenen Punkte bleibt sichtbar", schmal.zahlDa);
+
+  /* UND SIE VERSCHWINDET, WENN NICHTS ANLIEGT. Das Attribut hidden wirkt nur
+     über die Vorgabe des Browsers, und die verliert gegen jede Klassenregel
+     mit display — .menu-badge trug display:inline-flex. Die Zähler an
+     Wunschliste und live Partie standen dadurch IMMER da, mit einer Null
+     darin: zwei gelbe Punkte in der Kopfzeile, die nichts bedeuteten.
+     Geprüft an BEIDEN Zuständen; nur „sichtbar“ zu messen ließe die Regel
+     „immer sichtbar“ durchgehen. */
+  stand.ist("ohne offene Punkte ist die Zahl weg",
+    await seite.evaluate(() => {
+      const z = document.querySelector("#wish-badge");
+      z.textContent = "0"; z.hidden = true;
+      const weg = getComputedStyle(z).display === "none";
+      z.textContent = "3"; z.hidden = false;
+      return weg;
+    }));
+
+  /* Der Titel wandert mit der Sprache: Er ist jetzt die einzige Beschriftung,
+     und eine Beschriftung, die auf Deutsch stehen bleibt, ist keine. */
+  await seite.evaluate(() => setLang("de"));
+  await seite.waitForTimeout(200);
+  stand.gleich("der Titel wechselt mit der Sprache",
+    await seite.evaluate(() => document.querySelector('nav > button[data-v="coll"]').title),
+    "Sammlung");
+
+  await seite.setViewportSize({ width: 1600, height: 900 });
+  await seite.waitForTimeout(250);
 
   /* --- Fehlt eine Bilddatei -------------------------------------------- */
   /* Der Rückfall, ohne den ein noch nicht hochgeladenes Sinnbild ein Loch in
