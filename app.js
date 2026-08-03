@@ -11564,10 +11564,37 @@ function wireStatSprung(root) {
    Platzhalter, der die Maskierung unbeschadet übersteht (esc() fasst nur
    & < > " ' an) und erst danach durch das fertige Element ersetzt wird. */
 const KARTEN_PLATZHALTER = " karte ";
+const DECK_PLATZHALTER = " deck ";
+
+/* Der Anzeigename der Person — dieselbe Regel wie in aktivitaetText(): kein
+   Name und das alte deutsche Literal führen beide auf „ein Mitglied" in der
+   Oberflächensprache. */
+const aktivitaetName = (row) => {
+  const name = (row.actor_name || "").trim();
+  return (!name || name === "Ein Mitglied") ? t("community.anonMember") : name;
+};
 
 function aktivitaetHtml(row) {
   const karte = (row.metadata?.name || "").trim();
   const n = Number(row.metadata?.n) || 1;
+
+  /* Ein geteiltes Deck steht MIT NAMEN da und führt beim Klick in seine
+     Ansicht. Name und Kennung kommen aus dem Verbund der Feed-Abfrage, nicht
+     aus der gespeicherten Zeile: Wird das Deck wieder privat gestellt,
+     liefert die Abfrage beides nicht mehr, und die Zeile fällt von selbst auf
+     den namenlosen Satz zurück. Ältere Einträge tragen gar keine Kennung —
+     welches Deck damals gemeint war, lässt sich nicht nachträglich klären. */
+  if (row.kind === "deck_public" && row.deck_id && (row.deck_name || "").trim() && n === 1) {
+    const deck = row.deck_name.trim();
+    const text = t("community.kind.deck_public_named",
+      { name: aktivitaetName(row), deck: DECK_PLATZHALTER });
+    if (text !== "community.kind.deck_public_named") {
+      const el = `<button type="button" class="cf-deck" data-cf-deck="${esc(row.deck_id)}"
+        title="${esc(t("community.openDeck", { deck }))}">${esc(deck)}</button>`;
+      return esc(text).split(DECK_PLATZHALTER).join(el);
+    }
+  }
+
   // Ohne Namen, bei anderer Art oder bei zusammengefassten Einträgen (die
   // stehen für viele Karten) bleibt es beim bisherigen Satz.
   if (!karte || row.kind !== "card_added" || n > 1) return esc(aktivitaetText(row));
@@ -11680,6 +11707,17 @@ function wireCommunityKartenHover(root) {
   });
 }
 
+/* Der Decknamen im Feed führt in die Deckansicht — dieselbe, die auch die
+   Kacheln der Community-Decks öffnen. Ein <button> und kein <a>: Es gibt keine
+   Adresse dahinter, und ein Link ohne Ziel ist für Tastatur und
+   Vorleseprogramme eine Falle. Getrennt von der Kartenvorschau, weil die an
+   HOVER_OK hängt — ein Klick muss auch auf einem Gerät ohne Zeiger gehen. */
+function wireCommunityDeckKlick(root) {
+  if (!root) return;
+  root.querySelectorAll("[data-cf-deck]").forEach(el =>
+    el.onclick = () => communityDeckZeigen(el.dataset.cfDeck));
+}
+
 /* Der Feed lässt sich zuklappen; die Wahl überlebt den Ansichtswechsel — wie
    bei den offenen Decks. */
 function feedOffen() {
@@ -11718,6 +11756,7 @@ function zeigeCommunity() {
   wireCommunityFeedToggle();
   wireStatSprung(el);
   wireCommunityKartenHover(el);
+  wireCommunityDeckKlick(el);
   wireCommunityHighlights(el);
 }
 
@@ -11742,6 +11781,7 @@ function renderCommunity() {
   wireCommunityFeedToggle();
   wireStatSprung(el);
   wireCommunityKartenHover(el);
+  wireCommunityDeckKlick(el);
   wireCommunityHighlights(el);
   wireMitgliederSuche();
   wireMitgliederListe();
@@ -11994,6 +12034,15 @@ async function communityDecksLaden(suche, sort, seite) {
   });
   if (error) throw error;
   return data || [];
+}
+/* Genau eine Kachel, für den Weg aus dem Live-Feed. Eigene Abfrage und nicht
+   community_decks mit Suchbegriff: Die sucht im NAMEN, und zwei Decks dürfen
+   gleich heißen. Liefert null, wenn das Deck inzwischen wieder privat ist —
+   die Abfrage prüft is_public, nicht diese Zeile hier. */
+async function communityDeckKachelLaden(deckId) {
+  const { data, error } = await sb.rpc("community_deck_tile", { p_deck: deckId });
+  if (error) throw error;
+  return (data || [])[0] || null;
 }
 async function deckBewertenSchreiben(deckId, sterne) {
   const { data, error } = await sb.rpc("rate_deck", { p_deck: deckId, p_stars: sterne });
@@ -12257,17 +12306,23 @@ function cdeckDetailHtml(kachel, daten) {
    erst das Fenster mit dem Rädchen, damit der Klick sofort etwas bewirkt, und
    das Versprechen wird NICHT abgewartet, bevor die eigenen Knöpfe hängen. */
 async function communityDeckZeigen(deckId) {
-  const kachel = CDECKS.zeilen.find(x => x.id === deckId);
-  if (!kachel) return;
   const zu = confirmDlg(`<div id="cd-detail"><div class="meta"><span class="syn-spin">&#9881;</span></div></div>`);
   try {
-    const daten = await communityDeckLaden(deckId);
+    /* Die Kachel steht meist schon in der geladenen Liste. Aus dem Live-Feed
+       heraus aber oft NICHT: Die Liste zeigt eine Seite, womöglich gefiltert,
+       und das eben geteilte Deck muss darin nicht vorkommen. Dann wird genau
+       diese eine Kachel nachgeholt.
+       Vorher stand hier ein `if (!kachel) return` — der Klick tat dann
+       stillschweigend gar nichts. */
+    const kachel = CDECKS.zeilen.find(x => x.id === deckId)
+      || await communityDeckKachelLaden(deckId);
+    const daten = kachel ? await communityDeckLaden(deckId) : null;
     const body = $("#cd-detail");
     if (body) {
-      body.innerHTML = daten
+      body.innerHTML = kachel && daten
         ? cdeckDetailHtml(kachel, daten)
         : `<div class="empty">${esc(t("cdeck.gone"))}</div>`;
-      wireCdeckDetail(deckId);
+      if (kachel && daten) wireCdeckDetail(deckId);
     }
   } catch (e) {
     const body = $("#cd-detail");

@@ -858,9 +858,43 @@ Deshalb entscheidet der Trigger beim Anlegen, welche der beiden es ist:
 | neues Deck, privat | `deck_created` |
 | bestehendes, privat → öffentlich | `deck_public` |
 
-**Ohne Decknamen.** Der Feed ist seit Sprint 1 bewusst datensparsam, und ein
-Deck kann später wieder privat gestellt werden — sein Name stünde dann noch da.
-Die Zeile nennt die Person und das Ereignis, nicht das Deck.
+**Mit Decknamen — und anklickbar.** Die Zeile nennt das Deck beim Namen und
+führt beim Klick in seine Ansicht, dieselbe, die auch die Kacheln der
+Community-Decks öffnen.
+
+Die beiden Gründe, aus denen sie das anfangs *nicht* tat, bleiben dabei gewahrt,
+weil **nicht der Name gespeichert wird, sondern die Deck-Kennung** — der Name
+kommt erst beim Lesen dazu, aus `decks` und nur solange `is_public` gilt:
+
+* *Datensparsamkeit* („Private card, deck and event details never enter this
+  table", Sprint 1): Eine Kennung auf etwas, das öffentlich ist, ist kein
+  privates Detail. Der Deckname landet nie in `community_activity`.
+* *Wieder privat gestellt*: Dann findet der Verbund nichts mehr, und die Zeile
+  fällt von selbst auf den namenlosen Satz zurück — **ohne Knopf**, denn ein
+  Knopf, der ins Leere führte, wäre schlimmer als gar keiner. Ein gespeicherter
+  Name täte das nicht, und nichts würde dabei fehlschlagen; er stünde einfach
+  für immer da.
+
+`is_public` steht deshalb in der **Verbundbedingung** und nicht in einer
+`where`-Klausel: Sonst fielen solche Zeilen ganz aus dem Feed, statt bloß ihren
+Namen zu verlieren. Nebenbei stimmt der Name dadurch immer — wird das Deck
+umbenannt, zeigt der Feed den neuen.
+
+Ein privat angelegtes Deck (`deck_created`) bekommt **keine** Kennung mit: Sie
+wäre ein Griff auf etwas, das niemand sehen darf. Ältere Einträge tragen gar
+keine und bleiben beim alten Satz; welches Deck damals gemeint war, lässt sich
+nicht nachträglich klären.
+
+Für den Klick gibt es `community_deck_tile(p_deck)` — dieselbe Kachelzeile wie
+in der Deckliste, aber für genau ein Deck. `community_decks` liefert immer eine
+*Seite* und sucht im Namen; das eben geteilte Deck steht dort womöglich gar
+nicht drin, weil die Liste auf Seite 1 steht oder eine Suche aktiv ist. Vorher
+endete der Klick in dem Fall in einem stillen `return`.
+
+> Liegt `supabase/migrations/20260803160000_feed_deckname.sql` noch nicht, gibt
+> die Feed-Abfrage die beiden neuen Spalten gar nicht zurück — und der Feed
+> bleibt beim namenlosen Satz. Kein Fehler, kein Knopf, nichts kaputt: derselbe
+> Rückfall wie bei einem wieder privat gestellten Deck.
 
 ### Sterne und Rangliste
 
@@ -2474,11 +2508,40 @@ Tagesmodus — praktisch zum Ausprobieren, weil er nur 5 MB lädt.
 ```bash
 cd tests
 npm ci
-npm test                 # alles
-npm test -- ziehen css   # nur Fälle, deren Name das enthält
+npm test                    # alles
+npm test -- ziehen css      # nur Fälle, deren Name das enthält
+PRUEF_PARALLEL=1 npm test   # streng nacheinander
 ```
 
 Läuft bei jedem Pull Request (`.github/workflows/pruefungen.yml`).
+
+**Mehrere Fälle gleichzeitig**, standardmäßig so viele wie Kerne. Das ist keine
+Umstellung, sondern nur das Weglassen des Wartens aufeinander: Jeder Fall hat
+ohnehin schon seinen eigenen Browserkontext. Gemessen auf vier Kernen:
+
+| gleichzeitig | Dauer |
+| --- | --- |
+| 1 (wie früher) | ~7:00 |
+| 3 | 2:41 |
+| 4 (Vorgabe) | 1:59 |
+| 6 | 1:25 |
+
+Zu holen war das, weil an den sieben Minuten fast nichts Rechnerei war: Jeder
+Fall hat einen Sockel von 14 bis 16 Sekunden, während `migrationen` — der
+einzige ohne Browser — in 1,1 s fertig ist. Die Zeit steckt im Seitenaufbau und
+in den festen Wartezeiten, mit denen die Fälle auf Übergänge warten
+(`fremdmatte` wartet allein zweimal 4,6 s auf den Auffrischtakt). Wartezeit ist
+kein Rechenbedarf.
+
+Sechs wären noch schneller und blieben im Versuch grün; die Vorgabe bleibt
+trotzdem bei der Kernzahl. Die Fälle warten in **festen** Zeitspannen („350 ms,
+dann müsste es stehen"), und aus einer solchen wird unter Last schnell zu wenig.
+Wie viel Luft bleibt, hängt an der Maschine — nachgemessen ist es auf einer,
+nicht auf dem Prüfrechner.
+
+> Wird ein Fall nur im vollen Lauf rot und bleibt einzeln grün, ist
+> `PRUEF_PARALLEL=1` der erste Griff. Bestätigt sich der Verdacht, liegt es an
+> einer zu knappen Wartezeit in diesem Fall — nicht an der Gleichzeitigkeit.
 
 ### Warum es sie gibt
 
@@ -2509,6 +2572,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `spielrunde`     | Die Matte: Ziehen zwischen den Zonen (die Lade geht dabei zu und danach wieder auf), Tappen per Klick, die Lebensreihe (vier einzeilige Kacheln nebeneinander, Regler links neben der Zahl, kein Rollbalken), der Länderstreifen (mehr als die halbe zweite Reihe sichtbar), die Kartenspalte (kein Rollbalken, das Bild gibt nach), der Kopfkasten unter der Matte, die fünf Laden links unten neben der Matte (senkrechte Reihenfolge, unten verankert, eigene Spalte statt darübergelegt, nach rechts aufklappend, immer nur eine offen, auch zugeklappt Ablageziel) samt der Bibliothekssuche in ihrem Korb, der Würfel (nur W20, blanke Fläche über der ganzen Matte UND über allem darin, Zahl aufs Emblem, jeder Wurf anders) und „Zufällig ziehen" (gewichtet über Exemplare, leere Bibliothek) |
 | `fremdmatte`     | Die Matte eines Mitspielers: dass die Abfrage die Spalte `hand` nicht führt und Zeilen ohne offene Zone überspringt, dass die Anzeige ein doch geliefertes `hand` gar nicht erst übernimmt, dass fremde Karten keine Handgriffe tragen, dass die Lebensreihe frei und anklickbar bleibt und dass der Takt nach dem Schließen samt Intervall verschwindet; dazu, dass die Lade hochkant im Blickfeld statt weit unten aufklappt und dass ein Zuschauer ohne eigenes Deck die Mitspieler samt Auge überhaupt sieht |
 | `steuer`         | Die Commander-Steuer: je Commander eine eigene Marke in der Kopfzeile der Kommandozone (der alte Kasten darüber darf nicht zurückkommen), Wirken erhöht nur die des gewirkten, der Rücknahme-Knopf trifft nur seine Karte — und beides steht auch dann noch da, wenn der Commander längst auf dem Schlachtfeld liegt und die Kommandozone leer ist |
+| `feeddeck`       | Das geteilte Deck im Live-Feed: dass die Kennung und nicht der Name gespeichert wird, dass der Feed den Namen im VERBUND dazuholt (und die Zeile ihn beim Zurückstellen auf privat verliert, statt ganz zu verschwinden), dass die einzelne Kachel nur öffentliche Decks herausgibt — und in der Anzeige: Name als Knopf, kein Knopf ohne Namen, ein Deckname mit Markup als Text, und der Klick, der die fehlende Kachel nachholt |
 | `mana`           | Mana in diesem Zug: der Übersetzer an einer Mustertabelle (Signet netto, Selbstopfer ja, fremdes Opfer nein, „for each“ variabel, CR 305.6 ohne Text), die Summen frei/gesamt je Exemplar, Tappen senkt frei, die Hand zählt nie mit, und ohne Quellen Strich statt Null — dazu die Farbaufteilung: feste Reihenfolge, Summe der Marken gleich der Gesamtzahl, Tappen kommt in der Farbe an, und alle sieben Marken brechen in der 154-px-Spalte um, statt hinauszulaufen |
 | `export`         | Deck ausgeben: die fünf Zeilen genau so, wie sie dastehen müssen — englischer Name statt gedrucktem, Setcode groß, keine leere Klammer ohne Auflage, alphabetisch sortiert, Deckmenge statt Bestand; dazu Datei, Zwischenablage und der Rückfall „Text markiert“, wenn das Kopieren scheitert |
 | `mitglieder`     | Die Mitgliederliste ohne Stufen: dass die Abfrage das neueste Mitglied aus allen Profilen und mit echtem Namen nimmt, dass Karten und „größte Sammlung“ weiterhin an den Stufen hängen, dass ein leerer Anzeigename die Ersatzbezeichnung behält — und dass die Zusage in allen fünf Sprachen mitgewandert ist |
