@@ -169,7 +169,7 @@ export default async function ({ seite, adresse, stand }) {
         kopf: Math.round(document.querySelector("header").getBoundingClientRect().height),
         zeilen: new Set(k.map(b => Math.round(b.getBoundingClientRect().top))).size,
         wort: getComputedStyle(k[0].querySelector("span[data-i18n]")).display !== "none",
-        titel: k.every(b => (b.title || "").trim().length > 0),
+        titel: k.every(b => (titelVon(b) || "").trim().length > 0),
         // Die Zahl an Wunschliste/live Partie ist KEIN Beschriftungs-span und
         // muss bleiben — sie ist der einzige Hinweis, dass etwas wartet.
         zahlDa: getComputedStyle(document.querySelector("#wish-badge")).display !== "none",
@@ -219,7 +219,7 @@ export default async function ({ seite, adresse, stand }) {
   await seite.evaluate(() => setLang("de"));
   await seite.waitForTimeout(200);
   stand.gleich("der Titel wechselt mit der Sprache",
-    await seite.evaluate(() => document.querySelector('nav > button[data-v="coll"]').title),
+    await seite.evaluate(() => titelVon(document.querySelector('nav > button[data-v="coll"]'))),
     "Sammlung");
 
   await seite.setViewportSize({ width: 1600, height: 900 });

@@ -746,7 +746,7 @@ export default async function ({ seite, adresse, stand }) {
       // Der Weg, den auch das Echo der Datenbank nimmt.
       logHinzu({ id: 1, user_id: "u1", kind: "dice", data: { sides: 20, result: 13 } });
       logHinzu({ id: 2, user_id: "u0", kind: "dice", data: { sides: 20, result: 7 } });
-      return document.querySelector("#dice-roll").title.split("\n");
+      return titelVon(document.querySelector("#dice-roll")).split("\n");
     }),
     ["Würfeln", "Ich: 7", "Mira: 13"]);
   stand.ist("jeder Wurf nennt Werfer und Ergebnis",

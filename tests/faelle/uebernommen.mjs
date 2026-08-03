@@ -168,7 +168,7 @@ export default async function ({ seite, adresse, stand, wurzel }) {
   const gesperrt = await seite.evaluate(() => {
     const b = document.querySelector('[data-public="d-kopie"]');
     const eigen = document.querySelector('[data-public="d-eigen"]');
-    return { aus: b?.disabled, titel: b?.title || "",
+    return { aus: b?.disabled, titel: titelVon(b) || "",
              eigenAus: eigen?.disabled,
              hinweis: document.querySelector(".deck-uebernommen")?.textContent || "" };
   });
