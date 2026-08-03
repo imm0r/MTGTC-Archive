@@ -2508,11 +2508,40 @@ Tagesmodus — praktisch zum Ausprobieren, weil er nur 5 MB lädt.
 ```bash
 cd tests
 npm ci
-npm test                 # alles
-npm test -- ziehen css   # nur Fälle, deren Name das enthält
+npm test                    # alles
+npm test -- ziehen css      # nur Fälle, deren Name das enthält
+PRUEF_PARALLEL=1 npm test   # streng nacheinander
 ```
 
 Läuft bei jedem Pull Request (`.github/workflows/pruefungen.yml`).
+
+**Mehrere Fälle gleichzeitig**, standardmäßig so viele wie Kerne. Das ist keine
+Umstellung, sondern nur das Weglassen des Wartens aufeinander: Jeder Fall hat
+ohnehin schon seinen eigenen Browserkontext. Gemessen auf vier Kernen:
+
+| gleichzeitig | Dauer |
+| --- | --- |
+| 1 (wie früher) | ~7:00 |
+| 3 | 2:41 |
+| 4 (Vorgabe) | 1:59 |
+| 6 | 1:25 |
+
+Zu holen war das, weil an den sieben Minuten fast nichts Rechnerei war: Jeder
+Fall hat einen Sockel von 14 bis 16 Sekunden, während `migrationen` — der
+einzige ohne Browser — in 1,1 s fertig ist. Die Zeit steckt im Seitenaufbau und
+in den festen Wartezeiten, mit denen die Fälle auf Übergänge warten
+(`fremdmatte` wartet allein zweimal 4,6 s auf den Auffrischtakt). Wartezeit ist
+kein Rechenbedarf.
+
+Sechs wären noch schneller und blieben im Versuch grün; die Vorgabe bleibt
+trotzdem bei der Kernzahl. Die Fälle warten in **festen** Zeitspannen („350 ms,
+dann müsste es stehen"), und aus einer solchen wird unter Last schnell zu wenig.
+Wie viel Luft bleibt, hängt an der Maschine — nachgemessen ist es auf einer,
+nicht auf dem Prüfrechner.
+
+> Wird ein Fall nur im vollen Lauf rot und bleibt einzeln grün, ist
+> `PRUEF_PARALLEL=1` der erste Griff. Bestätigt sich der Verdacht, liegt es an
+> einer zu knappen Wartezeit in diesem Fall — nicht an der Gleichzeitigkeit.
 
 ### Warum es sie gibt
 
