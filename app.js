@@ -13425,20 +13425,33 @@ function sessionLobbyHtml() {
     ${inv ? `<div class="card"><h3 style="margin-top:0">${esc(t("sess.invitesTitle"))}</h3>${inv}</div>` : ""}`;
 }
 
-/* Eine Spielerkachel: Avatar, Name/Deck und Lebenspunkte NEBENeinander.
+/* Eine Spielerkachel, EINE Zeile: Avatar, Name/Deck, Schieberegler, Zahl.
    Gestapelt füllten vier Mitspieler den halben Schirm, bevor die eigenen Karten
-   überhaupt anfingen. In der Matte stehen dieselben Kacheln schmal untereinander
-   im Feld „Lebenspunkte" — deshalb eine Funktion für beide Anordnungen. */
+   überhaupt anfingen. In der Matte stehen dieselben Kacheln schmal
+   nebeneinander im Feld „Lebenspunkte" — deshalb eine Funktion für beide
+   Anordnungen; was sich unterscheidet, sind allein die Spaltenbreiten (CSS). */
+/* Die Obergrenze des Schiebereglers. Sie muss den HÖCHSTEN Stand am Tisch
+   fassen: Rutschte sie darunter, sprängen Kacheln beim Neuzeichnen auf einen
+   kleineren Wert, und aus einem Anzeigefehler würde ein Datenverlust.
+   Startleben plus die Hälfte als Luft nach oben (Lebensgewinn ist normal), aber
+   nie weniger als der tatsächlich höchste Stand — und mindestens 40, damit die
+   Skala bei einer Runde mit wenig Startleben nicht zur Briefmarke wird. */
+function lebenObergrenze() {
+  const hoechste = Math.max(0, ...(SESSION_PLAYERS || []).map(p => p.life || 0));
+  const start = SESSION?.start_life || 40;
+  return Math.max(40, Math.ceil(start * 1.5), hoechste);
+}
+
 function spielerKachelHtml(p) {
   const joined = p.status === "joined";
   const besiegt = joined && p.life <= 0;   // bei 0 Leben ausgeschieden
   const name = p.profile?.display_name
     || (p.user_id === USER.id ? (PROFILE?.display_name || t("sess.you")) : t("friends.unknown"));
   // Das Auge sitzt AM AVATAR, nicht in einer eigenen Spalte: In der Mattenreihe
-  // ist eine Kachel bei vier Mitspielern und 820 px Fensterbreite 141 px breit,
-  // und um die ringen Name, Lebenszahl und vier Knöpfe schon jetzt. Der Avatar
-  // hat feste Maße und steht in beiden Anordnungen ganz links — an seiner Ecke
-  // kostet das Auge keine Breite, die woanders fehlt.
+  // ist eine Kachel bei vier Mitspielern und 820 px Fensterbreite 122 px breit,
+  // und um die ringen Name, Regler und Lebenszahl schon jetzt — der Name muss
+  // dort sogar zurücktreten. Der Avatar hat feste Maße und steht in beiden
+  // Anordnungen ganz links; an seiner Ecke kostet das Auge keine Breite.
   const auge = joined && p.user_id !== USER.id
     ? `<button type="button" class="sp-matte${FREMD?.uid === p.user_id ? " an" : ""}"
          data-matte="${esc(p.user_id)}" aria-pressed="${FREMD?.uid === p.user_id}"
@@ -13453,13 +13466,10 @@ function spielerKachelHtml(p) {
       <div class="sp-besiegt">&#9760; ${esc(t("sess.defeated"))}</div>
     </div>
     ${joined
-      ? `<div class="sp-life" data-u="${esc(p.user_id)}">${Math.max(0, p.life)}</div>
-         <div class="sp-ctrl">
-           <button class="btn ghost sm" data-life="${esc(p.user_id)}" data-d="-5">&minus;5</button>
-           <button class="btn ghost sm" data-life="${esc(p.user_id)}" data-d="-1">&minus;1</button>
-           <button class="btn ghost sm" data-life="${esc(p.user_id)}" data-d="1">+1</button>
-           <button class="btn ghost sm" data-life="${esc(p.user_id)}" data-d="5">+5</button>
-         </div>`
+      ? `<input type="range" class="sp-schieber" data-lifeset="${esc(p.user_id)}"
+           min="0" max="${lebenObergrenze()}" step="1" value="${Math.max(0, p.life)}"
+           title="${esc(t("sess.lifeSlider", { name }))}" aria-label="${esc(t("sess.lifeSlider", { name }))}">
+         <div class="sp-life" data-u="${esc(p.user_id)}">${Math.max(0, p.life)}</div>`
       : `<div class="sp-wait">${esc(t("sess.waiting"))}</div>`}
   </div>`;
 }
@@ -13478,8 +13488,16 @@ function sessionBoardHtml() {
       <div style="flex:none"><button class="btn ghost sm" data-sess-invite="${esc(o.id)}">${esc(t("sess.invite"))}</button></div>
     </div>`).join("");
 
-  return `
-    <div class="card">
+  /* Kopf, Deckwahl und Verlassen. Sie standen ÜBER der Matte und schoben sie
+     um ihre Höhe nach unten — für drei Dinge, die man einmal zu Beginn
+     braucht und danach nicht mehr. Unter der Matte sind sie genauso
+     erreichbar, und die Matte bekommt die Höhe.
+     Im schmalen Fenster tritt das Akkordeon an die Stelle der Matte, und der
+     Kasten steht genauso darunter. Nur OHNE gewähltes Deck — dann liefert
+     deckTrackerHtml() gar nichts — steht er zuerst: Er ist dann das Einzige,
+     was da ist, und die Deckwahl darin ist genau das, was fehlt. */
+  const kopfKasten = `
+    <div class="card sess-kopf">
       <div class="row" style="align-items:center;justify-content:space-between">
         <h3 style="margin:0">${esc(t("sess.roundTitle"))} <span class="hint">&middot; ${esc(t("sess.startLife"))} ${SESSION.start_life}</span></h3>
         <div class="row" style="flex:none;gap:6px">
@@ -13501,9 +13519,11 @@ function sessionBoardHtml() {
           ${(DECKS || []).map(d => `<option value="${esc(d.id)}"${d.id === (meinSpieler()?.deck_id || "") ? " selected" : ""}>${esc(d.name)}</option>`).join("")}
         </select></div>
       </div>
-    </div>
+    </div>`;
 
-    ${tracker}
+  return `
+    ${tracker || kopfKasten}
+    ${tracker ? kopfKasten : ""}
 
     <!-- Der Würfel steht sonst in der Matte bzw. im Akkordeon (beides in
          #zonen). Ohne gewähltes Deck gibt es beides nicht — dann steht er für
@@ -14997,11 +15017,14 @@ function wireSession() {
   wireSpielerKacheln();
 }
 
-/* Lebenspunkt-Knöpfe und Commander-Vorschau der Spielerkacheln. Steht für sich,
+/* Lebensregler und Commander-Vorschau der Spielerkacheln. Steht für sich,
    weil die Kacheln in der Matte im Zonenbehälter sitzen und dort bei jedem Zug
    neu entstehen — renderZonen() ruft das deshalb ebenfalls auf. */
 function wireSpielerKacheln() {
-  $$("#v-session [data-life]").forEach(b => b.onclick = () => lebenAendern(b.dataset.life, parseInt(b.dataset.d)));
+  // „input" und nicht „change": Die Zahl daneben soll beim Ziehen mitlaufen,
+  // sonst stellt man blind ein. Geschrieben wird ohnehin entprellt.
+  $$("#v-session [data-lifeset]").forEach(r =>
+    r.oninput = () => lebenSetzen(r.dataset.lifeset, Number(r.value)));
   // Dasselbe Auge schließt wieder, wenn die Matte dieses Spielers schon offen
   // steht — sonst bliebe der einzige Weg zurück der Knopf in der Lade, und der
   // liegt woanders als der, mit dem man sie aufgemacht hat.
@@ -15064,14 +15087,20 @@ async function lebenReset() {
   } catch (e) { toast(dbErr(e)); }
 }
 
-/* Leben ändern: lokal sofort (optimistisch), Schreiben entprellt. Fremde
+/* Leben setzen: lokal sofort (optimistisch), Schreiben entprellt. Fremde
    Änderungen kommen per Realtime rein und überschreiben die Anzeige. */
-function lebenAendern(userId, delta) {
+function lebenSetzen(userId, wert) {
   const p = SESSION_PLAYERS.find(x => x.user_id === userId);
   if (!p || p.status !== "joined") return;
-  p.life = Math.max(0, Math.min(999, p.life + delta));   // 0 = besiegt, kein Minus
+  p.life = Math.max(0, Math.min(999, Math.round(wert)));   // 0 = besiegt, kein Minus
+  /* NICHT neu zeichnen: Der Regler läge sonst bei jeder Bewegung als neues
+     Element unter dem Finger, und der Zug bräche ab. Nachgeführt werden nur
+     die Zahl, die Kachelfarbe und der Regler selbst (falls die Änderung von
+     woanders kam — ein Mitspieler, „Neues Spiel", die Datenbank). */
   const el = $(`.sp-life[data-u="${userId}"]`);
   if (el) { el.textContent = p.life; el.closest(".sp-card")?.classList.toggle("besiegt", p.life <= 0); }
+  const r = $(`.sp-schieber[data-lifeset="${userId}"]`);
+  if (r && Number(r.value) !== p.life) r.value = p.life;
   clearTimeout(lifeTimers[userId]);
   lifeTimers[userId] = setTimeout(async () => {
     const wert = p.life; delete lifeTimers[userId];
