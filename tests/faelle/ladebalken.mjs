@@ -105,9 +105,41 @@ export default async function ({ seite, adresse, stand }) {
     spanne > bewegung.bahn * 0.5, `${spanne} px von ${bewegung.bahn} px`);
   // Es beginnt links AUSSERHALB und endet rechts außerhalb — nur dann ist es
   // eine durchlaufende Bahn und kein Pendel in der Mitte.
-  stand.ist("es startet links außerhalb der Bahn",
-    Math.min(...bewegung.punkte) <= -bewegung.lichtBreite * 0.5,
-    `${Math.min(...bewegung.punkte)} px bei ${bewegung.lichtBreite} px Lichtbreite`);
+  //
+  // Gemessen wird das NICHT über Stichproben. Acht davon über 880 ms treffen
+  // die äußersten Punkte eines 1250-ms-Zyklus nur manchmal — die Prüfung war
+  // in dieser Form einmal rot und beim nächsten Lauf grün, ohne dass sich
+  // etwas geändert hätte. Stattdessen wird die Animation angehalten und an
+  // ihren Anfang und ihr Ende gestellt: dieselbe Aussage, nur ohne Zufall.
+  const enden = await seite.evaluate(() => {
+    const licht = document.querySelector("#lb-probe .ladebalken-licht");
+    const bahn = document.querySelector("#lb-probe .ladebalken-schiene").getBoundingClientRect();
+    const anim = licht.getAnimations()[0];
+    if (!anim) return null;
+    const bei = (t) => {
+      anim.currentTime = t;
+      const r = licht.getBoundingClientRect();
+      return { links: Math.round(r.left - bahn.left), rechts: Math.round(r.right - bahn.left) };
+    };
+    anim.pause();
+    // getComputedTiming(), nicht getTiming(): Letzteres gibt bei einer
+    // CSS-Animation "auto" zurück, currentTime bliebe dann stehen.
+    const dauer = anim.effect.getComputedTiming().duration;
+    const a = bei(0);
+    // NICHT auf dauer selbst, sondern kurz davor. Bei currentTime === dauer ist
+    // eine Animation mit infinite bereits im NÄCHSTEN Durchlauf und steht damit
+    // wieder am Anfang — gemessen: 0,25 → 10 px, 0,5 → 147, 0,75 → 283,
+    // 1,0 → wieder −126. Beide Messungen lieferten so denselben Wert, was
+    // aussah wie ein Balken, der sich nicht bewegt.
+    const e = bei(dauer * 0.999);
+    anim.play();
+    return { a, e, dauer, bahn: Math.round(bahn.width) };
+  });
+  stand.ist("am Anfang steht es vollständig links außerhalb",
+    enden && enden.a.rechts <= 0, JSON.stringify(enden?.a));
+  stand.ist("und am Ende vollständig rechts außerhalb",
+    enden && enden.e.links >= enden.bahn - 3,
+    `${JSON.stringify(enden?.e)} bei ${enden?.bahn} px Bahn`);
 
   /* --- Wer weniger Bewegung will, bekommt langsamer — nicht stillstehend -- */
   await seite.emulateMedia({ reducedMotion: "reduce" });
@@ -140,4 +172,56 @@ export default async function ({ seite, adresse, stand }) {
   stand.ist("das Zahnrad gibt es weiterhin für die kurzen Fälle",
     (quelle.match(/syn-spin/g) || []).length > 10,
     (quelle.match(/syn-spin/g) || []).length + " Stellen");
+
+  /* --- Am Deck steht er da, wo geklickt wurde --------------------------- */
+  /* DER EIGENTLICHE FEHLER. Der Balken war gezeichnet und trotzdem unsichtbar:
+     Die Ergebniskästen eines Decks stehen UNTER der Kartentabelle, bei hundert
+     Karten zweitausend Pixel tiefer. Zu sehen blieb das Zahnrad am Knopf —
+     also genau das, was der Balken ersetzen sollte. Gemessen wird deshalb
+     nicht „gibt es ihn", sondern „wie weit ist er vom Knopf entfernt". */
+  await seite.evaluate(() => document.getElementById("lb-probe")?.remove());
+  await seite.evaluate(AUFBAU, { karten: 100, kategorien: 2, decks: 1, ansicht: "tabelle" });
+  await seite.waitForTimeout(400);
+
+  // Die Suche anhalten, damit der Lade-Zustand stehen bleibt und sich messen
+  // lässt. Ohne Attrappe liefe sie gegen Scryfall.
+  await seite.evaluate(() => {
+    window.LOESE = null;
+    window.themenFuerKarten = async () => null;
+    window.synergieAnzeigen = (box) => new Promise(fertig => {
+      window.LOESE = () => { box.innerHTML = `<div class="empty">fertig</div>`; fertig(); };
+    });
+    renderDecks();
+  });
+  await seite.waitForTimeout(300);
+  await seite.locator('[data-synbtn="d0"]').click();
+  await seite.waitForTimeout(300);
+
+  const platz = await seite.evaluate(() => {
+    const knopf = document.querySelector('[data-synbtn="d0"]').getBoundingClientRect();
+    const balken = document.querySelector('[data-ladebox="d0"] .ladebalken');
+    const kasten = document.querySelector('.deck-syn[data-synbox="d0"]').getBoundingClientRect();
+    return {
+      da: !!balken,
+      unterKnopf: balken ? Math.round(balken.getBoundingClientRect().top - knopf.bottom) : null,
+      kastenUnterKnopf: Math.round(kasten.top - knopf.bottom),
+      fenster: innerHeight,
+    };
+  });
+  stand.ist("der Balken steht unter dem Knopf, nicht erst im Ergebniskasten",
+    platz.da && platz.unterKnopf >= 0 && platz.unterKnopf < 200,
+    `${platz.unterKnopf} px unter dem Knopf`);
+  // Die Gegenprobe: Der Ergebniskasten ist WIRKLICH weit weg. Rutschte er
+  // eines Tages nach oben, verlöre die Messung darüber ihren Sinn — sie wäre
+  // dann grün, ohne noch etwas zu zeigen.
+  stand.ist("und der Ergebniskasten liegt tatsächlich außerhalb des Bildes",
+    platz.kastenUnterKnopf > platz.fenster,
+    `${platz.kastenUnterKnopf} px unter dem Knopf, Fenster ${platz.fenster} px hoch`);
+
+  // Und er verschwindet wieder — ein Ladebalken, der stehen bleibt, wäre eine
+  // Suche, die nie fertig wird.
+  await seite.evaluate(() => window.LOESE());
+  await seite.waitForTimeout(300);
+  stand.ist("nach der Suche ist er weg",
+    await seite.evaluate(() => !document.querySelector('[data-ladebox="d0"] .ladebalken')));
 }

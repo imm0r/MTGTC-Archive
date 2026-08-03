@@ -6455,6 +6455,23 @@ function ladeBalken(text, hinweis) {
   </div>`;
 }
 
+/* Denselben Balken an einem DECK zeigen — direkt unter den Knöpfen statt in
+   dem Kasten, der später das Ergebnis aufnimmt.
+
+   Warum getrennt: Die Ergebniskästen eines Decks (Synergien, Combos,
+   Legalität) stehen UNTER der Kartentabelle. Bei hundert Karten sind das
+   zweitausend Pixel, und genau daran ging der Balken vorbei — gezeichnet war
+   er, nur außerhalb des Bildes. Zu sehen blieb das drehende Zahnrad am Knopf,
+   also genau das, was er ersetzen sollte. Es ist dasselbe Problem, aus dem der
+   Deck-Verlauf über der Tabelle steht.
+
+   Ohne text räumt die Funktion den Balken wieder ab. */
+function deckLade(deckId, text, hinweis) {
+  const el = $(`[data-ladebox="${esc(deckId)}"]`);
+  if (el) el.innerHTML = text ? ladeBalken(text, hinweis) : "";
+  return el;
+}
+
 /* Synergie-Knopf in den Ladezustand versetzen: Lupe → drehendes Zahnrad,
    Knopf gesperrt. Zurück auf die Lupe, wenn die Suche fertig ist. */
 function synBtnBusy(btn, label, busy, icon) {
@@ -9896,6 +9913,13 @@ function renderDecks() {
             </div>
           </div>` : ""}
         </div>
+        <!-- Der Ladebalken der Deck-Knöpfe steht HIER, direkt unter ihnen —
+             und nicht in dem Kasten, der das Ergebnis aufnimmt. Der liegt
+             nämlich unter der Kartentabelle, bei hundert Karten zweitausend
+             Pixel tiefer: Gezeichnet wurde er dort schon, nur eben außerhalb
+             des Bildes, und zu sehen blieb das Zahnrad am Knopf. Dasselbe
+             Problem, aus dem der Deck-Verlauf ÜBER der Tabelle steht. -->
+        <div class="deck-lade" data-ladebox="${d.id}"></div>
         <div class="deck-dash" data-dash="${d.id}" style="margin-top:12px"></div>
         <!-- Der Verlauf steht ÜBER der Kartentabelle, nicht wie die übrigen
              Kästen darunter: Bei hundert Karten läge er sonst zweitausend Pixel
@@ -10064,6 +10088,7 @@ function deckVerlaufKnopf(deckId) {
     const gsw = [$(`[data-analysebtn="${id}"]`), $(`[data-synaibtn="${id}"]`)];
     synBtnBusy(b, lbl, true);
     synGeschwister(gsw, true);
+    deckLade(id, t("syn.loading"));
     const weg = excludeVon(cards);   // nur Karten DIESES Decks raus, Besessenes darf auftauchen
     // Erst die Themen des ganzen Decks (EIN Sammelabruf, siehe
     // themenFuerKarten), dann die Suche. Erst wenn sie fertig ist, nach unten
@@ -10075,7 +10100,7 @@ function deckVerlaufKnopf(deckId) {
           maxHooks: 5, limit: 20, deckId: id,
           maxPrice: numVal($(`[data-syncap="${id}"]`)), totalBudget: numVal($(`[data-synbudget="${id}"]`)) }))
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
-      .finally(() => { synBtnBusy(b, lbl, false); synGeschwister(gsw, false); });
+      .finally(() => { synBtnBusy(b, lbl, false); synGeschwister(gsw, false); deckLade(id); });
   });
 
   // Deck-Analyse: welche Funktionsbausteine (Ramp, Kartenvorteil, Entfernung,
@@ -10094,9 +10119,10 @@ function deckVerlaufKnopf(deckId) {
     const gsw = [$(`[data-synbtn="${id}"]`), $(`[data-synaibtn="${id}"]`)];
     synBtnBusy(b, lbl, true, "&#128295;");
     synGeschwister(gsw, true);
+    deckLade(id, t("an.loading"));
     deckAnalyseAnzeigen(box, cards, farbIdentitaet(cards), id)
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
-      .finally(() => { synBtnBusy(b, lbl, false, "&#128295;"); synGeschwister(gsw, false); });
+      .finally(() => { synBtnBusy(b, lbl, false, "&#128295;"); synGeschwister(gsw, false); deckLade(id); });
   });
 
   // KI-Synergien fürs ganze Deck: die Deckliste als Kontext an Claude (implizite
@@ -10114,9 +10140,10 @@ function deckVerlaufKnopf(deckId) {
     const gsw = [$(`[data-synbtn="${id}"]`), $(`[data-analysebtn="${id}"]`)];
     synBtnBusy(b, lbl, true, "&#10024;");
     synGeschwister(gsw, true);
+    deckLade(id, t("syn.aiLoading"), t("syn.aiLoadingHint"));
     kiSynergienDeck(d, cards, box, { maxPrice: numVal($(`[data-syncap="${id}"]`)) })
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
-      .finally(() => { synBtnBusy(b, lbl, false, "&#10024;"); synGeschwister(gsw, false); });
+      .finally(() => { synBtnBusy(b, lbl, false, "&#10024;"); synGeschwister(gsw, false); deckLade(id); });
   });
 
   // Combos im Deck über Commander Spellbook: fertige + „fast fertige" Combos in
@@ -10131,9 +10158,10 @@ function deckVerlaufKnopf(deckId) {
     if (!cards.length || !box) return;
     const lbl = t("combo.btn");
     synBtnBusy(b, lbl, true, "&#128279;");
+    deckLade(id, t("combo.loading"));
     deckCombosAnzeigen(box, cards, id)
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
-      .finally(() => synBtnBusy(b, lbl, false, "&#128279;"));
+      .finally(() => { synBtnBusy(b, lbl, false, "&#128279;"); deckLade(id); });
   });
 
   // Deck-Legalität: jede Deckkarte gegen das Deck-Format prüfen (gebannt /
@@ -10151,9 +10179,10 @@ function deckVerlaufKnopf(deckId) {
     if (!cards.length || !box) return;
     const lbl = t("legal.deckBtn");
     synBtnBusy(b, lbl, true, "&#9878;");
+    deckLade(id, t("legal.loading"));
     deckLegalPruefen(box, cards, d)
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
-      .finally(() => synBtnBusy(b, lbl, false, "&#9878;"));
+      .finally(() => { synBtnBusy(b, lbl, false, "&#9878;"); deckLade(id); });
   });
 
   // Fehlende Karten kaufen: die (Deckmenge > Bestand) fehlenden Karten in einen
