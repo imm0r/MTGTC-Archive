@@ -1332,7 +1332,29 @@ body.zieht-gerade .zk:hover,body.zieht-gerade .zk:focus-within{transform:none}
 .cdeck-bild{width:52px;height:73px;object-fit:cover;border-radius:5px;flex:none;
   border:1px solid var(--line);background:#000}
 .cdeck-txt{min-width:0;display:flex;flex-direction:column;gap:4px}
-.cdeck-name{font-size:15px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Der Deckname ist der Knopf in die Detailansicht. Er sieht aus wie vorher —
+   fett und einzeilig —, nur der Zeiger und die Farbe beim Überfahren verraten,
+   dass da etwas dahinterliegt. Ein Kasten drum machte aus einer Kachel mit
+   einem Namen eine Kachel mit einem Formular. */
+.cdeck-name{display:block;width:100%;padding:0;border:none;background:none;text-align:left;
+  font:inherit;font-size:15px;font-weight:700;color:inherit;cursor:pointer;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cdeck-name:hover{color:var(--acc)}
+.cdeck-name:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:6px}
+/* Die Kachel selbst ist ebenfalls anklickbar (siehe wireCommunityDecksListe).
+   Der Zeiger sagt das; die Knöpfe darin setzen ihn sich selbst. */
+.cdeck{cursor:pointer}
+.cdeck:hover{border-color:var(--acc2)}
+
+/* Die Detailansicht im Dialog. Die Kartenliste bekommt eine eigene Höhe und
+   rollt darin: Ein Commander-Deck sind hundert Zeilen, und die schöben Kopf
+   und Übernehmen-Knopf sonst aus dem Fenster. */
+.cdeck-detail-kopf{display:flex;gap:12px;min-width:0;margin-bottom:10px}
+.cdeck-detail-bild{width:74px;height:104px;object-fit:cover;border-radius:6px;flex:none;
+  border:1px solid var(--line);background:#000}
+.cdeck-detail-leiste{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:8px 0;margin-bottom:8px}
+.cdeck-detail-liste{max-height:min(52vh,460px);overflow:auto}
 .cdeck-meta{display:flex;flex-wrap:wrap;align-items:center;gap:5px}
 .cdeck-wer{display:inline-flex;align-items:center;gap:6px;padding:0;border:none;
   background:none;cursor:pointer;color:var(--dim);font-size:12px;text-align:left}

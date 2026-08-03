@@ -76,6 +76,17 @@ function confirmDlg(html) {
     $("#dlg-yes").onclick = () => done(true);
     $("#dlg-no").onclick  = () => done(false);
     dlg.onclose = () => res(false);
+    /* AUS EINEM OFFENEN DIALOG HERAUS AUFRUFBAR. Steht #dlg schon offen (etwa
+       die Deckansicht, aus der die Rückfrage „übernehmen?" kommt), tauscht die
+       Zeile oben einfach den Inhalt, und showModal() ist ein Leerlauf — im
+       Prüfbrowser nachgemessen: Es wirft NICHT, anders als es die alte Fassung
+       der Spezifikation verlangte.
+       Nicht vorher schließen. Ein close() gefolgt von showModal() sieht
+       harmlos aus, ist es aber nicht: Das close-Ereignis kommt als eigene
+       Aufgabe und träfe dann den Zuhörer der NEUEN Frage — die damit mit
+       „nein" beantwortet wäre, bevor jemand sie gelesen hat. Genau daran
+       verschwand die Deckübernahme zuerst: Der Knopf tat nichts, und nichts
+       meldete einen Fehler. */
     dlg.showModal();
   });
 }
@@ -11952,11 +11963,18 @@ function cdeckKachelHtml(d) {
   const eigenes = d.owner_id === USER?.id;
   const schnitt = Number(d.schnitt || 0);
   const stimmen = Number(d.stimmen || 0);
+  // Der Name ist ein ECHTER Knopf und nicht die ganze Kachel mit role=button:
+  // In der Kachel stecken schon Knöpfe (Sterne, Erbauer), und ein Knopf im
+  // Knopf ist weder gültiges HTML noch mit der Tastatur zu bedienen.
+  // Für die Maus reicht das trotzdem nicht — dort will man irgendwohin auf die
+  // Kachel treffen. Das erledigt die Verdrahtung, die Klicks auf anderen
+  // Knöpfen durchlässt.
   return `<div class="cdeck" data-cdeck="${esc(d.id)}">
     <div class="cdeck-kopf">
       ${d.commander_img ? `<img class="cdeck-bild" src="${esc(d.commander_img)}" alt="" loading="lazy">` : ""}
       <div class="cdeck-txt">
-        <div class="cdeck-name">${esc(d.name || "")}</div>
+        <button type="button" class="cdeck-name" data-cdopen="${esc(d.id)}"
+          title="${esc(t("cdeck.openTitle"))}">${esc(d.name || "")}</button>
         <div class="cdeck-meta">${[
           d.format ? `<span class="pill fmt">${esc(d.format)}</span>` : "",
           d.archetype ? `<span class="pill">${esc(d.archetype)}</span>` : "",
@@ -12037,6 +12055,16 @@ function wireCommunityDecksListe() {
     b.onclick = () => deckBewerten(b.dataset.sterne, +b.dataset.n));
   $$("#cdecks-liste [data-mitglied]").forEach(b =>
     b.onclick = () => mitgliedProfilZeigen(b.dataset.mitglied));
+  $$("#cdecks-liste [data-cdopen]").forEach(b =>
+    b.onclick = () => communityDeckZeigen(b.dataset.cdopen));
+  // Die ganze Kachel als Trefferfläche für die Maus — außer dort, wo schon ein
+  // Knopf sitzt (Sterne, Erbauer, der Name selbst). Ohne diese Ausnahme
+  // bewertete ein Klick auf den dritten Stern das Deck UND risse den Dialog
+  // auf, und die Kachel darunter wäre schon neu gezeichnet.
+  $$("#cdecks-liste [data-cdeck]").forEach(k => k.onclick = ev => {
+    if (ev.target.closest("button")) return;
+    communityDeckZeigen(k.dataset.cdeck);
+  });
   const zurueck = $("#cd-zurueck"), vor = $("#cd-vor");
   if (zurueck) zurueck.onclick = () => { CDECKS.seite = Math.max(0, CDECKS.seite - 1); communityDecksHolen(); };
   if (vor) vor.onclick = () => { CDECKS.seite++; communityDecksHolen(); };
@@ -12060,6 +12088,147 @@ async function deckBewerten(deckId, sterne) {
     }
     toast(sterne ? t("cdeck.rated", { n: sterne }) : t("cdeck.unrated"));
   } catch (e) { toast(dbErr(e)); }
+}
+
+/* ---- Ein Community-Deck ansehen --------------------------------------
+   Die Kachel sagt, WELCHES Deck es ist; was drinsteckt, sagt erst die Liste.
+   Ohne sie ist eine Bewertung eine Meinung über ein Bild.
+
+   Geladen wird DIREKT über die Tabellen, nicht über eine eigene RPC: Die
+   SELECT-Policies aus der Community-Decks-Migration geben Deck, Einträge,
+   Karten und die Einteilung für öffentliche Decks bereits frei. Eine RPC
+   daneben wäre eine zweite Stelle, an der dieselbe Sichtbarkeitsfrage
+   beantwortet wird — und die zweite ist die, die man beim Ändern vergisst.
+
+   Eigene Naht (stubbar) wie bei den übrigen Community-Abfragen, damit die
+   Prüfungen ohne Datenbank auskommen. */
+async function communityDeckLaden(deckId) {
+  const { data: deck, error } = await sb.from("decks").select("*").eq("id", deckId).maybeSingle();
+  if (error) throw error;
+  if (!deck) return null;
+
+  const { data: entries } = await sb.from("deck_entries").select("*").eq("deck_id", deckId);
+  const cardIds = [...new Set((entries || []).map(e => e.card_id))];
+  const cardsById = {};
+  if (cardIds.length) {
+    const { data: cards } = await sb.from("cards").select("*").in("id", cardIds);
+    (cards || []).forEach(c => cardsById[c.id] = { ...c, set: c.set_code, disp: c.printed_name || c.name });
+  }
+  // Die Einteilung ist Teil dessen, was da veröffentlicht wurde. Fehlt die
+  // Tabelle in einer älteren Datenbank, bleibt es bei der schlichten Liste —
+  // deshalb abgefangen und nicht geworfen.
+  let kategorien = [], zuord = new Map();
+  try {
+    const [k, z] = await Promise.all([
+      sb.from("deck_categories").select("*").eq("deck_id", deckId).order("pos").order("created"),
+      sb.from("deck_entry_categories").select("*").eq("deck_id", deckId),
+    ]);
+    kategorien = k.data || [];
+    for (const x of (z.data || [])) {
+      const s = x.deck_id + "|" + x.card_id;
+      if (!zuord.has(s)) zuord.set(s, []);
+      zuord.get(s).push({ id: x.category_id, primaer: !!x.is_primary });
+    }
+  } catch { /* ältere Datenbank — dann eben ohne Einteilung */ }
+  return { deck, entries: entries || [], cardsById, kategorien, zuord };
+}
+
+/* Der Inhalt des Dialogs. `kachel` ist die Zeile aus der Rangliste (Name,
+   Erbauer, Sterne) — die steht schon da und wird nicht noch einmal geholt. */
+function cdeckDetailHtml(kachel, daten) {
+  const { deck, entries, cardsById, kategorien, zuord } = daten;
+  const eigenes = kachel.owner_id === USER?.id;
+  const rows = fremdDeckZeilen(entries, cardsById);
+  const n = rows.reduce((s, x) => s + x.e.qty, 0);
+  const wert = rows.reduce((s, x) => s + (x.c.price || 0) * x.e.qty, 0);
+  const haupt = deck.main_card_id ? cardsById[deck.main_card_id] : null;
+  const bild = haupt?.img || kachel.commander_img || "";
+  const stimmen = Number(kachel.stimmen || 0);
+  const schnitt = Number(kachel.schnitt || 0);
+  return `<div class="cdeck-detail">
+    <div class="cdeck-detail-kopf">
+      ${bild ? `<img class="cdeck-detail-bild" src="${esc(bild)}" alt="">` : ""}
+      <div style="flex:1;min-width:0">
+        <h3 style="margin:0 0 4px">${esc(deck.name || kachel.name || "")}</h3>
+        <div class="cdeck-meta">${[
+          deck.format ? `<span class="pill fmt">${esc(deck.format)}</span>` : "",
+          deck.archetype ? `<span class="pill">${esc(deck.archetype)}</span>` : "",
+        ].join("")}<span class="hint">${n} ${esc(t("common.cards"))} &middot; ${eur(wert)}</span></div>
+        <button type="button" class="cdeck-wer" data-mitglied="${esc(kachel.owner_id)}" style="margin-top:6px">
+          ${avatarHtml(22, { display_name: kachel.owner_name, avatar_url: kachel.owner_avatar })}
+          <span>${esc((kachel.owner_name || "").trim() || t("community.anonMember"))}</span>
+        </button>
+      </div>
+    </div>
+    <div class="cdeck-detail-leiste">
+      ${sterneHtml(kachel, eigenes)}
+      <span class="cdeck-wert">${stimmen
+        ? `${schnitt.toFixed(2).replace(".", ",")} <span class="hint">(${stimmen})</span>`
+        : `<span class="hint">${esc(t("cdeck.noVotes"))}</span>`}</span>
+      <span style="flex:1"></span>
+      ${eigenes
+        ? `<span class="hint cdeck-eigen">${esc(t("cdeck.ownDeckHint"))}</span>`
+        : `<button class="btn sm" id="cd-import" data-cdimport="${esc(deck.id)}"
+             title="${esc(t("deck.importTitle"))}">${esc(t("deck.importBtn"))}</button>`}
+    </div>
+    ${rows.length
+      ? `<div class="xscroll cdeck-detail-liste"><table class="deck-tbl">
+           <tbody>${fremdDeckListeHtml(deck.id, rows, kategorien, zuord)}</tbody></table></div>`
+      : `<div class="empty">${esc(t("cdeck.emptyDeck"))}</div>`}
+  </div>`;
+}
+
+/* Kachel angeklickt: Dialog auf, Inhalt nachladen. Wie mitgliedProfilZeigen —
+   erst das Fenster mit dem Rädchen, damit der Klick sofort etwas bewirkt, und
+   das Versprechen wird NICHT abgewartet, bevor die eigenen Knöpfe hängen. */
+async function communityDeckZeigen(deckId) {
+  const kachel = CDECKS.zeilen.find(x => x.id === deckId);
+  if (!kachel) return;
+  const zu = confirmDlg(`<div id="cd-detail"><div class="meta"><span class="syn-spin">&#9881;</span></div></div>`);
+  try {
+    const daten = await communityDeckLaden(deckId);
+    const body = $("#cd-detail");
+    if (body) {
+      body.innerHTML = daten
+        ? cdeckDetailHtml(kachel, daten)
+        : `<div class="empty">${esc(t("cdeck.gone"))}</div>`;
+      wireCdeckDetail(deckId);
+    }
+  } catch (e) {
+    const body = $("#cd-detail");
+    if (body) body.innerHTML = `<div class="empty">${esc(dbErr(e))}</div>`;
+  }
+  await zu;
+}
+
+/* Die Knöpfe im Dialog. Bewerten wirkt an BEIDEN Stellen: hier und an der
+   Kachel dahinter — sonst stünde nach dem Schließen noch der alte Schnitt da. */
+function wireCdeckDetail(deckId) {
+  const wurzel = $("#cd-detail");
+  if (!wurzel) return;
+  wurzel.querySelectorAll("[data-sterne]").forEach(b =>
+    b.onclick = async () => {
+      await deckBewerten(b.dataset.sterne, +b.dataset.n);
+      const k = CDECKS.zeilen.find(x => x.id === deckId);
+      const leiste = wurzel.querySelector(".sterne");
+      if (k && leiste) {
+        leiste.outerHTML = sterneHtml(k, k.owner_id === USER?.id);
+        const wert = wurzel.querySelector(".cdeck-detail-leiste .cdeck-wert");
+        const stimmen = Number(k.stimmen || 0), schnitt = Number(k.schnitt || 0);
+        if (wert) wert.innerHTML = stimmen
+          ? `${schnitt.toFixed(2).replace(".", ",")} <span class="hint">(${stimmen})</span>`
+          : `<span class="hint">${esc(t("cdeck.noVotes"))}</span>`;
+        wireCdeckDetail(deckId);
+      }
+    });
+  /* Beides — das Profil des Erbauers und die Übernahme-Rückfrage — geht über
+     confirmDlg, also über DIESEN Dialog. Das ist Absicht und kein Versehen:
+     confirmDlg tauscht den Inhalt und tritt an die Stelle der Deckansicht.
+     Vorher zu schließen wäre falsch, siehe die Begründung dort. */
+  wurzel.querySelectorAll("[data-mitglied]").forEach(b =>
+    b.onclick = () => mitgliedProfilZeigen(b.dataset.mitglied));
+  const imp = wurzel.querySelector("[data-cdimport]");
+  if (imp) imp.onclick = () => fremdDeckUebernehmen(imp.dataset.cdimport);
 }
 
 /* Der Schalter am Deck. Wie shareDeck, nur eine Ebene weiter. */
@@ -12303,7 +12472,7 @@ async function zeigeFreundDecks(friendId) {
       k.querySelector(".deck-pfeil").innerHTML = auf ? "&#9660;" : "&#9654;";
       k.title = auf ? t("common.collapse") : t("common.expand");
     });
-    ziel.querySelectorAll("[data-fimport]").forEach(b => b.onclick = () => importFriendDeck(b.dataset.fimport));
+    ziel.querySelectorAll("[data-fimport]").forEach(b => b.onclick = () => fremdDeckUebernehmen(b.dataset.fimport));
   } catch (e) {
     ziel.innerHTML = `<div class="card"><div class="meta"><span class="pill err">${esc(e.message)}</span></div></div>`;
   }
@@ -12313,16 +12482,21 @@ async function zeigeFreundDecks(friendId) {
    Read-only-Blick, kein Dauerzustand. */
 const freundDeckOffen = new Set();
 
-/* Read-only Deck eines Freundes: auf-/zuklappbarer Kopf mit Kennzahlen (wie in
-   der eigenen Deckliste) und eine einfache Kartenliste (Bild, Name, Set·#,
-   Deckmenge, Preis). Keine Bearbeitung; ein Knopf übernimmt das Deck. */
-function friendDeckHtml(d, entries, cardsById, kategorien = [], zuord = new Map()) {
-  const rows = entries.map(e => ({ e, c: cardsById[e.card_id] })).filter(x => x.c)
-    .sort((a, b) => a.c.disp.localeCompare(b.c.disp));
-  const n = rows.reduce((s, x) => s + x.e.qty, 0);
-  const v = rows.reduce((s, x) => s + (x.c.price || 0) * x.e.qty, 0);
-  const haupt = d.main_card_id ? cardsById[d.main_card_id] : null;
-  const offen = freundDeckOffen.has(d.id);
+/* Die Kartenliste eines FREMDEN Decks — die des Freundes wie die aus der
+   Community. Eine Stelle für beide: Es ist derselbe Blick von außen, und zwei
+   Fassungen davon liefen unweigerlich auseinander (die eine bekäme eine
+   Spalte, die andere nicht).
+
+   Erwartet `rows` als [{e, c}] (Deckeintrag + Karte), bereits sortiert.
+
+   Hat der Erbauer sein Deck eingeteilt, zeigen wir SEINE Einteilung. Hat er
+   keine, bleibt es bei der schlichten alphabetischen Liste — hier wird nichts
+   umgruppiert, was er nicht selbst so angelegt hat.
+
+   Bewusst ohne deckGruppen(): Dessen Umschalter zwischen Typ und Kategorien
+   gehört dem Eigentümer der Ansicht und liegt in seinem Browser. Für einen
+   fremden Blick gibt es nur eine richtige Ordnung — die des Erbauers. */
+function fremdDeckListeHtml(deckId, rows, kategorien = [], zuord = new Map()) {
   const zeile = ({ e, c }) => `
     <tr>
       <td style="width:40px">${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy" style="width:34px;border-radius:3px;display:block">` : ""}</td>
@@ -12331,36 +12505,44 @@ function friendDeckHtml(d, entries, cardsById, kategorien = [], zuord = new Map(
       <td class="num">${e.qty}&times;</td>
       <td class="num">${eur(c.price)}</td>
     </tr>`;
+  if (!kategorien.length) return rows.map(zeile).join("");
 
-  // Hat der Freund sein Deck eingeteilt, zeigen wir SEINE Einteilung. Hat er
-  // keine, bleibt es bei der schlichten alphabetischen Liste — hier wird nichts
-  // umgruppiert, was er nicht selbst so angelegt hat.
-  //
-  // Bewusst ohne deckGruppen(): Dessen Umschalter zwischen Typ und Kategorien
-  // gehört dem Eigentümer der Ansicht und liegt in seinem Browser. Für einen
-  // fremden Blick gibt es nur eine richtige Ordnung — die des Erbauers.
-  let list;
-  if (kategorien.length) {
-    const gruppen = new Map(kategorien.map(k => [k.id, []]));
-    const rest = [];
-    for (const x of rows) {
-      const meine = (zuord.get(d.id + "|" + x.c.id) || []).filter(z => gruppen.has(z.id));
-      if (!meine.length) rest.push(x);
-      else for (const z of meine) gruppen.get(z.id).push(x);
-    }
-    // "stumm": Hier klappt nichts auf oder zu — die Kopfzeile darf also auch
-    // nicht so aussehen. Leere Kategorien bleiben trotzdem stehen, wie in der
-    // eigenen Ansicht: Sie sind eine Aussage dessen, der das Deck gebaut hat.
-    const block = (label, items) => `
-      <tr class="deck-cat-head stumm"><td colspan="99">
-        <span class="deck-cat-name">${esc(label)}</span>
-        <span class="deck-cat-count">${items.reduce((s, x) => s + x.e.qty, 0)}</span></td></tr>
-      ${items.map(zeile).join("")}`;
-    list = kategorien.map(k => block(k.name, gruppen.get(k.id))).join("")
-         + (rest.length ? block(t("kat.none"), rest) : "");
-  } else {
-    list = rows.map(zeile).join("");
+  const gruppen = new Map(kategorien.map(k => [k.id, []]));
+  const rest = [];
+  for (const x of rows) {
+    const meine = (zuord.get(deckId + "|" + x.c.id) || []).filter(z => gruppen.has(z.id));
+    if (!meine.length) rest.push(x);
+    else for (const z of meine) gruppen.get(z.id).push(x);
   }
+  // "stumm": Hier klappt nichts auf oder zu — die Kopfzeile darf also auch
+  // nicht so aussehen. Leere Kategorien bleiben trotzdem stehen, wie in der
+  // eigenen Ansicht: Sie sind eine Aussage dessen, der das Deck gebaut hat.
+  const block = (label, items) => `
+    <tr class="deck-cat-head stumm"><td colspan="99">
+      <span class="deck-cat-name">${esc(label)}</span>
+      <span class="deck-cat-count">${items.reduce((s, x) => s + x.e.qty, 0)}</span></td></tr>
+    ${items.map(zeile).join("")}`;
+  return kategorien.map(k => block(k.name, gruppen.get(k.id))).join("")
+       + (rest.length ? block(t("kat.none"), rest) : "");
+}
+
+/* Einträge zu Zeilen: nur was auch als Karte vorliegt, alphabetisch nach dem
+   angezeigten Namen. Ebenfalls für beide fremden Ansichten. */
+function fremdDeckZeilen(entries, cardsById) {
+  return entries.map(e => ({ e, c: cardsById[e.card_id] })).filter(x => x.c)
+    .sort((a, b) => a.c.disp.localeCompare(b.c.disp));
+}
+
+/* Read-only Deck eines Freundes: auf-/zuklappbarer Kopf mit Kennzahlen (wie in
+   der eigenen Deckliste) und eine einfache Kartenliste (Bild, Name, Set·#,
+   Deckmenge, Preis). Keine Bearbeitung; ein Knopf übernimmt das Deck. */
+function friendDeckHtml(d, entries, cardsById, kategorien = [], zuord = new Map()) {
+  const rows = fremdDeckZeilen(entries, cardsById);
+  const n = rows.reduce((s, x) => s + x.e.qty, 0);
+  const v = rows.reduce((s, x) => s + (x.c.price || 0) * x.e.qty, 0);
+  const haupt = d.main_card_id ? cardsById[d.main_card_id] : null;
+  const offen = freundDeckOffen.has(d.id);
+  const list = fremdDeckListeHtml(d.id, rows, kategorien, zuord);
   return `<div class="card">
     <div class="deck-kopf" data-ftoggle="${esc(d.id)}" title="${offen ? t("common.collapse") : t("common.expand")}">
       <span class="deck-pfeil">${offen ? "&#9660;" : "&#9654;"}</span>
@@ -12382,18 +12564,28 @@ function friendDeckHtml(d, entries, cardsById, kategorien = [], zuord = new Map(
   </div>`;
 }
 
-/* Ein geteiltes Freund-Deck als neues, PRIVATES Deck in die eigenen übernehmen.
+/* Ein FREMDES Deck als neues, privates Deck in die eigenen übernehmen — vom
+   Freund geteilt oder aus der Community, die RPC prüft beide Wege.
    Karten, die man nicht besitzt, kommen als Bestand-0-Zeilen ins Deck (dort
-   „fehlen") — die eigene Sammlung ändert sich nicht. Macht die RPC atomar. */
-async function importFriendDeck(deckId) {
-  if (!await confirmDlg(t("dlg.importDeck"))) return;
+   „fehlen") — die eigene Sammlung ändert sich nicht. Macht die RPC atomar.
+
+   Die Kopie bleibt PRIVAT, obwohl neue Decks von sich aus öffentlich sind:
+   Das hier ist das Deck eines anderen, und der Bestätigungstext verspricht es
+   seit jeher so. Begründung ausführlich in der Migration
+   20260803120000_deck_uebernehmen.sql.
+
+   Heißt nicht mehr importFriendDeck: Der Name log, sobald auch ein
+   Community-Deck durch dieselbe Tür geht. */
+async function fremdDeckUebernehmen(deckId) {
+  if (!await confirmDlg(t("dlg.importDeck"))) return false;
   try {
     const { error } = await sb.rpc("import_shared_deck", { p_deck: deckId });
     if (error) throw error;
     await reload(); renderAll();
     toast(t("toast.deckImported"));
     const b = $('nav button[data-v="decks"]'); if (b) b.click();
-  } catch (e) { toast(dbErr(e)); }
+    return true;
+  } catch (e) { toast(dbErr(e)); return false; }
 }
 
 /* ============ Import einer Text-Deckliste (mtgsalvation & Co.) ==========
