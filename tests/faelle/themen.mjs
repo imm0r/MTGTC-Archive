@@ -37,7 +37,19 @@ const STUB = `
       }
       return { data: null, error: { message: "unbekannt: " + fn } };
     },
-    from: (tabelle) => ({
+    from: (tabelle) => tabelle === "card_tags"
+      // Direkte Tags je Karte, für themenFuerKarten. Absichtlich MIT Müll:
+      // Was die Kuratierung aussieben muss, muss die Attrappe erst liefern.
+      ? { select: () => ({ in: async (spalte, ids) => ({ error: null, data: [
+          { oracle_id: "orc-solring", tag: "mana-rock" },
+          { oracle_id: "orc-solring", tag: "ramp" },
+          { oracle_id: "orc-solring", tag: "removal" },        // zu groß (4200)
+          { oracle_id: "orc-solring", tag: "cycle-lea-moxen" },// Set-Zyklus
+          { oracle_id: "orc-solring", tag: "alliteration" },   // Sperrliste
+          { oracle_id: "orc-solring", tag: "winzling" },       // unter der Schwelle
+          { oracle_id: "orc-fremd", tag: "ramp" },
+        ].filter(r => ids.includes(r.oracle_id)) }) }) }
+      : {
       // .order() sortiert WIRKLICH, wie PostgREST es täte — die App verlässt
       // sich auf die Reihenfolge aus der Datenbank, also muss die Attrappe
       // den Vertrag einhalten, nicht nur die Form.
@@ -46,10 +58,12 @@ const STUB = `
           { slug: "mana-rock", label: "mana-rock", description: "Artefakt, das Mana erzeugt.", cards: 109 },
           { slug: "removal", label: "removal", description: null, cards: 4200 },
           { slug: "ramp", label: "ramp", description: null, cards: 562 },
+          { slug: "alliteration", label: "alliteration", description: null, cards: 800 },
+          { slug: "cycle-lea-moxen", label: "cycle-lea-moxen", description: null, cards: 30 },
         ].sort((a, b) => (opts && opts.ascending ? 1 : -1) * (a[spalte] - b[spalte]));
         return { data: rows, error: null };
       } }) }),
-    }),
+    },
   };`;
 
 export default async function ({ seite, adresse, stand }) {
@@ -157,7 +171,44 @@ export default async function ({ seite, adresse, stand }) {
   });
   stand.ist("mit Daten erscheint die Filter-Gruppe", menu.sichtbar);
   stand.gleich("das Menü führt „Alle“ und die Themen nach Größe",
-    menu.alle, ["", "removal", "ramp", "mana-rock"]);
+    menu.alle, ["", "removal", "alliteration", "ramp", "mana-rock", "cycle-lea-moxen"]);
   stand.gleich("die Suche grenzt ein (Alle bleibt stehen)",
     menu.gefiltert, ["", "mana-rock"]);
+
+  /* --- Themen als Synergie-Haken ------------------------------------------- */
+  /* Die Synergie-Suche zieht ihre Themen-Haken aus denselben Tags. Kuratiert:
+     Set-Zyklen, Sperrlisten-Themen, zu große (sagen nichts) und zu kleine
+     (geben keine Auswahl her) fliegen raus. Fällt der Index aus, raten die
+     alten Regexe weiter — die Suche verstummt nicht. */
+  const haken = await seite.evaluate(async () => {
+    const karte = { oracle_id: "orc-solring", name: "Sol Ring",
+      oracle_text: "{T}: Add {C}{C}.", type_line: "Artifact", keywords: [] };
+    const tm = await themenFuerKarten([karte]);
+    const mit = synergyHooks(karte, tm ? (tm.get(karte.oracle_id) || []) : null);
+    // Karte ohne Kennung im selben Lauf: bekommt keine Themen, bricht nichts.
+    const ohneId = synergyHooks({ name: "Alt", oracle_text: "Sacrifice a creature.", type_line: "Sorcery" },
+      tm ? [] : null);
+    return { tm: tm ? [...tm.get("orc-solring")] : null,
+             mit: mit.map(h => h.kind + ":" + h.q),
+             ohneId: ohneId.map(h => h.kind + ":" + h.label) };
+  });
+  stand.gleich("kuratiert: Zyklus, Sperrliste, zu groß und zu klein fliegen raus — kleinste zuerst",
+    haken.tm, ["mana-rock", "ramp"]);
+  stand.gleich("die Haken suchen über otag:",
+    haken.mit, ["thema:otag:mana-rock", "thema:otag:ramp"]);
+  stand.gleich("Karte ohne Tags bekommt KEINE geratenen Themen untergemischt",
+    haken.ohneId, []);
+
+  const rueckfall = await seite.evaluate(async () => {
+    // Index weg: Vokabular-Cache leeren und die Datenbank wegnehmen — genau
+    // der Zustand „Migration nicht eingespielt".
+    themenVokabularP = null; sb = null;
+    const karte = { name: "Ashnod's Altar", type_line: "Artifact",
+      oracle_text: "Sacrifice a creature: Add {C}{C}." };
+    const tm = await themenFuerKarten([karte]);
+    return { tm, hooks: synergyHooks(karte, tm).map(h => h.kind + ":" + h.label) };
+  });
+  stand.gleich("ohne Index: themenFuerKarten sagt null (nicht leer)", rueckfall.tm, null);
+  stand.gleich("und die Regex-Rückfallebene rät wie bisher",
+    rueckfall.hooks, ["theme:sacrifice", "theme:ramp"]);
 }

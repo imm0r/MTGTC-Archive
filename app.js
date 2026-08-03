@@ -5558,14 +5558,20 @@ function wireDetailThemen(c) {
 function wireDetailSynergien(c) {
   // Synergien: passende Karten zu dieser Karte (nur die Karte selbst raus).
   const yb = $("#dt-syn");
-  if (yb) yb.onclick = () => {
+  if (yb) yb.onclick = async () => {
     const lbl = t("syn.find");
     synBtnBusy(yb, lbl, true);
     synGeschwister([$("#dt-syn-ai")], true);
     const weg = excludeVon([c]);   // nur die Ausgangskarte selbst raus, Besessenes darf auftauchen
-    synergieAnzeigen($("#syn-box"), synergyHooks(c),
-      { excludeIds: weg.ids, excludeNames: weg.names, limit: 18, maxPrice: numVal($("#syn-cap")) })
-      .finally(() => { synBtnBusy(yb, lbl, false); synGeschwister([$("#dt-syn-ai")], false); });
+    try {
+      // Erst die Themen der Karte (null = Index nicht da → Regex-Rückfall),
+      // dann die Suche. Der Abruf ist ein einzelner Sammelzugriff und hängt
+      // am selben Sitzungs-Cache wie das Filter-Dropdown.
+      const tm = await themenFuerKarten([c]);
+      await synergieAnzeigen($("#syn-box"),
+        synergyHooks(c, tm ? (tm.get(c.oracle_id) || []) : null),
+        { excludeIds: weg.ids, excludeNames: weg.names, limit: 18, maxPrice: numVal($("#syn-cap")) });
+    } finally { synBtnBusy(yb, lbl, false); synGeschwister([$("#dt-syn-ai")], false); }
   };
   // KI-Synergien: implizite Vorschläge über die Edge Function. Solange sie läuft,
   // ist der Standard-Synergien-Knopf gesperrt (Konflikt um denselben Kasten).
@@ -5916,10 +5922,17 @@ function wireThemaFilter() {
 /* ============================ Synergien ==============================
    Zu einer Karte (oder einem Deck) passende Karten über Fähigkeits-Synergien
    vorschlagen. Die „Haken" einer Karte sind ihre Schlüsselwörter, ihre
-   Kreaturentypen (Tribal) und grobe Regeltext-Themen. Je Haken fragt Scryfall
-   nach den beliebtesten passenden Karten (order:edhrec); wer von mehreren
-   Haken getroffen wird, passt besser und steht oben. Bereits besessene Karten
-   (und die Ausgangskarte) fallen raus — gesucht sind NEUE Karten. */
+   Kreaturentypen (Tribal) und ihre THEMEN. Je Haken fragt Scryfall nach den
+   beliebtesten passenden Karten (order:edhrec); wer von mehreren Haken
+   getroffen wird, passt besser und steht oben.
+
+   Die Themen kommen seit dem Themen-Index (#196) aus Scryfalls Tagger: die
+   direkten Tags der Karte, kuratiert (siehe themaTaugtAlsHook). Vorher wurden
+   sie mit den zehn Regexen unten aus dem Regeltext GERATEN — ein Regex kennt
+   aber keinen Unterschied zwischen „sacrifice a creature" als Kosten und als
+   Bedrohung, und zehn Themen sind ein Fingerhut gegen 4500. Die Regexe
+   bleiben als Rückfallebene: Ohne Themen-Index (Migration fehlt, Tabelle
+   leer) rät die Suche weiter wie bisher, statt zu verstummen. */
 const SYNERGY_THEMES = [
   { key: "sacrifice", re: /\bsacrifice\b/i,                          q: "otag:sacrifice-outlet" },
   { key: "counters",  re: /\+1\/\+1 counter/i,                       q: "otag:counters-matter" },
@@ -5945,8 +5958,77 @@ function untertypen(typeLine) {
    kontrollierst …", die „wollen deinen Elf"-Richtung) — zählen deutlich mehr als
    bloße Typgleichheit („ist auch ein Elf"). Zwei Karten mit demselben Mechanismus
    passen besser zusammen als zwei, die nur denselben Kreaturentyp teilen. */
-const HOOK_GEWICHT = { keyword: 3, theme: 3, payoff: 3, tribe: 1 };
+const HOOK_GEWICHT = { keyword: 3, theme: 3, thema: 3, payoff: 3, tribe: 1 };
 const hookGewicht = kind => HOOK_GEWICHT[kind] || 1;
+
+/* ------------------------- Themen als Synergie-Haken ------------------
+   Nicht jedes Tagger-Thema taugt als Haken. Drei Siebe, alle an den echten
+   Daten begründet:
+
+   * SPERRLISTE für Wortspiel- und Katalogthemen. „alliteration" (4400 Karten)
+     oder „single-english-word-name" (1276) beschreiben den NAMEN, nicht das
+     Spiel — als Synergie wären sie Unfug. Kurz gehalten: Die Größensiebe
+     unten fangen das meiste; hier steht nur, was durchrutschen würde.
+   * ZYKLEN raus („cycle-…", 1726 Stück): „einer von fünf Talismanen aus MH1"
+     ist Set-Trivia, keine Mechanik.
+   * GRÖSSE zwischen 20 und 1600 direkten Karten. Unter 20 gibt der Haken
+     keine Auswahl her (die Suche zeigt ohnehin nur die besten je Haken) —
+     dieselbe Schwelle wie beim Sammlungsfilter, damit es EINE Wahrheit gibt.
+     Über 1600 sagt er nichts mehr: „activated-ability" (9074), „evasion"
+     (4588) oder „spot-removal" (5007) treffen halb Magic, und ein Haken, der
+     überall einhakt, zieht nichts heran. Die Schwelle liegt bewusst über
+     counters-matter (1273) — das war schon als Regex-Thema dabei und trägt. */
+const THEMA_HOOK_MIN = 20, THEMA_HOOK_MAX = 1600;
+const THEMA_HOOK_SPERRE = new Set([
+  "alliteration", "single-english-word-name", "unique-type-line",
+  "deprecated-mechanics", "potentially-black-border", "sth-storyline-in-cards",
+  "vanilla", "french-vanilla", "flavors-of-vanilla",
+  "bigger-than-mv", "more-expensive-than-mv",
+  // Beim Stichproben-Vergleich durch die Größensiebe gerutscht: „meme" (129)
+  // hängt an Rhystic Study, „inscryption-achievement" (40) an Blood Artist —
+  // beides Kultur- bzw. Fremdspiel-Trivia, keine Mechanik.
+  "meme", "inscryption-achievement",
+]);
+function themaTaugtAlsHook(slug, groesse) {
+  if (slug.startsWith("cycle-") || THEMA_HOOK_SPERRE.has(slug)) return false;
+  const n = groesse.get(slug);
+  return n != null && n >= THEMA_HOOK_MIN && n <= THEMA_HOOK_MAX;
+}
+
+/* Die kuratierten Themen mehrerer Karten auf einen Schlag: EINE Sammelabfrage
+   je 200 Karten statt eines RPC je Karte — deckHooks läuft über ganze Decks,
+   und hundert Einzelabrufe vor jeder Synergie-Suche wären der falsche Preis.
+   Bewusst nur die DIREKTEN Tags (card_tags), ohne die Hierarchie: Geerbte
+   Ober-Themen sind breiter, und für Haken zählt das Scharfe.
+
+   Rückgabe: Map oracle_id → [slugs], kleinste Themen zuerst (die schärfsten
+   Haken überleben so das Kappen bei maxHooks). NULL heißt: der Themen-Index
+   ist nicht verfügbar — dann greift die Regex-Rückfallebene. Das ist eine
+   andere Aussage als eine leere Map (Index da, Karten nur ungetaggt), und die
+   beiden dürfen nicht zusammenfallen: sonst würde eine einzige ungetaggte
+   Karte still auf Raten zurückgestuft, obwohl der Index läuft. */
+async function themenFuerKarten(cards) {
+  const vokab = await themenVokabular();
+  if (!vokab.length) return null;
+  const groesse = new Map(vokab.map(v => [v.slug, v.cards]));
+  const ids = [...new Set(cards.map(c => c && c.oracle_id).filter(Boolean))];
+  const map = new Map();
+  for (let i = 0; i < ids.length; i += 200) {
+    try {
+      const { data, error } = await sb.from("card_tags")
+        .select("oracle_id,tag").in("oracle_id", ids.slice(i, i + 200));
+      if (error) return null;
+      for (const r of (data || [])) {
+        if (!themaTaugtAlsHook(r.tag, groesse)) continue;
+        if (!map.has(r.oracle_id)) map.set(r.oracle_id, []);
+        map.get(r.oracle_id).push(r.tag);
+      }
+    } catch { return null; }
+  }
+  for (const liste of map.values())
+    liste.sort((a, b) => groesse.get(a) - groesse.get(b));
+  return map;
+}
 
 /* Plural eines Kreaturentyps: Tribal-Payoffs stehen im Text fast immer im Plural
    („Elves you control"); der Singular ist zu verrauscht (belegt per Scryfall). */
@@ -5959,12 +6041,23 @@ function pluralTyp(typ) {
 
 /* Synergie-Haken einer Karte: { kind, label, q }. Reihenfolge nach Aussagekraft
    (Schlüsselwörter, Themen, Tribal-Payoffs, zuletzt bloße Typgleichheit) — so
-   bleiben beim Kappen (maxHooks) die stärksten Haken erhalten. */
-function synergyHooks(card) {
+   bleiben beim Kappen (maxHooks) die stärksten Haken erhalten.
+
+   `themen` sind die kuratierten Tagger-Slugs dieser Karte (aus
+   themenFuerKarten). Drei Zustände, bewusst getrennt:
+     Array   → Tags als Themen-Haken (kind "thema", Suche über otag:)
+     []      → Index läuft, Karte trägt nur nichts Brauchbares — KEIN Regex-
+               Ersatz, sonst mischte sich Geratenes unter Kuratiertes
+     null    → Index nicht verfügbar — die alten Regexe raten wie bisher */
+function synergyHooks(card, themen) {
   const hooks = [];
   (card.keywords || []).forEach(k => hooks.push({ kind: "keyword", label: k, q: `keyword:"${k}"` }));
-  const text = card.oracle_text || "";
-  SYNERGY_THEMES.forEach(th => { if (th.re.test(text)) hooks.push({ kind: "theme", label: th.key, q: th.q }); });
+  if (Array.isArray(themen)) {
+    themen.forEach(s => hooks.push({ kind: "thema", label: s, q: `otag:${s}` }));
+  } else {
+    const text = card.oracle_text || "";
+    SYNERGY_THEMES.forEach(th => { if (th.re.test(text)) hooks.push({ kind: "theme", label: th.key, q: th.q }); });
+  }
   const subs = /creature/i.test(card.type_line || "") ? untertypen(card.type_line) : [];
   subs.forEach(s => hooks.push({ kind: "payoff", label: s, q: `oracle:"${pluralTyp(s)}"` }));  // Karten, die den Typ belohnen
   subs.forEach(s => hooks.push({ kind: "tribe",  label: s, q: `type:${s.toLowerCase()}` }));     // weitere Karten des Typs
@@ -5972,7 +6065,9 @@ function synergyHooks(card) {
 }
 
 /* Anzeige-Chip eines Hakens: Schlüsselwort/Tribe sind Kartendaten (bleiben),
-   Themen werden übersetzt. */
+   Regex-Themen werden übersetzt. Tagger-Themen (kind "thema") erscheinen als
+   ihr Kürzel — dasselbe Vokabular, das die Detailansicht und der
+   Sammlungsfilter zeigen; eine Übersetzung von 4500 Slugs gibt es nicht. */
 function hookLabel(h) { return h.kind === "theme" ? t("syn.theme." + h.label) : h.label; }
 
 /* Ausschlussmengen (oracle_id + Kleinschrift-Name) aus einer Kartenliste.
@@ -6581,11 +6676,13 @@ async function kiSynergieLauf(box, cfg) {
 
 /* Haken eines ganzen Decks: über alle Karten sammeln, dann nach Häufigkeit MAL
    Gewicht sortieren — eine oft geteilte Fähigkeit schlägt einen oft geteilten
-   Kreaturentyp, damit auch bei der Deck-Suche die Mechanik führt. */
-function deckHooks(eintraege) {
+   Kreaturentyp, damit auch bei der Deck-Suche die Mechanik führt.
+   `themenMap` kommt aus themenFuerKarten (ein Sammelabruf fürs ganze Deck);
+   null reicht die Regex-Rückfallebene an jede Karte durch. */
+function deckHooks(eintraege, themenMap) {
   const zaehler = new Map();
   for (const { c } of eintraege)
-    for (const h of synergyHooks(c)) {
+    for (const h of synergyHooks(c, themenMap ? (themenMap.get(c.oracle_id) || []) : null)) {
       const k = h.kind + "|" + h.q;
       const cur = zaehler.get(k) || { hook: h, n: 0 };
       cur.n++; zaehler.set(k, cur);
@@ -9846,12 +9943,15 @@ function deckVerlaufKnopf(deckId) {
     synBtnBusy(b, lbl, true);
     synGeschwister(gsw, true);
     const weg = excludeVon(cards);   // nur Karten DIESES Decks raus, Besessenes darf auftauchen
-    // Erst wenn die Suche fertig ist, nach unten zu den Ergebnissen springen —
-    // vorher dreht sich das Zahnrad am Knopf, wo der Blick gerade ist.
-    synergieAnzeigen(box, deckHooks(cards.map(c => ({ c }))),
-      { excludeIds: weg.ids, excludeNames: weg.names, colors: farbIdentitaet(cards),
-        maxHooks: 5, limit: 20, deckId: id,
-        maxPrice: numVal($(`[data-syncap="${id}"]`)), totalBudget: numVal($(`[data-synbudget="${id}"]`)) })
+    // Erst die Themen des ganzen Decks (EIN Sammelabruf, siehe
+    // themenFuerKarten), dann die Suche. Erst wenn sie fertig ist, nach unten
+    // zu den Ergebnissen springen — vorher dreht sich das Zahnrad am Knopf,
+    // wo der Blick gerade ist.
+    themenFuerKarten(cards)
+      .then(tm => synergieAnzeigen(box, deckHooks(cards.map(c => ({ c })), tm),
+        { excludeIds: weg.ids, excludeNames: weg.names, colors: farbIdentitaet(cards),
+          maxHooks: 5, limit: 20, deckId: id,
+          maxPrice: numVal($(`[data-syncap="${id}"]`)), totalBudget: numVal($(`[data-synbudget="${id}"]`)) }))
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
       .finally(() => { synBtnBusy(b, lbl, false); synGeschwister(gsw, false); });
   });

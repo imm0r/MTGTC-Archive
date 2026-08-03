@@ -2672,10 +2672,23 @@ Stellen von selbst: die Filter-Gruppe bleibt versteckt, die Detailansicht sagt
 „keine Themen". Wie beim Deck-Verlauf hält eine fehlende Tabelle den Rest der
 App nicht auf.
 
-Die Synergie-Suche läuft weiterhin über ihre zehn Regex-Themen — sie auf den
-Index umzustellen ist ein eigenes Vorhaben: Eine Karte trägt im Mittel sechs
-Themen, darunter Kuriositäten wie `alliteration`, und die ungefiltert als
-Synergie-Haken zu nehmen ergäbe schlechtere Vorschläge als heute.
+**Auch die Synergie-Suche zieht ihre Themen-Haken aus dem Index** — die
+direkten Tags der Karte, kuratiert: Set-Zyklen (`cycle-…`) und Wortspiel-Themen
+(`alliteration`) fliegen raus, ebenso alles unter 20 Karten (gibt keine Auswahl
+her) oder über 1600 (`activated-ability` trifft halb Magic und sagt nichts).
+Was der Unterschied praktisch bedeutet, an der Stichprobe gemessen:
+
+| Karte | vorher (Regex) | jetzt (Tagger, kuratiert) |
+| --- | --- | --- |
+| Sol Ring | ramp | mana-rock · full-refund · adds-multiple-mana |
+| Elvish Archdruid | ramp | typal-elf · mana-dork · anthem · power-boost-to-all |
+| Rhystic Study | — | cast-trigger-other · rhystic · repeatable-pure-draw · draw-engine |
+| Blood Artist | lifegain | blood-artist-ability · opponent-loses-life |
+
+Fällt der Index aus, raten die alten zehn Regexe weiter wie bisher — die
+Suche verstummt nicht. Eine Karte, die der Tagger schlicht nicht kennt,
+bekommt dagegen **keine** geratenen Themen untergemischt: Kuratiertes und
+Geratenes zu mischen wäre schlechter als beides einzeln.
 
 ## Changelog
 
