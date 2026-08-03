@@ -7770,9 +7770,14 @@ function schnittHinweisHtml(schnitt, deckId, karte) {
   // schnitteAuffrischen() von hier aus die übrigen Zeilen neu.
   const merkmale = deckId && karte?.id
     ? ` data-deck="${esc(deckId)}" data-sid="${esc(karte.id)}" data-cut="${esc(schnitt.karte.id)}"` : "";
-  return `<div class="syn-cut"${merkmale} title="${esc(warum)}">
-    &#9986; ${esc(t("deck.cutFor", { name: raus }))}
-    <span class="syn-cut-why${schnitt.unbelegt ? " strich" : ""}">${esc(warum)}</span>${marke}${tausch}</div>`;
+  // Der title sitzt am TEXT, nicht am Kasten — sonst stünde der Knopf DARIN und
+  // bekäme zwei Hinweise auf einmal: initTooltip() hängt den des Knopfes aus und
+  // zeigt den eigenen, der Browser findet daraufhin den title des Vorfahren und
+  // legt seinen nativen daneben. Als Geschwister des Knopfes stört der Text
+  // nicht mehr.
+  return `<div class="syn-cut"${merkmale}>
+    <span class="syn-cut-txt" title="${esc(warum)}">&#9986; ${esc(t("deck.cutFor", { name: raus }))}
+    <span class="syn-cut-why${schnitt.unbelegt ? " strich" : ""}">${esc(warum)}</span>${marke}</span>${tausch}</div>`;
 }
 
 /* Zeilen, die in dieser Sitzung durch einen Tausch ins Deck gekommen sind.
