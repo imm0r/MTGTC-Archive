@@ -2852,6 +2852,17 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px}
   .cf-card[data-cmd-img]{ cursor:help; text-decoration:underline;
                           text-decoration-style:dotted; text-underline-offset:2px; }
 }
+/* Deckname im Community-Feed: derselbe Ton wie der Kartenname, aber ein KNOPF
+   — er führt in die Deckansicht. Deshalb die durchgezogene Unterstreichung
+   statt der gepunkteten der Vorschau: gepunktet heißt hier „da steht noch
+   was", durchgezogen „da kommt man hin". Alles, was ein Knopf von Haus aus
+   mitbringt (Rahmen, Grund, eigene Schrift), wird abgeräumt; er steht mitten
+   im Satz und soll dort nicht wie eine Schaltfläche stehen. */
+.cf-deck{ padding:0; border:0; background:none; font:inherit; text-align:left;
+          color:var(--acc); font-weight:600; cursor:pointer;
+          text-decoration:underline; text-underline-offset:2px; }
+.cf-deck:hover{ color:var(--acc2); }
+.cf-deck:focus-visible{ outline:2px solid var(--acc); outline-offset:2px; border-radius:4px; }
 /* Zusatzzeile der Hover-Vorschau (im Community-Feed der Preis). Ruhiger als
    der Name darüber — eine Angabe, keine Überschrift. */
 .cmd-hover-zus{ text-align:center; font-size:13px; color:var(--dim);
