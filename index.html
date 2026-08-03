@@ -154,6 +154,13 @@
          daran —, deshalb hier oben. Und NUR hier: zweimal derselbe Punkt an
          zwei Stellen wäre zweimal dieselbe Frage, wo man ihn jetzt drückt. -->
     <button data-v="community"><img class="nav-sym" src="assets/community.PNG" alt=""><span data-i18n="nav.community">Community</span></button>
+    <!-- Regelfrage und live Partie kamen aus demselben Grund herauf wie
+         Community: Beide sind etwas, das man MITTEN IM SPIEL braucht, und
+         dafür war ein Menü, das man erst aufklappen muss, der falsche Ort.
+         Die Zahl am Punkt „live Partie" (offene Einladungen) füllt
+         zeigeSessionBadge() — sie muss deshalb im Knopf bleiben. -->
+    <button data-v="rules"><img class="nav-sym" src="assets/rules.PNG" alt=""><span data-i18n="nav.rules">Regelfrage</span></button>
+    <button data-v="session"><img class="nav-sym" src="assets/livepartie.PNG" alt=""><span data-i18n="nav.session">live Partie</span><span id="sess-badge" class="menu-badge" hidden></span></button>
     <!-- Profil, Freunde und Abmelden wohnen im Menü hinter Avatar + Name:
          aufklappen per Hover (Desktop) bzw. Klick (Touch). Die data-v-Knöpfe
          hier laufen über dieselbe Verdrahtung wie die Haupt-Navigation. -->
@@ -164,8 +171,6 @@
         <button data-v="profile" data-i18n="nav.profile">Profil</button>
         <button data-v="friends" data-i18n="nav.friends">Freunde</button>
         <button data-v="messages"><span data-i18n="nav.messages">Nachrichten</span><span id="dm-badge" class="menu-badge" hidden></span></button>
-        <button data-v="session"><span data-i18n="nav.session">Spielrunde</span><span id="sess-badge" class="menu-badge" hidden></span></button>
-        <button data-v="rules" data-i18n="nav.rules">Regelfrage</button>
         <button data-v="events" data-i18n="nav.events">Termine</button>
         <button data-v="status" data-i18n="nav.status">Site Status</button>
         <button data-v="settings" data-i18n="nav.settings">Einstellungen</button>

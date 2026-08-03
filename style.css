@@ -62,7 +62,7 @@ nav button:hover{background:rgba(255,255,255,.055);color:var(--txt)}
 nav button.on,nav button.on:hover{background:var(--akt-flaeche);color:var(--acc2);
                font-weight:600;box-shadow:var(--akt-schein)}
 /* Die Sinnbilder der obersten Navigation sind gemalte Illustrationen, keine
-   flachen Piktogramme. Fünf davon in voller Farbe nebeneinander machen aus
+   flachen Piktogramme. Sieben davon in voller Farbe nebeneinander machen aus
    einer ruhigen Kopfzeile einen Jahrmarkt — und dann sieht auch der Text
    daneben falsch aus.
    Deshalb: im Ruhezustand entsättigt und abgedunkelt, in voller Farbe erst

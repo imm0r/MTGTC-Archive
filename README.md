@@ -423,7 +423,7 @@ lässt sich das jederzeit nachrechnen statt schätzen.
 Im Benutzermenü unter **Regelfrage** lässt sich eine unklare Spielsituation in
 ein paar Sätzen schildern; die App klärt sie gegen das **offizielle erweiterte
 Regelwerk** (Comprehensive Rules) auf und zitiert die einschlägigen Regeln
-wörtlich. Gedacht für die Live-Spielrunde, wenn am Tisch diskutiert wird, wie
+wörtlich. Gedacht für die live Partie, wenn am Tisch diskutiert wird, wie
 eine Situation regeltechnisch ausgeht.
 
 Der Kernpunkt gegen „klingt plausibel, ist aber falsch": Das Modell **rät nur,
@@ -481,7 +481,7 @@ allein durch die Anmeldung geschützt. Für den **Verlauf** kommt die Tabelle
 
 **Kosten.** Zwei Modell-Aufrufe je Frage: die günstige Triage und das eigentliche
 Urteil (Modelle stehen als `MODEL_TRIAGE`/`MODEL_JUDGE` oben in `index.ts`). In
-Summe rund **2–3 ct pro Frage** — für eine Spielrunde mit einem Dutzend
+Summe rund **2–3 ct pro Frage** — für eine live Partie mit einem Dutzend
 Streitfällen ein paar Cent. Jede Antwort meldet unter `usage` die verbrauchten
 Tokens; die Kostenzeile im Ergebnis rechnet sie vor.
 
@@ -682,16 +682,35 @@ nicht die ganze Kachel mit `role="button"`: In der Kachel stecken schon Knöpfe,
 und ein Knopf im Knopf ist weder gültiges HTML noch mit der Tastatur zu
 bedienen.
 
-### Community steht jetzt oben
+### Was oben steht
 
-Sie war ein Eintrag im Benutzermenü hinter Avatar und Name — einer Klappe, die
-man erst aufmachen muss. Für einen Nebenraum war das richtig. Inzwischen hängen
-Mitgliederliste, Community-Decks und der Live-Feed daran, und dann ist es keiner
-mehr: **Community ist der fünfte Punkt der obersten Navigation**, hinter „Card
-Management", mit `assets/community.PNG` als Sinnbild.
+Drei Punkte sind aus dem Benutzermenü in die oberste Leiste gewandert — aus
+demselben Grund: Ein Menü, das man erst aufklappen muss, ist der richtige Ort
+für einen Nebenraum, und keiner von den dreien ist einer.
 
-Und **nur** dort. Der alte Eintrag im Benutzermenü ist weg; zwei Wege zur selben
-Ansicht sind zweimal dieselbe Frage, wo man jetzt eigentlich hindrückt.
+| Punkt | Sinnbild | warum oben |
+| --- | --- | --- |
+| **Community** | `assets/community.PNG` | trägt Mitgliederliste, Community-Decks und den Live-Feed |
+| **Regelfrage** | `assets/rules.PNG` | braucht man mitten im Spiel |
+| **live Partie** | `assets/livepartie.PNG` | dito — dazu hängt die Zahl der offenen Einladungen daran |
+
+Damit stehen sieben Punkte oben: Sammlung, Decks, Wunschliste, Card Management,
+Community, Regelfrage, live Partie.
+
+Und jeder **nur** dort. Die alten Einträge im Benutzermenü sind weg; zwei Wege
+zur selben Ansicht sind zweimal dieselbe Frage, wo man jetzt eigentlich
+hindrückt. Der Prüffall zählt sie deshalb im ganzen Dokument und nicht nur in
+der Leiste — ein Eintrag, der oben dazukam und unten stehen blieb, fiele
+niemandem auf, weil beide funktionieren.
+
+> **„Spielrunde" heißt auf Deutsch jetzt „live Partie".** Umbenannt sind alle
+> deutschen Zeichenketten, nicht nur der Navigationspunkt: ein Wort, das an
+> einer Stelle wechselt und an fünf anderen stehen bleibt, sind zwei Namen für
+> dieselbe Sache. Der Prüffall geht dafür über `I18N.de` als Ganzes. Die
+> anderen vier Sprachen behalten ihre Bezeichnung — gefragt war die deutsche.
+> Die internen Namen (`nav.session`, `terminSpielrunde`, Tabelle
+> `game_sessions`) bleiben ebenfalls: Sie stehen in keiner Oberfläche, und ein
+> Umbenennen quer durch Code und Datenbank wäre Bewegung ohne Wirkung.
 
 Zwei Dinge, die an dieser Leiste schon still danebengingen und die der Prüffall
 `navigation` seither festhält:
@@ -709,11 +728,13 @@ Zwei Dinge, die an dieser Leiste schon still danebengingen und die der Prüffall
   jemand hinsah, meldet sich `error` nie mehr; dann verrät `complete` ohne
   `naturalWidth`, was los ist.
 
-> Die Kopfzeile bricht dadurch etwas früher um: mit fünf Punkten unterhalb von
-> rund 980 px Fensterbreite statt vorher 860 px, und wächst dabei von 67 auf
-> 125 px. Das ist der Preis dafür, dass die Leiste seit den Sinnbildern 32 px
-> hohe Knöpfe trägt — `nav` bricht von sich aus um, ein eigener Umbruchpunkt
-> kam nicht dazu.
+> **Der Preis: Die Kopfzeile bricht früher um.** Gemessen im Prüfbrowser:
+> ohne Sinnbilder bei rund 860 px Fensterbreite, mit fünf Punkten bei rund
+> 980 px, mit sieben bei rund **1200 px** — und wächst dabei von 67 auf
+> 125 px. Darüber ändert sich nichts. `nav` bricht von sich aus um; ein
+> eigener Umbruchpunkt (etwa: Text weglassen, nur noch Sinnbilder) kam
+> bewusst nicht dazu — sieben unbeschriftete Bilder nebeneinander sind ein
+> Rätsel, keine Navigation.
 
 ### Der Weg dorthin: Kacheln, die führen
 
@@ -1654,9 +1675,9 @@ Geteilte Decks zeigen ihren **aktuellen** Stand, nicht die Umwege dorthin — f�
 > ausführen (oder `supabase/migrations/20260802090000_deck_verlauf.sql`
 > einzeln).
 
-## Live-Spielrunde: die eigenen Karten am Tisch
+## live Partie: die eigenen Karten am Tisch
 
-In der Spielrunde wählt jeder sein Deck; darunter steht der **private
+In der live Partie wählt jeder sein Deck; darunter steht der **private
 Kartenüberblick** — nur der Spieler selbst sieht ihn, Mitspieler sehen lediglich
 den Decknamen und den Commander.
 
@@ -1755,7 +1776,7 @@ Text entfällt, nennt die Beschriftung für Vorleseprogramme Zone und Anzahl mit
 > der Hand deckt die ganze Matte, damit ihr Fächer mittig aufgehen kann, und
 > jeder Punkt des Schlachtfelds wäre sonst ein Handziel.
 
-Die Spielrunde darf dabei **breiter werden als der Rest der App** (1800 statt
+Die live Partie darf dabei **breiter werden als der Rest der App** (1800 statt
 1100 px): die Mattenspalten sind fest, alles Zusätzliche geht ans Schlachtfeld
 und an die Länder. Auf einem 3440-px-Monitor wächst das Schlachtfeld damit von
 628 auf 1328 px.
