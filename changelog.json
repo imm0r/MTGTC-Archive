@@ -1,5 +1,11 @@
 [
  {
+  "am": "2026-08-04T01:13:00+02:00",
+  "art": "behoben",
+  "text": "Ladebalken und Text der Deck-Suchen standen doppelt: einmal oben bei den Knöpfen und noch einmal unter der Kartenliste. Beim Scrollen fand man den unteren zuerst — also den an der falschen Stelle. Jetzt gibt es nur noch den oberen.",
+  "pr": 209
+ },
+ {
   "am": "2026-08-04T00:50:00+02:00",
   "art": "behoben",
   "text": "Der Ladebalken der Deck-Suchen stand bisher im Ergebniskasten — und der liegt unter der Kartenliste, bei hundert Karten also weit außerhalb des Bildes. Zu sehen blieb das kleine Zahnrad am Knopf. Jetzt erscheint er direkt unter den Knöpfen, wo man gerade geklickt hat.",

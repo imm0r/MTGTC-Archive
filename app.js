@@ -6472,6 +6472,27 @@ function deckLade(deckId, text, hinweis) {
   return el;
 }
 
+/* Den Ladebalken zeigen — und zwar nur EINMAL.
+
+   Ein Deck hat zwei mögliche Plätze: den Streifen unter den Knöpfen und den
+   Ergebniskasten weit unten. Schrieben beide hinein, stünde der Balken samt
+   Text zweimal da — und weil man beim Lesen von oben nach unten scrollt, fände
+   man den unteren zuerst, also genau den an der falschen Stelle. Gibt es den
+   Streifen, gewinnt er; der Kasten bleibt leer, bis das Ergebnis kommt.
+
+   Ohne Deck-Bezug — im Kartendetail, in der Sammlung — gibt es keinen
+   Streifen. Dort ist der Kasten der richtige Platz und alles bleibt wie
+   bisher. */
+function ladeZeigen(box, deckId, text, hinweis) {
+  const streifen = deckId ? $(`[data-ladebox="${esc(deckId)}"]`) : null;
+  if (!streifen) { box.innerHTML = ladeBalken(text, hinweis); return; }
+  // Nur füllen, wenn er noch leer ist: Der Knopf setzt ihn schon beim Klick,
+  // und ein zweites Zeichnen ließe die Animation von vorne beginnen — ein
+  // Ruckler mitten im Warten.
+  if (!streifen.firstElementChild) streifen.innerHTML = ladeBalken(text, hinweis);
+  box.innerHTML = "";
+}
+
 /* Synergie-Knopf in den Ladezustand versetzen: Lupe → drehendes Zahnrad,
    Knopf gesperrt. Zurück auf die Lupe, wenn die Suche fertig ist. */
 function synBtnBusy(btn, label, busy, icon) {
@@ -6550,7 +6571,7 @@ async function synergieAnzeigen(box, hooks, opts = {}) {
   if (!box) return;
   const lauf = ++synergyLauf;
   if (!hooks.length) { box.innerHTML = `<div class="empty">${esc(t("syn.noHooks"))}</div>`; return; }
-  box.innerHTML = ladeBalken(t("syn.loading"));
+  ladeZeigen(box, opts.deckId, t("syn.loading"));
   const res = await synergieSuchen(hooks, opts);
   if (lauf !== synergyLauf) return;                  // ein neuerer Lauf hat übernommen
   if (!res.length) { box.innerHTML = `<div class="empty">${esc(t("syn.none"))}</div>`; return; }
@@ -6681,7 +6702,7 @@ function kiKostenHtml(usage) {
 async function kiSynergieLauf(box, cfg) {
   if (!box) return;
   const lauf = ++synergyLauf;
-  box.innerHTML = ladeBalken(t("syn.aiLoading"), t("syn.aiLoadingHint"));
+  ladeZeigen(box, cfg.deckId, t("syn.aiLoading"), t("syn.aiLoadingHint"));
 
   let data, error;
   try {
@@ -7195,7 +7216,7 @@ let combosLauf = 0;
 async function deckCombosAnzeigen(box, cards, deckId) {
   if (!box) return;
   const lauf = ++combosLauf;
-  box.innerHTML = ladeBalken(t("combo.loading"));
+  ladeZeigen(box, deckId, t("combo.loading"));
   let data;
   try {
     data = await combosApi({ mode: "find-my-combos", cards: cards.map(c => ({ card: c.name, quantity: 1 })) });
@@ -7254,7 +7275,7 @@ async function deckCombosAnzeigen(box, cards, deckId) {
 async function sammlungCombosAnzeigen(box, cards) {
   if (!box) return;
   const lauf = ++combosLauf;
-  box.innerHTML = ladeBalken(t("combo.loading"));
+  ladeZeigen(box, null, t("combo.loading"));
   let data;
   try {
     data = await combosApi({ mode: "find-my-combos", cards: cards.map(c => ({ card: c.name, quantity: 1 })) });
@@ -7287,7 +7308,7 @@ async function sammlungCombosAnzeigen(box, cards) {
 async function karteCombosAnzeigen(box, card) {
   if (!box) return;
   const lauf = ++combosLauf;
-  box.innerHTML = ladeBalken(t("combo.loading"));
+  ladeZeigen(box, null, t("combo.loading"));
   let data;
   try {
     // Anführungszeichen im Namen raus, sonst bricht die CSB-Suche card:"…".
@@ -7321,7 +7342,7 @@ async function karteCombosAnzeigen(box, card) {
 async function deckAnalyseAnzeigen(box, cards, colors, deckId) {
   if (!box) return;
   const lauf = ++synergyLauf;   // teilt den Lauf-Zähler mit der Synergiesuche
-  box.innerHTML = ladeBalken(t("an.loading"));
+  ladeZeigen(box, deckId, t("an.loading"));
   const analyse = deckAnalyse(cards);
 
   const zeilen = analyse.map(a => {
