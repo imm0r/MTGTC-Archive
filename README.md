@@ -603,6 +603,20 @@ zeigen, welche führt.
 
 ### Im Live-Feed: „hat ein Deck mit der Community geteilt"
 
+> **Beim Fortschreiben von der jüngsten Fassung ausgehen, nicht von der
+> ersten.** Die Liste der erlaubten Feed-Arten steht an zwei Stellen
+> (Tabellen-Constraint und Schreibweg) und ist seit der Foundation-Migration
+> gewachsen. Wer sie aus der ältesten abschreibt, verliert `combo_search` und
+> `synergy_search` — der Constraint scheitert dann an bestehenden Zeilen
+> („is violated by some row"). Das ist der **glimpfliche** Fall.
+>
+> Der andere fällt nicht auf: Der Schreibweg prüft seit
+> `20260724234500_community_visibility.sql` die Sichtbarkeitsstufe („privat"
+> schreibt gar nicht, „anonym" ohne `actor_id`). Wer ihn aus der ersten Fassung
+> neu schreibt, nimmt das ersatzlos heraus — und **nichts schlägt fehl**. Der
+> Feed nennt danach Leute, die das abgewählt haben. Beide Fälle sind hier
+> passiert; der Prüffall `migrationen` fängt sie seither.
+
 Ein neues Ereignis, `deck_public`. **Eine Zeile, nicht zwei:** Ein neu
 angelegtes Deck ist von sich aus öffentlich; schriebe man dafür `deck_created`
 *und* `deck_public`, stünden im Feed zwei Zeilen für denselben Augenblick.
@@ -2145,6 +2159,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `anzeigename`    | Der Anzeigename als Pflicht: die Regel selbst (2–40, getrimmt), das Feld beim Anlegen, der Weg über die Nutzer-Metadaten bis ins frisch angelegte Profil, die Maske vor der App für alte Konten samt Ausweg — und dass das Profilfeld ihn nicht mehr leeren kann |
 | `mitgliederliste` | Die Mitgliederliste und das öffentliche Profil: dass die Abfrage `findable` achtet, die Gesamtzahl je Zeile mitzählt und das Verhältnis gleich mitliefert; die vier Knöpfe, Blättern und Suchen (samt Rücksprung auf Seite eins und Fokus im Feld) — und dass ein `javascript:`-Ziel kein Verweis wird und Markup im Steckbrief Text bleibt |
 | `communitydecks` | Community-Decks: dass die Migration bestehende Decks NICHT veröffentlicht (Reihenfolge der beiden ALTERs), dass die Rangliste glättet und trotzdem den echten Schnitt zeigt, dass das eigene Deck keine Knöpfe hat und die Datenbank es abweist — dazu Bewerten ohne Neuladen der Liste, Sortieren und Suchen über den Commander; dazu die beiden führenden Kacheln (und dass die übrigen keine sind), der Sprung im niedrigen Fenster samt Aufleuchten, und der Feed-Trigger, der beim Anlegen genau EINE der beiden Zeilen schreibt |
+| `migrationen`    | Migrationen, die eine frühere Fassung fortschreiben: dass die Liste der Feed-Arten nie schrumpft, dass Tabellen-Constraint und Schreibweg dieselbe führen — und dass keine spätere Fassung die Sichtbarkeitsprüfung wieder herausnimmt (der Fall, den kein Datenbankfehler meldet) |
 
 ### Zwei Regeln, die dabei gelernt wurden
 

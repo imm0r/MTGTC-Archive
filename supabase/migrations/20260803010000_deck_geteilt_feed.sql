@@ -20,10 +20,24 @@
 -- =====================================================================
 
 -- ---- Die neue Art -----------------------------------------------------
+-- ACHTUNG, hier ist schon einmal etwas schiefgegangen: Die Liste der erlaubten
+-- Arten steht an ZWEI Stellen (Tabellen-Constraint und Schreibweg), und sie ist
+-- seit der Foundation-Migration GEWACHSEN — 20260725014500_search_activity.sql
+-- hat 'combo_search' und 'synergy_search' ergänzt. Wer die Liste aus der
+-- ältesten Migration abschreibt, verliert die beiden: Der Constraint scheitert
+-- dann an bestehenden Zeilen („is violated by some row"), und das ist der
+-- glimpfliche Fall — der Schreibweg wiese sie stillschweigend ab.
+--
+-- Beim Fortschreiben deshalb IMMER von der jüngsten Fassung ausgehen, nicht
+-- von der ersten. Dasselbe gilt für den Rumpf: Seit 20260724234500 prüft der
+-- Schreibweg die Sichtbarkeitsstufe (privat schreibt gar nicht, anonym ohne
+-- actor_id). Wer ihn aus der Foundation-Fassung neu schreibt, nimmt die
+-- Sichtbarkeit ersatzlos wieder heraus — ohne dass irgendetwas fehlschlägt.
 alter table public.community_activity drop constraint if exists community_activity_kind_check;
 alter table public.community_activity add constraint community_activity_kind_check
   check (kind in ('card_added', 'deck_created', 'deck_public', 'session_started',
-                  'session_joined', 'session_ended', 'event_created', 'event_rsvp'));
+                  'session_joined', 'session_ended', 'event_created', 'event_rsvp',
+                  'combo_search', 'synergy_search'));
 
 create or replace function public.record_community_activity(
   p_actor_id uuid,
@@ -32,14 +46,27 @@ create or replace function public.record_community_activity(
 ) returns void
 language plpgsql security definer set search_path = public
 as $$
+declare
+  v_sicht text;
 begin
   if p_kind not in ('card_added', 'deck_created', 'deck_public', 'session_started',
-                    'session_joined', 'session_ended', 'event_created', 'event_rsvp') then
+                    'session_joined', 'session_ended', 'event_created', 'event_rsvp',
+                    'combo_search', 'synergy_search') then
     raise exception 'Unknown community activity kind';
   end if;
 
+  -- Unverändert aus 20260725014500 übernommen: Die Sichtbarkeitsstufe
+  -- entscheidet, OB und MIT WESSEN Namen geschrieben wird.
+  select community_visibility into v_sicht from public.profiles where id = p_actor_id;
+  v_sicht := coalesce(v_sicht, 'public');
+
+  if v_sicht = 'private' then
+    return;
+  end if;
+
   insert into public.community_activity (actor_id, kind, metadata)
-    values (p_actor_id, p_kind, coalesce(p_metadata, '{}'::jsonb));
+    values (case when v_sicht = 'anonymous' then null else p_actor_id end,
+            p_kind, coalesce(p_metadata, '{}'::jsonb));
 end;
 $$;
 revoke all on function public.record_community_activity(uuid, text, jsonb) from public, anon, authenticated;
