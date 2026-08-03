@@ -3080,7 +3080,11 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px}
    welche Karte dafuer weichen koennte. */
 .syn-add.voll{ opacity:.45; cursor:not-allowed; }
 .syn-cut{ font-size:11px; color:var(--dim); padding:0 8px 6px;
-          overflow-wrap:anywhere; cursor:help; }
+          overflow-wrap:anywhere; }
+/* Der erklärende Text trägt den title, nicht der Kasten — sonst läge der
+   Tausch-Knopf darin und der Browser zeigte beim Überfahren zusätzlich zum
+   gestalteten Tooltip seinen eigenen (siehe schnittHinweisHtml). */
+.syn-cut-txt{ display:block; cursor:help; }
 /* Die Begründung darunter: leiser als der Kartenname, damit die Zeile zuerst
    sagt WAS raus soll und erst danach warum. Auf drei Zeilen begrenzt — der
    ganze Satz steht weiterhin im title. */

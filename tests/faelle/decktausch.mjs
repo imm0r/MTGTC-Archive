@@ -140,6 +140,24 @@ export default async function ({ seite, adresse, stand }) {
   stand.ist("die Beschriftung ist übersetzt, nicht der Schlüssel",
     knopf.text.includes("Tauschen"), knopf.text);
 
+  // ZWEI Tooltips auf einmal. initTooltip() hängt den title des überfahrenen
+  // Elements aus und zeigt den eigenen, gestalteten. Steckt der Knopf aber in
+  // einem Element, das SELBST einen title trägt, findet der Browser den beim
+  // Hochlaufen und legt seinen nativen daneben — beide stehen gleichzeitig da.
+  // Deshalb sitzt der erklärende Text in einem Geschwister-Element.
+  const vorfahr = await seite.evaluate(() => {
+    const b = document.querySelector("#tausch-probe .syn-swap");
+    const kachel = b.closest(".syn-card");
+    const mitTitel = b.parentElement.closest("[title]");
+    return { drin: !!(mitTitel && kachel.contains(mitTitel)),
+             wer: mitTitel ? mitTitel.className : null,
+             textHatTitel: !!document.querySelector("#tausch-probe .syn-cut-txt[title]") };
+  });
+  stand.ist("zwischen Knopf und Kachel trägt kein Vorfahre einen title",
+    !vorfahr.drin, vorfahr.wer);
+  stand.ist("die Begründung steht trotzdem im title — nur am Text daneben",
+    vorfahr.textHatTitel);
+
   // Ohne Deck-Bezug bleibt die Zeile ein Hinweis. Sonst stünde im Kartendetail
   // ein Knopf, der nicht weiß, aus welchem Deck er schneiden soll.
   stand.ist("ohne Deck-Bezug gibt es keinen Knopf",

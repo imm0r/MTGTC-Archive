@@ -1,5 +1,11 @@
 [
  {
+  "am": "2026-08-03T23:50:00+02:00",
+  "art": "behoben",
+  "text": "Beim Überfahren des „Tauschen“-Knopfes standen zwei Hinweisfenster übereinander: das der App und zusätzlich das des Browsers mit der Schnitt-Begründung. Jetzt ist es wieder eines.",
+  "pr": 206
+ },
+ {
   "am": "2026-08-03T23:30:00+02:00",
   "art": "neu",
   "text": "Ist ein Commander-Deck voll, sagt der Synergie-Vorschlag nicht mehr nur, welche Karte dafür weichen könnte — ein Klick auf „Tauschen“ erledigt beides auf einmal: die genannte Karte raus, die vorgeschlagene rein, bei Bedarf als Wunschkarte. Das Deck bleibt dabei immer bei 100 Karten.",
