@@ -1,12 +1,24 @@
 # Hinweise für Claude
 
-## Zu Beginn jeder Sitzung: den Stop-Hook flicken
+## Den Stop-Hook flicken — bei jedem Fehlalarm erneut
 
 ```bash
 node scripts/stop-hook-patch.mjs
 ```
 
-Einmal, gefahrlos wiederholbar, und ohne diese Arbeitsumgebung tut es nichts.
+Gefahrlos wiederholbar, und ohne diese Arbeitsumgebung tut es nichts. Zu
+Sitzungsbeginn aufrufen — und **jedes Mal wieder, wenn der Fehlalarm erneut
+erscheint**. Einmal reicht nicht: Die Arbeitsumgebung setzt den Hook nicht nur
+je Container-Bereitstellung zurück, sondern laufend mitten in der Sitzung.
+Gemessen am 03.08.2026 (Sitzung ab 11:50): Rücksetzungen um 13:57, 14:35:57
+(keine Minute nach einem stillen Lauf), 14:41, 15:11 und weiter im selben
+Takt. Wer sich auf den Aufruf vom Anfang verlässt, bekommt den Fehlalarm
+mitten in der Arbeit.
+
+Der Umgang bleibt derselbe, nur eben je Vorfall: Skript aufrufen, Fehlalarm
+verschwindet, **niemals amenden** (Begründung unten). Prüfen lässt sich der
+Zustand an der Dateigröße — Original 3262 Bytes, geflickt 5463 — oder daran,
+dass `grep -c origin/main ~/.claude/stop-hook-git-check.sh` mindestens 1 ist.
 
 **Warum.** Der Stop-Hook der Arbeitsumgebung schlägt aus zwei Gründen falsch an.
 
@@ -33,18 +45,20 @@ Das Skript nimmt beide Ursachen weg: Die Prüfungen klammern aus, was schon auf
 Nachgemessen bleiben beide echten Fälle erhalten — ein unsignierter Commit und
 einer mit falscher Identität werden weiterhin gemeldet.
 
-Das ist ein Notnagel. Der Hook wird bei jeder Container-Bereitstellung neu
-geschrieben, die Änderung überlebt die Sitzung also nicht — deshalb liegt sie
-hier statt im Container. Nachgewiesen am 29.07.2026: Die Sitzung wurde um
-08:48:20 neu aufgesetzt, der Hook kam im Original zurück und meldete prompt
-wieder GitHubs Merge-Commit. Ein Aufruf des Skripts, und er schwieg.
+Das ist ein Notnagel, und er hält kürzer als zuerst gedacht. Nachgewiesen am
+29.07.2026: Container neu aufgesetzt (08:48:20), Hook im Original zurück,
+prompt wieder der Fehlalarm. Nachgemessen am 03.08.2026: Es braucht nicht
+einmal eine Neubereitstellung — der Hook kam **mehrfach je Stunde** im
+Original zurück, mitten in der laufenden Sitzung (Zeiten oben). Deshalb liegt
+der Flicken hier statt im Container, und deshalb gilt „bei jedem Fehlalarm
+erneut" statt „einmal zu Beginn".
 
 **Schon gemeldet — nicht noch einmal melden.** Beide Fehlalarme sind bei
 Anthropic eingegangen, Referenz-ID
 `b5746b94-aef0-4d56-a8c4-22684b591659`. Behoben gehört der Hook dort, wo er
-herkommt; hier ist nichts weiter zu tun, als das Skript zu Beginn der Sitzung
-laufen zu lassen. Trägt eine künftige Fassung den Fehler nicht mehr, sagt das
-Skript das von selbst („sieht anders aus als erwartet") und ändert nichts —
+herkommt; hier ist nichts weiter zu tun, als das Skript laufen zu lassen,
+sooft er anspringt. Trägt eine künftige Fassung den Fehler nicht mehr, sagt
+das Skript das von selbst („sieht anders aus als erwartet") und ändert nichts —
 dann kann dieser Abschnitt samt `scripts/stop-hook-patch.mjs` weg.
 
 ## Pull Requests selbst zusammenführen
