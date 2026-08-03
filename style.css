@@ -2157,6 +2157,18 @@ tr.treffer>td{
 .stat{flex:1;min-width:130px;background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);padding:12px}
 .stat .v{font-size:22px;font-weight:700;color:var(--acc);font-variant-numeric:tabular-nums}
 .stat .k{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
+/* Kacheln, unter denen etwas liegt: als Knopf, mit Pfeil und Reaktion beim
+   Überfahren. Die übrigen bleiben Flächen — so sieht man, welche führt. */
+.stat-link{cursor:pointer;text-align:left;font:inherit;transition:border-color .12s,background .12s}
+.stat-link:hover{border-color:var(--acc);background:var(--panel)}
+.stat-link:hover .stat-pfeil{transform:translateY(2px)}
+.stat-link:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.stat-pfeil{display:inline-block;transition:transform .12s;opacity:.7}
+/* Kurzes Aufleuchten am Sprungziel: Ohne das landete man mitten in einer
+   Seite, die überall gleich aussieht, und wüsste nicht, ob etwas geschah. */
+@keyframes karte-leuchtet{from{box-shadow:0 0 0 2px var(--acc)}to{box-shadow:0 0 0 2px transparent}}
+.card.leuchtet{animation:karte-leuchtet 1.4s ease-out}
+@media(prefers-reduced-motion:reduce){ .card.leuchtet{animation:none;box-shadow:0 0 0 2px var(--acc)} }
 
 /* ----------------------------------------------------- Dashboard ----- */
 /* Zwei Spalten, sobald Platz ist. auto-fit statt fester Spaltenzahl: auf dem

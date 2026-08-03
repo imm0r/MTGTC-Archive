@@ -11423,21 +11423,53 @@ function aktivitaetText(row) {
   return t("community.kind.unknown", params);
 }
 
+/* Zwei der Kacheln führen irgendwohin: Mitglieder und Community-Decks stehen
+   als Listen weiter unten auf derselben Seite. Eine Zahl, unter der etwas
+   Ganzes liegt, soll man anklicken können — sonst liest man „6 Mitglieder"
+   und sucht die Liste von Hand.
+
+   Die übrigen sind reine Zahlen und bleiben es: Ein Knopf, der nichts tut,
+   ist schlechter als eine Fläche, die nie so aussah. */
 function communityStatsHtml() {
   const s = COMMUNITY_STATS;
   if (!s) return "";
   const zahl = v => Number(v ?? 0).toLocaleString(LANG);
   return `<div class="stats" style="margin-bottom:14px">${[
-    [t("community.members"), s.member_count],
+    [t("community.members"), s.member_count, "mitglieder-karte"],
     [t("community.decks"), s.deck_count],
+    // public_deck_count kennt erst die neuere Fassung von community_statistics.
+    // Bis die Migration liegt, fehlt die Kachel lieber, als eine 0 zu zeigen,
+    // die keine ist.
+    ...(s.public_deck_count == null ? []
+        : [[t("cdeck.title"), s.public_deck_count, "cdecks-karte"]]),
     [t("community.cards"), s.card_count],
     [t("community.activeSessions"), s.active_session_count],
     [t("community.upcomingEvents"), s.upcoming_event_count],
     [t("community.activity7d"), s.activity_7d_count],
     [t("community.combos"), s.combo_count],
     [t("community.synergies"), s.synergy_count],
-  ].map(([k, v]) =>
-    `<div class="stat"><div class="v">${esc(zahl(v))}</div><div class="k">${esc(k)}</div></div>`).join("")}</div>`;
+  ].map(([k, v, ziel]) => ziel
+    ? `<button type="button" class="stat stat-link" data-springt="${esc(ziel)}"
+         title="${esc(t("community.jumpTo", { was: k }))}"><div class="v">${esc(zahl(v))}</div><div
+         class="k">${esc(k)} <span class="stat-pfeil" aria-hidden="true">&#8595;</span></div></button>`
+    : `<div class="stat"><div class="v">${esc(zahl(v))}</div><div class="k">${esc(k)}</div></div>`).join("")}</div>`;
+}
+
+/* Zur Karte springen und sie kurz aufleuchten lassen. Ohne das Aufleuchten
+   landete man mitten in einer Seite, die überall gleich aussieht, und wüsste
+   nicht, ob überhaupt etwas geschehen ist. */
+function wireStatSprung(root) {
+  (root || document).querySelectorAll("[data-springt]").forEach(b => b.onclick = () => {
+    const ziel = document.getElementById(b.dataset.springt);
+    if (!ziel) return;
+    ziel.scrollIntoView({ behavior: "smooth", block: "start" });
+    ziel.classList.remove("leuchtet");
+    // Neu anstoßen, auch wenn die Klasse eben erst weg ist: Ohne diesen
+    // erzwungenen Umbruch bliebe die Animation beim zweiten Klick aus.
+    void ziel.offsetWidth;
+    ziel.classList.add("leuchtet");
+    setTimeout(() => ziel.classList.remove("leuchtet"), 1400);
+  });
 }
 
 /* Wie aktivitaetText, nur als HTML: Ist ein Kartenname hinterlegt, wird er zu
@@ -11598,6 +11630,7 @@ function zeigeCommunity() {
   if (!el) return;
   el.innerHTML = communityBodyHtml();
   wireCommunityFeedToggle();
+  wireStatSprung(el);
   wireCommunityKartenHover(el);
   wireCommunityHighlights(el);
 }
@@ -11621,6 +11654,7 @@ function renderCommunity() {
          „was bauen die" diese hier. -->
     ${communityDecksKarteHtml()}`;
   wireCommunityFeedToggle();
+  wireStatSprung(el);
   wireCommunityKartenHover(el);
   wireCommunityHighlights(el);
   wireMitgliederSuche();
