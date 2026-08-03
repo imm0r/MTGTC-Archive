@@ -160,8 +160,10 @@ export default async function ({ seite, adresse, stand }) {
   // bräuchte.
   const quelle = await seite.evaluate(() => fetch("app.js").then(r => r.text()));
   const lang = ["syn.loading", "syn.aiLoading", "combo.loading", "an.loading"];
+  // Entweder direkt (ladeBalken) oder über die Weiche, die zwischen Streifen
+  // und Kasten entscheidet (ladeZeigen) — beide enden beim selben Balken.
   const ohne = lang.filter(k =>
-    !new RegExp(`ladeBalken\\(\\s*t\\("${k.replace(".", "\\.")}"`).test(quelle));
+    !new RegExp(`lade(?:Balken|Zeigen)\\([^)]*t\\("${k.replace(".", "\\.")}"`).test(quelle));
   stand.gleich("Synergien, KI-Synergien, Combos und Deck-Analyse zeigen den Balken", ohne, []);
   const nochZahnrad = lang.filter(k =>
     new RegExp(`syn-spin[^\`]*\\$\\{esc\\(t\\("${k.replace(".", "\\.")}"`).test(quelle));
@@ -183,14 +185,15 @@ export default async function ({ seite, adresse, stand }) {
   await seite.evaluate(AUFBAU, { karten: 100, kategorien: 2, decks: 1, ansicht: "tabelle" });
   await seite.waitForTimeout(400);
 
-  // Die Suche anhalten, damit der Lade-Zustand stehen bleibt und sich messen
-  // lässt. Ohne Attrappe liefe sie gegen Scryfall.
+  // Angehalten wird die SUCHE, nicht die Anzeige: synergieAnzeigen läuft echt
+  // durch und schreibt dabei ihren eigenen Lade-Zustand. Nur so zeigt sich, ob
+  // der Balken am Ende einmal oder zweimal dasteht — mit einer Attrappe für
+  // die ganze Anzeige käme der Kasten nie dazu, seinen eigenen zu setzen.
   await seite.evaluate(() => {
     window.LOESE = null;
     window.themenFuerKarten = async () => null;
-    window.synergieAnzeigen = (box) => new Promise(fertig => {
-      window.LOESE = () => { box.innerHTML = `<div class="empty">fertig</div>`; fertig(); };
-    });
+    window.deckHooks = () => [{ kind: "theme", label: "x", q: "otag:x" }];
+    window.synergieSuchen = () => new Promise(fertig => { window.LOESE = () => fertig([]); });
     renderDecks();
   });
   await seite.waitForTimeout(300);
@@ -200,9 +203,13 @@ export default async function ({ seite, adresse, stand }) {
   const platz = await seite.evaluate(() => {
     const knopf = document.querySelector('[data-synbtn="d0"]').getBoundingClientRect();
     const balken = document.querySelector('[data-ladebox="d0"] .ladebalken');
-    const kasten = document.querySelector('.deck-syn[data-synbox="d0"]').getBoundingClientRect();
+    const kastenEl = document.querySelector('.deck-syn[data-synbox="d0"]');
+    const kasten = kastenEl.getBoundingClientRect();
     return {
       da: !!balken,
+      alle: document.querySelectorAll(".ladebalken").length,
+      texte: [...document.querySelectorAll(".ladebalken-txt")].map(e => e.textContent.trim()),
+      kastenLeer: !kastenEl.innerHTML.trim(),
       unterKnopf: balken ? Math.round(balken.getBoundingClientRect().top - knopf.bottom) : null,
       kastenUnterKnopf: Math.round(kasten.top - knopf.bottom),
       fenster: innerHeight,
@@ -211,6 +218,13 @@ export default async function ({ seite, adresse, stand }) {
   stand.ist("der Balken steht unter dem Knopf, nicht erst im Ergebniskasten",
     platz.da && platz.unterKnopf >= 0 && platz.unterKnopf < 200,
     `${platz.unterKnopf} px unter dem Knopf`);
+  // Er steht GENAU EINMAL da. Setzten Knopf und Suchfunktion ihn beide, stünde
+  // er samt Text zweimal — und weil man von oben nach unten liest, fände man
+  // den unteren zuerst, also den an der falschen Stelle.
+  stand.ist("und zwar genau einmal, samt Text",
+    platz.alle === 1 && platz.texte.length === 1,
+    `${platz.alle} Balken, Texte: ${JSON.stringify(platz.texte)}`);
+  stand.ist("der Ergebniskasten bleibt solange leer", platz.kastenLeer);
   // Die Gegenprobe: Der Ergebniskasten ist WIRKLICH weit weg. Rutschte er
   // eines Tages nach oben, verlöre die Messung darüber ihren Sinn — sie wäre
   // dann grün, ohne noch etwas zu zeigen.

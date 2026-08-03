@@ -1788,10 +1788,22 @@ Zahnrad am Knopf: also genau das, was er ersetzen sollte. Es ist dasselbe
 Problem, aus dem der [Deck-Verlauf](#verlauf-je-deck-zurück-auf-einen-älteren-stand)
 über der Tabelle steht.
 
+**Und zwar nur an einer Stelle.** Es gibt zwei mögliche Plätze — den Streifen
+unter den Knöpfen und den Ergebniskasten —, und anfangs schrieben beide hinein:
+der Knopf beim Klick, die Suchfunktion beim Start. Der Balken stand samt Text
+zweimal da, und weil man von oben nach unten liest, fand man den unteren
+zuerst, also genau den an der falschen Stelle. `ladeZeigen()` entscheidet
+deshalb: Gibt es den Streifen, gewinnt er, und der Kasten bleibt leer, bis das
+Ergebnis kommt. Ohne Deck-Bezug — im Kartendetail, in der Sammlung — gibt es
+keinen Streifen, dort bleibt der Kasten der richtige Platz.
+
 Deshalb misst die Prüfung nicht „gibt es den Balken", sondern **wie weit er vom
-Knopf entfernt ist** — und als Gegenprobe, dass der Ergebniskasten wirklich
-außerhalb des Bildes liegt. Rutschte der eines Tages nach oben, wäre die erste
-Messung grün, ohne noch etwas zu zeigen.
+Knopf entfernt ist**, **dass es genau einer ist** und, als Gegenprobe, dass der
+Ergebniskasten wirklich außerhalb des Bildes liegt. Rutschte der eines Tages
+nach oben, wäre die erste Messung grün, ohne noch etwas zu zeigen. Angehalten
+wird dabei die *Suche*, nicht die Anzeige: Mit einer Attrappe für die ganze
+Anzeige käme der Kasten nie dazu, seinen eigenen Balken zu setzen — und der
+doppelte fiele nicht auf.
 
 Das Zahnrad bleibt, wo es hingehört: in Knöpfen und bei allem, was in einem
 Wimpernschlag da ist. Am Knopf markiert es weiterhin, *welche* Suche läuft —
