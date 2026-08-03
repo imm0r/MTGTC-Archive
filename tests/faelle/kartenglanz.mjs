@@ -64,8 +64,14 @@ export default async function ({ seite, adresse, stand }) {
 
   /* --- Die Neigung folgt dem Zeiger --------------------------------------- */
   const kasten = await seite.locator("#dt-karte3d").boundingBox();
-  const lies = () => seite.evaluate(() => {
+  // Geschrieben wird beim Bewegen erst im nächsten Bild (requestAnimationFrame,
+  // siehe wireKarte3d) — gewartet wird deshalb auf den erwarteten Stand des
+  // Zeigers, nicht auf eine Anzahl Millisekunden. Kommt er nicht, meldet die
+  // Behauptung darunter, was stattdessen dastand.
+  const lies = (erwartet) => seite.evaluate(async (soll) => {
     const el = document.getElementById("dt-karte3d");
+    for (let i = 0; i < 80 && el.style.getPropertyValue("--kmx") !== soll; i++)
+      await new Promise(r => setTimeout(r, 25));
     return { zeigt: el.classList.contains("zeigt"),
              kx: parseFloat(el.style.getPropertyValue("--kx")),
              ky: parseFloat(el.style.getPropertyValue("--ky")),
@@ -74,13 +80,12 @@ export default async function ({ seite, adresse, stand }) {
              // Das Lichtband läuft GEGEN den Zeiger — sonst führte die Karte
              // ihre Lampe mit sich, statt sich unter einer festen zu drehen.
              kbx: el.style.getPropertyValue("--kbx") };
-  });
+  }, erwartet);
 
   // Links oben: obere Kante nach hinten (rotateX positiv), linke Kante nach
   // vorn (rotateY negativ).
   await seite.mouse.move(kasten.x + kasten.width * 0.2, kasten.y + kasten.height * 0.2);
-  await seite.waitForTimeout(120);
-  const lo = await lies();
+  const lo = await lies("20.0%");
   stand.ist("der Zeiger auf der Karte schaltet den Effekt ein", lo.zeigt);
   stand.ist("links oben: obere Kante nach hinten, linke nach vorn",
     lo.kx > 0 && lo.ky < 0, `rotateX ${lo.kx}°, rotateY ${lo.ky}°`);
@@ -89,8 +94,7 @@ export default async function ({ seite, adresse, stand }) {
 
   // Rechts unten: die Vorzeichen kippen beide.
   await seite.mouse.move(kasten.x + kasten.width * 0.8, kasten.y + kasten.height * 0.8);
-  await seite.waitForTimeout(120);
-  const ru = await lies();
+  const ru = await lies("80.0%");
   stand.ist("rechts unten: beide Vorzeichen kippen",
     ru.kx < 0 && ru.ky > 0, `rotateX ${ru.kx}°, rotateY ${ru.ky}°`);
   stand.ist("der Ausschlag bleibt im Rahmen (höchstens 10°)",
@@ -105,15 +109,19 @@ export default async function ({ seite, adresse, stand }) {
 
   /* --- Zeiger weg: alles zurück ------------------------------------------- */
   await seite.mouse.move(kasten.x + kasten.width / 2, kasten.y - 90);
-  // 600 ms, weil das Zurücksinken 500 ms dauert (siehe .karte3d-buehne). Mit
-  // 120 ms misst man die Karte MITTEN in der Bewegung und liest eine Matrix,
-  // die weder schief noch gerade ist.
-  await seite.waitForTimeout(600);
-  const weg = await seite.evaluate(() => {
+  // ABGEWARTET, NICHT ABGEZÄHLT. Das Zurücksinken dauert 500 ms — auf diesem
+  // Rechner. Der Prüfläufer fährt vier Browser gleichzeitig auf zwei Kernen,
+  // und dort ist jede feste Wartezeit eine Wette. Gewartet wird deshalb auf
+  // den ZUSTAND, mit einer großzügigen Schranke dahinter.
+  const weg = await seite.evaluate(async () => {
     const el = document.getElementById("dt-karte3d");
+    const buehne = el.querySelector(".karte3d-buehne");
+    const gerade = t => t === "none" || t === "matrix(1, 0, 0, 1, 0, 0)";
+    for (let i = 0; i < 80 && !gerade(getComputedStyle(buehne).transform); i++)
+      await new Promise(r => setTimeout(r, 25));
     return { zeigt: el.classList.contains("zeigt"), stil: el.getAttribute("style") || "",
              // matrix3d(1,0,0,0, 0,1,0,0, …) ist die Einheitsmatrix: keine Neigung.
-             transform: getComputedStyle(el.querySelector(".karte3d-buehne")).transform };
+             transform: getComputedStyle(buehne).transform };
   });
   stand.ist("Zeiger weg: der Effekt geht aus", !weg.zeigt);
   stand.ist("Zeiger weg: keine Stilwerte bleiben stehen", !/--k/.test(weg.stil), weg.stil);
@@ -174,11 +182,17 @@ export default async function ({ seite, adresse, stand }) {
   await seite.evaluate(() => showCardDetail("d0c0"));
   const k2 = await seite.locator("#dt-karte3d").boundingBox();
   await seite.mouse.move(k2.x + k2.width * 0.2, k2.y + k2.height * 0.2);
-  await seite.waitForTimeout(120);
-  const ruhig = await seite.evaluate(() => {
+  // Auch hier auf den Zustand warten statt auf die Uhr: Der Glanz blendet in
+  // 350 ms ein, und wer nach 120 ms misst, misst auf einem ausgelasteten
+  // Läufer die Null von vorher. Genau daran ist diese Zeile im ersten Anlauf
+  // gescheitert — hier grün, auf dem Läufer rot.
+  const ruhig = await seite.evaluate(async () => {
     const el = document.getElementById("dt-karte3d");
+    const glanz = el.querySelector(".karte3d-glanz");
+    for (let i = 0; i < 80 && Number(getComputedStyle(glanz).opacity) === 0; i++)
+      await new Promise(r => setTimeout(r, 25));
     return { transform: getComputedStyle(el.querySelector(".karte3d-buehne")).transform,
-             glanz: getComputedStyle(el.querySelector(".karte3d-glanz")).opacity };
+             glanz: getComputedStyle(glanz).opacity };
   });
   stand.ist("weniger Bewegung: die Karte kippt nicht", ruhig.transform === "none", ruhig.transform);
   stand.ist("weniger Bewegung: der Glanz bleibt", Number(ruhig.glanz) > 0, ruhig.glanz);
