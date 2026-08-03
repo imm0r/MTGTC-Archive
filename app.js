@@ -377,6 +377,54 @@ async function sfSearch(q, max = 12) {
   return r?.data ? r.data.slice(0, max) : [];
 }
 
+/* Alle Auflagen EINER Karte, eine Zeile je Druck (unique=prints), neueste
+   zuerst. Gesucht wird über die oracle_id: die bezeichnet die KARTE, nicht die
+   Auflage, und trifft im Gegensatz zum Namen auch dann genau eine, wenn zwei
+   verschiedene Karten gleich heißen (eine Karte und der gleichnamige
+   Spielstein). Fehlt sie, tritt der Name ein.
+
+   include_extras nimmt Spielsteine und Sonderdrucke mit — ein gescannter
+   Spielstein soll seine Auflage genauso wählen können. `extras: false` schaltet
+   das ab: Der Cardmarket-Weg sucht in dieser Liste die REGULÄRE Auflage eines
+   Sets über die kleinste Sammlernummer, und eine Sonderreihe mit niedriger
+   Nummer verdrängte sie.
+
+   Bewusst OHNE include_multilingual: sonst vervielfacht sich die Liste mit den
+   Sprachen, und bei viel Gedrucktem schöbe das die gesuchte Auflage aus dem
+   Fenster. Die Sprache holt inSprache nach, sobald eine Auflage feststeht.
+
+   `seiten` deckelt das Blättern. Eine Seite fasst 175 Einträge, und das reicht
+   für fast alles — ein Sol Ring kommt gemessen auf 137. Standardländer sprengen
+   es: ein Wald hat 946 Auflagen. Wer alle wählen können soll, muss also
+   blättern; wer bloß die reguläre Auflage eines bestimmten Sets sucht
+   (Cardmarket-Weg), kommt mit einer Seite aus und soll nicht sechs Abrufe
+   auslösen. Deshalb die Vorgabe 1 und der bewusste Aufschlag beim Aufrufer.
+
+   Zurück kommt neben den Drucken auch `gesamt` — die Zahl, die Scryfall meldet.
+   Nur so lässt sich sagen, ob die Liste vollständig ist; eine gedeckelte Liste
+   als vollständig auszugeben wäre die schlechtere Sorte Fehler. Ein
+   fehlgeschlagener Abruf beendet das Blättern, wirft aber nicht weg, was schon
+   da ist: eine halbe Liste ist mehr wert als keine. */
+async function sfDrucke(card, { extras = true, seiten = 1 } = {}) {
+  if (!card) return { drucke: [], gesamt: 0 };
+  const q = card.oracle_id
+    ? `oracleid:${card.oracle_id}`
+    : `!"${String(card.name || "").replace(/"/g, "")}"`;
+  const basis = "/cards/search?" + (extras ? "include_extras=true&" : "") +
+                "unique=prints&order=released&dir=desc&q=" + encodeURIComponent(q);
+  const drucke = [];
+  let gesamt = 0;
+  for (let seite = 1; seite <= seiten; seite++) {
+    let r = null;
+    try { r = await sf(basis + "&page=" + seite); } catch { break; }
+    if (!r?.data?.length) break;
+    drucke.push(...r.data);
+    gesamt = r.total_cards ?? drucke.length;
+    if (!r.has_more) break;
+  }
+  return { drucke, gesamt: Math.max(gesamt, drucke.length) };
+}
+
 const norm = s => (s || "").toLowerCase()
   .replace(/[’']/g, "").replace(/[^a-zà-ÿ0-9]+/g, " ").trim();
 
@@ -897,6 +945,18 @@ function nameHitMatchesRead(hit, readName) {
   return false;
 }
 
+/* Rückgabe von identify(). `genau` unterscheidet die beiden Wege, auf denen
+   eine Karte gefunden wird, und ist der ganze Unterschied zwischen „steht fest"
+   und „geraten":
+
+     genau: true   Setcode und Sammlernummer aus der Ecke wurden gelesen. Sie
+                   bezeichnen GENAU EINE Auflage — die Karte steht fest.
+     genau: false  Nur der Name wurde gelesen. Welche der oft dutzenden
+                   Auflagen dieser Karte im Foto liegt, weiß niemand; die
+                   Namenssuche liefert irgendeine davon.
+
+   Beim zweiten Fall darf nicht stillschweigend übernommen werden, was Scryfall
+   zufällig zuerst nennt — dafür fragt scanBild über renderAuflagen nach. */
 async function identify(img, lang, onStep) {
   let firstGuess = "", best = [];
 
@@ -934,12 +994,12 @@ async function identify(img, lang, onStep) {
         // der Nummern-Lücke ~2000–2014, z. B. Rußbold) erreichen findByCode nie,
         // weil parseCorner dort null liefert und der Namensweg allein greift.
         if (hit && nameHitMatchesRead(hit, v.printed_name))
-          return { card: hit, guess: printedNameOf(hit) || hit.name, candidates: [], vision: v, lang: l };
+          return { card: hit, guess: printedNameOf(hit) || hit.name, candidates: [], vision: v, lang: l, genau: true };
       }
       if (v.printed_name) {
         onStep(t("scan.searchingName", { name: v.printed_name }));
         const { card, candidates: cs } = await findCard(v.printed_name, l);
-        if (card) return { card, guess: v.printed_name, candidates: [], vision: v, lang: l };
+        if (card) return { card, guess: v.printed_name, candidates: [], vision: v, lang: l, genau: false };
         if (cs.length) { best = cs; firstGuess = v.printed_name; }
       }
     }
@@ -955,7 +1015,7 @@ async function identify(img, lang, onStep) {
     if (c) {
       onStep(t("scan.searchingCode", { set: c.set, num: c.num, token: c.token ? t("scan.tokenSuffix") : "" }));
       const hit = await findByCode(c.set, c.num, lang, c.token);
-      if (hit) return { card: hit, guess: printedNameOf(hit) || hit.name, candidates: [] };
+      if (hit) return { card: hit, guess: printedNameOf(hit) || hit.name, candidates: [], genau: true };
     }
   } catch { /* Ecke unlesbar — weiter über den Namen */ }
 
@@ -967,7 +1027,7 @@ async function identify(img, lang, onStep) {
     for (const line of lines) {
       onStep(t("scan.searchingName", { name: line }));
       const { card, candidates: cs } = await findCard(line, lang);
-      if (card) return { card, guess: line, candidates: [] };
+      if (card) return { card, guess: line, candidates: [], genau: false };
       // Mehrdeutig: merken, aber weitersuchen — vielleicht trifft eine
       // andere Zeile eindeutig.
       if (cs.length && !best.length) { best = cs; firstGuess = line; }
@@ -1014,9 +1074,16 @@ async function scanBild(img, thumbSrc, lang, ziel) {
     // werden: So landet eine falsch erkannte Karte gar nicht erst in der
     // Sammlung, sondern lässt sich vorher korrigieren. Nur wer das direkte
     // Übernehmen eingeschaltet hat, schreibt sofort (der alte Weg).
+    //
+    // Steht dagegen nur der NAME fest (r.genau ist falsch — die Ecke mit
+    // Setcode und Sammlernummer war nicht lesbar), ist die Auflage offen. Dann
+    // wird sie erfragt statt geraten, und zwar auch bei eingeschaltetem
+    // direkten Übernehmen: Was die Erkennung gar nicht gelesen hat, kann sie
+    // auch nicht bestätigen.
     if (r.card) {
       const detected = r.vision ? { lang: r.lang } : null;
-      if (autoUebernehmen()) await addToCollection(r.card, el, detected);
+      if (!r.genau) await renderAuflagen(el, r.card, detected);
+      else if (autoUebernehmen()) await addToCollection(r.card, el, detected);
       else renderConfirm(r.card, el, detected);
     } else renderManual(el, r.guess, r.candidates);
   } catch (e) {
@@ -1412,7 +1479,139 @@ function renderConfirm(card, el, detected) {
   el.querySelector("[data-drop]").onclick = () => ziehKachelWeg(el);
 }
 
-function renderManual(el, guess, candidates) {
+/* Der Kartenname steht fest, die AUFLAGE nicht.
+   ---------------------------------------------------------------------------
+   Setcode und Sammlernummer unten links sind das einzige, was eine Auflage
+   eindeutig benennt. Sind sie nicht lesbar — verdeckt, unscharf, im Schatten,
+   oder die Karte ist so alt, dass sie gar keine trägt —, bleibt nur der Name.
+   Der benennt aber die KARTE, nicht den Druck: „Sol Ring" gibt es über hundert
+   Mal, und die Namenssuche liefert davon irgendeinen.
+
+   Bisher wurde genau der stillschweigend übernommen. Das ist die häufigste
+   Panne des Foto-Imports, und sie ist teurer, als sie aussieht: In der Sammlung
+   steht danach das falsche Set, das falsche Bild und vor allem der falsche
+   Wert — zwischen dem Normaldruck und einer Sonderauflage derselben Karte liegt
+   im Handel oft ein Vielfaches.
+
+   Also wird nicht geraten, sondern gefragt — dieselbe Antwort wie beim
+   Cardmarket-Weg (siehe cmKarteAusNamen). Gezeigt werden ALLE Auflagen der
+   gefundenen Karte, jede mit Bild, Set-Zeichen, Sammlernummer, Jahr und Preis;
+   am Bild erkennt man die Karte in der Hand sofort. Das Feld darüber filtert
+   nach Setname, Setcode, Nummer oder Jahr — bei hundert Auflagen ist Scrollen
+   allein keine Bedienung.
+
+   Zwei Fälle gehen ohne Rückfrage weiter wie bisher: Es gibt nur EINE Auflage
+   (dann ist nichts zu wählen), oder der Abruf schlägt fehl. Eine Auswahl, die
+   sich nicht laden lässt, darf den Scan nicht anhalten.
+
+   Die Liste ist englisch (sfDrucke lädt bewusst ohne Sprachfassungen). Sobald
+   eine Auflage gewählt ist, holt inSprache die Fassung in der erkannten
+   Sprache nach — dieselbe Auflage, nur mit deren gedrucktem Namen und Bild. */
+async function renderAuflagen(el, card, detected) {
+  const lang = detected?.lang || $("#d-lang").value;
+  // Nach der Wahl geht es den gewohnten Weg: bestätigen — oder sofort
+  // schreiben, wenn das eingeschaltet ist. Die Auflage war die offene Frage,
+  // und die ist damit beantwortet.
+  const weiter = async k => {
+    if (autoUebernehmen()) {
+      try { await addToCollection(k, el, detected); } catch (e) { toast(e.message); }
+    } else renderConfirm(k, el, detected);
+  };
+
+  // Der Abruf dauert; solange sagt die Kachel, worauf sie wartet. Beim Scan
+  // steht dafür die Schrittzeile bereit, aus der Handkorrektur heraus die
+  // Hinweiszeile — beide sitzen an derselben Stelle der Kachel.
+  const schritt = el.querySelector("[data-step]") || el.querySelector(".meta");
+  if (schritt) schritt.textContent = t("scan.loadingPrints");
+  // Sechs Seiten à 175 = 1050. Das deckt den meistgedruckten Fall, den es
+  // gibt: Ein Wald kommt auf 946 Auflagen — nachgemessen, sechs Seiten, die
+  // letzte mit 71 Einträgen. Wächst er darüber hinaus, sagt der Zähler unten,
+  // wie viele fehlen, statt eine gedeckelte Liste als die ganze auszugeben.
+  // Der Deckel ist also eine Notbremse, kein Regelfall — und der Abruf kostet
+  // nur, was er muss: Wer auf eine Seite passt (ein Sol Ring: 137), löst
+  // genau EINEN Aufruf aus, denn has_more beendet die Schleife.
+  let drucke = [], gesamt = 0;
+  try { ({ drucke, gesamt } = await sfDrucke(card, { seiten: 6 })); }
+  catch { /* dann wie bisher */ }
+  if (drucke.length < 2) return weiter(card);
+
+  // „Diese meinte die Namenssuche" — verglichen über Set und Sammlernummer,
+  // NICHT über die Scryfall-Kennung: Die Namenssuche kann eine fremdsprachige
+  // Fassung geliefert haben, und die trägt eine andere Kennung als der
+  // englische Druck in dieser Liste. Set und Nummer teilen sie sich.
+  const istTreffer = c => c.id === card.id ||
+    (c.set === card.set && c.collector_number === card.collector_number);
+  // Der Zähler sagt beim Filtern, wie viel übrig ist — und, falls die Liste
+  // gedeckelt wurde, dass sie es ist. „175 Auflagen" für eine Karte mit 946
+  // wäre keine Auskunft, sondern eine falsche.
+  const zaehlText = n => gesamt > drucke.length
+    ? t("scan.printCountOf", { n, gesamt })
+    : n === 1 ? t("scan.printCountOne") : t("scan.printCount", { n });
+
+  const zeile = (c, i) => `
+    <button class="pick" data-druck="${i}"${istTreffer(c) ? ' data-treffer="1"' : ""}>
+      ${imgOf(c) ? `<img src="${esc(imgOf(c))}" alt="" loading="lazy">` : ""}
+      <span><b>${setSymbol(c.set, c.rarity)}${esc(c.set_name || c.set || "")}</b>
+      <i>#${esc(c.collector_number)} · ${esc((c.set || "").toUpperCase())}${
+        c.released_at ? " · " + esc(String(c.released_at).slice(0, 4)) : ""}</i>
+      <i>${eur(priceOf(c, false))}</i></span>
+    </button>`;
+
+  el.classList.add("pending");
+  el.querySelector(".body").innerHTML = `
+    <div class="title">${esc(t("scan.whichPrint"))}</div>
+    <div class="meta">${t("scan.printHint", { name: esc(printedNameOf(card) || card.name) })}</div>
+    <input type="text" class="pick-filter" data-filter placeholder="${esc(t("scan.printFilterPh"))}">
+    <div class="picks viele" data-liste>${drucke.map(zeile).join("")}</div>
+    <div class="meta" data-zaehler>${esc(zaehlText(drucke.length))}</div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn ghost sm" data-fix>${esc(t("scan.wrongCard"))}</button>
+      <button class="btn ghost sm" data-drop>${esc(t("scan.discard"))}</button>
+    </div>`;
+
+  // Gefiltert wird im Browser über die schon gezeichneten Knöpfe: Die Liste
+  // liegt vollständig vor, ein erneuter Abruf je Tastendruck wäre Unfug — und
+  // Scryfall bittet ausdrücklich um Zurückhaltung.
+  const liste = el.querySelector("[data-liste]");
+  const zaehler = el.querySelector("[data-zaehler]");
+  const knoepfe = [...liste.querySelectorAll("[data-druck]")];
+  el.querySelector("[data-filter]").oninput = e => {
+    const q = norm(e.target.value);
+    let sichtbar = 0;
+    knoepfe.forEach((b, i) => {
+      const c = drucke[i];
+      const heu = norm([c.set_name, c.set, c.collector_number,
+        String(c.released_at || "").slice(0, 4)].join(" "));
+      const zeig = !q || heu.includes(q);
+      b.hidden = !zeig;
+      if (zeig) sichtbar++;
+    });
+    zaehler.textContent = zaehlText(sichtbar);
+  };
+
+  knoepfe.forEach(b => b.onclick = async () => {
+    const gewaehlt = drucke[+b.dataset.druck];
+    b.disabled = true;
+    try {
+      // Die gewählte Auflage in der erkannten Sprache — und mit Preis und
+      // Cardmarket-ID, die fremdsprachige Drucke bei Scryfall nicht tragen.
+      await weiter(await withPrice(await inSprache(gewaehlt, lang)));
+    } catch (e) { b.disabled = false; toast(e.message); }
+  });
+  el.querySelector("[data-fix]").onclick = () => renderManual(el, card.name);
+  el.querySelector("[data-drop]").onclick = () => ziehKachelWeg(el);
+}
+
+/* `opts.drucke` sagt, WAS in der Auswahlliste steht, und das entscheidet, was
+   ein Klick darauf bedeutet:
+
+     false (Vorgabe)  verschiedene KARTEN (byCard hat je Karte eine Auflage
+                      behalten). Die gezeigte Auflage ist beliebig — nach dem
+                      Klick geht es deshalb in die Auflagenwahl.
+     true             bereits konkrete AUFLAGEN einer Karte (der Zieh-Import
+                      liefert sie so aus dem Cardmarket-Weg). Da ist die Frage
+                      schon beantwortet; der Klick übernimmt direkt. */
+function renderManual(el, guess, candidates, opts = {}) {
   const cs = candidates || [];
   const list = cs.length ? `
     <div class="picks">${cs.map((c, i) => `
@@ -1436,8 +1635,14 @@ function renderManual(el, guess, candidates) {
     <p class="hint" style="margin-top:6px">${t("scan.codeHint")}</p>`;
 
   el.querySelectorAll("[data-pick]").forEach(b => b.onclick = async () => {
-    try { await addToCollection(cs[+b.dataset.pick], el); }
-    catch (e) { toast(e.message); }
+    const gewaehlt = cs[+b.dataset.pick];
+    try {
+      // Steht in der Liste die Karte (nicht die Auflage), ist mit dem Klick
+      // erst die halbe Frage beantwortet — die zweite Hälfte stellt
+      // renderAuflagen.
+      if (opts.drucke) await addToCollection(gewaehlt, el);
+      else await renderAuflagen(el, gewaehlt, null);
+    } catch (e) { toast(e.message); }
   });
 
   const inp = el.querySelector("[data-name]");
@@ -1462,8 +1667,11 @@ function renderManual(el, guess, candidates) {
       if (m) return el.querySelector(".meta").innerHTML =
         `<span class="pill err">${esc(t("scan.notExist", { set: m[1].toUpperCase(), num: m[2], token: m[3] ? t("scan.asToken") : "" }))}</span>`;
 
+      // Ein getippter NAME benennt die Karte, nicht die Auflage — anders als
+      // die Eingabe von Setcode und Nummer weiter oben, die direkt schreibt.
+      // Also auch hier erst die Auflage wählen lassen.
       const r = await findCard(v, $("#d-lang").value);
-      if (r.card) await addToCollection(r.card, el);
+      if (r.card) await renderAuflagen(el, r.card, null);
       else if (r.candidates.length) renderManual(el, v, r.candidates);
       else el.querySelector(".meta").innerHTML =
         `<span class="pill err">${esc(t("scan.noNameMatch"))}</span>`;
@@ -1795,17 +2003,12 @@ async function cmKarteAusNamen(name, setName, lang, variante) {
   if (!hit) return null;
   const gesucht = setWorte(setName);
   if (!gesucht) return withPrice(hit);
-  // Alle Auflagen der Karte, EINE je Druck (unique=prints, OHNE Sprach-
-  // fassungen): mit include_multilingual multipliziert sich die Liste mit den
-  // Sprachen, und bei viel Gedrucktem wie einem Sol Ring schöbe die Deckelung
-  // das gesuchte Set aus dem Fenster. Eine Seite (175) reicht für alles außer
-  // Standardländern — und wer die zieht, dem genügt auch der Namenstreffer.
+  // Alle Auflagen der Karte, EINE je Druck. Ohne Sonderdrucke: gesucht wird
+  // gleich der REGULÄRE Druck des Sets über die kleinste Sammlernummer, und
+  // eine Sonderreihe mit niedriger Nummer verdrängte ihn (siehe sfDrucke).
   let drucke = [];
-  try {
-    const r = await sf("/cards/search?unique=prints&order=released&dir=desc&q=" +
-                       encodeURIComponent(`!"${hit.name.replace(/"/g, "")}"`));
-    drucke = r?.data || [];
-  } catch { /* dann eben die Auflage der Namenssuche */ }
+  try { ({ drucke } = await sfDrucke(hit, { extras: false })); }
+  catch { /* dann eben die Auflage der Namenssuche */ }
   // Unter den Auflagen des Sets die REGULÄRE: Cardmarket hängt an Showcase-
   // und Sonderrahmen ein "-V2"/"-V3" an — die nackte Adresse meint den
   // Normaldruck, und der trägt die niedrigste Sammlernummer.
@@ -1834,7 +2037,9 @@ async function karteAusText(text, lang) {
   const m = v.match(/^([a-z0-9]{3,5})[\s\-\/·•]+(\d{1,4}[a-z★]?)(?:\s+(t))?$/i);
   if (m) {
     const c = await findByCode(m[1], m[2], lang, !!m[3]);
-    if (c) return { card: c, candidates: [] };
+    // `genau`: Setcode und Nummer benennen die AUFLAGE — hier ist nichts offen.
+    // Der Namensweg darunter benennt nur die Karte (siehe identify).
+    if (c) return { card: c, candidates: [], genau: true };
   }
   return findCard(v, lang);
 }
@@ -1980,7 +2185,10 @@ async function ziehErkennen(nutzlast, lang, schritt, diag) {
     // seine Auflage sofort.
     if (card?.kandidaten) {
       notiz(`${k.art} · ${k.quelle}`, `${card.kandidaten.length} Auflagen zur Auswahl`, fehler);
-      return { card: null, guess: k.name || nameHinweis, candidates: card.kandidaten };
+      // `drucke`: Das sind bereits konkrete Auflagen EINES Sets, keine
+      // verschiedenen Karten — ein Klick darauf ist die fertige Antwort und
+      // führt nicht noch einmal in die Auflagenwahl.
+      return { card: null, guess: k.name || nameHinweis, candidates: card.kandidaten, drucke: true };
     }
     notiz(`${k.art} · ${k.quelle}`, card ? `${card.name} [${card.set}/${card.collector_number}/${card.lang}]` : "—", fehler);
     if (card) return { card, quelle: k.quelle, sicher: true };
@@ -1992,7 +2200,7 @@ async function ziehErkennen(nutzlast, lang, schritt, diag) {
     notiz(`name · ${n}`, r?.card ? `${r.card.name} [${r.card.set}/${r.card.collector_number}/${r.card.lang}]`
       : r?.candidates.length ? `${r.candidates.length} Kandidaten` : "—", fehler);
     if (!r) continue;
-    if (r.card) return { card: r.card, quelle: t("drag.viaName"), sicher: false };
+    if (r.card) return { card: r.card, quelle: t("drag.viaName"), sicher: false, genau: !!r.genau };
     if (r.candidates.length) return { card: null, guess: n, candidates: r.candidates };
   }
   return { card: null, guess: nameHinweis, candidates: [] };
@@ -2176,7 +2384,7 @@ async function ziehImport(dt, ziel) {
       // Kein Treffer: sofort die Handkorrektur, wo man den Namen tippt oder
       // Setcode und Nummer einträgt — und, wenn eine Bilddatei mitkam, der
       // Knopf für die Bilderkennung. Angeboten statt aufgedrängt (siehe oben).
-      renderManual(el, r.guess || "", r.candidates);
+      renderManual(el, r.guess || "", r.candidates, { drucke: !!r.drucke });
       if (dateien.length) ziehScanKnopf(el, dateien, ziel);
       return ziehDiagnoseZeigen(el, diag);
     }
@@ -2190,7 +2398,14 @@ async function ziehImport(dt, ziel) {
     // ändert die Zeile über „Bearbeiten" genauso, und dort steht die Karte im
     // Bestand statt in einem Kasten davor. Eine Rückfrage, die nichts fragt,
     // was danach nicht besser zu beantworten wäre, ist bloß ein Klick.
-    if (r.sicher || autoUebernehmen()) {
+    //
+    // Blieb es beim NAMEN — weder Kennung noch getippter Setcode, sondern
+    // alt-Text oder mitgezogene Beschriftung —, ist die Auflage offen, genau
+    // wie beim Foto ohne lesbare Ecke. Dann wird sie erfragt statt geraten;
+    // welcher Weg gezogen hat, sagt dort schon die Überschrift.
+    if (!r.sicher && !r.genau) {
+      await renderAuflagen(el, r.card, { lang: r.card.lang });
+    } else if (r.sicher || autoUebernehmen()) {
       const id = await addToCollection(r.card, el, { lang: r.card.lang });
       if (diag) diag.geschrieben = { id, lang: r.card.lang, zustand: $("#d-cond").value,
         foil: $("#d-foil").value === "1", preis: priceOf(r.card, $("#d-foil").value === "1") };

@@ -236,6 +236,50 @@ dabei entscheidend: `mkm/8` und `tmkm/8` sind zwei völlig verschiedene Karten.
 Fürs Fotografieren heißt das: Die untere linke Ecke sollte mit aufs Bild und
 scharf sein — sie ist wertvoller als der Kartenname.
 
+### War die Ecke nicht lesbar: die Auflage wählen
+
+Setcode und Sammlernummer sind das einzige, was eine **Auflage** eindeutig
+benennt. Sind sie nicht lesbar — verdeckt, unscharf, im Schatten, oder die
+Karte ist so alt, dass sie gar keinen solchen Aufdruck trägt —, bleibt nur der
+Name. Der benennt aber die *Karte*, nicht den Druck: „Sol Ring" gibt es über
+hundert Mal.
+
+Früher nahm die App in diesem Fall stillschweigend die Auflage, die Scryfalls
+Namenssuche zufällig zuerst nannte. Das ging fast immer daneben, und zwar
+teuer: In der Sammlung stand danach das falsche Set, das falsche Bild und vor
+allem der falsche Wert — zwischen einem Normaldruck und einer Sonderauflage
+derselben Karte liegt im Handel oft ein Vielfaches.
+
+Stattdessen **fragt** die Kachel jetzt. Sie zeigt alle Auflagen der gefundenen
+Karte, neueste zuerst, jede mit Bild, Set-Zeichen, Sammlernummer, Jahr und
+Preis; das Feld darüber filtert nach Setname, Setcode, Nummer oder Jahr. Am
+Bild erkennt man die Karte in der Hand sofort. Die Auflage, die die Namenssuche
+geliefert hatte, ist markiert — als Hinweis, nicht als Vorauswahl.
+
+Drei Dinge dazu:
+
+* **Auch bei „Treffer sofort übernehmen".** Was die Erkennung gar nicht gelesen
+  hat, kann sie nicht bestätigen; das ist genau der Fall, in dem eine Rückfrage
+  ihr Geld wert ist.
+* **Nicht, wenn die Ecke gelesen wurde.** Dann steht die Auflage fest und es
+  wird nichts gefragt. Ebenso wenig, wenn es von der Karte nur eine einzige
+  Auflage gibt.
+* **Die Sprache bleibt erhalten.** Die Liste selbst ist englisch (sonst
+  vervielfachte sie sich mit den Sprachfassungen); nach der Wahl lädt die App
+  dieselbe Auflage in der erkannten Sprache nach.
+
+Scryfall liefert 175 Auflagen je Seite. Das reicht für fast alles — ein Sol
+Ring kommt auf 137 und damit auf **einen** Abruf —, für Standardländer nicht:
+Ein Wald hat 946. Die App blättert deshalb bis zu sechs Seiten weit (1050), und
+das deckt auch ihn. Sollte eine Karte je darüber hinauswachsen, sagt der Zähler
+unter der Liste, wie viele von wie vielen geladen sind; die übrigen erreicht man
+über „Falsche Karte?" und den eingetippten Setcode. Eine gedeckelte Liste als
+vollständige auszugeben wäre der schlechtere Fehler.
+
+Dieselbe Wahl erscheint, wenn man in der Handkorrektur einen **Namen** eintippt
+— auch der benennt die Karte, nicht die Auflage. Wer `MKM 8` eintippt, bekommt
+sie nicht: Setcode und Nummer sind eindeutig.
+
 ### Karte aus einem zweiten Fenster ziehen
 
 Zwei Browserfenster nebeneinander: links die App, rechts Scryfall, Cardmarket
@@ -248,10 +292,10 @@ Multiverse- oder Cardmarket-Produktnummer), wird ohne Rückfrage geschrieben:
 Die Sammlung springt auf die neue Zeile und hebt sie kurz hervor. Dort stehen
 Bearbeiten und Entfernen ohnehin — eine Rückfrage davor hätte nur Sprache
 (steht schon fest), Ausführung und Zustand angeboten, und die ändert die Zeile
-genauso. Bleibt nur der **Namensweg** (Gatherer-Bild, markierter Text), kann
-die falsche Karte herauskommen — dann erscheint die Bestätigung wie beim Scan,
-in einem schwebenden Kasten unten rechts, samt Auswahlliste bei
-Mehrdeutigkeit.
+genauso. Bleibt nur der **Namensweg** (Gatherer-Bild, markierter Text), ist
+neben der Karte auch die Auflage offen — dann erscheint in einem schwebenden
+Kasten unten rechts dieselbe Auflagenwahl wie beim Scan ohne lesbare Ecke
+(siehe oben), und bei mehrdeutigem Namen zuvor die Auswahl der Karte.
 
 Voreinstellung ist dabei „Normal" und „NM" — wer regelmäßig Foils oder
 gespielte Karten zieht, stellt die Dropdowns unter **Card Management → Karten
