@@ -134,6 +134,85 @@ export default async function ({ seite, adresse, stand }) {
   stand.gleich("und markiert genau diesen einen Punkt", nachKlick.an, ["community"]);
   stand.gleich("die Ansicht wird dabei einmal aufgebaut", nachKlick.gerufen, 1);
 
+  /* --- Die Leiste bleibt eine Zeile ------------------------------------ */
+  /* Sieben Punkte mit Wort passen nicht mehr überall. Bricht die Kopfzeile um,
+     ist das kein Schönheitsfehler: Sie klebt oben (position:sticky) und nimmt
+     dem Inhalt die Höhe dauerhaft weg — gemessen 229 statt 67 px bei 560.
+
+     Gemessen wird in FRANZÖSISCH, der breitesten der fünf Sprachen (volle
+     Beschriftung verlangt dort 1420 px Fensterbreite, auf Deutsch 1353). Eine
+     Schwelle, die nur in der eigenen Sprache stimmt, ist keine — genau das
+     wäre bei 1360 passiert. */
+  /* WIE IM ECHTEN BETRIEB messen, nicht wie in der Attrappe: Rechts stehen
+     Avatar und Name, und die kosten rund 190 px. Ohne sie fiele die Messung um
+     genau diese Breite zu günstig aus — eine Schwelle, die nur im
+     abgemeldeten Zustand hält, hilft niemandem.
+     Dazu eine Zahl an der Wunschliste, damit sich prüfen lässt, dass sie beim
+     Ausblenden der Wörter STEHEN bleibt. */
+  await seite.evaluate(() => {
+    const who = document.querySelector("#who");
+    who.innerHTML = `<span style="width:26px;height:26px;border-radius:50%;background:#444;display:inline-block"></span><span>Sturmprophet</span><span class="who-caret">&#9662;</span>`;
+    const z = document.querySelector("#wish-badge");
+    z.textContent = "3"; z.hidden = false;
+  });
+  await seite.evaluate(() => setLang("fr"));
+  const kopfhoehe = async (breite) => {
+    await seite.setViewportSize({ width: breite, height: 800 });
+    await seite.waitForTimeout(250);
+    return seite.evaluate(() => {
+      const k = [...document.querySelectorAll("nav > button")];
+      return {
+        kopf: Math.round(document.querySelector("header").getBoundingClientRect().height),
+        zeilen: new Set(k.map(b => Math.round(b.getBoundingClientRect().top))).size,
+        wort: getComputedStyle(k[0].querySelector("span[data-i18n]")).display !== "none",
+        titel: k.every(b => (b.title || "").trim().length > 0),
+        // Die Zahl an Wunschliste/live Partie ist KEIN Beschriftungs-span und
+        // muss bleiben — sie ist der einzige Hinweis, dass etwas wartet.
+        zahlDa: getComputedStyle(document.querySelector("#wish-badge")).display !== "none",
+      };
+    });
+  };
+  const breit = await kopfhoehe(1600);
+  stand.gleich("breit: eine Zeile, 67 px, mit Wort",
+    [breit.kopf, breit.zeilen, breit.wort], [67, 1, true]);
+
+  for (const b of [1440, 1366, 1200, 1024, 900, 768]) {
+    const m = await kopfhoehe(b);
+    stand.gleich(`bei ${b} px bleibt es eine Zeile à 67 px`, [m.kopf, m.zeilen], [67, 1]);
+  }
+
+  const schmal = await kopfhoehe(1200);
+  stand.ist("dort steht das Wort nicht mehr da", !schmal.wort);
+  stand.ist("dafür trägt JEDER Knopf einen Titel — sonst wäre er ein Rätsel", schmal.titel);
+  stand.ist("und die Zahl der offenen Punkte bleibt sichtbar", schmal.zahlDa);
+
+  /* UND SIE VERSCHWINDET, WENN NICHTS ANLIEGT. Das Attribut hidden wirkt nur
+     über die Vorgabe des Browsers, und die verliert gegen jede Klassenregel
+     mit display — .menu-badge trug display:inline-flex. Die Zähler an
+     Wunschliste und live Partie standen dadurch IMMER da, mit einer Null
+     darin: zwei gelbe Punkte in der Kopfzeile, die nichts bedeuteten.
+     Geprüft an BEIDEN Zuständen; nur „sichtbar“ zu messen ließe die Regel
+     „immer sichtbar“ durchgehen. */
+  stand.ist("ohne offene Punkte ist die Zahl weg",
+    await seite.evaluate(() => {
+      const z = document.querySelector("#wish-badge");
+      z.textContent = "0"; z.hidden = true;
+      const weg = getComputedStyle(z).display === "none";
+      z.textContent = "3"; z.hidden = false;
+      return weg;
+    }));
+
+  /* Der Titel wandert mit der Sprache: Er ist jetzt die einzige Beschriftung,
+     und eine Beschriftung, die auf Deutsch stehen bleibt, ist keine. */
+  await seite.evaluate(() => setLang("de"));
+  await seite.waitForTimeout(200);
+  stand.gleich("der Titel wechselt mit der Sprache",
+    await seite.evaluate(() => document.querySelector('nav > button[data-v="coll"]').title),
+    "Sammlung");
+
+  await seite.setViewportSize({ width: 1600, height: 900 });
+  await seite.waitForTimeout(250);
+
   /* --- Fehlt eine Bilddatei -------------------------------------------- */
   /* Der Rückfall, ohne den ein noch nicht hochgeladenes Sinnbild ein Loch in
      die Kopfzeile schlägt. Geprüft an einem eigens erfundenen Pfad und nicht

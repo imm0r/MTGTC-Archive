@@ -728,13 +728,51 @@ Zwei Dinge, die an dieser Leiste schon still danebengingen und die der Prüffall
   jemand hinsah, meldet sich `error` nie mehr; dann verrät `complete` ohne
   `naturalWidth`, was los ist.
 
-> **Der Preis: Die Kopfzeile bricht früher um.** Gemessen im Prüfbrowser:
-> ohne Sinnbilder bei rund 860 px Fensterbreite, mit fünf Punkten bei rund
-> 980 px, mit sieben bei rund **1200 px** — und wächst dabei von 67 auf
-> 125 px. Darüber ändert sich nichts. `nav` bricht von sich aus um; ein
-> eigener Umbruchpunkt (etwa: Text weglassen, nur noch Sinnbilder) kam
-> bewusst nicht dazu — sieben unbeschriftete Bilder nebeneinander sind ein
-> Rätsel, keine Navigation.
+#### Die Leiste bleibt eine Zeile
+
+Mit sieben Punkten passt sie nicht mehr überall. Eine zweite Kopfzeile ist
+dabei kein Schönheitsfehler: Die Leiste klebt oben (`position:sticky`) und
+nimmt dem Inhalt die Höhe **dauerhaft** weg — bei 560 px waren es 229 statt
+67 px, ein Drittel eines Telefonschirms.
+
+**Skalieren allein reicht nicht**, und das ist keine Meinung. Angemeldet
+gemessen (Avatar und Name kosten rund 190 px):
+
+| Fensterbreite | 1600 | 1366 | 1280 | 1200 | 1100 | 1024 |
+| --- | --- | --- | --- | --- | --- | --- |
+| verfügbar | 1372 | 1138 | 1052 | 972 | 872 | 796 |
+| gebraucht (mit Wort, deutsch) | 1125 | 1125 | 1125 | 1125 | 1125 | 1125 |
+
+Bei 1100 px fehlen 253 px. Sieben Bilder von 32 auf 20 zu schrumpfen bringt
+7 × 12 = 84. Selbst ganz **ohne** Bilder blieben die Wörter zu breit. Unter
+einer bestimmten Breite muss also das Wort weichen — das Bild trägt die
+Aussage ohnehin, es ist bloß größer als eine Schriftzeile.
+
+**Wo genau, sagt die längste Sprache und nicht die eigene.** Was die volle
+Beschriftung an Fensterbreite verlangt:
+
+| de | en | es | it | fr |
+| --- | --- | --- | --- | --- |
+| 1353 | 1361 | 1401 | 1402 | **1420** |
+
+Deshalb **1440** und nicht 1360: Bei 1366 — einem sehr verbreiteten Laptop —
+ginge es auf Deutsch gerade eben auf und auf Französisch nicht. Eine Schwelle,
+die nur in der eigenen Sprache stimmt, ist keine. Der Prüffall misst deshalb
+in Französisch.
+
+Ohne Wort trägt die Leiste bis **768 px** eine Zeile à 67 px; darunter darf
+sie umbrechen. Damit ein Punkt ohne Wort ansprechbar bleibt, trägt jeder Knopf
+ein `data-i18n-title` — `applyI18n()` füllt es und wechselt es mit der Sprache.
+Die **Zahl** an Wunschliste und live Partie bleibt in jeder Breite stehen: Sie
+ist der einzige Hinweis darauf, dass etwas wartet.
+
+> **Dabei aufgefallen:** `[hidden]` wirkt nur über die Vorgabe des Browsers
+> (`display:none`), und die verliert gegen **jede** Klassenregel mit `display`
+> — Klasse schlägt Element. `.menu-badge` trug `display:inline-flex`, also
+> standen die Zähler an Wunschliste und live Partie **immer** da, mit einer
+> Null darin: zwei gelbe Punkte in der Kopfzeile, die nichts bedeuteten.
+> Dieselbe Falle bei `.gate-usercount`/`.gate-deckcount`. Ein globales
+> `[hidden]{display:none !important}` nimmt sie für alle weg.
 
 ### Der Weg dorthin: Kacheln, die führen
 

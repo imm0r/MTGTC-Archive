@@ -38,6 +38,19 @@
    gesparte Breite ist eine Spalte, die nicht umbricht.
    Die Systemschriften bleiben als Rückfall stehen, für den Augenblick vor dem
    Laden und für den Fall, dass die Datei einmal fehlt. */
+/* [hidden] schlägt jede eigene display-Regel.
+   Das Attribut wirkt nur über die Vorgabe des Browsers (display:none), und die
+   verliert gegen JEDE Klassenregel mit display — Klasse schlägt Element.
+   Zwei Stellen hatten sich genau daran verfangen: .menu-badge (display:
+   inline-flex) und .gate-usercount/.gate-deckcount (display:block). Die
+   Zähler an Wunschliste und live Partie standen dadurch IMMER da, auch mit
+   einer Null darin; auf den Bildern der Kopfzeile sind sie als zwei gelbe
+   Punkte zu sehen. Gefunden beim Umbau der Leiste, nicht gesucht.
+   Die Regel hier gilt für alle und nimmt die Falle künftig weg — wer ein
+   Element mit hidden versteckt, soll sich nicht fragen müssen, ob seine
+   Klasse zufällig ein display trägt. */
+[hidden]{display:none !important}
+
 body{margin:0;background:var(--bg);color:var(--txt);
      font:15px/1.5 "Fira Sans Condensed",system-ui,"Segoe UI",Roboto,sans-serif;
      -webkit-text-size-adjust:100%}
@@ -82,6 +95,58 @@ nav button:hover .nav-sym,nav button.on .nav-sym{filter:none}
    das nicht geladene <img> als 32 px breites Loch neben dem Wort. */
 .nav-sym.fehlt{display:none}
 @media(prefers-reduced-motion:reduce){ .nav-sym{transition:none} }
+
+/* ---- Die Leiste soll EINE Zeile bleiben ------------------------------
+   Seit sieben Punkte oben stehen, passt sie nicht mehr überall. Nachgemessen
+   im Prüfbrowser, angemeldet (Avatar und Name kosten rund 190 px):
+
+     Fensterbreite   1600   1366   1280   1200   1100   1024
+     verfügbar       1372   1138   1052    972    872    796
+     gebraucht                  alle sieben mit Wort: 1125 (deutsch)
+
+   Eine zweite Kopfzeile ist kein Schönheitsfehler: Die Leiste klebt oben
+   (position:sticky) und nimmt dem Inhalt die Höhe dauerhaft weg — bei 560 px
+   waren es 229 statt 67 px, ein Drittel eines Telefonschirms.
+
+   SKALIEREN ALLEIN REICHT NICHT, und das ist keine Meinung: Bei 1100 px
+   fehlen 253 px; sieben Bilder von 32 auf 20 zu schrumpfen bringt 7 × 12 =
+   84. Selbst ganz ohne Bilder blieben die Wörter zu breit. Also muss unter
+   einer bestimmten Breite das WORT weichen — das Bild trägt die Aussage
+   ohnehin, es ist bloß größer als eine Schriftzeile.
+
+   WO GENAU, sagt die längste Sprache und nicht die eigene. Gemessen, was die
+   volle Beschriftung an Fensterbreite verlangt:
+
+     de 1353    en 1361    es 1401    it 1402    fr 1420
+
+   Deshalb 1440 und nicht 1360: Bei 1366 (ein sehr verbreiteter Laptop) ginge
+   es auf Deutsch gerade eben auf — und auf Französisch nicht. Eine Schwelle,
+   die nur in der eigenen Sprache stimmt, ist keine.
+
+   Damit der Punkt ohne Wort ansprechbar bleibt, trägt jeder Knopf ein
+   data-i18n-title; applyI18n() füllt es und wechselt es mit der Sprache. Das
+   Wort bleibt als span im Baum stehen (display:none) — am Aufbau soll nichts
+   hängen, was nur die Anzeige betrifft.
+
+   Unter 600 px darf sie umbrechen. Dort wäre der nächste Schritt, Avatar und
+   Name zu opfern, und das ist der Punkt, an dem man nicht mehr sieht, als wer
+   man angemeldet ist. */
+@media (max-width:1440px){
+  /* Nur der Beschriftungs-span. Die Zahl daneben (Wunschliste, live Partie)
+     ist KEIN Beschriftungs-span und bleibt — sie ist der einzige Hinweis
+     darauf, dass etwas auf einen wartet. */
+  nav > button > span[data-i18n]{display:none}
+  nav{gap:4px}
+  nav button{padding:6px 10px}
+  .nav-sym{width:30px;height:30px}
+}
+@media (max-width:820px){
+  nav button{padding:5px 7px}
+  .nav-sym{width:24px;height:24px}
+  /* Der Name schrumpft mit, der Avatar bleibt: Ein Gesicht erkennt man auch
+     schmal, eine abgeschnittene Zeile liest man nicht. */
+  #who{max-width:112px}
+}
 /* Neben dem Logo: Statusseite und Version, zweizeilig untereinander. */
 .header-meta{display:inline-flex;flex-direction:column;align-items:flex-start;
              gap:1px;line-height:1.25;min-width:0}
