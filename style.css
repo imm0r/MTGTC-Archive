@@ -218,14 +218,73 @@ main:has(#v-session.on){max-width:1800px}
    zusätzliche Breite geht an genau diese beiden Spalten — die übrigen (Mana,
    Set, Sprache, Anzahl) sind inhaltlich fest.
 
-   2400 statt "so breit wie das Fenster": Ab einer gewissen Zeilenlänge verliert
-   man beim Blick von der Karte zur Menge die Zeile. Auf einem 3440er sind das
-   rund siebzig Prozent der Breite — deutlich mehr als bisher, aber noch eine
-   Strecke, die das Auge in einem Zug schafft. Auf allem darunter greift ohnehin
-   die Fensterbreite, nicht diese Zahl. */
+   1400 statt 2400: Ab einer gewissen Zeilenlänge verliert man beim Blick von
+   der Karte zur Menge die Zeile — bei 2400 war das auf einem breiten Schirm
+   erreicht. 1400 lässt den beiden dehnbaren Spalten (Name, Kategorien) immer
+   noch 300 px mehr als den übrigen Ansichten und hält die Zeile in einem
+   Blick.
+
+   Und es gibt den Seitenrand frei, in dem das große Sinnbild steht (siehe
+   unten). Bei 2400 blieb auf einem 2000er Schirm überhaupt kein Rand — die
+   Ansicht lief von Kante zu Kante. */
 main:has(#v-coll.on),
 main:has(#v-wish.on),
-main:has(#v-decks.on){max-width:2400px}
+main:has(#v-decks.on){max-width:1400px}
+
+/* ---- Das große Sinnbild im Seitenrand --------------------------------
+   Dasselbe Bild wie in der obersten Leiste, nur groß und halb durchsichtig,
+   links neben dem Inhalt. Es sagt ohne ein Wort, wo man ist — und es tut das
+   in einer Fläche, die sonst leer bleibt.
+
+   ÜBER :has() UND NICHT ÜBER JAVASCRIPT, aus demselben Grund wie die Breite
+   darüber: Die Startansicht steht schon in index.html auf „on", ohne dass je
+   ein Klick fiel. Ein Umschalter im Klick-Handler ließe genau sie aus.
+
+   NUR, WENN DER RAND ES HERGIBT. Ein Bild, das halb unter dem Inhalt liegt
+   oder am Fensterrand abgeschnitten wird, ist schlechter als keines. Wie viel
+   Platz nötig ist, hängt an der Breite der jeweiligen Ansicht:
+
+     Ansicht              breit   nötig
+     Vorgabe              1100    1100 + 2·(240+16+14) = 1640
+     Sammlung/Decks/…     1400    1940
+     live Partie          1800    2340
+
+   pointer-events:none, damit es keinen Klick abfängt: Es ist Schmuck, keine
+   Schaltfläche. */
+main{position:relative}
+main::before{
+  content:"";
+  position:absolute;top:14px;right:calc(100% + 16px);
+  width:240px;height:240px;
+  background-repeat:no-repeat;background-position:top right;background-size:contain;
+  opacity:.5;pointer-events:none;display:none}
+main:has(#v-coll.on)::before{display:block;background-image:url("assets/sym_sammlung.PNG")}
+main:has(#v-decks.on)::before{display:block;background-image:url("assets/sym_decks.PNG")}
+main:has(#v-wish.on)::before{display:block;background-image:url("assets/sym_wishlist.PNG")}
+main:has(#v-more.on)::before{display:block;background-image:url("assets/sym_cardmanagent.PNG")}
+main:has(#v-community.on)::before{display:block;background-image:url("assets/community.PNG")}
+main:has(#v-rules.on)::before{display:block;background-image:url("assets/rules.PNG")}
+main:has(#v-session.on)::before{display:block;background-image:url("assets/livepartie.PNG")}
+/* Reicht der Rand nicht, bleibt es weg — je Ansicht bei ihrer eigenen Zahl.
+   DIESELBEN SELEKTOREN WIE OBEN, nicht das kürzere „main::before": Eine
+   Medienabfrage erhöht die Spezifität NICHT. „main::before{display:none}"
+   verlöre gegen „main:has(#v-coll.on)::before{display:block}" — die Regel
+   stünde da und gälte nie. Gleiche Spezifität und weiter unten gewinnt. */
+@media (max-width:1640px){
+  main:has(#v-coll.on)::before,
+  main:has(#v-decks.on)::before,
+  main:has(#v-wish.on)::before,
+  main:has(#v-more.on)::before,
+  main:has(#v-community.on)::before,
+  main:has(#v-rules.on)::before,
+  main:has(#v-session.on)::before{display:none}
+}
+@media (max-width:1940px){
+  main:has(#v-coll.on)::before,
+  main:has(#v-wish.on)::before,
+  main:has(#v-decks.on)::before{display:none}
+}
+@media (max-width:2340px){ main:has(#v-session.on)::before{display:none} }
 .view{display:none} .view.on{display:block}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:14px}
 button,select,input,textarea{font:inherit}

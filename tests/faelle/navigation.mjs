@@ -225,6 +225,90 @@ export default async function ({ seite, adresse, stand }) {
   await seite.setViewportSize({ width: 1600, height: 900 });
   await seite.waitForTimeout(250);
 
+  /* --- Das große Sinnbild im Seitenrand -------------------------------- */
+  /* Dasselbe Bild wie oben, nur groß und halb durchsichtig, links neben dem
+     Inhalt. Zwei Dinge dürfen dabei nicht auseinanderlaufen:
+
+     * ES MUSS DASSELBE BILD SEIN wie am Navigationspunkt. Zwei Listen von
+       Pfaden — eine in index.html, eine in style.css — driften auseinander,
+       sobald eine Datei umbenannt wird. Geprüft wird deshalb PAARWEISE gegen
+       die Leiste und nicht gegen eine abgeschriebene Liste.
+     * ES DARF NICHT ERSCHEINEN, WENN KEIN PLATZ IST. Ein Bild, das halb unter
+       dem Inhalt liegt oder am Fensterrand abgeschnitten wird, ist schlechter
+       als keines. */
+  await seite.setViewportSize({ width: 2400, height: 900 });
+  await seite.waitForTimeout(250);
+  const rand = await seite.evaluate(() => {
+    const raus = [];
+    for (const b of document.querySelectorAll("nav > button[data-v]")) {
+      const v = b.dataset.v;
+      document.querySelectorAll(".view").forEach(x => x.classList.toggle("on", x.id === "v-" + v));
+      const st = getComputedStyle(document.querySelector("main"), "::before");
+      raus.push({
+        v,
+        leiste: b.querySelector("img.nav-sym").getAttribute("src"),
+        gross: (st.backgroundImage.match(/assets\/[^"')]+/) || [])[0] || null,
+        sichtbar: st.display !== "none",
+        deckkraft: st.opacity,
+        breite: st.width,
+        klickt: st.pointerEvents !== "none",
+      });
+    }
+    return raus;
+  });
+  stand.gleich("jede der sieben Ansichten zeigt ein großes Sinnbild",
+    rand.filter(r => r.sichtbar).length, 7);
+  stand.gleich("und zwar dasselbe Bild wie am Punkt darüber",
+    rand.filter(r => r.leiste !== r.gross).map(r => `${r.v}: ${r.leiste} ≠ ${r.gross}`), []);
+  stand.gleich("halb durchsichtig", [...new Set(rand.map(r => r.deckkraft))], ["0.5"]);
+  stand.ist("und größer als das in der Leiste",
+    rand.every(r => parseInt(r.breite, 10) >= 200), rand[0]?.breite);
+  stand.gleich("es fängt keinen Klick ab — es ist Schmuck, keine Schaltfläche",
+    rand.filter(r => r.klickt).map(r => r.v), []);
+
+  /* Eine Ansicht ohne Punkt in der Leiste (Profil) hat auch kein Sinnbild.
+     Ohne diese Zeile bliebe „immer dasselbe Bild“ unbemerkt. */
+  stand.ist("eine Ansicht ohne eigenen Punkt zeigt keines",
+    await seite.evaluate(() => {
+      document.querySelectorAll(".view").forEach(x => x.classList.toggle("on", x.id === "v-profile"));
+      return getComputedStyle(document.querySelector("main"), "::before").display === "none";
+    }));
+
+  /* Und der Platz. Die Sammlung ist breiter als die übrigen Ansichten, ihre
+     Schwelle liegt deshalb höher — bei 1920 px ist der Rand zu schmal, bei
+     2000 reicht er. */
+  const platz = async (breite, ansicht) => {
+    await seite.setViewportSize({ width: breite, height: 900 });
+    await seite.evaluate(v => {
+      document.querySelectorAll(".view").forEach(x => x.classList.toggle("on", x.id === "v-" + v));
+    }, ansicht);
+    await seite.waitForTimeout(200);
+    const m = await seite.evaluate(() => {
+      const el = document.querySelector("main");
+      const st = getComputedStyle(el, "::before");
+      return { sichtbar: st.display !== "none", breite: Math.round(el.getBoundingClientRect().width),
+               links: Math.round(el.getBoundingClientRect().left) };
+    });
+    return m;
+  };
+  const engCo = await platz(1920, "coll");
+  const weitCo = await platz(2000, "coll");
+  const engCom = await platz(1600, "community");
+  const weitCom = await platz(1700, "community");
+  stand.ist("in der Sammlung bleibt es bei zu schmalem Rand weg", !engCo.sichtbar,
+    `Rand ${engCo.links} px`);
+  stand.ist("und erscheint, sobald er reicht", weitCo.sichtbar, `Rand ${weitCo.links} px`);
+  stand.ist("die schmaleren Ansichten kommen früher dazu", weitCom.sichtbar && !engCom.sichtbar,
+    `1600: Rand ${engCom.links}, 1700: Rand ${weitCom.links}`);
+  stand.gleich("die Sammlung ist wieder schmaler als vorher (1400 statt 2400)",
+    weitCo.breite, 1400);
+
+  await seite.setViewportSize({ width: 1600, height: 900 });
+  await seite.evaluate(() => {
+    document.querySelectorAll(".view").forEach(x => x.classList.toggle("on", x.id === "v-coll"));
+  });
+  await seite.waitForTimeout(200);
+
   /* --- Fehlt eine Bilddatei -------------------------------------------- */
   /* Der Rückfall, ohne den ein noch nicht hochgeladenes Sinnbild ein Loch in
      die Kopfzeile schlägt. Geprüft an einem eigens erfundenen Pfad und nicht

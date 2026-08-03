@@ -728,6 +728,40 @@ Zwei Dinge, die an dieser Leiste schon still danebengingen und die der Prüffall
   jemand hinsah, meldet sich `error` nie mehr; dann verrät `complete` ohne
   `naturalWidth`, was los ist.
 
+#### Das große Sinnbild im Seitenrand
+
+Jede Ansicht mit einem Punkt in der Leiste zeigt **dasselbe Bild noch einmal
+groß und halb durchsichtig**, links neben dem Inhalt. Es sagt ohne ein Wort,
+wo man ist, und tut das in einer Fläche, die sonst leer bleibt.
+
+Geschaltet wird es über `:has()` und nicht über JavaScript — aus demselben
+Grund wie die Breite: Die Startansicht steht schon in `index.html` auf `on`,
+ohne dass je ein Klick fiel; ein Umschalter im Klick-Handler ließe genau sie
+aus.
+
+**Nur, wenn der Rand es hergibt.** Ein Bild, das halb unter dem Inhalt liegt
+oder am Fensterrand abgeschnitten wird, ist schlechter als keines. Wie viel
+Platz nötig ist, hängt an der Breite der jeweiligen Ansicht:
+
+| Ansicht | breit | nötig |
+| --- | --- | --- |
+| Vorgabe (Community, Termine, …) | 1100 | 1640 |
+| Sammlung, Decks, Wunschliste | 1400 | 1940 |
+| live Partie | 1800 | 2340 |
+
+Dafür sind **Sammlung, Decks und Wunschliste von 2400 auf 1400** geschrumpft.
+Bei 2400 blieb auf einem 2000er Schirm überhaupt kein Rand — die Ansicht lief
+von Kante zu Kante. 1400 lässt den beiden dehnbaren Spalten (Name, Kategorien)
+immer noch 300 px mehr als den übrigen Ansichten und hält die Zeile in einem
+Blick.
+
+> **Eine Medienabfrage erhöht die Spezifität nicht.** Die Verstecken-Regeln
+> müssen deshalb *dieselben* Selektoren tragen wie die Zeigen-Regeln;
+> `main::before{display:none}` verlöre gegen
+> `main:has(#v-coll.on)::before{display:block}` — die Regel stünde da und
+> gälte nie. Genau so ist es beim ersten Anlauf passiert, und aufgefallen ist
+> es nur, weil der Prüffall den Rand an einer schmalen Stelle misst.
+
 #### Die Leiste bleibt eine Zeile
 
 Mit sieben Punkten passt sie nicht mehr überall. Eine zweite Kopfzeile ist
