@@ -858,9 +858,16 @@ Deshalb entscheidet der Trigger beim Anlegen, welche der beiden es ist:
 | neues Deck, privat | `deck_created` |
 | bestehendes, privat → öffentlich | `deck_public` |
 
-**Mit Decknamen — und anklickbar.** Die Zeile nennt das Deck beim Namen und
-führt beim Klick in seine Ansicht, dieselbe, die auch die Kacheln der
-Community-Decks öffnen.
+**Mit Decknamen — und anklickbar.** „*Sturmprophet hat das Deck „Sidisi" mit
+der Community geteilt*" — der Name führt beim Klick in die Deckansicht,
+dieselbe, die auch die Kacheln der Community-Decks öffnen.
+
+> **„das Deck", nicht „sein Deck".** Im Feed stehen echte Mitglieder, und die
+> App kennt ihr Geschlecht nicht. Deutsch hat für Personen keinen neutralen
+> Possessiv; Englisch mit „their" schon, und im Französischen, Spanischen und
+> Italienischen richtet sich das Possessiv nach dem **Deck** statt nach der
+> Person und sagt über sie nichts aus. Deshalb steht nur der deutsche Satz
+> anders als die vier anderen.
 
 Die beiden Gründe, aus denen sie das anfangs *nicht* tat, bleiben dabei gewahrt,
 weil **nicht der Name gespeichert wird, sondern die Deck-Kennung** — der Name

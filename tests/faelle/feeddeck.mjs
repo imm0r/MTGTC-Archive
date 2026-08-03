@@ -131,9 +131,23 @@ export default async function ({ seite, adresse, stand, wurzel }) {
   stand.ist("der Feed steht", zeilen.length === 4, zeilen.length);
   stand.gleich("das geteilte Deck steht mit Namen da und ist ein Knopf",
     [zeilen[0]?.knopf, zeilen[0]?.id], ["Reyhan & Ikra", "d-a"]);
+  /* Der Satz nennt die Sache beim Wort und setzt den Namen in Anführungszeichen:
+     „hat DAS DECK ‚X' geteilt" statt „hat X geteilt". Ohne das las sich die
+     Zeile, als sei X eine Karte, ein Termin oder sonst etwas.
+
+     „das Deck" und nicht „sein Deck": Im Feed stehen echte Mitglieder, und die
+     App kennt ihr Geschlecht nicht. Deutsch hat für Personen keinen neutralen
+     Possessiv — Englisch mit „their" schon, und im Französischen, Spanischen
+     und Italienischen richtet sich das Possessiv nach dem DECK statt nach der
+     Person, sagt über sie also nichts aus. Deshalb steht es nur hier anders. */
   stand.ist("… und der Name steht auch im Satz",
     /Mira/.test(zeilen[0]?.text || "") && /Reyhan & Ikra/.test(zeilen[0]?.text || ""),
     zeilen[0]?.text);
+  stand.ist("der Satz nennt es ein Deck und setzt den Namen in Anführungszeichen",
+    /hat das Deck „Reyhan & Ikra“ mit der Community geteilt/.test(zeilen[0]?.text || ""),
+    zeilen[0]?.text);
+  stand.ist("und er weist niemandem ein Geschlecht zu",
+    !/\b(sein|seine|ihr|ihre)\b/i.test(zeilen[0]?.text || ""), zeilen[0]?.text);
   /* Ohne Namen bleibt es beim bisherigen Satz — und OHNE Knopf: Ein Knopf, der
      ins Leere führte, wäre schlimmer als gar keiner. */
   stand.gleich("ein wieder privates Deck bleibt namenlos und ohne Knopf",
