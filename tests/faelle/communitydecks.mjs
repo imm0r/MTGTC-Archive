@@ -186,6 +186,98 @@ export default async function ({ seite, adresse, stand, wurzel }) {
   stand.gleich("und die Sortierung bleibt dabei stehen", suche.abfrage.sort, "neu");
   stand.gleich("ein Treffer", suche.kacheln, 1);
 
+  /* --- Die Kacheln führen zu den Listen --------------------------------
+     Eine Zahl, unter der etwas Ganzes liegt, soll man anklicken können —
+     sonst liest man „6 Mitglieder" und sucht die Liste von Hand. Die übrigen
+     Kacheln bleiben Flächen: Ein Knopf, der nichts tut, ist schlechter als
+     eine Fläche, die nie so aussah. */
+  const kacheln = await seite.evaluate(() => {
+    COMMUNITY_STATS = { member_count: 6, deck_count: 15, public_deck_count: 9,
+      card_count: 1601, active_session_count: 1, upcoming_event_count: 47,
+      activity_7d_count: 195, combo_count: 741, synergy_count: 466 };
+    renderCommunity();
+    return [...document.querySelectorAll(".stat")].map(el => ({
+      wert: el.querySelector(".v").textContent.trim(),
+      text: el.querySelector(".k").textContent.trim().replace(/\s*↓$/, ""),
+      ziel: el.dataset.springt || null,
+    }));
+  });
+  await seite.waitForTimeout(300);
+  stand.gleich("die Community-Decks stehen als eigene Kachel gleich nach den Decks",
+    kacheln.slice(0, 3).map(k => `${k.text}=${k.wert}`),
+    ["Mitglieder=6", "Decks=15", "Community-Decks=9"]);
+  stand.gleich("genau zwei Kacheln führen irgendwohin",
+    kacheln.filter(k => k.ziel).map(k => k.ziel), ["mitglieder-karte", "cdecks-karte"]);
+
+  /* Kennt die Datenbank die neue Zahl noch nicht, fehlt die Kachel lieber,
+     als eine 0 zu zeigen, die keine ist. */
+  const ohne = await seite.evaluate(() => {
+    const { public_deck_count, ...alt } = COMMUNITY_STATS;
+    COMMUNITY_STATS = alt;
+    renderCommunity();
+    return [...document.querySelectorAll(".stat")].map(el => el.dataset.springt || null);
+  });
+  stand.gleich("ohne die neue Spalte bleibt die Kachel weg",
+    ohne.filter(Boolean), ["mitglieder-karte"]);
+
+  await seite.evaluate(() => {
+    COMMUNITY_STATS = { ...COMMUNITY_STATS, public_deck_count: 9 };
+    renderCommunity();
+  });
+  await seite.waitForTimeout(400);
+  /* Gemessen in einem NIEDRIGEN Fenster: In einem hohen steht die Karte
+     ohnehin schon im Bild, und ein Sprung, der nichts bewegt, ließe sich von
+     einem kaputten nicht unterscheiden. */
+  await seite.setViewportSize({ width: 1280, height: 380 });
+  await seite.waitForTimeout(300);
+  const sprung = await seite.evaluate(async () => {
+    const karte = document.getElementById("cdecks-karte");
+    window.scrollTo(0, 0);
+    await new Promise(r => setTimeout(r, 100));
+    const vorher = karte.getBoundingClientRect().top;
+    document.querySelector('[data-springt="cdecks-karte"]').click();
+    await new Promise(r => setTimeout(r, 900));
+    return { vorher: Math.round(vorher), nachher: Math.round(karte.getBoundingClientRect().top),
+             hoehe: innerHeight, leuchtet: karte.classList.contains("leuchtet") };
+  });
+  stand.ist("vorher steht die Karte unterhalb des Fensters",
+    sprung.vorher > sprung.hoehe, `oben bei ${sprung.vorher}, Fenster ${sprung.hoehe}`);
+  stand.ist("ein Klick holt sie ins Bild",
+    sprung.nachher < sprung.hoehe && sprung.nachher < sprung.vorher,
+    `von ${sprung.vorher} auf ${sprung.nachher}`);
+  stand.ist("und lässt sie kurz aufleuchten", sprung.leuchtet);
+  await seite.setViewportSize({ width: 1600, height: 900 });
+  await seite.waitForTimeout(250);
+
+  /* --- Der Feed nennt das Teilen -------------------------------------- */
+  const feed = await seite.evaluate(() => {
+    const zeile = k => aktivitaetText({ actor_name: "Mira", kind: k, metadata: {} });
+    const mehr = k => aktivitaetText({ actor_name: "Mira", kind: k, metadata: { n: 3 } });
+    return { einzeln: zeile("deck_public"), mehrere: mehr("deck_public"),
+             angelegt: zeile("deck_created") };
+  });
+  stand.ist("ein geteiltes Deck steht als eigene Zeile im Feed",
+    /Mira/.test(feed.einzeln) && /geteilt/.test(feed.einzeln), feed.einzeln);
+  stand.ist("… auch in der Mehrzahl", /3/.test(feed.mehrere), feed.mehrere);
+  stand.ist("und bleibt vom bloßen Anlegen unterscheidbar",
+    feed.angelegt !== feed.einzeln && !/geteilt/.test(feed.angelegt), feed.angelegt);
+  stand.ist("der Deckname steht NICHT darin — der Feed bleibt datensparsam",
+    !/Deck [AB]|Mein Deck/.test(feed.einzeln));
+
+  /* --- Der Trigger schreibt genau EINE Zeile --------------------------- */
+  const trig = await readFile(join(wurzel, "supabase/migrations/20260803010000_deck_geteilt_feed.sql"), "utf8");
+  const tsql = trig.slice(trig.indexOf("alter table public.community_activity"));
+  stand.ist("beim Anlegen entscheidet der Trigger, welche der beiden Zeilen es ist",
+    /case when new\.is_public then 'deck_public' else 'deck_created' end/.test(tsql));
+  stand.ist("beim Umschalten von privat auf öffentlich ebenfalls",
+    /coalesce\(old\.is_public, false\) = false and new\.is_public/.test(tsql));
+  stand.ist("dafür hängt ein Trigger am UPDATE",
+    /after update of is_public on public\.decks/.test(tsql));
+  stand.ist("die neue Art ist in der Prüfbedingung erlaubt",
+    /check \(kind in \([^)]*'deck_public'/.test(tsql.replace(/\n/g, " ")));
+  stand.ist("und die Kennzahl zählt die öffentlichen Decks",
+    /public_deck_count bigint/.test(tsql) && /count\(\*\) from public\.decks where is_public/.test(tsql));
+
   /* --- Der Schalter am Deck ------------------------------------------- */
   const schalter = await seite.evaluate(async () => {
     window.GESCHRIEBEN = null;

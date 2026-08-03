@@ -585,6 +585,39 @@ Zuordnungen, Karten. Dieselben Policies wie bei `shared`, nur ohne die
 Freundschaftsprüfung: Ein Deck ohne seine Einteilung wäre eine Liste, mit ihr
 ein Bauplan.
 
+### Der Weg dorthin: Kacheln, die führen
+
+Zwei der Kennzahlen oben in der Community-Ansicht sind **Knöpfe**: „Mitglieder"
+und die neue „Community-Decks" (gleich nach „Decks"). Ein Klick holt die
+zugehörige Liste ins Bild und lässt sie kurz aufleuchten — ohne das landete man
+mitten in einer Seite, die überall gleich aussieht, und wüsste nicht, ob
+überhaupt etwas geschehen ist.
+
+Die übrigen Kacheln bleiben Flächen. Ein Knopf, der nichts tut, ist schlechter
+als eine Fläche, die nie so aussah; ein Pfeil ↓ und die Reaktion beim Überfahren
+zeigen, welche führt.
+
+> Die Zahl der öffentlichen Decks kennt erst die neuere Fassung von
+> `community_statistics()`. Liegt die Migration noch nicht, **fehlt die Kachel**
+> — lieber das, als eine 0 zu zeigen, die keine ist.
+
+### Im Live-Feed: „hat ein Deck mit der Community geteilt"
+
+Ein neues Ereignis, `deck_public`. **Eine Zeile, nicht zwei:** Ein neu
+angelegtes Deck ist von sich aus öffentlich; schriebe man dafür `deck_created`
+*und* `deck_public`, stünden im Feed zwei Zeilen für denselben Augenblick.
+Deshalb entscheidet der Trigger beim Anlegen, welche der beiden es ist:
+
+| Fall | Zeile |
+| --- | --- |
+| neues Deck, öffentlich | `deck_public` |
+| neues Deck, privat | `deck_created` |
+| bestehendes, privat → öffentlich | `deck_public` |
+
+**Ohne Decknamen.** Der Feed ist seit Sprint 1 bewusst datensparsam, und ein
+Deck kann später wieder privat gestellt werden — sein Name stünde dann noch da.
+Die Zeile nennt die Person und das Ereignis, nicht das Deck.
+
 ### Sterne und Rangliste
 
 Jedes Mitglied vergibt 1 bis 5 Sterne, eine Stimme je Deck, jederzeit änderbar
@@ -2111,7 +2144,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `mitglieder`     | Die Mitgliederliste ohne Stufen: dass die Abfrage das neueste Mitglied aus allen Profilen und mit echtem Namen nimmt, dass Karten und „größte Sammlung“ weiterhin an den Stufen hängen, dass ein leerer Anzeigename die Ersatzbezeichnung behält — und dass die Zusage in allen fünf Sprachen mitgewandert ist |
 | `anzeigename`    | Der Anzeigename als Pflicht: die Regel selbst (2–40, getrimmt), das Feld beim Anlegen, der Weg über die Nutzer-Metadaten bis ins frisch angelegte Profil, die Maske vor der App für alte Konten samt Ausweg — und dass das Profilfeld ihn nicht mehr leeren kann |
 | `mitgliederliste` | Die Mitgliederliste und das öffentliche Profil: dass die Abfrage `findable` achtet, die Gesamtzahl je Zeile mitzählt und das Verhältnis gleich mitliefert; die vier Knöpfe, Blättern und Suchen (samt Rücksprung auf Seite eins und Fokus im Feld) — und dass ein `javascript:`-Ziel kein Verweis wird und Markup im Steckbrief Text bleibt |
-| `communitydecks` | Community-Decks: dass die Migration bestehende Decks NICHT veröffentlicht (Reihenfolge der beiden ALTERs), dass die Rangliste glättet und trotzdem den echten Schnitt zeigt, dass das eigene Deck keine Knöpfe hat und die Datenbank es abweist — dazu Bewerten ohne Neuladen der Liste, Sortieren und Suchen über den Commander |
+| `communitydecks` | Community-Decks: dass die Migration bestehende Decks NICHT veröffentlicht (Reihenfolge der beiden ALTERs), dass die Rangliste glättet und trotzdem den echten Schnitt zeigt, dass das eigene Deck keine Knöpfe hat und die Datenbank es abweist — dazu Bewerten ohne Neuladen der Liste, Sortieren und Suchen über den Commander; dazu die beiden führenden Kacheln (und dass die übrigen keine sind), der Sprung im niedrigen Fenster samt Aufleuchten, und der Feed-Trigger, der beim Anlegen genau EINE der beiden Zeilen schreibt |
 
 ### Zwei Regeln, die dabei gelernt wurden
 
