@@ -4610,7 +4610,8 @@ function priceChart(hist, w = 560, h = 200) {
   const med = H.length >= 3 ? medianOf(vs) : null;
   const avg = H.length >= 3 && !schmal
     ? vs.reduce((s, v) => s + v, 0) / vs.length : null;
-  const linie = H.map(p => `${X(p).toFixed(1)},${Y(p.v).toFixed(1)}`).join(" ");
+  const XY = H.map(p => ({ x: X(p), y: Y(p.v) }));
+  const kurve = glatterPfad(XY);
   const farbe = H[H.length - 1].v >= H[0].v ? "var(--ok)" : "var(--err)";
 
   // Platz für ein Etikett an einer waagerechten Bezugslinie suchen. Eine feste
@@ -4667,7 +4668,12 @@ function priceChart(hist, w = 560, h = 200) {
   }
 
   const id = ++PCHART_NR;
-  PCHART_GEO.set(id, { pts: H.map(p => ({ x: X(p), y: Y(p.v), d: p.d, v: p.v })), w });
+  // pt/ih fürs Lot (die senkrechte Linie am abgelesenen Punkt) und der letzte
+  // Wert für die Veränderung im Ablesekästchen — beides kennt nur diese
+  // Funktion, der Zuhörer am Dokument bekäme es sonst nicht heraus.
+  PCHART_GEO.set(id, { pts: H.map(p => ({ x: X(p), y: Y(p.v), d: p.d, v: p.v })), w,
+                       oben: pt, unten: pt + ih,
+                       letzter: H[H.length - 1].v, letzterD: H[H.length - 1].d });
   // Aufräumen: alles wegwerfen, was nicht mehr im Dokument hängt. Ohne das
   // wüchse die Map mit jedem geöffneten Kartendetail weiter.
   if (PCHART_GEO.size > 12)
@@ -4676,6 +4682,15 @@ function priceChart(hist, w = 560, h = 200) {
 
   return `<div class="pchart" data-pc="${id}">
     <svg class="chart-svg" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
+      ${/* Der Verlauf trägt die Kurvenfarbe und verläuft nach unten ins Nichts.
+            Die Kennung hängt an der Graphen-Nummer: Zwei Graphen auf einer
+            Seite (Dialog und Hover-Vorschau) hätten sonst dieselbe, und der
+            zweite überschriebe die Füllung des ersten — im SVG sind Kennungen
+            dokumentweit. */""}
+      <defs><linearGradient id="pcf${id}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="${farbe}" stop-opacity=".28"/>
+        <stop offset="1" stop-color="${farbe}" stop-opacity="0"/>
+      </linearGradient></defs>
       ${Array.from({ length: yN + 1 }, (_, i) => {
         const v = yLo + i * schritt, y = Y(v).toFixed(1);
         return `<line x1="${pl}" y1="${y}" x2="${w - pr}" y2="${y}" stroke="var(--line)" stroke-width="1"/>
@@ -4699,7 +4714,12 @@ function priceChart(hist, w = 560, h = 200) {
             und ohne mit dem Grün/Rot der Kurve verwechselbar zu sein. */""}
       ${avg != null ? `<line x1="${pl}" y1="${Y(avg).toFixed(1)}" x2="${w - pr}" y2="${Y(avg).toFixed(1)}"
           stroke="var(--dim)" stroke-width="1" stroke-dasharray="2 3" opacity=".42"/>` : ""}
-      ${H.length > 1 ? `<polyline points="${linie}" fill="none" stroke="${farbe}"
+      ${/* Fläche vor Kurve: Im SVG gibt es kein z-index, es zählt allein die
+            Reihenfolge. Andersherum läge der Verlauf über der Linie und
+            trübte sie ein. */""}
+      ${kurve ? `<path d="${kurve} L${XY[XY.length - 1].x.toFixed(1)},${(pt + ih).toFixed(1)}
+          L${XY[0].x.toFixed(1)},${(pt + ih).toFixed(1)} Z" fill="url(#pcf${id})" stroke="none"/>` : ""}
+      ${kurve ? `<path d="${kurve}" fill="none" stroke="${farbe}"
           stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` : ""}
       ${punkte ? H.map(p => `<circle cx="${X(p).toFixed(1)}" cy="${Y(p.v).toFixed(1)}"
           r="${r}" fill="${farbe}"/>`).join("") : ""}
@@ -4715,14 +4735,181 @@ function priceChart(hist, w = 560, h = 200) {
         <text x="${(e.x + e.b / 2).toFixed(1)}"
           y="${(e.y + e.h - (fs - 1) * 0.28).toFixed(1)}" text-anchor="middle"
           font-size="${fs - 1}" fill="${e.farbe}" opacity=".9">${esc(e.text)}</text>`).join("")}
+      ${/* Das Lot VOR der Marke: Beim Ablesen soll der Punkt auf der Linie
+            liegen, nicht die Linie auf dem Punkt. */""}
+      <line class="pchart-lot" y1="${pt}" y2="${(pt + ih).toFixed(1)}" stroke="var(--dim)"
+        stroke-width="1" stroke-dasharray="3 3" opacity=".55" style="display:none"/>
       <circle class="pchart-marke" r="4.5" fill="${farbe}" stroke="var(--panel)"
         stroke-width="2" style="display:none"/>
     </svg>
     <div class="pchart-tip" hidden>
       <div class="pchart-tip-d"></div>
       <div class="pchart-tip-v"><i style="background:${farbe}"></i><span></span></div>
+      <div class="pchart-tip-w"></div>
     </div>
   </div>`;
+}
+
+/* Eine Kurve durch die Punkte statt eines Streckenzugs — monoton kubisch nach
+   Fritsch-Carlson.
+
+   Die Wahl des Verfahrens ist hier keine Geschmacksfrage. Der naheliegende
+   Catmull-Rom-Spline SCHIESST ÜBER: Zwischen zwei Punkten läuft er über den
+   höheren hinaus, wenn davor oder danach ein Ausreißer liegt. Bei Preisen
+   hieße das, dass der Graph Werte zeigt, die es nie gegeben hat — eine Karte
+   sähe zwischen zwei Messungen teurer aus als an jedem gemessenen Tag.
+
+   Fritsch-Carlson kann das nicht: Wo die Steigung das Vorzeichen wechselt,
+   setzt es die Tangente auf null, sonst auf das gewichtete harmonische Mittel
+   der Nachbarsteigungen. Beides zusammen hält die Kurve zwischen den
+   Nachbarpunkten. Sie geht weiterhin exakt durch jeden Messwert; geglättet
+   wird allein der Weg dazwischen. */
+function glatterPfad(pts) {
+  if (!pts || pts.length < 2) return "";
+  const n = pts.length, dx = [], m = [];
+  for (let i = 0; i < n - 1; i++) {
+    dx[i] = pts[i + 1].x - pts[i].x;
+    // Zwei Punkte auf derselben Senkrechten kann es nicht geben (die Reihe ist
+    // nach Datum entdoppelt), aber eine Division durch null wäre ein NaN im
+    // Pfad und damit eine unsichtbare Kurve — also lieber abgefangen.
+    m[i] = dx[i] === 0 ? 0 : (pts[i + 1].y - pts[i].y) / dx[i];
+  }
+  const tg = new Array(n);
+  tg[0] = m[0]; tg[n - 1] = m[n - 2];
+  for (let i = 1; i < n - 1; i++) {
+    if (m[i - 1] * m[i] <= 0) { tg[i] = 0; continue; }   // Wendepunkt: waagerecht
+    const w1 = 2 * dx[i] + dx[i - 1], w2 = dx[i] + 2 * dx[i - 1];
+    tg[i] = (w1 + w2) / (w1 / m[i - 1] + w2 / m[i]);
+  }
+  const z = v => v.toFixed(1);
+  let d = `M${z(pts[0].x)},${z(pts[0].y)}`;
+  for (let i = 0; i < n - 1; i++) {
+    const h = dx[i] / 3;
+    d += ` C${z(pts[i].x + h)},${z(pts[i].y + tg[i] * h)}` +
+         ` ${z(pts[i + 1].x - h)},${z(pts[i + 1].y - tg[i + 1] * h)}` +
+         ` ${z(pts[i + 1].x)},${z(pts[i + 1].y)}`;
+  }
+  return d;
+}
+
+/* ------------------------------------------------ Preisverlauf im Dialog ---
+   Der Graph allein beantwortet „wie lief es", aber nicht „wie lief es WORIN".
+   Dazu kommen drei Dinge, die ohne einander wenig taugen:
+
+   * ein Zeitfenster (30 Tage bis Alle) — ohne das quetscht ein Jahresverlauf
+     die letzten Wochen auf zwei Pixel zusammen, und genau die interessieren;
+   * Kennzahlen zum GEWÄHLTEN Fenster, oben Hoch und Tief, unten Veränderung,
+     Spanne und Anzahl der Messpunkte;
+   * die Anzahl der Punkte, und die steht dort nicht als Zierde: Eine Spanne
+     von 6 % aus vierzehn Messungen ist etwas anderes als dieselbe Spanne aus
+     zweien. Ohne das n ist jede Prozentzahl hier eine Behauptung ohne Beleg.
+
+   NUR IM DIALOG. Die Hover-Vorschau zeigt weiterhin den nackten Graphen: Dort
+   huscht der Zeiger vorbei, und Knöpfe, die man im Vorbeifahren nicht drücken
+   kann, sind nur Gedränge. */
+const PV_FENSTER = [
+  { id: "30t",  tage: 30,   lbl: "chart.w30"  },
+  { id: "3m",   tage: 91,   lbl: "chart.w3m"  },
+  { id: "6m",   tage: 183,  lbl: "chart.w6m"  },
+  { id: "1j",   tage: 365,  lbl: "chart.w1y"  },
+  { id: "alle", tage: null, lbl: "chart.wall" },
+];
+
+/* Vorzeichen IMMER mitschreiben, auch das Plus: „6,5 %" allein liest sich als
+   Spanne, „+6,5 %" als Bewegung. Das echte Minuszeichen (U+2212) statt des
+   Bindestrichs — auf Ziffernbreite gesetzt steht es mittig statt zu kleben. */
+const prozentText = p =>
+  (p >= 0 ? "+" : "−") + Math.abs(p).toFixed(1).replace(".", ",") + " %";
+
+/* Die Reihe auf ein Fenster beschneiden und durchrechnen.
+
+   Gerechnet wird ab HEUTE zurück, nicht ab dem letzten Messpunkt. Der
+   Unterschied fällt auf, sobald die Reihe ein paar Tage alt ist: Ab dem
+   letzten Punkt gerechnet hieße „30 Tage" in Wahrheit „30 Tage, die vor einer
+   Woche endeten". Ab heute gerechnet endet der Graph eben früher — das ist
+   sichtbar und ehrlich, statt unsichtbar und falsch. */
+function pvFenster(hist, fensterId) {
+  const f = PV_FENSTER.find(x => x.id === fensterId) || PV_FENSTER[PV_FENSTER.length - 1];
+  const alle = (hist || []).filter(p => p && Number.isFinite(Number(p.v)));
+  const H = f.tage == null ? alle : (() => {
+    const grenze = Date.parse(`${today()}T00:00:00Z`) - f.tage * 864e5;
+    return alle.filter(p => Date.parse(`${p.d}T00:00:00Z`) >= grenze);
+  })();
+  if (!H.length) return { H, n: 0 };
+
+  let hoch = Number(H[0].v), tief = hoch;
+  for (const p of H) { const v = Number(p.v); if (v > hoch) hoch = v; if (v < tief) tief = v; }
+  const erst = Number(H[0].v), letzt = Number(H[H.length - 1].v);
+  return {
+    H, n: H.length, hoch, tief,
+    // Beide Prozentwerte brauchen einen Nenner über null — bei einem
+    // Nullpreis (kommt bei sehr billigen Karten vor) bleibt das Feld leer,
+    // statt „unendlich" zu behaupten.
+    spanne: tief > 0 ? (hoch - tief) / tief * 100 : null,
+    wandel: erst > 0 && H.length > 1 ? (letzt - erst) / erst * 100 : null,
+  };
+}
+
+function preisVerlaufHtml(c, fensterId) {
+  const alle = mergedHist(c);
+  // Ein einzelner Punkt ist kein Verlauf: Dann bleibt es beim nackten Graphen
+  // (der sagt selbst, dass die Historie noch wächst), ohne Fenster und
+  // Kennzahlen, die alle dasselbe zeigten.
+  if (alle.length < 2) return priceChart(alle, 900, 200);
+
+  const spanneVoll = { von: Date.parse(`${alle[0].d}T00:00:00Z`) };
+  const knoepfe = PV_FENSTER.map(f => {
+    const d = pvFenster(alle, f.id);
+    // Zwei Gründe, ein Fenster zu sperren, und beide werden benannt: zu wenige
+    // Punkte darin — oder es zeigt ohnehin alles, ist also ein zweiter Knopf
+    // für „Alle".
+    const leer = d.n < 2;
+    const wieAlle = f.tage != null && !leer &&
+      spanneVoll.von >= Date.parse(`${today()}T00:00:00Z`) - f.tage * 864e5;
+    const aus = leer || wieAlle;
+    return { ...f, aus, titel: leer ? t("chart.winEmpty") : (wieAlle ? t("chart.winSameAsAll") : "") };
+  });
+  // Voreinstellung: 30 Tage, wenn dort etwas steht — sonst das kleinste
+  // Fenster, das etwas zeigt. „Alle" ist nie gesperrt und fängt den Rest.
+  const gewaehlt = knoepfe.find(k => k.id === fensterId && !k.aus)
+    || knoepfe.find(k => k.id === "30t" && !k.aus)
+    || knoepfe.find(k => !k.aus);
+  const d = pvFenster(alle, gewaehlt.id);
+
+  const kz = (lbl, wert, kl) =>
+    `<span class="pv-kz"><span class="pv-kz-l">${esc(lbl)}</span><b${
+      kl ? ` class="${kl}"` : ""}>${esc(wert)}</b></span>`;
+
+  return `<div class="pv-kopf">
+      <span class="pv-fenstername">${esc(t(gewaehlt.lbl))}</span>
+      ${kz(t("chart.high"), eur(d.hoch))}
+      ${kz(t("chart.low"), eur(d.tief))}
+    </div>
+    ${priceChart(d.H, 900, 200)}
+    <div class="pv-leiste" role="group" aria-label="${esc(t("chart.windowLabel"))}">
+      ${knoepfe.map(k => `<button class="pv-fenster${k.id === gewaehlt.id ? " on" : ""}"
+          data-pv="${esc(k.id)}"${k.aus ? " disabled" : ""}${
+          k.titel ? ` title="${esc(k.titel)}"` : ""}>${esc(t(k.lbl))}</button>`).join("")}
+    </div>
+    <div class="pv-fuss">
+      ${d.wandel != null ? kz(t("chart.change"), prozentText(d.wandel),
+        d.wandel >= 0 ? "hoch" : "runter") : ""}
+      ${d.spanne != null ? kz(t("chart.range"), prozentText(d.spanne).replace(/^\+/, "")) : ""}
+      ${kz(t("chart.points"), String(d.n))}
+    </div>`;
+}
+
+/* Fensterwechsel: nur den Verlaufsblock neu zeichnen, nicht die ganze
+   Detailansicht. Ein renderDetail() hier schlösse den aufgeklappten Kasten
+   wieder zu — und genau darin steht der Graph. */
+function wirePreisVerlauf(c) {
+  const box = $("#dt-pverlauf");
+  if (!box) return;
+  box.onclick = e => {
+    const b = e.target.closest("button[data-pv]");
+    if (!b || b.disabled) return;
+    box.innerHTML = preisVerlaufHtml(c, b.dataset.pv);
+  };
 }
 
 /* Zeigerkasten wie bei Cardmarket: er rastet auf den nächstgelegenen Punkt ein
@@ -4736,8 +4923,10 @@ function pchartAus() {
   if (!PCHART_OFFEN) return;
   const tip = PCHART_OFFEN.querySelector(".pchart-tip");
   const mk  = PCHART_OFFEN.querySelector(".pchart-marke");
+  const lot = PCHART_OFFEN.querySelector(".pchart-lot");
   if (tip) tip.hidden = true;
   if (mk)  mk.style.display = "none";
+  if (lot) lot.style.display = "none";
   PCHART_OFFEN = null;
 }
 
@@ -4765,10 +4954,34 @@ function pchartZeige(e) {
 
   tip.querySelector(".pchart-tip-d").textContent = dmyAusIso(treffer.d);
   tip.querySelector(".pchart-tip-v span").textContent = eur(treffer.v);
+
+  /* Die Veränderung von HIER BIS ZUM LETZTEN PUNKT DES GRAPHEN, und das Datum
+     steht dabei. Ein „+2,9 %" ohne Bezugspunkt wäre eine hübsche Zahl ohne
+     Aussage, und „bis heute" wäre schlicht falsch, sobald die Reihe ein paar
+     Tage alt ist — das Datum sagt beides in vier Zeichen mehr.
+
+     Kein Prozentwert bei einem Nullpreis: Die Division wäre unendlich, und
+     „+∞ %" ist keine Auskunft. Beim letzten Punkt selbst entfällt die Zeile
+     ebenfalls — „0 % gegenüber sich selbst" sagt niemandem etwas. */
+  const wz = tip.querySelector(".pchart-tip-w");
+  if (wz) {
+    const zeigen = treffer !== pts[pts.length - 1] && Number.isFinite(geo.letzter) && treffer.v > 0;
+    wz.hidden = !zeigen;
+    if (zeigen) {
+      const pz = (geo.letzter - treffer.v) / treffer.v * 100;
+      wz.textContent = `${prozentText(pz)} ${t("chart.till")} ${dmyAusIso(geo.letzterD)}`;
+      wz.className = `pchart-tip-w ${pz >= 0 ? "hoch" : "runter"}`;
+    }
+  }
   tip.hidden = false;
 
   const mk = box.querySelector(".pchart-marke");
   if (mk) { mk.setAttribute("cx", treffer.x); mk.setAttribute("cy", treffer.y); mk.style.display = ""; }
+  const lot = box.querySelector(".pchart-lot");
+  if (lot) {
+    lot.setAttribute("x1", treffer.x); lot.setAttribute("x2", treffer.x);
+    lot.style.display = "";
+  }
 
   const px = treffer.x * sk, py = treffer.y * sk;
   const tw = tip.offsetWidth, th = tip.offsetHeight;
@@ -5245,7 +5458,7 @@ function detailHtml(c, hover) {
       </div>
     </div>
     ${!hover ? `<details class="legal-det dt-price-full"><summary>&#128200; ${esc(t("detail.priceHistory"))}</summary>
-      <div style="margin-top:8px">${priceChart(mergedHist(c), 900, 200)}</div>
+      <div class="pverlauf" id="dt-pverlauf">${preisVerlaufHtml(c, "30t")}</div>
     </details>
     <div id="syn-box" class="dt-results-full"></div>
     <div id="card-combo-box" class="dt-results-full"></div>` : ""}`;
@@ -5274,8 +5487,10 @@ function renderDetail(c, id, fremd) {
   $("#detail-body").innerHTML = detailHtml(c, false);
   wireFlip(c, id);
   // Vor dem Abzweig für fremde Karten: Die Neigung gehört zum Bild, nicht zum
-  // Besitz — eine Community-Karte darf sich genauso im Licht drehen.
+  // Besitz — eine Community-Karte darf sich genauso im Licht drehen. Für den
+  // Preisverlauf gilt dasselbe: Er liest nur, was ohnehin dasteht.
   wireKarte3d();
+  wirePreisVerlauf(c);
 
   // Fremde Karte (Community-Kachel): Bearbeiten und Preis-Aktualisieren
   // gehören dem Besitzer, nicht dem Betrachter. Synergien und Combos bleiben —

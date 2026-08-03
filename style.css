@@ -2793,6 +2793,44 @@ dialog::backdrop{background:#000a}
    inline aus priceChart. Der dunkle Rand hält ihn auf dem hellen Kasten
    sichtbar, auch wenn die Kurvenfarbe einmal blass ausfällt. */
 .pchart-tip-v i{width:10px;height:10px;flex:none;border:1px solid rgba(0,0,0,.3)}
+/* Die Veränderung bis zum Fensterende. Grün/Rot ist hier kein Schmuck, sondern
+   die einzige Angabe im Kasten, die eine Richtung hat. */
+.pchart-tip-w{font-size:11px;margin-top:1px;color:#5a5e6e;font-variant-numeric:tabular-nums}
+.pchart-tip-w[hidden]{display:none}
+.pchart-tip-w.hoch{color:#1e7a4f}
+.pchart-tip-w.runter{color:#b03a38}
+
+/* -------------------------------------------- Preisverlauf mit Zeitfenster
+   Drei Zeilen um den Graphen: Hoch/Tief darüber, die Fensterknöpfe darunter,
+   Veränderung/Spanne/Messpunkte zuunterst.
+
+   Alle Zahlen auf Ziffernbreite (tabular-nums). Ohne das springt die Zeile
+   beim Fensterwechsel seitlich, weil eine „1" schmaler ist als eine „8" —
+   und ein Wert, der beim Umschalten wandert, sieht aus wie ein anderer Wert. */
+.pverlauf{margin-top:8px}
+.pv-kopf,.pv-fuss{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;
+  font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+.pv-kopf{margin-bottom:6px}
+.pv-fuss{margin-top:8px}
+.pv-fenstername{color:var(--txt);font-weight:600;letter-spacing:.3px}
+.pv-kz{display:inline-flex;align-items:baseline;gap:5px}
+.pv-kz-l{opacity:.8}
+.pv-kz b{color:var(--txt);font-weight:600}
+.pv-kz b.hoch{color:var(--ok)}
+.pv-kz b.runter{color:var(--err)}
+/* Die Knopfreihe: schmale Schalter, der gewählte in der Sprache für „aktiv"
+   aus dem Kopf dieser Datei (getönte Fläche, goldener Rand, goldene Schrift).
+   Kein Schein dazu — das sind kleine Schalter, siehe dortige Begründung. */
+.pv-leiste{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.pv-fenster{background:var(--panel2);color:var(--dim);border:1px solid var(--line);
+  border-radius:6px;padding:3px 10px;font:inherit;font-size:12px;cursor:pointer;
+  transition:border-color .15s,color .15s,background .15s}
+.pv-fenster:hover:not(:disabled){border-color:var(--acc);color:var(--txt)}
+.pv-fenster.on{background:var(--akt-flaeche);border-color:var(--akt-rand);color:var(--acc2)}
+/* Gesperrt heißt hier NICHT „kaputt", sondern „zeigt dasselbe wie Alle" oder
+   „zu wenige Punkte". Der Grund steht im title; deshalb bleibt der Knopf
+   lesbar statt fast unsichtbar, und der Zeiger sagt, dass hier nichts geht. */
+.pv-fenster:disabled{opacity:.42;cursor:not-allowed}
 
 /* Fähigkeiten. Schlüsselwörter als Tags, darunter der Regeltext in einem
    abgesetzten Kasten (pre-line: die Zeilenumbrüche aus oracle_text bleiben,
