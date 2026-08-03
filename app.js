@@ -11397,6 +11397,13 @@ function meldeCommunityEreignisse() {
   // Realtime-Zeile. Fehlt einer (Feed schon weitergerückt), greift der
   // anonyme Fallback.
   const namen = new Map(COMMUNITY_FEED.map(r => [r.actor_id, r.actor_name]));
+  /* Der Deckname steht ebenfalls NUR im frisch geladenen Feed: Die
+     Realtime-Zeile trägt die Kennung, aber keinen Namen — den holt erst der
+     Verbund der Feed-Abfrage dazu, und nur solange das Deck öffentlich ist.
+     Nachgeschlagen wird über die Kennung des Ereignisses. Ist es aus den
+     zwanzig Feed-Zeilen schon herausgerutscht (viel Betrieb), bleibt es beim
+     namenlosen Satz — derselbe Rückfall wie überall sonst. */
+  const feedZeilen = new Map(COMMUNITY_FEED.map(r => [r.id, r]));
   const proPerson = new Map();
   for (const row of puffer) {
     const k = row.actor_id || "";
@@ -11404,27 +11411,35 @@ function meldeCommunityEreignisse() {
     proPerson.get(k).zeilen.push(row);
   }
   for (const g of proPerson.values())
-    communityToastSchlange.push(communityMeldung(g, namen.get(g.actor_id)));
+    communityToastSchlange.push(communityMeldung(g, namen.get(g.actor_id), feedZeilen));
   zeigeNaechsteCommunityMeldung();
 }
 
 /* Eine Person, eine Art → der gewohnte Satz, bei mehreren Ereignissen mit
    Anzahl. Gemischte Arten lassen sich nicht in einen Satz gießen, dafür gibt
    es die neutrale Zählform. */
-function communityMeldung(gruppe, name) {
+function communityMeldung(gruppe, name, feedZeilen) {
   const anzeige = (name || "").trim() || t("community.anonMember");
   const arten = new Set(gruppe.zeilen.map(r => r.kind));
   if (arten.size === 1) {
     const n = gruppe.zeilen.reduce((s, r) => s + (Number(r.metadata?.n) || 1), 0);
     const meta = { n };
+    const zeile = { kind: [...arten][0], actor_name: anzeige, metadata: meta };
     // Genau ein Ereignis: den Kartennamen mitnehmen, damit der Toast ihn nennt.
     // Bei mehreren wäre die Auswahl eines einzelnen Namens willkürlich.
     if (gruppe.zeilen.length === 1 && gruppe.zeilen[0].metadata?.name) {
       meta.name = gruppe.zeilen[0].metadata.name;
       meta.img = gruppe.zeilen[0].metadata.img;
     }
-    // Als HTML, damit der Kartenname im Toast dieselbe Vorschau trägt wie im Feed.
-    return aktivitaetHtml({ kind: [...arten][0], actor_name: anzeige, metadata: meta });
+    // Dasselbe für ein geteiltes Deck: Name und Kennung aus dem Feed, damit die
+    // Meldung dasselbe sagt wie die Zeile, die gleich darunter steht — und
+    // damit man von hier aus direkt hineinkommt.
+    if (gruppe.zeilen.length === 1) {
+      const aus = feedZeilen?.get(gruppe.zeilen[0].id);
+      if (aus?.deck_id && aus?.deck_name) { zeile.deck_id = aus.deck_id; zeile.deck_name = aus.deck_name; }
+    }
+    // Als HTML, damit Karten- und Deckname im Toast dasselbe tragen wie im Feed.
+    return aktivitaetHtml(zeile);
   }
   return esc(t("community.toast.multi", { name: anzeige, n: gruppe.zeilen.length }));
 }
@@ -11441,14 +11456,36 @@ function zeigeNaechsteCommunityMeldung() {
   el.innerHTML = communityToastSchlange.shift();
   el.classList.add("on");
   wireCommunityKartenHover(el);
-  // Wer auf den Kartennamen zeigt, will die Vorschau ansehen — solange hält die
-  // Meldung an, sonst verschwände sie unter dem Mauszeiger. Danach läuft die
-  // Zeit von vorn, statt sofort abzubrechen.
-  el.querySelectorAll(".cf-card").forEach(k => {
+  /* Der Deckname führt auch von hier aus in die Deckansicht. Beim Klick geht
+     die Meldung SOFORT zu: Der Dialog legt sich ohnehin darüber, und eine
+     Meldung, die dahinter noch drei Sekunden weiterzählt, käme beim Schließen
+     als Rest zurück. */
+  wireCommunityDeckKlick(el);
+  el.querySelectorAll("[data-cf-deck]").forEach(k =>
+    k.addEventListener("click", communityToastSofortZu));
+  // Wer auf den Karten- oder Decknamen zeigt, will hin — solange hält die
+  // Meldung an, sonst verschwände sie unter dem Mauszeiger. Bei drei Sekunden
+  // Standzeit ist das kein Beiwerk: Ohne das wäre ein Knopf darin eine Falle.
+  // Danach läuft die Zeit von vorn, statt sofort abzubrechen.
+  el.querySelectorAll(".cf-card, .cf-deck").forEach(k => {
     k.addEventListener("mouseenter", () => clearTimeout(communityToastTimer));
     k.addEventListener("mouseleave", communityToastUhr);
   });
   communityToastUhr();
+}
+
+/* Die laufende Meldung wegräumen und die nächste holen — ohne die übliche
+   Standzeit abzuwarten. Die kurze Lücke bleibt, damit zwei Meldungen nicht
+   ineinanderblenden. */
+function communityToastSofortZu() {
+  clearTimeout(communityToastTimer);
+  $("#community-toast")?.classList.remove("on");
+  versteckeCmdHover();
+  communityToastTimer = setTimeout(() => {
+    communityToastTimer = null;
+    communityToastLaeuft = false;
+    zeigeNaechsteCommunityMeldung();
+  }, 300);
 }
 
 function communityToastUhr() {

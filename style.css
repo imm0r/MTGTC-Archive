@@ -2829,10 +2829,11 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px}
 /* Auf Höhe der Kopfzeile statt darunter: die Meldung gehört optisch in die
    Leiste, nicht in den Inhalt. z-index liegt über der Kopfzeile (die hat 10). */
 .toast-top{ top:20px; bottom:auto; }
-/* .toast ist als Ganzes klickdurchlässig; der Kartenname muss es aber sein,
-   sonst lässt sich seine Vorschau nicht öffnen. pointer-events vererbt sich,
-   ein auto am Kind genügt. */
-.toast-top .cf-card{ pointer-events:auto; }
+/* .toast ist als Ganzes klickdurchlässig; Karten- und Deckname müssen es aber
+   sein — sonst ließe sich weder die Vorschau öffnen noch das Deck anklicken.
+   pointer-events vererbt sich, ein auto am Kind genügt. */
+.toast-top .cf-card,
+.toast-top .cf-deck{ pointer-events:auto; }
 
 /* Feed-Kopf als Schalter zum Ein- und Ausklappen. */
 .cf-toggle{ display:flex; align-items:center; gap:8px; width:100%;

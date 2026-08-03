@@ -891,10 +891,24 @@ in der Deckliste, aber für genau ein Deck. `community_decks` liefert immer eine
 nicht drin, weil die Liste auf Seite 1 steht oder eine Suche aktiv ist. Vorher
 endete der Klick in dem Fall in einem stillen `return`.
 
+**Auch in der Meldung**, die beim Eintreffen kurz oben erscheint. Sie baut
+ihren Satz über dieselbe Funktion wie der Feed, bekam aber nur die *Rohzeile*
+aus Realtime — die trägt die Kennung, aber keinen Namen. Nachgeschlagen wird
+deshalb im frisch geladenen Feed, über die Kennung des **Ereignisses** und
+nicht über die Person: Eine Person kann in derselben Runde mehrere Dinge getan
+haben. Ist das Ereignis aus den zwanzig Feed-Zeilen schon herausgerutscht,
+bleibt es beim namenlosen Satz.
+
+Zwei Kleinigkeiten hängen daran, ohne die der Knopf in der Meldung eine Falle
+wäre: Der Toast ist als Ganzes klickdurchlässig, der Knopf darf es nicht sein
+(`pointer-events:auto`) — und die Standzeit von drei Sekunden hält an, solange
+der Zeiger darauf steht. Ein Klick räumt die Meldung **sofort** weg; sonst
+zählte sie hinter dem Dialog weiter und käme beim Schließen als Rest zurück.
+
 > Liegt `supabase/migrations/20260803160000_feed_deckname.sql` noch nicht, gibt
-> die Feed-Abfrage die beiden neuen Spalten gar nicht zurück — und der Feed
-> bleibt beim namenlosen Satz. Kein Fehler, kein Knopf, nichts kaputt: derselbe
-> Rückfall wie bei einem wieder privat gestellten Deck.
+> die Feed-Abfrage die beiden neuen Spalten gar nicht zurück — und Feed wie
+> Meldung bleiben beim namenlosen Satz. Kein Fehler, kein Knopf, nichts kaputt:
+> derselbe Rückfall wie bei einem wieder privat gestellten Deck.
 
 ### Sterne und Rangliste
 
@@ -2572,7 +2586,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `spielrunde`     | Die Matte: Ziehen zwischen den Zonen (die Lade geht dabei zu und danach wieder auf), Tappen per Klick, die Lebensreihe (vier einzeilige Kacheln nebeneinander, Regler links neben der Zahl, kein Rollbalken), der Länderstreifen (mehr als die halbe zweite Reihe sichtbar), die Kartenspalte (kein Rollbalken, das Bild gibt nach), der Kopfkasten unter der Matte, die fünf Laden links unten neben der Matte (senkrechte Reihenfolge, unten verankert, eigene Spalte statt darübergelegt, nach rechts aufklappend, immer nur eine offen, auch zugeklappt Ablageziel) samt der Bibliothekssuche in ihrem Korb, der Würfel (nur W20, blanke Fläche über der ganzen Matte UND über allem darin, Zahl aufs Emblem, jeder Wurf anders) und „Zufällig ziehen" (gewichtet über Exemplare, leere Bibliothek) |
 | `fremdmatte`     | Die Matte eines Mitspielers: dass die Abfrage die Spalte `hand` nicht führt und Zeilen ohne offene Zone überspringt, dass die Anzeige ein doch geliefertes `hand` gar nicht erst übernimmt, dass fremde Karten keine Handgriffe tragen, dass die Lebensreihe frei und anklickbar bleibt und dass der Takt nach dem Schließen samt Intervall verschwindet; dazu, dass die Lade hochkant im Blickfeld statt weit unten aufklappt und dass ein Zuschauer ohne eigenes Deck die Mitspieler samt Auge überhaupt sieht |
 | `steuer`         | Die Commander-Steuer: je Commander eine eigene Marke in der Kopfzeile der Kommandozone (der alte Kasten darüber darf nicht zurückkommen), Wirken erhöht nur die des gewirkten, der Rücknahme-Knopf trifft nur seine Karte — und beides steht auch dann noch da, wenn der Commander längst auf dem Schlachtfeld liegt und die Kommandozone leer ist |
-| `feeddeck`       | Das geteilte Deck im Live-Feed: dass die Kennung und nicht der Name gespeichert wird, dass der Feed den Namen im VERBUND dazuholt (und die Zeile ihn beim Zurückstellen auf privat verliert, statt ganz zu verschwinden), dass die einzelne Kachel nur öffentliche Decks herausgibt — und in der Anzeige: Name als Knopf, kein Knopf ohne Namen, ein Deckname mit Markup als Text, und der Klick, der die fehlende Kachel nachholt |
+| `feeddeck`       | Das geteilte Deck im Live-Feed und in der Meldung: dass die Kennung und nicht der Name gespeichert wird, dass der Name im VERBUND dazukommt (und die Zeile ihn beim Zurückstellen auf privat verliert, statt ganz zu verschwinden), dass die einzelne Kachel nur öffentliche Decks herausgibt — und in der Anzeige: Name als Knopf, kein Knopf ohne Namen, ein Deckname mit Markup als Text, der Klick, der die fehlende Kachel nachholt, und die Meldung, die beim Klick sofort weggeht |
 | `mana`           | Mana in diesem Zug: der Übersetzer an einer Mustertabelle (Signet netto, Selbstopfer ja, fremdes Opfer nein, „for each“ variabel, CR 305.6 ohne Text), die Summen frei/gesamt je Exemplar, Tappen senkt frei, die Hand zählt nie mit, und ohne Quellen Strich statt Null — dazu die Farbaufteilung: feste Reihenfolge, Summe der Marken gleich der Gesamtzahl, Tappen kommt in der Farbe an, und alle sieben Marken brechen in der 154-px-Spalte um, statt hinauszulaufen |
 | `export`         | Deck ausgeben: die fünf Zeilen genau so, wie sie dastehen müssen — englischer Name statt gedrucktem, Setcode groß, keine leere Klammer ohne Auflage, alphabetisch sortiert, Deckmenge statt Bestand; dazu Datei, Zwischenablage und der Rückfall „Text markiert“, wenn das Kopieren scheitert |
 | `mitglieder`     | Die Mitgliederliste ohne Stufen: dass die Abfrage das neueste Mitglied aus allen Profilen und mit echtem Namen nimmt, dass Karten und „größte Sammlung“ weiterhin an den Stufen hängen, dass ein leerer Anzeigename die Ersatzbezeichnung behält — und dass die Zusage in allen fünf Sprachen mitgewandert ist |
