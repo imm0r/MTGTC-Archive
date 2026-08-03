@@ -1,5 +1,11 @@
 [
  {
+  "am": "2026-08-03T22:40:00+02:00",
+  "art": "verbessert",
+  "text": "Der Preisverlauf lässt sich jetzt auf 30 Tage, 3 Monate, 6 Monate, 1 Jahr oder alles einstellen. Über und unter dem Graphen stehen Hoch, Tief, Veränderung, Spanne und die Zahl der Messpunkte — jeweils für den gewählten Ausschnitt. Beim Überfahren zeigt die Kurve zusätzlich, wie viel Prozent sich seit diesem Tag getan hat.",
+  "pr": 202
+ },
+ {
   "am": "2026-08-03T22:05:00+02:00",
   "art": "verbessert",
   "text": "Die Karte in der Detailansicht neigt sich zum Mauszeiger und fängt dabei das Licht. Foils bekommen zusätzlich den Regenbogenschimmer, den sie im Regal auch haben — normale Karten bleiben matt.",
