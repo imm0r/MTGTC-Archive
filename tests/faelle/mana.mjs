@@ -89,11 +89,15 @@ const PARTIE = () => {
 
 /* Die Anzeige ablesen: frei/gesamt ohne die schmalen Leerzeichen. */
 const ABLESEN = () => {
-  const w = document.querySelector(".mat-manawert");
+  // Die Marke sitzt in der Kopfzeile des LÄNDERSTREIFENS — bei den Quellen,
+  // aus denen die Zahl entsteht — und nicht mehr als eigene Kachel in der
+  // schmalen Spalte. Der Tooltip hängt an der Klammer, die Zahlen darin.
+  const k = document.querySelector(".mat-laender .mat-titel .mat-mana");
+  const w = k?.querySelector(".mat-manawert");
   if (!w) return null;
   return { frei: w.querySelector(".mana-frei")?.textContent,
-           von: (w.querySelector(".mana-von")?.textContent || "").replace(/[\s /]+/g, ""),
-           titel: w.title, leer: w.classList.contains("leer") };
+           von: (w.querySelector(".mana-von")?.textContent || "").replace(/[\s /]+/g, ""),
+           titel: k.title };
 };
 
 export default async function ({ seite, adresse, stand }) {
@@ -178,22 +182,25 @@ export default async function ({ seite, adresse, stand }) {
   const wach = await seite.evaluate(ABLESEN);
   stand.gleich("nach dem Enttappen ist alles frei", [wach?.frei, wach?.von], ["9+", "9+"]);
 
-  /* --- Sie passt in die schmale Spalte -------------------------------- */
+  /* --- Sie passt in die Kopfzeile der Länder -------------------------- */
+  /* Seit sie dort steht, ist der enge Fall nicht mehr die 154-px-Spalte,
+     sondern die Zeile neben Zeichen, Wort und Anzahl. Läuft sie hinaus,
+     sieht das nicht kaputt aus — sie ist nur abgeschnitten. */
   await seite.setViewportSize({ width: 820, height: 900 });
   await seite.waitForTimeout(350);
   const eng = await seite.evaluate(() => {
-    const w = document.querySelector(".mat-manawert");
-    const sp = document.querySelector(".mat-mitte");
-    const lib = document.querySelector(".mat-lib");
-    return w && sp && lib ? {
-      passt: w.getBoundingClientRect().width <= sp.getBoundingClientRect().width + 1,
-      quer: w.scrollWidth - w.clientWidth,
-      libHoehe: Math.round(lib.getBoundingClientRect().height),
-    } : null;
+    const k = document.querySelector(".mat-laender .mat-titel .mat-mana");
+    const zeile = document.querySelector(".mat-laender .mat-titel");
+    if (!k || !zeile) return null;
+    const r = k.getBoundingClientRect(), z = zeile.getBoundingClientRect();
+    return { drin: r.left >= z.left - 1 && r.right <= z.right + 1,
+             quer: zeile.scrollWidth - zeile.clientWidth,
+             rechts: Math.round(z.right - r.right) };
   });
-  stand.ist("bei 820 px bleibt die Kachel in ihrer Spalte", eng?.passt && eng?.quer === 0,
-    JSON.stringify(eng));
-  stand.ist("und die Bibliothek behält Platz", eng?.libHoehe > 120, eng?.libHoehe + " px");
+  stand.ist("bei 820 px bleibt die Marke in der Kopfzeile der Länder",
+    eng?.drin && eng?.quer === 0, JSON.stringify(eng));
+  stand.ist("und steht an deren rechtem Ende", eng?.rechts >= 0 && eng?.rechts <= 14,
+    eng?.rechts + " px vom Rand");
 
   /* --- Das Akkordeon trägt die Marke in der Kopfzeile ------------------ */
   await seite.setViewportSize({ width: 560, height: 860 });
@@ -258,26 +265,25 @@ export default async function ({ seite, adresse, stand }) {
   await seite.click("#feld-enttappen");
   await seite.waitForTimeout(250);
 
-  /* --- Die Reihe passt in die schmale Spalte -------------------------- */
+  /* --- Die Reihe passt in die Kopfzeile der Länder -------------------- */
   await seite.setViewportSize({ width: 820, height: 900 });
   await seite.waitForTimeout(350);
   const platz = await seite.evaluate(() => {
-    const r = document.querySelector(".mana-farben").getBoundingClientRect();
-    const sp = document.querySelector(".mat-mitte").getBoundingClientRect();
-    const lib = document.querySelector(".mat-lib").getBoundingClientRect();
-    const el = document.querySelector(".mana-farben");
-    return { breit: Math.round(r.width), spalte: Math.round(sp.width),
-             quer: el.scrollWidth - el.clientWidth, lib: Math.round(lib.height) };
+    const el = document.querySelector(".mat-laender .mat-titel .mana-farben");
+    const zeile = document.querySelector(".mat-laender .mat-titel");
+    const r = el.getBoundingClientRect(), z = zeile.getBoundingClientRect();
+    return { breit: Math.round(r.width), zeile: Math.round(z.width),
+             quer: zeile.scrollWidth - zeile.clientWidth,
+             drin: r.left >= z.left - 1 && r.right <= z.right + 1 };
   });
-  stand.ist("bei 820 px bleibt die Farbreihe in ihrer Spalte",
-    platz.breit <= platz.spalte && platz.quer === 0, JSON.stringify(platz));
-  stand.ist("und die Bibliothek behält Platz", platz.lib > 120, platz.lib + " px");
+  stand.ist("bei 820 px bleibt die Farbreihe in der Kopfzeile",
+    platz.drin && platz.quer === 0, JSON.stringify(platz));
 
   /* --- Der Härtefall: alle sieben Marken auf einmal --------------------
      Fünf Farben, farblos und wählbar — mehr kann die Reihe nie tragen. In der
-     154 px schmalen Spalte muss sie dann umbrechen statt hinauszulaufen, und
-     die Bibliothek darunter muss übrig bleiben. Ein Fünf-Farben-Deck ist in
-     Commander nichts Ausgefallenes. */
+     Sie steht jetzt in der Kopfzeile der Länder und muss dort auch im
+     schmalen Fenster hineinpassen, ohne die Zeile zu sprengen. Ein
+     Fünf-Farben-Deck ist in Commander nichts Ausgefallenes. */
   await seite.evaluate(() => {
     // Der Zustand wird hinterher zurückgegeben: Die Prüfungen danach messen
     // sonst dieses Schlachtfeld statt ihres eigenen.
@@ -291,20 +297,24 @@ export default async function ({ seite, adresse, stand }) {
   });
   await seite.waitForTimeout(250);
   const voll = await seite.evaluate(() => {
-    const el = document.querySelector(".mana-farben");
-    const r = el.getBoundingClientRect();
-    const sp = document.querySelector(".mat-mitte").getBoundingClientRect();
-    const lib = document.querySelector(".mat-lib").getBoundingClientRect();
+    const el = document.querySelector(".mat-laender .mat-titel .mana-farben");
+    const zeile = document.querySelector(".mat-laender .mat-titel");
+    const r = el.getBoundingClientRect(), z = zeile.getBoundingClientRect();
     return { syms: [...el.querySelectorAll(".ms")].map(s => (s.className.match(/ms-([a-z]+)/) || [])[1]),
-             breit: Math.round(r.width), spalte: Math.round(sp.width),
-             quer: el.scrollWidth - el.clientWidth, hoch: Math.round(r.height),
-             lib: Math.round(lib.height) };
+             breit: Math.round(r.width), zeile: Math.round(z.width),
+             quer: zeile.scrollWidth - zeile.clientWidth, hoch: Math.round(z.height),
+             drin: r.left >= z.left - 1 && r.right <= z.right + 1 };
   });
   stand.gleich("alle sieben Marken stehen da, in fester Reihenfolge", voll.syms,
     ["w", "u", "b", "r", "g", "c", "multicolor"]);
-  stand.ist("sie brechen um, statt aus der Spalte zu laufen",
-    voll.breit <= voll.spalte && voll.quer === 0, JSON.stringify(voll));
-  stand.ist("und lassen der Bibliothek noch Platz", voll.lib > 120, voll.lib + " px");
+  stand.ist("sie passen in die Kopfzeile, statt sie zu sprengen",
+    voll.drin && voll.quer === 0, JSON.stringify(voll));
+  /* Bei sieben Marken im schmalen Fenster rückt der ganze Block in eine
+     zweite Zeile — das ist der Härtefall und darf sein. Was NICHT sein darf:
+     dass er dabei über den Rand läuft (oben geprüft) oder die Kopfzeile
+     beliebig hoch wird und den Länderstreifen darunter zusammenschiebt. */
+  stand.ist("die Kopfzeile bleibt höchstens zweizeilig", voll.hoch <= 70,
+    voll.hoch + " px hoch");
   await seite.evaluate(() => {
     window.SICHERUNG.forEach(s => {
       const c = CARDS.find(x => x.id === s.id);
@@ -342,6 +352,10 @@ export default async function ({ seite, adresse, stand }) {
     await seite.evaluate(() => !document.querySelector(".zone-mana")));
   await seite.setViewportSize({ width: 1600, height: 900 });
   await seite.waitForTimeout(350);
-  stand.ist("auf der Matte bleibt ein matter Strich",
-    await seite.evaluate(() => document.querySelector(".mat-manawert")?.classList.contains("leer")));
+  /* Auf der Matte GENAUSO: Die Marke sitzt jetzt in einer Kopfzeile, und dort
+     wäre eine „0/0" neben jedem leeren Länderstreifen derselbe Lärm wie im
+     Akkordeon. Früher blieb hier ein matter Strich stehen — das war die
+     eigene Kachel, die einen Platz zu füllen hatte. */
+  stand.ist("und auf der Matte ebenso",
+    await seite.evaluate(() => !document.querySelector(".mat-mana")));
 }

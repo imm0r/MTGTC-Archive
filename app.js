@@ -13894,15 +13894,24 @@ function manaTitel(st) {
 /* Das Feld in der Matte, unter der Commander-Steuer: gleiche Bauart, aber
    eine ANZEIGE, kein Knopf — am Mana gibt es nichts zu klicken. Ohne eine
    einzige Quelle ein matter Strich, wie bei der Steuer ohne Commander. */
+/* Das Mana steht IM LÄNDERBEREICH, nicht mehr als eigene Kachel in der
+   schmalen Spalte. Dort gehört es hin: Die Länder sind die Quellen, aus denen
+   die Zahl entsteht — sie danebenzustellen hieß, zwei Dinge zu trennen, die
+   man immer zusammen liest. Nebenbei bekommt die schmale Spalte ihren Platz
+   für die Kartenvorschau.
+
+   In die KOPFZEILE und nicht in den Korb: Die Zeile ist immer zu sehen, auch
+   wenn der Länderstreifen voll ist und innen rollt. Dieselbe Stelle wie im
+   Akkordeon, wo die Marke seit jeher in der Kopfzeile des Schlachtfelds sitzt.
+
+   Ohne Quellen bleibt sie ganz weg — eine „0/0" neben jedem leeren
+   Länderstreifen wäre Lärm. */
 function matManaHtml() {
   const st = manaStand();
+  if (!st.gesamt && !st.variabel.length) return "";
   const plus = st.variabel.length ? "+" : "";
-  return `<section class="mat-feld mat-mana">
-    <div class="mat-titel">${esc(t("mat.mana"))}</div>
-    <div class="mat-korb">${st.gesamt || st.variabel.length
-      ? `<div class="mat-manawert" title="${esc(manaTitel(st))}"><span class="mana-frei">${st.frei}${plus}</span><span class="mana-von">&thinsp;/&thinsp;${st.gesamt}${plus}</span></div>${manaFarbenHtml(st)}`
-      : `<div class="mat-manawert leer">&ndash;</div>`}</div>
-  </section>`;
+  return `<span class="mat-mana" title="${esc(manaTitel(st))}">
+    <span class="mat-manawert"><span class="mana-frei">${st.frei}${plus}</span><span class="mana-von">&thinsp;/&thinsp;${st.gesamt}${plus}</span></span>${manaFarbenHtml(st)}</span>`;
 }
 
 /* Dasselbe im Akkordeon, als Marke in der Kopfzeile des Schlachtfelds — dort
@@ -14076,10 +14085,10 @@ function querHinweisHtml() {
 /* Die Matte. Jedes Feld ist derselbe Zonenkorb wie im Akkordeon, nur ohne
    Kopfzeile zum Aufklappen — hier ist alles gleichzeitig offen. */
 function matInnerHtml() {
-  const feld = (key, titel, inhalt, extra = "") => `
+  const feld = (key, titel, inhalt, extra = "", marke = "") => `
     <section class="mat-feld${extra}" data-zone="${esc(key)}" data-zonedrop="${esc(key)}">
       <div class="mat-titel">${zoneDef(key)?.icon || ""} ${esc(titel)}
-        <span class="mat-n">${inhalt.n}</span></div>
+        <span class="mat-n">${inhalt.n}</span>${marke}</div>
       <div class="mat-korb">${inhalt.html}</div>
     </section>`;
 
@@ -14103,7 +14112,8 @@ function matInnerHtml() {
         `${getappt ? `<div class="feld-werkzeug"><button class="btn ghost sm" id="feld-enttappen"
             title="${esc(t("zone.untapAllTitle"))}">&#8635; ${esc(t("zone.untapAll"))}</button></div>` : ""}
          ${stapelHtml(bleibend)}` }, " mat-gross")}
-      ${feld("field", t("mat.lands"), { n: summe(laender), html: stapelHtml(laender) }, " mat-laender")}
+      ${feld("field", t("mat.lands"), { n: summe(laender), html: stapelHtml(laender) },
+             " mat-laender", matManaHtml())}
       <!-- Die Lebenspunkte laufen unter den Ländern über deren volle Breite:
            bis zu vier Kacheln NEBENeinander, so wie die Mitspieler am Tisch
            nebeneinander sitzen. In der schmalen Spalte rechts standen sie
@@ -14121,15 +14131,19 @@ function matInnerHtml() {
                title="${esc(t("sess.cmdTaxTitle", { mana: steuer * 2, n: steuer }))}">+${steuer * 2}</button>`
           : `<span class="mat-steuerwert leer">&ndash;</span>`}</div>
       </section>
-      ${matManaHtml()}
-      ${feld("cmd", t("zone.cmd"), { n: zoneSumme("cmd"), html: zoneKorbHtml("cmd") })}
-      ${feld("lib", t("zone.lib"), { n: zoneSumme("lib"), html: zoneKorbHtml("lib") }, " mat-lib")}
+      <!-- Die Bibliothek stand hier und ist in die schwebenden Laden gewandert
+           (SCHWEBEZONEN), das Mana in den Länderbereich. Übrig bleiben die
+           Kommandozone und darunter die angezeigte Karte — die stand vorher in
+           einer eigenen dritten Spalte. Zwei schmale Spalten nebeneinander
+           kosteten das Schlachtfeld Breite für Dinge, die untereinander
+           genauso gut stehen. -->
+      ${feld("cmd", t("zone.cmd"), { n: zoneSumme("cmd"), html: zoneKorbHtml("cmd") }, " mat-cmd")}
+      ${SPK_SPALTE ? `<section class="mat-feld mat-vorschau">
+        <div class="mat-titel">${esc(t("spk.slot"))}</div>
+        <div class="spk" id="spk-feld"><div class="spk-leer">${esc(t("spk.slotEmpty"))}</div></div>
+      </section>` : ""}
     </div>
-    ${schwebeLeisteHtml()}${fremdBuehneHtml()}
-    ${SPK_SPALTE ? `<section class="mat-feld mat-vorschau">
-      <div class="mat-titel">${esc(t("spk.slot"))}</div>
-      <div class="spk" id="spk-feld"><div class="spk-leer">${esc(t("spk.slotEmpty"))}</div></div>
-    </section>` : ""}`;
+    ${schwebeLeisteHtml()}${fremdBuehneHtml()}`;
 }
 
 /* ---- Schwebende Laden: Würfel, Hand, Exil, Friedhof ------------------
@@ -14176,6 +14190,12 @@ const SCHWEBEZONEN = [
   { key: "hand",  bild: "assets/cards-on-hand.PNG",       rahmen: false },
   { key: "exile", bild: "assets/cards-at-exil.PNG",       rahmen: true },
   { key: "grave", bild: "assets/cards-on-graveyard.PNG",  rahmen: true },
+  // Die Bibliothek stand als schmale Spalte IN der Matte und kostete dort
+  // dauerhaft Höhe für etwas, das man fast nie ansieht: Sie ist zugeklappt nur
+  // eine Zahl, aufgeklappt eine Suchzeile. Genau der Fall, für den es diese
+  // Laden gibt. Sie bleibt Ablageziel — eine Karte zurück auf die Bibliothek
+  // zu legen ist ein normaler Handgriff.
+  { key: "lib",   bild: "assets/sym_library.PNG",         rahmen: true },
 ];
 const schwebeBeschriftung = (key, n) =>
   t(schwebeOffen === key ? "zone.floatClose" : "zone.floatOpen", { zone: t("zone." + key) })
