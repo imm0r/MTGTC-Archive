@@ -2632,7 +2632,13 @@ dialog::backdrop{background:#000a}
 .detail-bildspalte{display:flex;flex-direction:column;gap:7px;
   width:230px;max-width:100%;flex:none;align-self:flex-start}
 .detail-bildtools{display:flex;justify-content:flex-end}
-.detail-img{width:100%;border-radius:10px;background:#000}
+/* display:block muss hier stehen, seit das Bild in .karte3d-blatt liegt: Als
+   inline-Element setzt es sich auf die Grundlinie und lässt darunter den Platz
+   für Unterlängen frei. Der Kasten wäre damit ein paar Pixel höher als das
+   Bild — Schlagschatten und Lichtschichten säßen sichtbar daneben. In der
+   Flex-Spalte von früher fiel das nicht auf; dort werden Kinder ohnehin zu
+   Blöcken. */
+.detail-img{width:100%;border-radius:10px;background:#000;display:block}
 /* Kein Bild hinterlegt: Platz halten, damit der Knopf darunter nicht im Nichts
    hängt — und sichtbar machen, dass hier etwas fehlt statt lädt. */
 .detail-img-leer{aspect-ratio:488/680;border:1px dashed var(--line);background:var(--panel2);
@@ -2665,6 +2671,81 @@ dialog::backdrop{background:#000a}
 .detail-flip:hover .flip-badge,.detail-flip:focus-visible .flip-badge{background:var(--acc);color:#12131a}
 .detail-flip:focus-visible{box-shadow:0 0 0 2px var(--acc);border-radius:12px}
 @media(prefers-reduced-motion:reduce){.detail-flip-inner{transition:none}}
+
+/* ------------------------------------------- Die Karte unter dem Zeiger ---
+   Aufbau und Begründung der drei Kästen stehen in app.js bei karte3dHtml. Hier
+   steht, warum die Lichtschichten so gemischt werden, wie sie gemischt werden.
+
+   ZWEI SCHICHTEN, ZWEI AUFGABEN:
+
+   * .karte3d-glanz ist das Licht — ein Glanzpunkt unter dem Zeiger und ein
+     schräges Band quer über die Karte. `screen` hellt auf, ohne die Farben
+     darunter zu drehen: Weiß auf Schwarz bleibt Schwarz, Weiß auf hell wird
+     heller. Genau das tut Licht auf mattem Karton. `overlay` wäre die
+     naheliegende Wahl gewesen und ist hier falsch — es multipliziert in den
+     dunklen Bereichen, und die Kartenränder sind fast alle dunkel; der
+     Glanzpunkt verschwände dort, wo man ihn am ehesten sucht.
+   * .karte3d-holo ist die Beschichtung — der Regenbogen einer Folie, und den
+     gibt es nur, wenn die Karte auch wirklich eine hat (siehe karte3dHtml).
+     `color-dodge` ist der harte Modus: Es hellt überproportional auf und
+     lässt helle Flächen ausbrennen, und genau dieses Ausbrennen ist der
+     Foil-Effekt. Damit es nicht die ganze Karte weißwäscht, hält die
+     radial-Lage darunter alles außerhalb des Zeigers dunkel — schwarz auf
+     color-dodge heißt „hier passiert nichts".
+
+   Die Größen der Hintergründe sind größer als die Karte (240 %/280 %), damit
+   `background-position` überhaupt etwas zu verschieben hat: Bei 100 % läge das
+   Band fest und bewegte sich beim Fahren keinen Pixel.
+
+   KEINE ANIMATION OHNE ZEIGER. Beide Schichten stehen auf opacity:0 und
+   kommen erst mit .zeigt. Eine dauerhaft schimmernde Karte wäre ein
+   Blickfang, der nie aufhört — im Dialog steht daneben Text, den jemand lesen
+   will. */
+.karte3d{position:relative;perspective:1200px;perspective-origin:50% 40%}
+.karte3d-buehne{--kz:1;position:relative;
+  transform:rotateX(var(--kx,0deg)) rotateY(var(--ky,0deg)) scale(var(--kz));
+  transition:transform .5s cubic-bezier(.22,.8,.28,1)}
+/* Unter dem Zeiger führt die Karte kurz nach (90 ms — lang genug, um das
+   Zittern der Abtastung zu glätten, kurz genug, um zu kleben); ohne Zeiger
+   sinkt sie in einer halben Sekunde zurück. */
+.karte3d.zeigt .karte3d-buehne{--kz:1.02;transition:transform .09s ease-out}
+.karte3d-blatt{position:relative;border-radius:10px;
+  box-shadow:0 12px 30px rgba(0,0,0,.5),0 0 0 1px rgba(0,0,0,.45);
+  transition:box-shadow .4s ease}
+.karte3d.zeigt .karte3d-blatt{box-shadow:0 22px 48px rgba(0,0,0,.6),
+  0 0 0 1px rgba(0,0,0,.45),0 0 46px -10px rgba(227,191,74,.7)}
+.karte3d-glanz,.karte3d-holo{position:absolute;inset:0;border-radius:10px;
+  pointer-events:none;opacity:0;transition:opacity .35s ease}
+/* Der inset-Rahmen ist die Kante, die das Licht fängt: eine Haarlinie, die im
+   screen-Modus mit aufhellt. Ohne sie hört die Karte an ihrem Rand einfach
+   auf, statt dort einen Grat zu haben. */
+.karte3d-glanz{mix-blend-mode:screen;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);
+  background-image:radial-gradient(circle at var(--kmx,50%) var(--kmy,50%),
+      rgba(255,255,255,.5) 0%,rgba(255,255,255,.14) 24%,rgba(255,255,255,0) 56%),
+    linear-gradient(115deg,rgba(255,255,255,0) 36%,rgba(255,255,255,.22) 50%,
+      rgba(255,255,255,0) 64%);
+  background-size:100% 100%,280% 280%;
+  background-position:0% 0%,var(--kbx,50%) var(--kby,50%)}
+.karte3d.zeigt .karte3d-glanz{opacity:1}
+.karte3d-holo{mix-blend-mode:color-dodge;
+  background-image:repeating-linear-gradient(105deg,
+      rgba(255,119,115,.55) 0%,rgba(255,237,95,.42) 6%,rgba(168,255,95,.46) 12%,
+      rgba(131,255,247,.55) 18%,rgba(120,148,255,.46) 24%,rgba(216,117,255,.55) 30%,
+      rgba(255,119,115,.55) 36%),
+    radial-gradient(circle at var(--kmx,50%) var(--kmy,50%),
+      rgba(255,255,255,.95) 0%,rgba(255,255,255,.25) 15%,#000 38%);
+  background-size:220% 220%,100% 100%;
+  background-position:var(--kbx,50%) var(--kby,50%),0% 0%;
+  background-blend-mode:multiply;
+  filter:brightness(.75) contrast(2.4) saturate(1.35)}
+.karte3d-foil.zeigt .karte3d-holo{opacity:.6}
+/* Wer weniger Bewegung möchte, bekommt Licht ohne Kippen: Der Glanz folgt dem
+   Zeiger direkt und ist damit keine Bewegung, die einem widerfährt, sondern
+   eine, die man selbst macht. Das Kippen der Fläche ist es sehr wohl. */
+@media(prefers-reduced-motion:reduce){
+  .karte3d-buehne,.karte3d.zeigt .karte3d-buehne{transform:none;transition:none}
+}
 .detail-info{flex:1;min-width:220px}
 /* Kartendetail aufgeräumt: Kopie-Zeile (Pillen + Preis + Kauf-Logos), dünne
    Abschnitts-Trenner und die Vorschlags-/Combo-Ergebnisse über die VOLLE Breite
