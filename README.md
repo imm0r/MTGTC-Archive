@@ -2588,6 +2588,74 @@ stündlichen Modus von Hand: er meldet, wie viele Karten ohne Verlauf dastehen,
 und endet sofort, wenn es keine gibt. `node backfill.mjs --today` fährt den
 Tagesmodus — praktisch zum Ausprobieren, weil er nur 5 MB lädt.
 
+## Themen-Index: was eine Karte inhaltlich tut
+
+Scryfalls **Tagger** ist ein Gemeinschaftsprojekt, das Karten von Hand
+verschlagwortet — `sacrifice-outlet`, `mana-rock`, `tutor-creature-giant`.
+Gemessen am Stand vom 03.08.2026: **4509 Themen, 230.993 Zuordnungen auf 35.825
+Karten**, im Mittel 6,4 Themen je Karte, dazu Beschreibungen und eine
+Ober-/Unterthemen-Hierarchie.
+
+Bisher rät die App das aus dem Regeltext: `SYNERGY_THEMES` in `app.js` führt
+zehn handgeschriebene Muster. Das trägt, ist aber grob — ein Regex unterscheidet
+nicht, ob „sacrifice a creature" Kosten oder Bedrohung ist.
+
+**Warum die Daten bei uns liegen.** Scryfalls Such-API kann nur eine Richtung:
+`otag:sacrifice-outlet` liefert die Karten zu einem Thema. Die Gegenrichtung —
+*welche Themen hat diese Karte?* — bietet sie nicht an. Sie entsteht erst, wenn
+der Bestand einmal umgedreht gespeichert ist.
+
+**Woher.** Aus **einer** Datei: `bulk-data`, Typ `oracle_tags`, 5,9 MB gepackt,
+von Scryfall täglich neu gebaut. Der erste Entwurf wollte je Thema eine
+`otag:`-Suche fahren; gemessen an hundert Zufallsthemen wären das rund 4300
+Anfragen und 2 GB gewesen. Die Bulk-Datei erledigt dasselbe mit einem Abruf —
+und bringt Beschreibungen und Hierarchie mit, die über die Suche gar nicht zu
+haben sind.
+
+### Die Hierarchie ist nicht Zierde
+
+`sacrifice-outlet` hat **null eigene Karten** und acht Unterthemen
+(`sacrifice-outlet-creature`, `-artifact`, `-land` …) — die Karten hängen
+ausschließlich an den Kindern. Wer nur die direkten Zuordnungen ansieht, bekommt
+eine leere Liste. Deshalb rollen beide Lesefunktionen die Hierarchie ab:
+
+```sql
+select * from tags_of_card('6ad8011d-…');   -- Sol Ring
+--  full-refund │ mana-rock │ adds-multiple-mana │ activated-ability   (direkt)
+--  mana-producer │ refund │ ramp                                      (geerbt)
+
+select count(*) from cards_with_tag('sacrifice-outlet');   -- 1502
+```
+
+Gespeichert werden trotzdem nur die **direkten** Zuordnungen. Hochgerollt wären
+es 472.000 statt 231.000 — beides klein genug, aber doppelte Wahrheit veraltet
+doppelt. Der Eltern-Graph ist zyklenfrei und höchstens fünfzehn Stufen tief;
+nachgemessen kostet `cards_with_tag` 37 ms, `tags_of_card` 3 ms.
+
+### Einspielen
+
+`.github/workflows/themen.yml` läuft täglich um 10:00 UTC (Scryfall baut gegen
+09:00) und braucht dieselben Secrets wie das Preisarchiv. Hat Scryfall nichts
+Neues, endet der Lauf nach einer Abfrage.
+
+Der Tausch geht über ein Zwischenlager und **eine** Transaktion: Wer währenddessen
+liest, sieht den alten Stand, nie einen halben. Davor sitzt eine Notbremse — ein
+Zwischenlager unter 1000 Themen oder 100.000 Zuordnungen lässt den Bestand
+unangetastet, damit ein abgebrochener Lauf ihn nicht halbiert.
+
+Das Skript kommt **ohne Abhängigkeiten** aus; `node:zlib` und `node:readline`
+genügen. Lokal:
+
+```bash
+node scripts/tag-index/themen.mjs --self-test   # nur die Zerlegung, ohne Netz
+node scripts/tag-index/themen.mjs --dry-run     # lädt und rechnet, schreibt nichts
+node scripts/tag-index/themen.mjs --force       # auch bei unverändertem Stand
+```
+
+> **Noch nicht verdrahtet.** Migration, Skript und Zeitplan stehen; die App
+> liest die Tabellen bisher nicht. Der nächste Schritt wäre die Detailansicht
+> (Themen einer Karte) und ein Filter über `cards_with_tag`.
+
 ## Prüfungen
 
 ```bash

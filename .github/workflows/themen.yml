@@ -1,0 +1,63 @@
+# Hält den Themen-Index (public.tags / public.card_tags) auf Stand.
+#
+# Quelle ist Scryfalls Tagger-Bestand, den Scryfall täglich als eine Datei von
+# 5,9 MB veröffentlicht (bulk-data, Typ `oracle_tags`). Der Lauf spielt sie
+# umgedreht ein: Scryfalls Such-API kann nur „welche Karten hat Thema X",
+# gebraucht wird „welche Themen hat Karte Y".
+#
+# WARUM KEIN `npm ci`: Das Skript kommt ohne Abhängigkeiten aus — Entpacken und
+# zeilenweises Lesen können `node:zlib` und `node:readline` von Haus aus. Damit
+# entfällt hier auch die package.json, die der Preis-Backfill braucht.
+#
+# Nötige Secrets (Repo → Settings → Secrets and variables → Actions), dieselben
+# wie beim Preisarchiv:
+#   SUPABASE_URL                 z. B. https://abcd.supabase.co
+#   SUPABASE_SERVICE_ROLE_KEY    service_role-Key aus Project Settings → API
+name: Themen-Index (Scryfall Tagger)
+
+on:
+  schedule:
+    # Täglich 10:00 UTC. Scryfall baut die Datei gegen 09:00 UTC; eine Stunde
+    # Abstand reicht und lässt Luft, falls der Build sich verspätet.
+    # Cron ist immer UTC.
+    - cron: "0 10 * * *"
+  workflow_dispatch: {}
+
+# Ein Lauf zur Zeit, und ein angefangener wird nicht abgeschossen: Der Tausch
+# am Ende ist eine Transaktion, aber das Füllen des Zwischenlagers davor sind
+# rund fünfzig Aufrufe. Ein Abbruch mittendrin ließe es halb gefüllt zurück —
+# schaden könnte das nicht (der nächste Lauf leert es zuerst, und die
+# Notbremse in tag_import_commit fängt einen zu dünnen Bestand ab), aber
+# Arbeit wegzuwerfen ist trotzdem sinnlos.
+concurrency:
+  group: themen-index
+  cancel-in-progress: false
+
+# Least Privilege: Der Job liest den Code aus und spricht sonst nur mit
+# Supabase und Scryfall — die GitHub-API braucht er nie.
+permissions:
+  contents: read
+
+jobs:
+  themen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # Vor dem Schreiben die Zerlegung prüfen. Der Selbsttest braucht kein
+      # Netz und keine Datenbank; er kostet eine Sekunde und fängt genau das
+      # ab, was sonst still schiefginge — etwa ein Illustrations-Tag, das in
+      # den Oracle-Bestand rutscht.
+      - name: Selbsttest
+        run: node scripts/tag-index/themen.mjs --self-test
+
+      - name: Themen einspielen
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/tag-index/themen.mjs
