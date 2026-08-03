@@ -8690,6 +8690,9 @@ function renderDecks() {
     if (dashOffen) deckDashRows.set(d.id, eintraege.map(({ e, c }) => ({ ...c, qty: e.qty })));
     const haupt = mainCard;
     const zweit = d.second_card_id ? CARDS.find(c => c.id === d.second_card_id) : null;
+    // 0 bei allem, was nicht übernommen ist — dann verhält sich der Kopf wie
+    // eh und je.
+    const nochAendern = deckNochAendern(d);
 
     return `<div class="card">
       <div class="deck-kopf" data-toggle="${d.id}" title="${offen ? t("common.collapse") : t("common.expand")}">
@@ -8707,6 +8710,7 @@ function renderDecks() {
             istCommanderDeck(d) && deckFrei(d) === 0
               ? ` &middot; <span class="deck-full-note">${esc(t("deck.fullShort", { n, max: DECK_MAX }))}</span>` : ""}${
             d.shared ? ` &middot; <span style="color:var(--ok)">${esc(t("deck.shared"))}</span>` : ""}${
+            nochAendern ? ` &middot; <span class="deck-uebernommen">${esc(t("deck.copyLeft", { n: nochAendern }))}</span>` : ""}${
             fehlt ? ` &middot; <span style="color:var(--err)">${esc(t("deck.incomplete", { n: fehlt }))}</span>` : ""}</div>
         </div>
         <!-- Reihenfolge wie gewünscht: Geteilt, Exportieren, Bearbeiten,
@@ -8719,8 +8723,14 @@ function renderDecks() {
             title="${d.shared ? esc(t("deck.unshareTitle")) : esc(t("deck.shareTitle"))}">${d.shared ? "&#128101; " + esc(t("deck.sharedBtn")) : esc(t("deck.share"))}</button>
           <!-- Eine Ebene weiter als „Geteilt": das gibt nicht den Freunden
                frei, sondern allen. Deshalb daneben und nicht statt dessen. -->
-          <button class="btn ghost sm${d.is_public ? " an" : ""}" data-public="${d.id}"
-            title="${d.is_public ? esc(t("deck.unpublicTitle")) : esc(t("deck.publicTitle"))}">${d.is_public ? "&#127758; " + esc(t("deck.publicBtn")) : esc(t("deck.public"))}</button>
+          <!-- Ein übernommenes Deck lässt sich erst zeigen, wenn es auch ein
+               eigenes geworden ist. Der Knopf sagt das VORHER (gesperrt, mit
+               der fehlenden Zahl im Titel) statt erst beim Drücken; die
+               eigentliche Sperre sitzt in der Datenbank. -->
+          <button class="btn ghost sm${d.is_public ? " an" : ""}" data-public="${d.id}"${
+            nochAendern ? " disabled" : ""}
+            title="${nochAendern ? esc(t("deck.copyBlocked", { n: nochAendern }))
+              : d.is_public ? esc(t("deck.unpublicTitle")) : esc(t("deck.publicTitle"))}">${d.is_public ? "&#127758; " + esc(t("deck.publicBtn")) : esc(t("deck.public"))}</button>
           <button class="btn ghost sm" data-exportbtn="${d.id}"
             title="${esc(t("exp.title", { name: d.name }))}">&#128203; ${esc(t("exp.btn"))}</button>
           <button class="btn ghost sm" data-ded="${d.id}"
@@ -12231,11 +12241,74 @@ function wireCdeckDetail(deckId) {
   if (imp) imp.onclick = () => fremdDeckUebernehmen(imp.dataset.cdimport);
 }
 
+/* ---- Übernommene Decks: erst ändern, dann zeigen ---------------------
+   Übernehmen ist ein Klick. Ohne Sperre entstünde aus einem beliebten Deck in
+   kurzer Zeit ein Dutzend Kopien in der Community-Liste — dieselbe
+   Kartenliste unter zwölf Namen, und die Rangliste wäre eine Liste desselben
+   Decks.
+
+   MASSGEBLICH IST DIE DATENBANK (Trigger in
+   20260803140000_uebernommen_sperre.sql). Hier wird dieselbe Rechnung noch
+   einmal aufgemacht, und zwar nur, um SAGEN zu können, wie viel noch fehlt:
+   Ein Knopf, der erst beim Drücken verrät, dass er nicht darf, ist ein
+   schlechter Knopf. Gehen beide Rechnungen je auseinander, gewinnt die
+   Datenbank — dann trifft man auf eine abgewiesene Änderung statt auf ein
+   ungewolltes Veröffentlichen.
+
+   Der Schlüssel ist die Oracle-Identität, nicht die Auflage: Wer dieselbe
+   Karte in einer schöneren Ausgabe einsetzt, hat das Deck nicht geändert. */
+const UEBERNOMMEN_ANTEIL = 10;   // ein Zehntel des übernommenen Decks
+const UEBERNOMMEN_MIN = 4;       // mindestens aber so viele Exemplare
+
+function deckSchluessel(c) {
+  return c?.oracle_id || (c?.name || "").toLowerCase();
+}
+
+/* Die Zusammensetzung eines eigenen Decks als {Schlüssel: Exemplare}. */
+function deckZusammensetzung(d) {
+  const raus = {};
+  for (const e of (d?.entries || [])) {
+    const c = CARDS.find(x => x.id === e.cardId);
+    if (!c) continue;
+    const k = deckSchluessel(c);
+    raus[k] = (raus[k] || 0) + (e.qty || 0);
+  }
+  return raus;
+}
+
+/* Summe der Beträge über die VEREINIGUNG beider Schlüsselmengen — nur über
+   eine zu laufen zählte entweder das Entfernte oder das Hinzugefügte nicht
+   mit, und ein komplett ausgetauschtes Deck käme auf null. */
+function deckAbweichung(d) {
+  const damals = d?.import_baseline || {};
+  const jetzt = deckZusammensetzung(d);
+  let summe = 0;
+  for (const k of new Set([...Object.keys(damals), ...Object.keys(jetzt)]))
+    summe += Math.abs((jetzt[k] || 0) - (damals[k] || 0));
+  return summe;
+}
+
+function deckSchwelle(basis) {
+  const n = Object.values(basis || {}).reduce((s, x) => s + (Number(x) || 0), 0);
+  return Math.max(UEBERNOMMEN_MIN, Math.ceil(n / UEBERNOMMEN_ANTEIL));
+}
+
+/* Wie viele Exemplare noch fehlen, bis das Deck gezeigt werden darf. 0 heißt
+   „darf". Ein selbst angelegtes Deck hat keine Grundlage und darf immer. */
+function deckNochAendern(d) {
+  if (!d?.import_baseline) return 0;
+  return Math.max(0, deckSchwelle(d.import_baseline) - deckAbweichung(d));
+}
+
 /* Der Schalter am Deck. Wie shareDeck, nur eine Ebene weiter. */
 async function publicDeck(id) {
   const d = DECKS.find(x => x.id === id);
   if (!d) return;
   const neu = !d.is_public;
+  // Nur beim Einschalten. Privat stellen darf man immer — sonst säße man in
+  // einem übernommenen Deck fest, das man versehentlich gezeigt hat.
+  const fehlt = neu ? deckNochAendern(d) : 0;
+  if (fehlt) return toast(t("deck.copyBlocked", { n: fehlt }));
   try {
     const { error } = await sb.from("decks").update({ is_public: neu }).eq("id", id);
     if (error) throw error;

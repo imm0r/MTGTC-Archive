@@ -1355,6 +1355,11 @@ body.zieht-gerade .zk:hover,body.zieht-gerade .zk:focus-within{transform:none}
 .cdeck-detail-leiste{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
   border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:8px 0;margin-bottom:8px}
 .cdeck-detail-liste{max-height:min(52vh,460px);overflow:auto}
+
+/* Ein übernommenes Deck, das noch nicht gezeigt werden darf. Gedämpftes Gold
+   statt Rot: Das ist keine Störung, sondern eine Ansage — es fehlt nur noch
+   etwas eigene Arbeit. */
+.deck-uebernommen{color:var(--acc2)}
 .cdeck-meta{display:flex;flex-wrap:wrap;align-items:center;gap:5px}
 .cdeck-wer{display:inline-flex;align-items:center;gap:6px;padding:0;border:none;
   background:none;cursor:pointer;color:var(--dim);font-size:12px;text-align:left}

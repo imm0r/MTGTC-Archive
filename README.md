@@ -585,6 +585,52 @@ Zuordnungen, Karten. Dieselben Policies wie bei `shared`, nur ohne die
 Freundschaftsprüfung: Ein Deck ohne seine Einteilung wäre eine Liste, mit ihr
 ein Bauplan.
 
+### Übernommen heißt noch nicht eigen
+
+Ein übernommenes Deck lässt sich **nicht veröffentlichen**, solange es dem
+Original noch zu ähnlich ist. Ohne diese Sperre entstünde aus einem beliebten
+Deck in kurzer Zeit ein Dutzend Kopien in der Community-Liste — dieselbe
+Kartenliste unter zwölf Namen, und die Rangliste wäre eine Liste desselben
+Decks. Der Erbauer stünde daneben.
+
+**Gemessen wird gegen einen Schnappschuss**, nicht gegen das Quelldeck. Das
+darf sich später ändern oder verschwinden; hinge die Frage „wie weit bist du
+davon weg" daran, wäre sie plötzlich anders beantwortet, ohne dass jemand
+etwas getan hätte. Beim Übernehmen wandert die Zusammensetzung der Quelle als
+`decks.import_baseline` mit.
+
+**Der Schlüssel ist die Oracle-Identität, nicht die Auflage.** Wer dieselbe
+Karte in einer schöneren Ausgabe einsetzt, hat das Deck nicht geändert — er
+hat es neu gekauft. Gezählt werden Exemplare über die *Vereinigung* beider
+Kartenmengen: Ein Tausch (eine raus, eine rein) zählt zwei. Liefe man nur über
+die Karten von heute, zählte das Entfernte nicht mit, und ein komplett
+ausgetauschtes Deck käme auf null.
+
+| Deckgröße | Schwelle | entspricht |
+| --- | --- | --- |
+| 100 Karten | 10 | fünf Tausche |
+| 60 Karten | 6 | drei Tausche |
+| kleiner | 4 | zwei Tausche |
+
+Ein Zehntel, weil es mit der Deckgröße mitwächst; die Untergrenze, damit ein
+Deck aus zehn Karten nicht mit einem einzigen Tausch durchrutscht.
+
+Zwei Dinge, die dabei bewusst so und nicht anders sind:
+
+* **Geprüft wird nur der Übergang privat → öffentlich.** Wer die Schwelle
+  erreicht, veröffentlicht und danach zurückbaut, bleibt öffentlich. Ein Deck,
+  das von sich aus wieder verschwindet, weil man zwei Karten herausgenommen
+  hat, wäre schlimmer als die Lücke. **Privat stellen geht immer** — sonst
+  säße fest, wer ein übernommenes Deck versehentlich gezeigt hat.
+* **Die Zahlen stehen an zwei Stellen.** Maßgeblich ist der Trigger in der
+  Datenbank; `app.js` rechnet dieselbe Regel noch einmal, um *sagen* zu können,
+  wie viel noch fehlt („übernommen · noch 4 Karten", und der Knopf ist
+  gesperrt). Ein Knopf, der erst beim Drücken verrät, dass er nicht darf, ist
+  ein schlechter Knopf. Laufen beide je auseinander, gewinnt die Datenbank —
+  dann trifft man auf eine abgewiesene Änderung statt auf ein ungewolltes
+  Veröffentlichen. Der Prüffall `uebernommen` misst beide gegen dieselbe
+  Tabelle.
+
 ### Ein Community-Deck ansehen und übernehmen
 
 Eine Kachel war bis dahin ein Bild, ein Name und fünf Sterne — bewerten ließ
@@ -2243,6 +2289,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `anzeigename`    | Der Anzeigename als Pflicht: die Regel selbst (2–40, getrimmt), das Feld beim Anlegen, der Weg über die Nutzer-Metadaten bis ins frisch angelegte Profil, die Maske vor der App für alte Konten samt Ausweg — und dass das Profilfeld ihn nicht mehr leeren kann |
 | `mitgliederliste` | Die Mitgliederliste und das öffentliche Profil: dass die Abfrage `findable` achtet, die Gesamtzahl je Zeile mitzählt und das Verhältnis gleich mitliefert; die vier Knöpfe, Blättern und Suchen (samt Rücksprung auf Seite eins und Fokus im Feld) — und dass ein `javascript:`-Ziel kein Verweis wird und Markup im Steckbrief Text bleibt |
 | `communitydecks` | Community-Decks: dass die Migration bestehende Decks NICHT veröffentlicht (Reihenfolge der beiden ALTERs), dass die Rangliste glättet und trotzdem den echten Schnitt zeigt, dass das eigene Deck keine Knöpfe hat und die Datenbank es abweist — dazu Bewerten ohne Neuladen der Liste, Sortieren und Suchen über den Commander; dazu die beiden führenden Kacheln (und dass die übrigen keine sind), der Sprung im niedrigen Fenster samt Aufleuchten, und der Feed-Trigger, der beim Anlegen genau EINE der beiden Zeilen schreibt |
+| `uebernommen`    | Die Sperre für übernommene Decks: eine Entscheidungstabelle für die Abweichung (Tausch zählt doppelt, komplett ausgetauscht kommt auf das Doppelte der Deckgröße, eine andere AUFLAGE derselben Karte auf null), die Schwelle samt Untergrenze, der gesperrte Knopf mit der fehlenden Zahl im Titel — und dass der Weg selbst abweist, aber privat stellen immer geht; an der Migration, dass die Übernahme den Schnappschuss der QUELLE mitschreibt (ohne ihn greift die Sperre nie) und der Trigger nur den Übergang prüft |
 | `deckansehen`    | Ein Community-Deck ansehen und übernehmen: dass der Name ein Knopf ist und die Kachel daneben auch klickt, ein Stern aber NICHT das Deck öffnet; dass der Dialog die Einteilung des Erbauers zeigt und die Deckmenge nennt; dass Bewerten im Dialog auch auf der Kachel dahinter ankommt; dass das eigene Deck keinen Übernehmen-Knopf trägt — und an der Migration, dass ein öffentliches Deck Zugang genug ist, die Kopie ausdrücklich privat entsteht und die Fächer mitkommen |
 | `navigation`     | Die oberste Leiste: dass Community dort steht (und nicht doppelt im Benutzermenü), dass das Wort in einem eigenen `<span>` sitzt und die fünf Sinnbilder einen Sprachwechsel überstehen, dass der Klick die Ansicht öffnet und genau einen Punkt markiert — und der Rückfall für eine fehlende Bilddatei in beiden Reihenfolgen, samt Gegenprobe, dass ein vorhandenes Sinnbild stehen bleibt |
 | `migrationen`    | Migrationen, die eine frühere Fassung fortschreiben: dass die Liste der Feed-Arten nie schrumpft, dass Tabellen-Constraint und Schreibweg dieselbe führen — und dass keine spätere Fassung die Sichtbarkeitsprüfung wieder herausnimmt (der Fall, den kein Datenbankfehler meldet) |
