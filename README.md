@@ -1298,6 +1298,36 @@ die eine Tabellenzeile in vier Spalten gibt — nur erkennt man sie, ohne zu
 lesen. Wer Magic spielt, liest Karten ohnehin an ihrem Balken; genau so liegen
 sie im Regal und in der Hand.
 
+#### Der Größenregler
+
+Neben den beiden Umschaltern steht in der Kartenansicht ein **Schieberegler**
+für die Darstellungsgröße — 140 bis 420 px Spaltenbreite, Vorgabe 210. Er
+verstellt genau eine Zahl: die Mindestbreite einer Spalte. Eine Spalte trägt
+die Menge (20 px) und daneben das Bild über die restliche Breite, also wächst
+mit ihr die Karte.
+
+Drei Entscheidungen dahinter:
+
+* **Er gilt für alle Decks.** Gruppierung und Ansicht beantworten eine Frage
+  über *dieses* Deck („wonach ist es geordnet", „wie will ich es hier sehen");
+  die Größe eine über den Betrachter und seinen Bildschirm. Je Deck gemerkt
+  hieße, sie dreißigmal einzustellen. Ein Zug an einem Regler stellt deshalb
+  alle sichtbaren mit.
+* **Ziehen zeichnet nichts neu.** Die Größe steht als CSS-Variable am
+  Wurzelelement, nicht in der Ausgabe. Liefe bei jeder Bewegung `renderDecks()`,
+  risse die Liste unter dem Finger weg und die Scrollposition ginge verloren —
+  ein Regler, nach dem man jedes Mal zurückscrollen muss. Die eingestellte
+  Größe sähe dabei völlig richtig aus; deshalb prüft der Prüffall die
+  **Identität** eines Knotens vor und nach dem Zug.
+* **`min(…, 100%)` begrenzt die Spalte auf den Kasten.** Ein Raster rollt nicht
+  von sich aus: Eine Spalte, die breiter eingestellt ist als das Fenster, liefe
+  seitlich hinaus, ohne dass ein Rollbalken erschiene.
+
+Gemerkt wird der Wert in `localStorage` und beim Start **sofort** angelegt —
+sonst sprängen die Karten von der Vorgabe auf den gemerkten Wert, sobald man
+den Regler anfasst. Gespeicherter Unsinn (von Hand, aus einer älteren Fassung)
+wird auf die Grenzen zurechtgestutzt.
+
 **Die Geometrie ist der ganze Trick.** Eine Magic-Karte misst 63 × 88 mm, ihr
 Seitenverhältnis ist also 1 : 1,397, und der Namensbalken sitzt zwischen rund
 4 % und 10 % der Kartenhöhe. Beides sind *Anteile*, keine Pixel — deshalb stimmt
@@ -2391,6 +2421,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `communitydecks` | Community-Decks: dass die Migration bestehende Decks NICHT veröffentlicht (Reihenfolge der beiden ALTERs), dass die Rangliste glättet und trotzdem den echten Schnitt zeigt, dass das eigene Deck keine Knöpfe hat und die Datenbank es abweist — dazu Bewerten ohne Neuladen der Liste, Sortieren und Suchen über den Commander; dazu die beiden führenden Kacheln (und dass die übrigen keine sind), der Sprung im niedrigen Fenster samt Aufleuchten, und der Feed-Trigger, der beim Anlegen genau EINE der beiden Zeilen schreibt |
 | `uebernommen`    | Die Sperre für übernommene Decks: eine Entscheidungstabelle für die Abweichung (Tausch zählt doppelt, komplett ausgetauscht kommt auf das Doppelte der Deckgröße, eine andere AUFLAGE derselben Karte auf null), die Schwelle samt Untergrenze, der gesperrte Knopf mit der fehlenden Zahl im Titel — und dass der Weg selbst abweist, aber privat stellen immer geht; an der Migration, dass die Übernahme den Schnappschuss der QUELLE mitschreibt (ohne ihn greift die Sperre nie) und der Trigger nur den Übergang prüft |
 | `deckansehen`    | Ein Community-Deck ansehen und übernehmen: dass der Name ein Knopf ist und die Kachel daneben auch klickt, ein Stern aber NICHT das Deck öffnet; dass der Dialog die Einteilung des Erbauers zeigt und die Deckmenge nennt; dass Bewerten im Dialog auch auf der Kachel dahinter ankommt; dass das eigene Deck keinen Übernehmen-Knopf trägt — und an der Migration, dass ein öffentliches Deck Zugang genug ist, die Kopie ausdrücklich privat entsteht und die Fächer mitkommen |
+| `kartengroesse`  | Der Größenregler der Kartenansicht: dass er nur dort steht, das Kartenbild wirklich mitwächst, ein Zug an einem Regler alle stellt und der Wert das Neuladen übersteht (und dabei SOFORT anliegt) — dazu die beiden, die richtig aussehen und es nicht sind: dass Ziehen den Baum stehen lässt (an der Knoten-Identität gemessen) und eine große Einstellung im schmalen Fenster nicht aus dem Kasten läuft |
 | `navigation`     | Die oberste Leiste: dass Community dort steht (und nicht doppelt im Benutzermenü), dass das Wort in einem eigenen `<span>` sitzt und die fünf Sinnbilder einen Sprachwechsel überstehen, dass der Klick die Ansicht öffnet und genau einen Punkt markiert — und der Rückfall für eine fehlende Bilddatei in beiden Reihenfolgen, samt Gegenprobe, dass ein vorhandenes Sinnbild stehen bleibt |
 | `migrationen`    | Migrationen, die eine frühere Fassung fortschreiben: dass die Liste der Feed-Arten nie schrumpft, dass Tabellen-Constraint und Schreibweg dieselbe führen — und dass keine spätere Fassung die Sichtbarkeitsprüfung wieder herausnimmt (der Fall, den kein Datenbankfehler meldet) |
 

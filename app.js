@@ -7122,6 +7122,36 @@ const deckAnsicht = {
   },
 };
 
+/* Die Darstellungsgröße der Karten in der Kartenansicht — eine Spaltenbreite
+   in Pixeln.
+
+   ANDERS ALS GRUPPIERUNG UND ANSICHT GILT SIE FÜR ALLE DECKS. Die beiden
+   anderen beantworten eine Frage über DIESES Deck („wonach ist es geordnet",
+   „wie will ich es hier sehen"); die Größe beantwortet eine über den
+   Betrachter und seinen Bildschirm. Sie je Deck zu merken hieße, sie dreißigmal
+   einzustellen.
+
+   Sie steht als CSS-Variable am Wurzelelement statt in der Ausgabe: Dann kostet
+   das Ziehen kein Neuzeichnen — die Liste bliebe sonst nicht unter dem Finger
+   stehen, und die Scrollposition ginge bei jeder Bewegung verloren. */
+const STAPEL_MIN = 140, STAPEL_MAX = 420, STAPEL_VORGABE = 210;
+const deckKartenBreite = {
+  lies() {
+    const n = Number(localStorage.getItem("mtg-stapel-breite"));
+    return Number.isFinite(n) && n ? this.begrenze(n) : STAPEL_VORGABE;
+  },
+  begrenze(n) { return Math.min(STAPEL_MAX, Math.max(STAPEL_MIN, Math.round(n))); },
+  setze(n) {
+    const w = this.begrenze(Number(n) || STAPEL_VORGABE);
+    try { localStorage.setItem("mtg-stapel-breite", String(w)); } catch { /* voll */ }
+    this.anwenden(w);
+    return w;
+  },
+  anwenden(w = this.lies()) {
+    document.documentElement.style.setProperty("--stapel-breite", w + "px");
+  },
+};
+
 /* Leiste über der Deck-Tabelle: die beiden Umschalter und der Zugang zur
    Verwaltung. Sie sitzt dort und nicht in der Werkzeugleiste darüber, weil sie
    genau das steuert, was direkt darunter steht.
@@ -7148,6 +7178,13 @@ function deckGruppeLeisteHtml(d) {
       <button class="btn ghost sm${karten ? " on" : ""}" data-ansicht="karten" data-deck="${d.id}"
         title="${esc(t("ansicht.cardsTitle"))}">${esc(t("ansicht.cards"))}</button>
     </div>
+    ${karten ? `<span class="tool-label" style="margin:0">${esc(t("ansicht.sizeLabel"))}</span>
+    <span class="stapel-groesse">
+      <input type="range" data-stapelbreite="${d.id}"
+        min="${STAPEL_MIN}" max="${STAPEL_MAX}" step="10" value="${deckKartenBreite.lies()}"
+        title="${esc(t("ansicht.sizeTitle"))}" aria-label="${esc(t("ansicht.sizeLabel"))}">
+      <output>${deckKartenBreite.lies()} px</output>
+    </span>` : ""}
     <button class="btn ghost sm" data-katverw="${d.id}"
       title="${esc(t("kat.manageTitle"))}">&#127991; ${esc(t("kat.manage"))}</button>
     <button class="btn ghost sm" data-katauto="${d.id}"
@@ -8900,6 +8937,19 @@ function deckVerlaufKnopf(deckId) {
   $$("#deck-list [data-ansicht]").forEach(b => b.onclick = () => {
     deckAnsicht.setze(b.dataset.deck, b.dataset.ansicht);
     renderDecks();
+  });
+  /* Der Größenregler. „input" und nicht „change": Die Karten sollen beim
+     ZIEHEN mitwachsen, nicht erst beim Loslassen — sonst stellt man blind ein.
+     Neu gezeichnet wird nichts (siehe deckKartenBreite); nur die Zahl daneben
+     wird nachgeführt, und alle anderen Regler in der Liste ziehen mit, weil
+     die Einstellung für alle Decks gilt. */
+  $$("#deck-list [data-stapelbreite]").forEach(r => r.oninput = () => {
+    const w = deckKartenBreite.setze(r.value);
+    $$("#deck-list [data-stapelbreite]").forEach(x => {
+      x.value = w;
+      const zahl = x.parentElement?.querySelector("output");
+      if (zahl) zahl.textContent = w + " px";
+    });
   });
   $$("#deck-list [data-katverw]").forEach(b => b.onclick = () => kategorienVerwalten(b.dataset.katverw));
   $$("#deck-list [data-katauto]").forEach(b => b.onclick = () => autoEinordnen(b.dataset.katauto));
@@ -16191,6 +16241,10 @@ function navSymboleAbsichern() {
 (async () => {
   applyI18n();          // statische Oberfläche in der gewählten Sprache
   navSymboleAbsichern();
+  // Die gemerkte Kartengröße gleich anlegen. Ohne das stünde die Variable erst
+  // nach der ersten Bewegung am Regler, und die Karten sprängen dann von der
+  // Vorgabe auf den gemerkten Wert.
+  deckKartenBreite.anwenden();
   synModusAnwenden();   // Synergie-Modus (welche Knöpfe sichtbar sind) früh setzen
   wireSetup();
   const c = cfg();
