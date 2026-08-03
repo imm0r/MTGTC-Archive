@@ -6347,7 +6347,7 @@ function synKachel(card, grundText, deckId, schnitt) {
       : `<button class="syn-add${owned ? " owned" : ""}" data-deck="${esc(deckId)}" data-sid="${esc(card.id)}"
       title="${esc(t(owned ? "syn.addOwnedTitle" : "syn.addWishTitle"))}">&#43;&#160;${
         esc(t(owned ? "syn.addDeck" : "syn.addWish"))}</button>`;
-    if (voll) cut = schnittHinweisHtml(schnitt || deckSchnittKandidat(deck, card));
+    if (voll) cut = schnittHinweisHtml(schnitt || deckSchnittKandidat(deck, card), deckId, card);
   }
   return `<div class="syn-card">
     <a class="syn-card-link" href="${esc(card.scryfall_uri || "#")}" target="_blank" rel="noopener noreferrer">
@@ -6363,13 +6363,14 @@ function synKachel(card, grundText, deckId, schnitt) {
 
 function synergyCardHtml(e, deckId) { return synKachel(e.card, synergyErklaerung(e), deckId); }
 
-/* Eine Vorschlags-Scryfall-Karte als Wunschkarte ins Deck legen (RPC
-   add_wish_to_deck): fehlt sie in der Sammlung, wird sie mit Bestand 0 angelegt,
-   sonst die eigene Karte verknüpft. Gibt die verknüpfte card_id zurück. */
-async function wunschkarteZumDeck(deckId, c) {
+/* Eine Scryfall-Karte als Parametersatz fürs Aufnehmen ins Deck. Steht für
+   sich, weil ZWEI Wege ihn brauchen — add_wish_to_deck und swap_in_deck, das
+   dieselbe Karte nach einem Schnitt aufnimmt. Zwei Abschriften gingen beim
+   nächsten Feld auseinander, und zwar still: Die Kachel sähe gleich aus, nur
+   die getauschte Wunschzeile hätte kein Bild. */
+function wunschParams(c) {
   const face = c.card_faces?.[0] || {};
-  const { data, error } = await sb.rpc("add_wish_to_deck", {
-    p_deck: deckId,
+  return {
     p_scryfall_id: c.id, p_oracle_id: c.oracle_id || null, p_name: c.name,
     p_printed_name: printedNameOf(c),
     // Setcode GROSS, wie auf allen Sammlungswegen (add_card macht es genauso).
@@ -6385,10 +6386,49 @@ async function wunschkarteZumDeck(deckId, c) {
     p_cmc: c.cmc ?? null, p_released: c.released_at || null,
     p_colors: c.colors || null, p_keywords: c.keywords || null,
     p_oracle_text: c.oracle_text ?? face.oracle_text ?? null,
-  });
+  };
+}
+
+/* Eine Vorschlags-Scryfall-Karte als Wunschkarte ins Deck legen (RPC
+   add_wish_to_deck): fehlt sie in der Sammlung, wird sie mit Bestand 0 angelegt,
+   sonst die eigene Karte verknüpft. Gibt die verknüpfte card_id zurück. */
+async function wunschkarteZumDeck(deckId, c) {
+  const { data, error } = await sb.rpc("add_wish_to_deck",
+    { p_deck: deckId, ...wunschParams(c) });
   if (error) throw error;
   return data;
 }
+
+/* Tauschen: die vorgeschlagene Karte heraus, der Vorschlag hinein — in EINEM
+   Aufruf, weil beides zusammen passieren muss. Zwei Aufrufe von hier wären in
+   jeder Reihenfolge falsch: erst aufnehmen läuft in den 100-Karten-Trigger,
+   erst herausnehmen lässt bei einem Abbruch ein Deck mit 99 Karten zurück.
+   Die Begründung steht ausführlich in der Migration.
+
+   raus ist eine SAMMLUNGSZEILE (cards.id), c eine Scryfall-Karte. */
+async function deckTauschen(deckId, raus, c) {
+  const { data, error } = await sb.rpc("swap_in_deck",
+    { p_deck: deckId, p_cut_card: raus, ...wunschParams(c) });
+  if (error) throw error;
+  return data;
+}
+
+/* Die Karte liegt nicht (mehr) in diesem Deck — der Schnitt-Vorschlag war
+   veraltet. Tritt auf, wenn ein zweites Gerät sie herausgenommen hat oder wenn
+   zwei Kacheln denselben Schnitt vorschlugen und eine davon schon getauscht
+   wurde. */
+const istKeinEintragFehler = e =>
+  e?.hint === "no_entry" || /no_entry/.test(e?.hint || e?.message || "");
+
+/* Wahr, solange public.swap_in_deck in dieser Datenbank fehlt (Schema noch
+   nicht nachgezogen). Bemerken lässt sich das erst beim ersten Klick — vorher
+   fragt niemand danach. Danach verschwinden die Knöpfe, und die Schnitt-Zeile
+   ist wieder das, was sie vorher war: ein Hinweis. Dieselbe Handhabung wie bei
+   den Deck-Kategorien und den aufgehobenen Vorschlägen: Die App läuft
+   vollständig weiter, gemeldet wird es dort, wo man es sucht. */
+let TAUSCH_FEHLT = false;
+const istFunktionFehltFehler = e =>
+  e?.code === "PGRST202" || /Could not find the function/i.test(e?.message || "");
 
 /* Synergie-Knopf in den Ladezustand versetzen: Lupe → drehendes Zahnrad,
    Knopf gesperrt. Zurück auf die Lupe, wenn die Suche fertig ist. */
@@ -7025,7 +7065,7 @@ function comboCardMini(card, deckId, alsAktion) {
       ? `<button class="syn-add voll" disabled title="${esc(t(schonDrin ? "deck.singletonBtnTitle" : "deck.fullBtnTitle"))}">&#43;&#160;${esc(t(owned ? "syn.addDeck" : "syn.addWish"))}</button>`
       : `<button class="syn-add${owned ? " owned" : ""}" data-deck="${esc(deckId)}" data-sid="${esc(card.id)}"
       title="${esc(owned ? t("syn.addOwnedTitle") : t("syn.addWishTitle"))}">&#43;&#160;${esc(t(owned ? "syn.addDeck" : "syn.addWish"))}</button>`;
-    if (voll) cut = schnittHinweisHtml(deckSchnittKandidat(deck, card));
+    if (voll) cut = schnittHinweisHtml(deckSchnittKandidat(deck, card), deckId, card);
   }
   // Weder besessen noch (mangels Deck-Kontext) wünschbar — z. B. im
   // Kartendetail: direkt zum Kauf verlinken (Scryfalls Cardmarket-Link,
@@ -7632,7 +7672,11 @@ const hauptTyp = tl => HAUPT_TYPEN.find(x => new RegExp(`\\b${x}\\b`, "i").test(
 
 function deckSchnittKandidat(d, vorschlag, opts = {}) {
   if (!d) return null;
-  const tabu = new Set([d.main_card_id, d.second_card_id].filter(Boolean));
+  // opts.tabu: zusätzlich ausgenommene Zeilen. Gebraucht nach einem Tausch —
+  // die eben aufgenommene Karte ist als Wunsch unbesessen und stünde damit
+  // ganz oben auf der Schnittliste. Der nächste Vorschlag wäre dann, die
+  // gerade gewählte Karte wieder herauszunehmen.
+  const tabu = new Set([d.main_card_id, d.second_card_id, ...(opts.tabu || [])].filter(Boolean));
   const karten = (d.entries || [])
     .filter(e => !tabu.has(e.cardId))
     .map(e => CARDS.find(c => c.id === e.cardId))
@@ -7702,18 +7746,66 @@ function schnittAusModell(deckId, vorschlag, karte) {
    übersetzt. Beim Modell sagt der feste Satz nur, DASS die KI es so wollte —
    das ist keine Begründung. Liefert es einen eigenen Satz, steht der hier;
    fehlt er, bleibt der feste Satz als ehrlicher Rückfall. */
-function schnittHinweisHtml(schnitt) {
+function schnittHinweisHtml(schnitt, deckId, karte) {
   if (!schnitt?.karte) return "";
   const warum = schnitt.warum || t("deck.cutWhy." + schnitt.grund);
+  const raus = schnitt.karte.disp || schnitt.karte.name;
   // Als unbelegt erkannt: durchgestrichen, damit auf einen Blick klar ist, dass
   // dieser Satz NICHT gilt, plus der Befund der Prüfung. Sieht nur, wer ein
   // Verfahren freigeschaltet hat — schnittAusModell entscheidet das vorher.
   const marke = schnitt.unbelegt
     ? `<span class="syn-cut-bad" title="${esc(schnitt.hinweis || t("deck.cutUnverifiedHint"))}">
         &#9888; ${esc(t("deck.cutUnverified"))}${schnitt.hinweis ? " — " + esc(schnitt.hinweis) : ""}</span>` : "";
-  return `<div class="syn-cut" title="${esc(warum)}">
-    &#9986; ${esc(t("deck.cutFor", { name: schnitt.karte.disp || schnitt.karte.name }))}
-    <span class="syn-cut-why${schnitt.unbelegt ? " strich" : ""}">${esc(warum)}</span>${marke}</div>`;
+  // Der Knopf, der den Satz ausführt. Er steht nur da, wo BEIDE Seiten bekannt
+  // sind: die Sammlungszeile, die weichen soll, und der Vorschlag als
+  // Scryfall-Karte (über SYN_CACHE, gefüllt von der Kachel drumherum). Im
+  // Kartendetail ohne Deck-Bezug bleibt die Zeile also wie bisher ein Hinweis.
+  const tausch = deckId && karte?.id && !TAUSCH_FEHLT
+    ? `<button class="syn-swap" data-deck="${esc(deckId)}" data-sid="${esc(karte.id)}"
+        data-cut="${esc(schnitt.karte.id)}"
+        title="${esc(t("deck.swapTitle", { out: raus, in: karte.name }))}"
+        >&#8646;&#160;${esc(t("deck.swap"))}</button>`
+    : "";
+  // deckId/sid/cut stehen auch am Kasten selbst: Nach einem Tausch rechnet
+  // schnitteAuffrischen() von hier aus die übrigen Zeilen neu.
+  const merkmale = deckId && karte?.id
+    ? ` data-deck="${esc(deckId)}" data-sid="${esc(karte.id)}" data-cut="${esc(schnitt.karte.id)}"` : "";
+  return `<div class="syn-cut"${merkmale} title="${esc(warum)}">
+    &#9986; ${esc(t("deck.cutFor", { name: raus }))}
+    <span class="syn-cut-why${schnitt.unbelegt ? " strich" : ""}">${esc(warum)}</span>${marke}${tausch}</div>`;
+}
+
+/* Zeilen, die in dieser Sitzung durch einen Tausch ins Deck gekommen sind.
+   Sie dürfen beim Neurechnen nicht als Schnitt vorgeschlagen werden: Eine
+   frisch aufgenommene Wunschkarte hat Bestand 0, und „nicht besessen" ist das
+   erste Argument der Heuristik — der nächste Vorschlag hieße also, die eben
+   gewählte Karte wieder herauszunehmen. */
+const TAUSCH_NEU = new Set();
+
+/* Nach einem Tausch: Die übrigen Vorschläge desselben Decks nennen womöglich
+   die Karte, die gerade herausgegangen ist. Wer dort weiterklickte, liefe in
+   „liegt nicht in diesem Deck" — die Zeile sähe bis dahin gültig aus.
+
+   Neu gerechnet wird HEURISTISCH, auch wo vorher ein Modell den Schnitt
+   vorgeschlagen hatte: Dessen Begründung galt für die alte Karte und wäre für
+   die neue erfunden. Das ist dieselbe Regel, nach der schnittAusModell() einen
+   nicht mehr auffindbaren Namen verwirft.
+
+   Angefasst werden nur die veralteten Zeilen. Alle neu zu zeichnen würde auch
+   die eben getauschte überschreiben und den Erfolg wieder wegnehmen. */
+function schnitteAuffrischen(deckId) {
+  const deck = DECKS.find(d => d.id === deckId);
+  if (!deck) return;
+  const drin = new Set((deck.entries || []).map(e => e.cardId));
+  for (const zeile of $$(".syn-cut")) {
+    if (zeile.dataset.deck !== deckId || zeile.classList.contains("getauscht")) continue;
+    if (!zeile.dataset.cut || drin.has(zeile.dataset.cut)) continue;
+    const karte = SYN_CACHE.get(zeile.dataset.sid);
+    // Bleibt nichts mehr zu schneiden übrig, verschwindet die Zeile — ein
+    // Vorschlag ohne Gegenstück ist keiner.
+    zeile.outerHTML = schnittHinweisHtml(
+      deckSchnittKandidat(deck, karte, { tabu: TAUSCH_NEU }), deckId, karte);
+  }
 }
 
 const DECK_FORMATE = ["Commander", "Standard", "Pioneer", "Modern", "Legacy",
@@ -17240,6 +17332,80 @@ function wireApp() {
       } else if (istDeckVollFehler(err)) {
         await reload(); deckVollMelden(DECKS.find(x => x.id === deckId));
         btn.classList.add("voll");
+      } else { btn.disabled = false; toast(dbErr(err)); }
+    }
+  });
+
+  // „Tauschen" an der Schnitt-Zeile eines vollen Decks: die genannte Karte
+  // raus, der Vorschlag rein. Ohne Rückfrage — die Zeile nennt die Karte, die
+  // weichen soll, im Klartext, und der Deck-Verlauf hat den Stand davor. Ein
+  // Bestätigungsdialog für etwas, das direkt daneben schon geschrieben steht,
+  // wäre nur ein zweiter Klick.
+  //
+  // Nicht neu gezeichnet wird: Die (teils bezahlten) Vorschläge sollen stehen
+  // bleiben, genau wie beim „+"-Knopf darüber. Angepasst wird deshalb von Hand,
+  // was jetzt nicht mehr stimmt — diese Kachel und die Schnitt-Zeilen der
+  // anderen, die dieselbe Karte genannt haben könnten.
+  document.addEventListener("click", async e => {
+    const btn = e.target.closest(".syn-swap");
+    if (!btn || btn.disabled) return;
+    e.preventDefault();
+    const card = SYN_CACHE.get(btn.dataset.sid);
+    const deckId = btn.dataset.deck, cutId = btn.dataset.cut;
+    if (!card || !deckId || !cutId) return;
+    // Den Namen VOR dem Aufruf festhalten: Danach ist die Zeile zwar noch in
+    // der Sammlung (nur der Deckplatz fällt weg), aber die Meldung soll sagen,
+    // was getauscht wurde, und nicht erst nachschlagen müssen.
+    const alt = CARDS.find(c => c.id === cutId);
+    const raus = alt?.disp || alt?.name || "";
+    btn.disabled = true;
+    try {
+      // Die Kachel VOR dem Umschreiben festhalten: zeile.innerHTML wirft die
+      // alten Kinder weg, und ein herausgelöster Knopf findet über closest()
+      // nichts mehr — er hat keinen Elternknoten mehr.
+      const kachel = btn.closest(".syn-card, .combo-mini");
+      const zeile = btn.closest(".syn-cut");
+      const neu = await deckTauschen(deckId, cutId, card);
+      if (neu) TAUSCH_NEU.add(neu);
+      await reload();
+      if (zeile) {
+        zeile.classList.add("getauscht");
+        zeile.removeAttribute("title");
+        // Die Merkmale ebenfalls weg: Diese Zeile ist erledigt und soll beim
+        // Neurechnen nicht mehr als Schnitt-Vorschlag gelten.
+        delete zeile.dataset.cut; delete zeile.dataset.sid;
+        zeile.innerHTML = `&#10003; ${esc(t("deck.swapDone", { out: raus, in: card.name }))}`;
+      }
+      // Der „+“-Knopf derselben Kachel stand auf „Deck ist voll“. Die Karte
+      // liegt jetzt drin — das soll er auch zeigen.
+      const plus = kachel?.querySelector(".syn-add");
+      if (plus) {
+        plus.disabled = true;
+        plus.classList.remove("voll"); plus.classList.add("done");
+        plus.innerHTML = "&#10003;";
+      }
+      toast(t("deck.swapToast", { out: raus, in: card.name,
+        deck: DECKS.find(x => x.id === deckId)?.name || "" }));
+      schnitteAuffrischen(deckId);
+    } catch (err) {
+      // Der Schnitt-Vorschlag war veraltet (zweites Gerät, oder zwei Kacheln
+      // nannten dieselbe Karte). Kein Fehler des Nutzers: neu rechnen und
+      // sagen, was passiert ist.
+      if (istFunktionFehltFehler(err)) {
+        // Die Migration ist noch nicht gelaufen. Einmal sagen, dann die Knöpfe
+        // abräumen — sie führen bis dahin alle ins Leere, und der Hinweis
+        // darüber trägt sich auch ohne sie.
+        TAUSCH_FEHLT = true;
+        $$(".syn-swap").forEach(b => b.remove());
+        toast(t("deck.swapNeedSchema"));
+      } else if (istKeinEintragFehler(err)) {
+        await reload();
+        toast(t("deck.swapGone", { name: raus }));
+        schnitteAuffrischen(deckId);
+      } else if (istSingletonFehler(err)) {
+        await reload();
+        toast(t("deck.singleton", { name: card.name, max: commanderMaxKopien(card),
+          n: deckKopien(DECKS.find(x => x.id === deckId), card) }));
       } else { btn.disabled = false; toast(dbErr(err)); }
     }
   });

@@ -5396,4 +5396,47 @@ Object.assign(I18N.it, {
   "kat.multiHint": "Una carta può stare in più categorie — la somma dei gruppi supera allora il mazzo.",
 });
 
+/* Tauschen an der Schnitt-Zeile: den Vorschlag ausführen, statt ihn nur zu
+   lesen. {out} ist die Karte, die weicht, {in} die, die kommt. */
+Object.assign(I18N.de, {
+  "deck.swap": "Tauschen",
+  "deck.swapTitle": "„{out}“ aus dem Deck nehmen und „{in}“ dafür aufnehmen — in einem Schritt",
+  "deck.swapDone": "„{out}“ raus, „{in}“ rein",
+  "deck.swapToast": "Getauscht in „{deck}“: „{out}“ raus, „{in}“ rein.",
+  "deck.swapGone": "„{name}“ liegt nicht mehr in diesem Deck — der Vorschlag wurde neu gerechnet.",
+  "deck.swapNeedSchema": "Dafür fehlt der Datenbank die Funktion swap_in_deck — supabase/migrations/20260803210000_deck_tausch.sql im SQL Editor ausführen.",
+});
+Object.assign(I18N.en, {
+  "deck.swap": "Swap",
+  "deck.swapTitle": "Take “{out}” out of the deck and add “{in}” instead — in one step",
+  "deck.swapDone": "“{out}” out, “{in}” in",
+  "deck.swapToast": "Swapped in “{deck}”: “{out}” out, “{in}” in.",
+  "deck.swapGone": "“{name}” is no longer in this deck — the suggestion was recalculated.",
+  "deck.swapNeedSchema": "The database is missing the swap_in_deck function — run supabase/migrations/20260803210000_deck_tausch.sql in the SQL editor.",
+});
+Object.assign(I18N.fr, {
+  "deck.swap": "Échanger",
+  "deck.swapTitle": "Retirer « {out} » du deck et prendre « {in} » à la place — en une fois",
+  "deck.swapDone": "« {out} » sort, « {in} » entre",
+  "deck.swapToast": "Échangé dans « {deck} » : « {out} » sort, « {in} » entre.",
+  "deck.swapGone": "« {name} » n’est plus dans ce deck — la suggestion a été recalculée.",
+  "deck.swapNeedSchema": "La fonction swap_in_deck manque à la base — exécute supabase/migrations/20260803210000_deck_tausch.sql dans l'éditeur SQL.",
+});
+Object.assign(I18N.es, {
+  "deck.swap": "Intercambiar",
+  "deck.swapTitle": "Sacar «{out}» del mazo y meter «{in}» en su lugar — en un solo paso",
+  "deck.swapDone": "«{out}» fuera, «{in}» dentro",
+  "deck.swapToast": "Intercambiado en «{deck}»: «{out}» fuera, «{in}» dentro.",
+  "deck.swapGone": "«{name}» ya no está en este mazo — la sugerencia se ha recalculado.",
+  "deck.swapNeedSchema": "A la base de datos le falta la función swap_in_deck — ejecuta supabase/migrations/20260803210000_deck_tausch.sql en el editor SQL.",
+});
+Object.assign(I18N.it, {
+  "deck.swap": "Scambia",
+  "deck.swapTitle": "Togliere «{out}» dal mazzo e inserire «{in}» al suo posto — in un solo passo",
+  "deck.swapDone": "«{out}» esce, «{in}» entra",
+  "deck.swapToast": "Scambiato in «{deck}»: «{out}» esce, «{in}» entra.",
+  "deck.swapGone": "«{name}» non è più in questo mazzo — il suggerimento è stato ricalcolato.",
+  "deck.swapNeedSchema": "Al database manca la funzione swap_in_deck — esegui supabase/migrations/20260803210000_deck_tausch.sql nell'editor SQL.",
+});
+
 initLang();

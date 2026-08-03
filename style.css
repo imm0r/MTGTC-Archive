@@ -3090,6 +3090,20 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px}
    dass dieser Satz NICHT gilt — sichtbar nur für freigeschaltete Tester. */
 .syn-cut-why.strich{ text-decoration:line-through; opacity:.45; }
 .syn-cut-bad{ display:block; margin-top:2px; color:var(--err); font-style:normal; }
+/* „Tauschen": führt aus, was die Zeile darüber vorschlägt. Bewusst dezent
+   (Ghost statt goldener Pille wie „+ Wunsch") — der Vorschlag ist eine
+   Vermutung der App, nicht die Hauptsache der Kachel. Eigene Zeile, damit er
+   bei langen Kartennamen nicht neben dem Text klemmt. */
+.syn-swap{ display:inline-flex; align-items:center; margin-top:5px; font-size:11px;
+           font-weight:600; padding:3px 9px; border-radius:999px; cursor:pointer;
+           background:var(--panel); color:var(--txt); border:1px solid var(--line);
+           white-space:nowrap; font-style:normal; }
+.syn-swap:hover{ border-color:var(--acc); color:var(--acc); }
+.syn-swap:disabled{ cursor:default; opacity:.45; border-color:var(--line); color:var(--txt); }
+/* Nach dem Tausch bleibt die Zeile stehen und sagt, was passiert ist —
+   verschwände sie, wäre der einzige Beleg für den Klick der Toast, und der ist
+   nach 2,6 s weg. */
+.syn-cut.getauscht{ color:var(--ok); cursor:default; }
 .deck-full-note{ color:var(--err); }
 
 /* ---- Nachrichten ----------------------------------------------------
