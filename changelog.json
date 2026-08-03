@@ -1,5 +1,11 @@
 [
  {
+  "am": "2026-08-04T01:35:00+02:00",
+  "art": "neu",
+  "text": "Ist seit deinem letzten Besuch eine neue Fassung der App da, steht die Versionsnummer oben rechts in Gold statt in Grau — der Hinweis, dass es im Changelog etwas zu lesen gibt. Ein Blick hinein nimmt die Farbe wieder weg.",
+  "pr": 210
+ },
+ {
   "am": "2026-08-04T01:13:00+02:00",
   "art": "behoben",
   "text": "Ladebalken und Text der Deck-Suchen standen doppelt: einmal oben bei den Knöpfen und noch einmal unter der Kartenliste. Beim Scrollen fand man den unteren zuerst — also den an der falschen Stelle. Jetzt gibt es nur noch den oberen.",

@@ -94,4 +94,85 @@ export default async function ({ seite, adresse, stand, wurzel }) {
     knopf.istKnopf && knopf.titel.length > 8, knopf.titel);
   stand.ist("ihr Klick öffnet das Changelog",
     await seite.evaluate(() => document.getElementById("changelog-dlg").open));
+
+  /* --- Neue Fassung seit dem letzten Besuch ------------------------------
+     Verglichen wird nur auf UNGLEICH, nicht auf „größer". Das geht, weil die
+     Nummer nur nach oben läuft (version.yml rechnet sie aus dem Zielzweig
+     hoch) — und es macht die Falle gegenstandslos, die ein Größenvergleich
+     mitbrächte: Als Text steht "0.9.0" NACH "0.10.0", die neue Fassung gälte
+     also als die ältere und die Nummer bliebe grau. Ein Fehler, der genau
+     einmal im Leben der App aufträte und dann niemandem erklärbar wäre.
+
+     Geprüft wird deshalb beides: dass Ungleiches erkannt wird — und dass die
+     Zehnerstelle daran nichts ändert, in BEIDE Richtungen. */
+  const vergleich = await seite.evaluate(() => ({
+    hoeher:    versionAnders("0.75.2", "0.75.1"),
+    gleich:    versionAnders("0.75.1", "0.75.1"),
+    zurueck:   versionAnders("0.75.0", "0.75.1"),   // zurückgenommene Auslieferung
+    zehner:    versionAnders("0.10.0", "0.9.0"),    // die Falle, die es nicht mehr gibt
+    zehnerRum: versionAnders("0.9.0", "0.10.0"),
+    anhang:    versionAnders("0.76.0-rc1", "0.75.2"),
+    leerA:     versionAnders("", "0.75.1"),
+    leerB:     versionAnders("0.75.1", ""),
+  }));
+  stand.gleich("eine andere Fassung wird erkannt, dieselbe nicht",
+    [vergleich.hoeher, vergleich.gleich], [true, false]);
+  stand.gleich("die Zehnerstelle ändert nichts — in beide Richtungen",
+    [vergleich.zehner, vergleich.zehnerRum], [true, true]);
+  // Eine zurückgenommene Auslieferung IST eine Änderung seit dem letzten
+  // Besuch, und genau das soll die Farbe sagen.
+  stand.ist("auch eine zurückgenommene Auslieferung zählt als Änderung",
+    vergleich.zurueck && vergleich.anhang);
+  // Ohne gemerkte Fassung darf nie hervorgehoben werden — sonst leuchtete die
+  // Nummer beim allerersten Besuch, wo es nichts zu verpassen gab.
+  stand.gleich("eine leere Angabe zählt nie als Änderung",
+    [vergleich.leerA, vergleich.leerB], [false, false]);
+
+  /* --- Was die Kopfzeile daraus macht ------------------------------------ */
+  const faelle = await seite.evaluate(() => {
+    const el = document.getElementById("header-version");
+    const lauf = (gemerkt) => {
+      if (gemerkt === null) localStorage.removeItem("mtg-version-gesehen");
+      else localStorage.setItem("mtg-version-gesehen", gemerkt);
+      zeigeKopfVersion();
+      return { neu: el.classList.contains("neu"), titel: el.title,
+               farbe: getComputedStyle(el).color, gemerkt: localStorage.getItem("mtg-version-gesehen") };
+    };
+    const alt = lauf("0.0.1");
+    const gleich = lauf(APP_VERSION);
+    const erst = lauf(null);
+    return { alt, gleich, erst, version: APP_VERSION };
+  });
+  stand.ist("nach einer neuen Fassung ist die Nummer hervorgehoben",
+    faelle.alt.neu, faelle.alt.titel);
+  stand.ist("und der Hinweis nennt die Fassung von vorher",
+    faelle.alt.titel.includes("0.0.1") && faelle.alt.titel.includes(faelle.version),
+    faelle.alt.titel);
+  stand.ist("bei gleicher Fassung bleibt sie unauffällig",
+    !faelle.gleich.neu, faelle.gleich.titel);
+  stand.ist("die Farbe unterscheidet sich wirklich, nicht nur die Klasse",
+    faelle.alt.farbe !== faelle.gleich.farbe,
+    `${faelle.alt.farbe} statt ${faelle.gleich.farbe}`);
+  // Wer noch nie hier war, hat nichts verpasst. Ohne diese Ausnahme leuchtete
+  // die Nummer jedem Neuling entgegen und bedeutete nichts.
+  stand.ist("beim allerersten Besuch ist sie nicht hervorgehoben",
+    !faelle.erst.neu, faelle.erst.titel);
+  stand.ist("die laufende Fassung wird dabei trotzdem gemerkt",
+    faelle.erst.gemerkt === faelle.version, faelle.erst.gemerkt);
+
+  // Und ein Blick ins Changelog nimmt die Hervorhebung wieder weg.
+  const danach = await seite.evaluate(async () => {
+    localStorage.setItem("mtg-version-gesehen", "0.0.1");
+    zeigeKopfVersion();
+    const el = document.getElementById("header-version");
+    const vorher = el.classList.contains("neu");
+    document.getElementById("changelog-dlg").close();
+    await zeigeChangelog();
+    return { vorher, nachher: el.classList.contains("neu"),
+             gemerkt: localStorage.getItem("mtg-version-gesehen") };
+  });
+  stand.ist("ein Blick ins Changelog nimmt die Hervorhebung weg",
+    danach.vorher && !danach.nachher, JSON.stringify(danach));
+  stand.ist("und merkt sich die jetzige Fassung",
+    danach.gemerkt === faelle.version, danach.gemerkt);
 }

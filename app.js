@@ -11314,6 +11314,40 @@ function showApp() {
   zeigeKopfLage();                            // Gesamtlage als Beschriftung daneben
 }
 
+/* ---- „Seit deinem letzten Besuch ist etwas passiert" -------------------
+   Die Versionsnummer steht gedimmt in der Kopfzeile und wird deshalb nie
+   angesehen. Ist seit dem letzten Besuch eine neue Fassung ausgeliefert
+   worden, bekommt sie Farbe — der einzige Hinweis darauf, dass es im
+   Changelog etwas Neues zu lesen gibt.
+
+   GERÄTELOKAL (localStorage), wie Sprache und Synergie-Modus. Am Konto hinge
+   es an einer Spalte in der Datenbank, und die Frage „was ist neu, seit ich
+   zuletzt hier war" ist ohnehin eine des Browsers vor einem: Wer an zwei
+   Geräten sitzt, hat an beiden einen letzten Besuch. */
+const VERSION_GESEHEN = "mtg-version-gesehen";
+function versionGesehen() {
+  try { return localStorage.getItem(VERSION_GESEHEN) || ""; } catch { return ""; }
+}
+function versionGesehenSetzen(v) {
+  try { localStorage.setItem(VERSION_GESEHEN, v); } catch { /* gesperrt — dann eben nicht */ }
+}
+
+/* Hat sich die Fassung geändert? Ein schlichter Ungleich — KEIN Vergleich,
+   welche die neuere ist.
+
+   Das ist Absicht und nicht Bequemlichkeit. Die Nummer geht nur nach oben
+   (version.yml rechnet sie aus dem Zielzweig hoch), „anders" und „neuer"
+   fallen also zusammen. Ein Größenvergleich brächte dagegen eine Falle mit,
+   die es hier gar nicht zu geben braucht: Als Text verglichen steht "0.9.0"
+   NACH "0.10.0" — die neue Fassung gälte als die ältere und die Nummer bliebe
+   grau. Stellenweise numerisch zu vergleichen löste das, wäre aber Aufwand für
+   eine Unterscheidung, die keine Frage beantwortet.
+
+   Der Nebeneffekt ist sogar der richtige: Wird eine Auslieferung einmal
+   zurückgenommen, hat sich die App seit dem letzten Besuch trotzdem geändert
+   — und genau das soll die Farbe sagen. */
+const versionAnders = (a, b) => !!a && !!b && a !== b;
+
 /* Versionsnummer im Kopf, unter dem Verweis auf die Statusseite. Quelle ist
    APP_VERSION aus dem <meta name="app-version"> in index.html; fehlt sie oder
    ist sie unbrauchbar, bleibt die Zeile weg statt „—“ zu zeigen. Läuft beim
@@ -11324,10 +11358,24 @@ function zeigeKopfVersion() {
   el.hidden = !APP_VERSION;
   if (!APP_VERSION) return;
   el.textContent = t("header.version", { v: APP_VERSION });
+
+  // BEIM ERSTEN BESUCH NICHT hervorheben. Wer noch nie hier war, hat nichts
+  // verpasst; gemerkt wird die Fassung trotzdem, damit die NÄCHSTE auffällt.
+  // Ohne diese Ausnahme leuchtete die Nummer jedem Neuling entgegen und
+  // bedeutete nichts — und die Farbe verlöre genau die Aussage, für die es
+  // sie gibt.
+  const gesehen = versionGesehen();
+  if (!gesehen) versionGesehenSetzen(APP_VERSION);
+  const neu = versionAnders(APP_VERSION, gesehen);
+  el.classList.toggle("neu", neu);
+
   // Der title sagt jetzt, dass hinter der Nummer das Changelog steckt — die
   // Nummer selbst bleibt die Beschriftung, ein „Changelog"-Schriftzug im Kopf
   // wäre ein weiteres Wort für etwas, das einmal im Monat jemand öffnet.
-  el.title = t("changelog.open", { v: APP_VERSION });
+  // Ist sie hervorgehoben, nennt er auch die Fassung von vorher: Sonst steht
+  // dort Farbe ohne Grund.
+  el.title = neu ? t("changelog.openNeu", { v: APP_VERSION, alt: gesehen })
+                 : t("changelog.open", { v: APP_VERSION });
   el.onclick = zeigeChangelog;
 }
 
@@ -11376,6 +11424,12 @@ async function zeigeChangelog() {
   body.innerHTML = `<h3 style="margin:0 0 10px">${esc(t("changelog.title"))}</h3>
     <div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("changelog.loading"))}</div>`;
   dlg.showModal();
+  // Gesehen ist gesehen: Die Nummer im Kopf verliert ihre Farbe, und erst die
+  // nächste Fassung bringt sie zurück. Hier und nicht beim Schließen — wer
+  // den Dialog geöffnet hat, hat das Angebot wahrgenommen; ob er ihn zu Ende
+  // liest, ist seine Sache und keine, die die App nachhalten sollte.
+  versionGesehenSetzen(APP_VERSION);
+  $("#header-version")?.classList.remove("neu");
   let eintraege;
   try { eintraege = await ladeChangelog(); }
   catch {

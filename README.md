@@ -2807,6 +2807,32 @@ und eine statische Datei im selben Verzeichnis kann nicht ausfallen. Der
 Rückgriff reicht bis Ende Juli (#156); die reine Arbeitsumgebung — Hooks, CI —
 bleibt draußen, weil kein Nutzer sie sehen oder spüren kann.
 
+### Die Nummer färbt sich, wenn es etwas zu lesen gibt
+
+Sie steht sonst gedimmt im Kopf und wird nie angesehen. Ist seit dem letzten
+Besuch eine andere Fassung ausgeliefert worden, erscheint sie in Akzentgold
+statt in Grau — der einzige Hinweis darauf, dass im Changelog etwas Neues
+steht. Ein Blick hinein nimmt die Farbe wieder weg.
+
+**Verglichen wird auf ungleich, nicht auf „größer".** Die Nummer läuft nur nach
+oben (`version.yml` rechnet sie aus dem Zielzweig hoch), „anders" und „neuer"
+fallen also zusammen. Ein Größenvergleich brächte dagegen eine Falle mit, die
+es hier gar nicht zu geben braucht: Als **Text** verglichen steht `0.9.0` *nach*
+`0.10.0` — die neue Fassung gälte als die ältere und die Nummer bliebe grau.
+Ein Fehler, der genau einmal im Leben der App aufträte und dann niemandem
+erklärbar wäre. Der Nebeneffekt ist sogar der richtige: Wird eine Auslieferung
+zurückgenommen, hat sich die App seit dem letzten Besuch trotzdem geändert.
+
+Zwei Feinheiten:
+
+* **Gerätelokal** (`localStorage`), wie Sprache und Synergie-Modus. „Was ist
+  neu, seit ich zuletzt hier war" ist ohnehin eine Frage des Browsers vor
+  einem; wer an zwei Geräten sitzt, hat an beiden einen letzten Besuch.
+* **Beim allerersten Besuch nicht.** Wer noch nie hier war, hat nichts
+  verpasst — die Fassung wird still gemerkt, damit die *nächste* auffällt.
+  Ohne diese Ausnahme leuchtete die Nummer jedem Neuling entgegen und
+  bedeutete nichts.
+
 ## Prüfungen
 
 ```bash
