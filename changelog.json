@@ -1,5 +1,11 @@
 [
  {
+  "am": "2026-08-03T22:45:00+02:00",
+  "art": "verbessert",
+  "text": "Die Synergie-Suche nutzt jetzt die Karten-Themen aus dem Scryfall Tagger statt zehn grober Textmuster. Rhystic Study findet damit Draw-Engines, Elvish Archdruid Elfen-Verstärker — vorher fanden beide fast nichts.",
+  "pr": 203
+ },
+ {
   "am": "2026-08-03T22:40:00+02:00",
   "art": "verbessert",
   "text": "Der Preisverlauf lässt sich jetzt auf 30 Tage, 3 Monate, 6 Monate, 1 Jahr oder alles einstellen. Über und unter dem Graphen stehen Hoch, Tief, Veränderung, Spanne und die Zahl der Messpunkte — jeweils für den gewählten Ausschnitt. Beim Überfahren zeigt die Kurve zusätzlich, wie viel Prozent sich seit diesem Tag getan hat.",
