@@ -256,6 +256,26 @@ Preis; das Feld darüber filtert nach Setname, Setcode, Nummer oder Jahr. Am
 Bild erkennt man die Karte in der Hand sofort. Die Auflage, die die Namenssuche
 geliefert hatte, ist markiert — als Hinweis, nicht als Vorauswahl.
 
+**Überfahren zeigt die ganze Karte.** Das Bild in der Zeile ist daumennagelgroß;
+dass zwei Auflagen verschiedene Illustrationen tragen, sieht man darin nicht.
+Beim Überfahren schwebt deshalb die große Karte daneben, darunter die Angaben,
+die tatsächlich auseinandergehen:
+
+| Zeile | Wozu |
+| --- | --- |
+| Set · #Nummer · Jahr | wo die Auflage herkommt |
+| Seltenheit · Rahmen | der Rahmen nur, wenn er ein **alter** ist (1993/1997/2003) — der heutige steht auf fast jeder Karte und sagt nichts |
+| Illustration | der klassische Unterschied zwischen zwei Drucken, und auf der Karte selbst unten abgedruckt |
+| Randlos · Vollbild · Showcase … | Sonderausstattungen, sofern welche |
+| Ausführungen | „nur Foil" schließt eine Auflage sofort aus, wenn man eine normale hält |
+| Preis | |
+
+Regeltext, Manakosten und Typzeile stehen bewusst **nicht** dabei: Die sind bei
+allen Auflagen derselben Karte gleich und beantworten die Frage „welche halte
+ich in der Hand?" nicht — sie füllten nur den Platz, den das Bild besser nutzt.
+Dieselbe Vorschau hängt auch an der Auswahl „Welche Karte ist es?", wenn ein
+Name auf mehrere Karten passt.
+
 Drei Dinge dazu:
 
 * **Auch bei „Treffer sofort übernehmen".** Was die Erkennung gar nicht gelesen

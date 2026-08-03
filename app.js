@@ -571,6 +571,10 @@ const priceOf = (c, foil) => {
   return v == null ? null : parseFloat(v);
 };
 const imgOf = c => c.image_uris?.small || c.card_faces?.[0]?.image_uris?.small || "";
+/* Dasselbe in groß (488×680) — für die Hover-Vorschau, wo man das Artwork
+   erkennen können muss. Fällt auf das kleine Bild zurück, damit die Vorschau
+   nie leer bleibt: ein grobes Bild ist mehr wert als keines. */
+const imgGrossOf = c => c.image_uris?.normal || c.card_faces?.[0]?.image_uris?.normal || imgOf(c);
 
 /* Regex-Sonderzeichen entschärfen — genutzt, um einen Schlüsselwort-Namen im
    Regeltext einer Kartenseite zu suchen. */
@@ -1479,6 +1483,84 @@ function renderConfirm(card, el, detected) {
   el.querySelector("[data-drop]").onclick = () => ziehKachelWeg(el);
 }
 
+/* Was eine AUFLAGE von einer anderen unterscheidet — für die Hover-Vorschau
+   über einer Auswahlzeile.
+
+   Bewusst NICHT detailHtml(): das zeigt Regeltext, Manakosten und Typzeile, und
+   genau die sind bei allen Auflagen derselben Karte gleich. Sie beantworten die
+   Frage „welche halte ich in der Hand?" also nicht — sie füllen nur Platz, den
+   das Bild besser nutzt. (Technisch käme dazu, dass detailHtml die Zeilenform
+   der Sammlung erwartet, nicht ein rohes Scryfall-Objekt.)
+
+   Gezeigt wird stattdessen, was tatsächlich auseinandergeht: Set, Nummer, Jahr,
+   Seltenheit, Rahmen — und vor allem der ILLUSTRATOR. Der ist der klassische
+   Unterschied zwischen zwei Drucken derselben Karte und steht auf der Karte
+   selbst unten, direkt neben dem Setcode. Dazu die Ausführungen: „nur Foil"
+   schließt eine Auflage sofort aus, wenn man eine normale in der Hand hält. */
+const FINISH_NAMEN = { nonfoil: () => t("cm.normal"), foil: () => "Foil", etched: () => "Etched" };
+
+/* Die alten Kartenrahmen. Genannt wird der Rahmen NUR, wenn er einer davon ist:
+   Der heutige (2015) steht auf fast jeder Karte und sagt darum nichts — eine
+   Zeile „Rahmen 2015" wäre Füllung. Ein alter Rahmen dagegen ist eine echte
+   Auskunft, und zwar in beide Richtungen: Bei einem Druck von 1997 bestätigt er
+   das Alter, bei einem neuen Set weist er den Retro-Nachdruck aus.
+
+   Bewusst eine Liste der ALTEN statt „alles außer 2015": Führt Wizards einen
+   neuen Rahmen ein, bleibt er hier ungenannt — das ist die harmlose Richtung.
+   Andersherum behauptete die Vorschau „Rahmen 2028" als Besonderheit, obwohl es
+   dann der gewöhnliche wäre. */
+const RETRO_RAHMEN = new Set(["1993", "1997", "2003"]);
+
+/* Sonderausstattungen, die man auf den ersten Blick sieht. Knapp gehalten: Was
+   das Bild ohnehin zeigt, braucht keine drei Wörter daneben — die Liste ist
+   eine Stütze für den Fall, dass zwei Auflagen sich sehr ähneln. */
+function druckMerkmale(c) {
+  const fe = Array.isArray(c.frame_effects) ? c.frame_effects : [];
+  const m = [];
+  if (c.border_color === "borderless") m.push(t("print.borderless"));
+  if (c.full_art) m.push(t("print.fullArt"));
+  if (fe.includes("showcase")) m.push("Showcase");
+  if (fe.includes("extendedart")) m.push(t("print.extendedArt"));
+  if (c.textless) m.push(t("print.textless"));
+  if (c.promo) m.push("Promo");
+  return m;
+}
+
+/* Die Zeilen unter dem Bild der Hover-Vorschau. Leere Angaben fallen weg —
+   eine Zeile „Illustration: —" sagt nichts und kostet Platz. */
+function druckHoverZeilen(c) {
+  const jahr = String(c.released_at || "").slice(0, 4);
+  const finishes = (Array.isArray(c.finishes) ? c.finishes : [])
+    .map(f => (FINISH_NAMEN[f] || (() => f))()).join(" · ");
+  const merkmale = druckMerkmale(c);
+  return [
+    [c.set_name || c.set, c.collector_number ? "#" + c.collector_number : "", jahr]
+      .filter(Boolean).join(" · "),
+    [RARITY[c.rarity]?.text || c.rarity,
+      RETRO_RAHMEN.has(String(c.frame)) ? t("print.frame", { jahr: c.frame }) : ""]
+      .filter(Boolean).join(" · "),
+    c.artist ? t("print.artist", { name: c.artist }) : "",
+    merkmale.length ? merkmale.join(" · ") : "",
+    finishes ? t("print.finishes", { liste: finishes }) : "",
+    eur(priceOf(c, false)),
+  ].filter(Boolean);
+}
+
+/* Hover-Vorschau an eine Auswahlzeile hängen: großes Bild und die Angaben, die
+   diese Auflage von ihren Schwestern trennen. Nur auf Geräten mit echtem Hover
+   (HOVER_OK) — auf dem Handy gäbe es kein Schweben, sondern einen Klick, der
+   die Auflage auswählt, und die Vorschau bliebe hängen. */
+function wireDruckHover(knopf, c) {
+  if (!HOVER_OK || !c) return;
+  const name = printedNameOf(c) || c.name || "";
+  knopf.addEventListener("mousemove", e =>
+    zeigeCmdHover(imgGrossOf(c), name, e.clientX, e.clientY, druckHoverZeilen(c)));
+  knopf.addEventListener("mouseleave", versteckeCmdHover);
+  // Nach dem Klick ist die Kachel neu gezeichnet und der Knopf fort — ohne das
+  // bliebe die Vorschau stehen, weil kein mouseleave mehr kommt.
+  knopf.addEventListener("click", versteckeCmdHover);
+}
+
 /* Der Kartenname steht fest, die AUFLAGE nicht.
    ---------------------------------------------------------------------------
    Setcode und Sammlernummer unten links sind das einzige, was eine Auflage
@@ -1575,6 +1657,10 @@ async function renderAuflagen(el, card, detected) {
   const liste = el.querySelector("[data-liste]");
   const zaehler = el.querySelector("[data-zaehler]");
   const knoepfe = [...liste.querySelectorAll("[data-druck]")];
+  // Rollt die Liste unter dem stehenden Zeiger weg, kommt kein mousemove — die
+  // Vorschau zeigte dann eine Auflage, die gar nicht mehr unter dem Zeiger
+  // liegt. Also wegblenden; die nächste Bewegung holt die richtige zurück.
+  liste.addEventListener("scroll", versteckeCmdHover);
   el.querySelector("[data-filter]").oninput = e => {
     const q = norm(e.target.value);
     let sichtbar = 0;
@@ -1589,14 +1675,20 @@ async function renderAuflagen(el, card, detected) {
     zaehler.textContent = zaehlText(sichtbar);
   };
 
-  knoepfe.forEach(b => b.onclick = async () => {
+  knoepfe.forEach(b => {
     const gewaehlt = drucke[+b.dataset.druck];
-    b.disabled = true;
-    try {
-      // Die gewählte Auflage in der erkannten Sprache — und mit Preis und
-      // Cardmarket-ID, die fremdsprachige Drucke bei Scryfall nicht tragen.
-      await weiter(await withPrice(await inSprache(gewaehlt, lang)));
-    } catch (e) { b.disabled = false; toast(e.message); }
+    // Die Zeile ist schmal und ihr Bild daumennagelgroß. Was die Auflagen
+    // wirklich trennt — Artwork, Rahmen, Illustrator —, erkennt man erst groß:
+    // beim Überfahren schwebt die ganze Karte daneben.
+    wireDruckHover(b, gewaehlt);
+    b.onclick = async () => {
+      b.disabled = true;
+      try {
+        // Die gewählte Auflage in der erkannten Sprache — und mit Preis und
+        // Cardmarket-ID, die fremdsprachige Drucke bei Scryfall nicht tragen.
+        await weiter(await withPrice(await inSprache(gewaehlt, lang)));
+      } catch (e) { b.disabled = false; toast(e.message); }
+    };
   });
   el.querySelector("[data-fix]").onclick = () => renderManual(el, card.name);
   el.querySelector("[data-drop]").onclick = () => ziehKachelWeg(el);
@@ -1634,15 +1726,20 @@ function renderManual(el, guess, candidates, opts = {}) {
     </div>
     <p class="hint" style="margin-top:6px">${t("scan.codeHint")}</p>`;
 
-  el.querySelectorAll("[data-pick]").forEach(b => b.onclick = async () => {
+  el.querySelectorAll("[data-pick]").forEach(b => {
     const gewaehlt = cs[+b.dataset.pick];
-    try {
-      // Steht in der Liste die Karte (nicht die Auflage), ist mit dem Klick
-      // erst die halbe Frage beantwortet — die zweite Hälfte stellt
-      // renderAuflagen.
-      if (opts.drucke) await addToCollection(gewaehlt, el);
-      else await renderAuflagen(el, gewaehlt, null);
-    } catch (e) { toast(e.message); }
+    // Auch hier hilft die große Karte: Zwei gleichnamige Karten (oder zwei
+    // Auflagen desselben Sets) unterscheidet man am Bild, nicht an der Zeile.
+    wireDruckHover(b, gewaehlt);
+    b.onclick = async () => {
+      try {
+        // Steht in der Liste die Karte (nicht die Auflage), ist mit dem Klick
+        // erst die halbe Frage beantwortet — die zweite Hälfte stellt
+        // renderAuflagen.
+        if (opts.drucke) await addToCollection(gewaehlt, el);
+        else await renderAuflagen(el, gewaehlt, null);
+      } catch (e) { toast(e.message); }
+    };
   });
 
   const inp = el.querySelector("[data-name]");
@@ -5274,7 +5371,10 @@ function zeigeHoverKarte(c, x, y) {
    nicht #hovercard — das ist 430px breit für die Sammlungs-Detailkarte). */
 let cmdHoverEl = null;
 /* zusatz ist optional (z. B. der Preis im Community-Feed) — die bisherigen
-   Aufrufer übergeben ihn nicht und bekommen unverändert nur Bild und Name. */
+   Aufrufer übergeben ihn nicht und bekommen unverändert nur Bild und Name.
+   Erlaubt ist eine Zeichenkette ODER eine Liste von Zeilen: Die Auflagenwahl
+   stellt mehrere Angaben untereinander (Set, Seltenheit, Illustration …), und
+   eine zweite Vorschau nur dafür wäre dieselbe Funktion mit anderem Namen. */
 function zeigeCmdHover(img, name, x, y, zusatz) {
   if (!cmdHoverEl) { cmdHoverEl = document.createElement("div"); cmdHoverEl.className = "cmd-hover"; }
   // Ist ein modaler Dialog offen (Kartendetail via showModal → Top-Layer), muss
@@ -5283,8 +5383,19 @@ function zeigeCmdHover(img, name, x, y, zusatz) {
   const ziel = document.querySelector("dialog[open]") || document.body;
   if (cmdHoverEl.parentElement !== ziel) ziel.appendChild(cmdHoverEl);
   const el = cmdHoverEl;
-  el.innerHTML = `<img src="${esc(img)}" alt=""><div class="cmd-hover-nm">${esc(name)}</div>` +
-    (zusatz ? `<div class="cmd-hover-zus">${esc(zusatz)}</div>` : "");
+  const zeilen = (Array.isArray(zusatz) ? zusatz : [zusatz]).filter(Boolean);
+  // Neu gebaut wird nur, wenn sich der Inhalt ändert. Aufgerufen wird von
+  // mousemove, also dutzende Male je Sekunde — und jedes innerHTML legt ein
+  // NEUES <img> an, das der Browser erst wieder anzeigen kann, wenn es (wenn
+  // auch aus dem Zwischenspeicher) geladen ist. Beim 488er Bild der
+  // Auflagenwahl flackerte das sichtbar. Die Position wird weiter bei jeder
+  // Bewegung nachgezogen, das ist ja der Zweck.
+  const schluessel = [img, name, ...zeilen].join(" ");
+  if (el.dataset.stand !== schluessel) {
+    el.innerHTML = `<img src="${esc(img)}" alt=""><div class="cmd-hover-nm">${esc(name)}</div>` +
+      zeilen.map(z => `<div class="cmd-hover-zus">${esc(z)}</div>`).join("");
+    el.dataset.stand = schluessel;
+  }
   el.style.left = "0px"; el.style.top = "0px"; el.style.display = "block";
   const r = el.getBoundingClientRect();
   let l = x + 18, o = y + 14;
