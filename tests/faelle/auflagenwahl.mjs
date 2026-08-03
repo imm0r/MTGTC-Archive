@@ -26,19 +26,32 @@ export const name = "auflagenwahl";
    auseinander — genau darum geht es: Eine still gewählte Auflage schreibt
    nicht nur den falschen Setnamen, sondern auch den falschen Wert. */
 const BILD = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-const druck = (set, setName, cn, jahr, preis, rarity = "uncommon") => ({
+const GROSS = "data:image/gif;base64,R0lGODlhAQABAIAAAP8AAAAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==";
+const druck = (set, setName, cn, jahr, preis, rarity = "uncommon", extra = {}) => ({
   object: "card", id: `sf-${set}-${cn}`, oracle_id: "orc-solring",
   name: "Sol Ring", lang: "en", set, set_name: setName, collector_number: cn,
   released_at: `${jahr}-01-01`, rarity, type_line: "Artifact",
-  image_uris: { small: BILD }, prices: { eur: preis }, cardmarket_id: 42,
+  // klein UND groß: Die Zeile nimmt das kleine, die Hover-Vorschau das große.
+  // Verschiedene Daten-URIs, damit die Prüfung merkt, wenn die Vorschau das
+  // Daumennagelbild zeigt — das wäre der ganze Sinn der Vorschau dahin.
+  image_uris: { small: BILD, normal: GROSS }, prices: { eur: preis }, cardmarket_id: 42,
+  artist: extra.artist || "Mike Bierek", frame: extra.frame || "2015",
+  finishes: extra.finishes || ["nonfoil", "foil"],
+  border_color: extra.border_color || "black",
+  frame_effects: extra.frame_effects, full_art: extra.full_art,
 });
 // Preise mit PUNKT als Trennzeichen — so liefert Scryfall sie, und priceOf
 // zieht sie durch parseFloat. Mit Komma käme aus "1,80" eine glatte 1.
 const DRUCKE = [
   druck("blc", "Bloomburrow Commander", "230", 2024, "1.80"),
   druck("ltc", "Tales of Middle-earth Commander", "284", 2023, "2.40"),
-  druck("sld", "Secret Lair Drop", "1518", 2022, "38.00", "rare"),
-  druck("cmr", "Commander Legends", "472", 2020, "3.10"),
+  // Die Sonderauflage: randlos, Vollbild, Showcase, nur als Foil, eigener
+  // Illustrator — an ihr hängen die Merkmalszeilen der Vorschau.
+  druck("sld", "Secret Lair Drop", "1518", 2022, "38.00", "rare",
+    { artist: "Anna Steinbauer", border_color: "borderless", full_art: true,
+      frame_effects: ["showcase"], finishes: ["foil"] }),
+  // Alter Rahmen: die einzige Auflage, bei der die Vorschau ihn nennen soll.
+  druck("cmr", "Commander Legends", "472", 2020, "3.10", "uncommon", { frame: "1997" }),
 ];
 // Was die Namenssuche geliefert hätte: irgendeine davon. Bewusst NICHT die
 // erste der Liste — sonst bestünde die Prüfung auch, wenn weiter geraten wird.
@@ -150,6 +163,54 @@ export default async function ({ seite, adresse, stand }) {
     ["Commander Legends"]);
 
   await seite.locator(".job [data-filter]").fill("");
+
+  /* --- Hover: die ganze Karte, groß, mit dem was die Auflagen trennt ------ */
+  /* Die Zeile ist schmal und ihr Bild daumennagelgroß — dass zwei Auflagen
+     verschiedene Illustrationen tragen, sieht man darin nicht. Beim Überfahren
+     schwebt deshalb die große Karte daneben, samt der Angaben, die tatsächlich
+     auseinandergehen. Regeltext und Manakosten gehören NICHT dazu: Die sind bei
+     allen Auflagen derselben Karte gleich und beantworten die Frage nicht. */
+  await seite.locator('.job [data-druck="2"]').hover();
+  await seite.waitForTimeout(200);
+  const vorschau = await seite.evaluate(() => {
+    const el = document.querySelector(".cmd-hover");
+    if (!el || el.style.display === "none") return null;
+    return { bild: el.querySelector("img")?.getAttribute("src") || "",
+             name: el.querySelector(".cmd-hover-nm")?.textContent.trim() || "",
+             zeilen: [...el.querySelectorAll(".cmd-hover-zus")].map(z => z.textContent.trim()) };
+  });
+  stand.ist("beim Überfahren erscheint die Vorschau", !!vorschau);
+  if (vorschau) {
+    stand.ist("sie zeigt das GROSSE Bild, nicht den Daumennagel",
+      vorschau.bild.startsWith("data:image/gif") && vorschau.bild !== BILD, vorschau.bild.slice(0, 40));
+    stand.gleich("mit Name und den Angaben, die die Auflagen trennen",
+      [vorschau.name, ...vorschau.zeilen],
+      ["Sol Ring", "Secret Lair Drop · #1518 · 2022", "Rare",
+       "Illustration: Anna Steinbauer", "Randlos · Vollbild · Showcase",
+       "Ausführungen: Foil", "38,00 €"]);
+  }
+
+  // Der heutige Rahmen (2015) steht auf fast jeder Karte — ihn zu nennen wäre
+  // Füllung. Ein alter ist eine Auskunft und gehört hin.
+  await seite.locator('.job [data-druck="3"]').hover();
+  await seite.waitForTimeout(200);
+  stand.gleich("ein ALTER Rahmen wird genannt, der heutige nicht",
+    await seite.evaluate(() => [...document.querySelectorAll(".cmd-hover-zus")]
+      .map(z => z.textContent.trim()).filter(z => /Rahmen|Uncommon|Rare/.test(z))),
+    ["Uncommon · Rahmen 1997"]);
+  await seite.locator('.job [data-druck="0"]').hover();
+  await seite.waitForTimeout(200);
+  stand.gleich("beim heutigen Rahmen bleibt nur die Seltenheit stehen",
+    await seite.evaluate(() => [...document.querySelectorAll(".cmd-hover-zus")]
+      .map(z => z.textContent.trim()).filter(z => /Rahmen|Uncommon|Rare/.test(z))),
+    ["Uncommon"]);
+
+  // Nach dem Verlassen darf nichts stehenbleiben — die Vorschau hängt am body
+  // und würde sonst über der halben Seite kleben.
+  await seite.locator(".job [data-filter]").hover();
+  await seite.waitForTimeout(200);
+  stand.ist("beim Verlassen verschwindet sie wieder",
+    await seite.evaluate(() => document.querySelector(".cmd-hover")?.style.display === "none"));
 
   /* --- Die Wahl geht in die Bestätigung, mit der GEWÄHLTEN Auflage -------- */
   // Bewusst die letzte Zeile: Sie ist weder der Namenstreffer noch die erste

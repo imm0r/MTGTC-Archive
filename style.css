@@ -2883,8 +2883,13 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px}
 .cf-deck:focus-visible{ outline:2px solid var(--acc); outline-offset:2px; border-radius:4px; }
 /* Zusatzzeile der Hover-Vorschau (im Community-Feed der Preis). Ruhiger als
    der Name darüber — eine Angabe, keine Überschrift. */
+/* max-width wie beim Namen darüber: In der Auflagenwahl steht hier auch mal ein
+   Illustratorenpaar („Kevin Sidharta & Henry G. Higginbotham"). Ohne Deckel
+   zöge eine solche Zeile die ganze Vorschau in die Breite, und das Kartenbild
+   schwämme in einem viel zu großen Kasten. */
 .cmd-hover-zus{ text-align:center; font-size:13px; color:var(--dim);
-                margin-top:2px; font-variant-numeric:tabular-nums; }
+                margin-top:2px; font-variant-numeric:tabular-nums;
+                max-width:220px; line-height:1.35; }
 
 /* ---------------- Community-Höhepunkte (Kacheln) ----------------
    Wie die Kennzahlen darüber, aber mit Platz für Kartenbild und zwei Zeilen
