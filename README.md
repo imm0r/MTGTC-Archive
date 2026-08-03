@@ -1829,11 +1829,30 @@ bekommt die Matte automatisch.
 **Die Lebenspunkte laufen unter den Ländern über deren volle Breite**, bis zu
 vier Kacheln nebeneinander — so wie die Mitspieler am Tisch nebeneinander
 sitzen. Vorher standen sie als schmale Spalte ganz rechts, eine Kachel über der
-anderen, und rollten bei vier Mitspielern innen. Die Reihe hat eine feste Höhe,
-weil die Emblemleiste darüber daraus rechnet; die vier Knöpfe (−5/−1/+1/+5)
-stehen deshalb unter Name und Zahl statt daneben. Nebeneinander rangen sie mit
-dem Namen um dieselbe Breite, und der verlor: Bei vier Mitspielern auf einer
-820-px-Matte blieben für ihn gemessen **null Pixel**.
+anderen, und rollten bei vier Mitspielern innen.
+
+**Jede Kachel ist EINE Zeile hoch**: Avatar, Name, **Schieberegler**, Zahl.
+Den Stand stellt man am Regler ein, statt ihn mit vier Knöpfen (−5/−1/+1/+5)
+zu verschieben — die brauchten eine zweite Zeile und machten die Reihe 120 px
+hoch. Jetzt sind es 88, und die Differenz bekommt das Schlachtfeld.
+
+* Die Zahl daneben läuft beim Ziehen mit; **geschrieben wird entprellt** (400 ms
+  nach dem letzten Zug), und neu gezeichnet wird während des Zuges gar nichts —
+  der Regler läge sonst bei jeder Bewegung als neues Element unter dem Finger.
+* Die **Obergrenze** ist Startleben plus die Hälfte, mindestens 40 und nie
+  weniger als der höchste Stand am Tisch. Rutschte sie darunter, spränge eine
+  Kachel beim nächsten Neuzeichnen auf einen kleineren Wert — aus einem
+  Anzeigefehler würde ein Datenverlust.
+* **Unter 980 px Fensterbreite tritt der Name zurück.** Bei vier Mitspielern ist
+  eine Kachel dort gemessen 122 px breit; nach Avatar, Zahl und Abständen
+  bleiben 34, und die gehen entweder an den Namen oder an den Regler. Der Regler
+  gewinnt — er ist das Bedienelement, der Name steht im Avatar und im Kurztext
+  des Reglers. In der Kachelliste unter der Matte steht er ohnehin.
+
+**Kopf, Deckwahl und Rundenknöpfe stehen UNTER der Matte.** Sie standen darüber
+und schoben sie um ihre Höhe nach unten — für drei Dinge, die man einmal zu
+Beginn braucht und danach nicht mehr. Die Matte ist dafür von 500–720 px auf
+560–860 gewachsen (64vh → 76vh).
 
 **Fünf Embleme** stehen als **senkrechte Leiste rechts neben der Matte**, von
 oben nach unten:
@@ -1870,9 +1889,12 @@ Der Handfächer trägt seine Form selbst: Seine Karten liegen gestaffelt und
 werfen Schatten — ein Kasten darum wäre ein Rahmen um etwas, das schon eine
 Gestalt hat.
 
-**Der Handfächer geht mittig über dem Schlachtfeld auf**, dicht über den
-Lebenspunkten — nicht rechts oben über seiner Schaltfläche, wo er die halbe
-Matte verdeckte. Er **rollt nicht**: Ein Rollbereich schnitte die gedrehten
+**Der Handfächer geht mittig über dem Schlachtfeld auf**, **auf Höhe der
+Lebenspunkte** — nicht rechts oben über seiner Schaltfläche, wo er die halbe
+Matte verdeckte, und nicht mehr im Streifen darüber, wo er dem Schlachtfeld die
+untersten 230 px nahm. Am Tisch hält man die Hand vor sich, und vor einem liegt
+die unterste Reihe; die verdeckt er, solange er offen ist.
+Er **rollt nicht**: Ein Rollbereich schnitte die gedrehten
 Ränder ab und die beim Zeigen angehobene Karte gleich mit. Nötig ist er auch
 nicht, denn der Fächer wird bei vielen Karten von selbst schmaler — der sichtbare
 Anteil je Karte schrumpft mit ihrer Zahl, gemessen in Kartenbreiten statt in

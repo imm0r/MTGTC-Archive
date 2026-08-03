@@ -59,6 +59,14 @@ const PARTIE = () => {
   // würde — daran hängt, dass ein Zug überhaupt gespeichert wird.
   window.GESCHRIEBEN = [];
   window.zoneSchreiben = id => window.GESCHRIEBEN.push(id);
+  /* Der Lebensstand geht NICHT über zoneSchreiben, sondern direkt über sb.
+     `sb` ist ein top-level `let` und keine Fenstereigenschaft — deshalb ohne
+     window davor. Gemerkt wird, WAS in die Datenbank ginge; ohne diesen
+     Ersatz endete jeder Reglerzug in einem gefangenen Fehler, und dass er
+     überhaupt geschrieben wird, bliebe ungeprüft. */
+  window.LEBEN = [];
+  sb = { from: () => ({ update: p => ({ eq: () => ({ eq: async () => {
+    window.LEBEN.push(p.life); return { error: null }; } }) }) }) };
   // Ebenso der Wurf: Gemerkt wird, WAS in die Runde ginge — daran hängt, dass
   // die Mitspieler den Wurf überhaupt zu sehen bekommen.
   window.WUERFE = [];
@@ -253,6 +261,28 @@ export default async function ({ seite, adresse, stand }) {
       // Und die Namen sind lesbar, statt auf null Pixel zusammenzufallen.
       namen: [...document.querySelectorAll(".mat-leben .sp-name")]
         .map(n => [Math.round(n.getBoundingClientRect().width), n.scrollWidth - n.clientWidth]),
+      /* EINE ZEILE je Kachel. Vorher standen unter der Zahl vier Knöpfe
+         (−5 −1 +1 +5) und machten sie zweizeilig — die Reihe kostete die
+         Matte 120 px. Höher als der Avatar (38) plus Polster darf sie
+         nicht werden, sonst ist die zweite Zeile still zurück. */
+      hoehen: k.map(r => Math.round(r.height)),
+      // Der Regler steht LINKS NEBEN der Zahl, nicht darunter: rechte Kante
+      // vor deren linker, und beide auf derselben Mittellinie.
+      reglerLinks: [...document.querySelectorAll(".mat-leben .sp-card")].map(c => {
+        const r = c.querySelector(".sp-schieber")?.getBoundingClientRect();
+        const z = c.querySelector(".sp-life")?.getBoundingClientRect();
+        if (!r || !z) return null;
+        return [Math.round(z.left - r.right) >= 0,
+                Math.abs((r.top + r.bottom) / 2 - (z.top + z.bottom) / 2) < 8,
+                Math.round(r.width)];
+      }),
+      // Die alten Knöpfe sind weg — in der ganzen Ansicht, nicht nur hier.
+      alteKnoepfe: document.querySelectorAll("#v-session [data-life],#v-session .sp-ctrl").length,
+      /* Die Obergrenze muss den HÖCHSTEN Stand am Tisch fassen. Läge sie
+         darunter, spränge die Kachel beim nächsten Neuzeichnen auf einen
+         kleineren Wert — aus einem Anzeigefehler würde ein Datenverlust. */
+      grenzen: [...document.querySelectorAll(".mat-leben .sp-schieber")]
+        .map(r => [Number(r.max), Number(r.value)]),
     };
   });
   stand.gleich("die Lebenspunkte stehen in der linken Spalte, die alte rechte ist weg",
@@ -265,6 +295,71 @@ export default async function ({ seite, adresse, stand }) {
   stand.gleich("die Reihe rollt nicht", leben.rollt, [0, 0]);
   stand.ist("und die Namen sind nicht auf null zusammengefallen",
     leben.namen.every(([b, ab]) => b >= 40 && ab === 0), JSON.stringify(leben.namen));
+  stand.ist("jede Kachel ist nur noch EINE Zeile hoch",
+    leben.hoehen.every(h => h <= 56), JSON.stringify(leben.hoehen));
+  stand.ist("der Schieberegler steht links neben der Zahl, auf einer Linie",
+    leben.reglerLinks.length === 4 && leben.reglerLinks.every(x => x && x[0] && x[1] && x[2] >= 30),
+    JSON.stringify(leben.reglerLinks));
+  stand.ist("die alten Knöpfe (−5 −1 +1 +5) sind weg", leben.alteKnoepfe === 0, leben.alteKnoepfe);
+  stand.ist("und die Skala reicht über den höchsten Stand am Tisch hinaus",
+    leben.grenzen.length === 4 && leben.grenzen.every(([max, wert]) => max >= 40 && max >= wert),
+    JSON.stringify(leben.grenzen));
+
+  /* Und er ändert den Stand auch wirklich — Zahl daneben, Kachelfarbe und
+     Datenbank. Geschrieben wird entprellt (400 ms), deshalb die Wartezeit. */
+  await seite.evaluate(() => { window.LEBEN = []; });
+  await seite.evaluate(() => {
+    const r = document.querySelector('.mat-leben .sp-schieber[data-lifeset="u1"]');
+    r.value = "12"; r.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await seite.waitForTimeout(60);
+  stand.gleich("ein Zug am Regler stellt die Zahl daneben sofort um",
+    await seite.evaluate(() => [document.querySelector('.sp-life[data-u="u1"]').textContent,
+                               SESSION_PLAYERS.find(p => p.user_id === "u1").life]),
+    ["12", 12]);
+  await seite.waitForTimeout(500);
+  stand.gleich("und schreibt ihn danach genau einmal", await seite.evaluate(() => window.LEBEN), [12]);
+  /* Auf null heißt ausgeschieden — dieselbe Kennzeichnung wie früher über die
+     Knöpfe. Und der Regler geht nicht darunter: −1 gäbe es sonst am Tisch. */
+  await seite.evaluate(() => {
+    const r = document.querySelector('.mat-leben .sp-schieber[data-lifeset="u1"]');
+    r.value = "0"; r.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await seite.waitForTimeout(60);
+  stand.gleich("bei null ist der Mitspieler besiegt",
+    await seite.evaluate(() => [
+      !!document.querySelector('.mat-leben .sp-card.besiegt'),
+      document.querySelector('.sp-life[data-u="u1"]').textContent,
+      Number(document.querySelector('.mat-leben .sp-schieber[data-lifeset="u1"]').min)]),
+    [true, "0", 0]);
+  // Zurück auf den Ausgangsstand, damit die folgenden Fälle unverändert messen.
+  await seite.evaluate(() => { lebenSetzen("u1", 39); });
+  await seite.waitForTimeout(500);
+
+  /* --- Kopf, Deckwahl und Verlassen stehen UNTER der Matte --------------- */
+  /* Sie standen darüber und schoben sie um ihre Höhe nach unten — für drei
+     Dinge, die man einmal zu Beginn braucht. Unten sind sie genauso
+     erreichbar, und die Höhe bekommt das Schlachtfeld. */
+  const kopf = await seite.evaluate(() => {
+    const k = document.querySelector(".sess-kopf"), m = document.querySelector(".mat");
+    if (!k || !m) return null;
+    const kr = k.getBoundingClientRect(), mr = m.getBoundingClientRect();
+    return { unterDerMatte: Math.round(kr.top - mr.bottom),
+             darin: [!!k.querySelector("#sess-deck"), !!k.querySelector("#sess-end")],
+             // Die Kacheln stehen NICHT zweimal da: in der Matte reichen sie.
+             doppelt: k.querySelectorAll(".sp-card").length,
+             matteHoch: Math.round(mr.height) };
+  });
+  stand.ist("der Kasten steht unter der Matte", kopf && kopf.unterDerMatte >= 0,
+    kopf ? kopf.unterDerMatte + " px darunter" : "kein Kasten");
+  stand.gleich("mit Deckwahl und Rundenknöpfen darin", kopf?.darin, [true, true]);
+  stand.ist("die Spielerkacheln stehen darin nicht ein zweites Mal", kopf?.doppelt === 0, kopf?.doppelt);
+  /* Die Matte war 500–720 px hoch (64vh) und ist es jetzt 560–860 (76vh). Bei
+     900 px Fensterhöhe sind das 684 statt 576 — die Höhe, die der Kasten
+     oben nicht mehr wegnimmt. Gemessen wird gegen die ALTE Formel: Nähme
+     jemand die Änderung zurück, stünde hier wieder 576. */
+  stand.ist("und die Matte ist dadurch höher als nach der alten Formel (64vh)",
+    kopf && kopf.matteHoch > Math.round(0.64 * 900), kopf?.matteHoch + " px");
 
   /* --- Die fünf Laden rechts neben der Matte ---------------------------- */
   /* Hand, Bibliothek, Exil, Friedhof und Würfel stehen als Embleme in einer
@@ -447,6 +542,15 @@ export default async function ({ seite, adresse, stand }) {
       linksRaus:  Math.round(kr.left - Math.min(...karten.map(r => r.left))),
       rechtsRaus: Math.round(Math.max(...karten.map(r => r.right)) - kr.right),
       untenRaus:  Math.round(Math.max(...karten.map(r => r.bottom)) - kr.bottom),
+      /* AUF HÖHE DER LEBENSPUNKTE, nicht mehr darüber. Am Tisch hält man die
+         Hand vor sich, und vor einem liegt die unterste Reihe. Über der
+         Lebensreihe schwebend nahm der Fächer dem Schlachtfeld die untersten
+         230 px — er soll die Reihe überdecken, solange er offen ist, statt
+         sich seinen eigenen Streifen zu nehmen. */
+      lebenReihe: (() => { const l = document.querySelector(".mat-leben").getBoundingClientRect();
+        return [Math.round(l.top), Math.round(l.bottom)]; })(),
+      korbUnten: Math.round(kr.bottom),
+      matteUnten: Math.round(document.querySelector(".mat").getBoundingClientRect().bottom),
     };
   });
   stand.gleich("ein Klick auf die Hand schließt das Exil", hand.offen, ["hand"]);
@@ -456,6 +560,9 @@ export default async function ({ seite, adresse, stand }) {
   stand.gleich("keine Karte wird vom Rand abgeschnitten",
     [hand.linksRaus <= 0, hand.rechtsRaus <= 0, hand.untenRaus <= 0], [true, true, true],
     `links ${hand.linksRaus}, rechts ${hand.rechtsRaus}, unten ${hand.untenRaus}`);
+  stand.ist("der Fächer liegt auf Höhe der Lebensreihe, nicht darüber",
+    hand.korbUnten > hand.lebenReihe[0] && hand.korbUnten <= hand.matteUnten,
+    `Fächer bis ${hand.korbUnten}, Lebensreihe ${hand.lebenReihe.join("–")}, Matte bis ${hand.matteUnten}`);
 
   // Aus der Hand aufs Schlachtfeld: Die Lade muss dabei zugehen, sonst läge sie
   // über genau den Zonen, auf die man zielt.

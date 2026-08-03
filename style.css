@@ -934,18 +934,22 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 /* DIE LEBENSPUNKTE stehen unter den Ländern über deren volle Breite, mit bis zu
    vier Kacheln nebeneinander — so wie die Mitspieler am Tisch nebeneinander
    sitzen. Damit entfällt die dritte Spalte: rechts stand nichts anderes darin.
-   --sp-leben ist ihre Höhe, und die Emblemleiste rechnet daraus, damit sie
-   darüber und nicht darauf steht. */
+   --sp-leben ist ihre Höhe: Sie ist FEST, weil die Reihe sonst bei jedem
+   Beitritt eine andere Höhe hätte und das Schlachtfeld darüber mitspränge.
+   88 px sind die Kopfzeile des Feldes (28) plus eine einzeilige Kachel (50)
+   plus Luft; darunter rollte die Reihe innen. */
 .mat{display:grid;gap:8px;margin-top:10px;
-  --sp-luecke:8px; --sp-mitte:154px; --sp-leben:120px;
+  --sp-luecke:8px; --sp-mitte:154px; --sp-leben:88px;
   /* Ganz rechts die schmale Spalte für die senkrechte Emblemleiste. Sie ist
      im Raster reserviert und nicht bloß darübergelegt: Sonst lägen die Embleme
      über der schmalen Spalte und verdeckten Kommandozone und Kartenvorschau. */
   --sp-laden:68px;
   grid-template-columns:minmax(0,1fr) var(--sp-mitte) var(--sp-laden);
-  /* Höher als früher (390–640): Die linke Spalte trägt jetzt drei Blöcke statt
-     zwei, und die 120 px der Lebensreihe dürfen nicht vom Schlachtfeld kommen. */
-  grid-template-rows:clamp(500px,64vh,720px);
+  /* Höher als früher (500–720): Kopf, Deckwahl und Verlassen stehen jetzt
+     UNTER der Matte und schieben sie nicht mehr nach unten; die Lebensreihe
+     ist von 120 auf 88 px geschrumpft, seit ihre Kacheln einzeilig sind.
+     Beides zusammen sind rund 145 px, die dem Schlachtfeld zugutekommen. */
+  grid-template-rows:clamp(560px,76vh,860px);
   grid-template-areas:"links mitte laden";
   --rechte-spalten:calc(var(--sp-mitte) + var(--sp-laden) + var(--sp-luecke) * 2);
   /* Bezugsrahmen der schwebenden Laden. */
@@ -1066,8 +1070,13 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
    beim Zeigen angehobene Karte gleich mit — und einen Rollbalken unter der Hand
    will ohnehin niemand. Der Fächer wird bei vielen Karten von selbst schmaler
    (app.js rechnet den sichtbaren Anteil je Karte aus), er läuft also nicht
-   davon. */
-.schwebe-zone.sz-hand .schwebe-korb{right:auto;top:auto;bottom:calc(var(--sp-leben) + 14px);
+   davon.
+
+   AUF HÖHE DER LEBENSPUNKTE, nicht mehr darüber: Am Tisch hält man die Hand
+   vor sich, und vor einem liegt die unterste Reihe. Über der Lebensreihe
+   schwebend nahm der Fächer dem Schlachtfeld die untersten 230 px — jetzt
+   liegt er über der Reihe, die er verdeckt, solange er offen ist. */
+.schwebe-zone.sz-hand .schwebe-korb{right:auto;top:auto;bottom:6px;
   left:calc((100% - var(--rechte-spalten)) / 2);
   transform:translate(-50%,14px);
   max-height:none;overflow:visible}
@@ -1366,24 +1375,25 @@ body.zieht-gerade .zk:hover,body.zieht-gerade .zk:focus-within{transform:none}
    fielen bei vier Kacheln auf 300 px je Spalte in zwei Zeilen um.) */
 .sp-grid.reihe{grid-template-columns:none;grid-auto-flow:column;
   grid-auto-columns:minmax(0,1fr);gap:6px;margin-top:0;height:100%}
-.sp-grid.reihe .sp-card{gap:1px 7px;padding:6px 8px;align-content:center}
-.sp-grid.reihe .sp-life{font-size:21px}
-.sp-grid.reihe .sp-ctrl .btn{padding:2px 5px;font-size:10px}
+/* In der Matte ist eine Kachel bei vier Mitspielern nur 122 bis 289 px breit —
+   gemessen zwischen 820 und 1600 px Fensterbreite. Deshalb hier engere
+   Abstände, eine kleinere Zahl und, statt fester Breiten, ein AUFTEILUNG:
+   Name und Regler teilen sich, was Avatar und Zahl übrig lassen, im
+   Verhältnis 1,4 zu 1. Eine feste Obergrenze für den Regler ginge nicht —
+   ein nicht-flexibler Track wächst im Grid VOR dem 1fr-Nachbarn bis an seine
+   Grenze, und genau daran fiel der Name bei 1200 px auf 34 px zusammen. */
+.sp-grid.reihe .sp-card{grid-template-columns:auto minmax(0,1.4fr) minmax(30px,1fr) auto;
+  gap:0 6px;padding:5px 6px;align-content:center}
+.sp-grid.reihe .sp-life{font-size:20px}
 .sp-grid.reihe .sp-name{font-size:12px}
-/* Die vier Knöpfe stehen UNTER Name und Zahl, quer über die Kachel, statt
-   rechts neben ihnen. Nebeneinander ringen sie mit dem Namen um dieselbe
-   Breite, und der verliert: Bei vier Mitspielern auf einer 820-px-Matte sind
-   das 141 px je Kachel, und für den Namen blieben davon gemessen NULL (28 px
-   abgeschnitten). Untereinander bekommt er 50 px, bei 1000 px sogar 95. */
-.sp-grid.reihe .sp-card>:first-child{grid-row:1}
-.sp-grid.reihe .sp-mitte{grid-row:1}
-/* Über die volle Kachelbreite, aber höchstens 200 px: Auf einer breiten Matte
-   trieben vier Knöpfe über 263 px auseinander und ihre Paare (−5/−1, +1/+5)
-   wären nicht mehr als solche zu erkennen. */
-.sp-grid.reihe .sp-ctrl{grid-column:1/4;grid-row:2;justify-content:space-between;
-  max-width:200px;margin-left:auto}
-.sp-grid.reihe .sp-wait{grid-column:1/4;grid-row:2;justify-self:end}
 .sp-grid.reihe .sp-deck{display:none}
+/* Unter 980 px reicht es für alle vier nicht mehr: Bei 122 px Kachel bleiben
+   nach Avatar, Zahl und Abständen 34 px, und die gingen entweder an den Namen
+   ODER an den Regler. Der Regler gewinnt — er ist das Bedienelement, und wer
+   die Kachel meint, liest den Namen aus dem Avatar oder aus dem Kurztext des
+   Reglers („Lebenspunkte von …"). In der großen Liste unter der Matte stehen
+   die Namen ohnehin. */
+@media (max-width:980px){ .sp-grid.reihe .sp-name{display:none} }
 /* Hinweis im Hochformat auf Geraeten, die quer breit genug waeren. */
 .quer-hinweis{margin-top:10px;padding:7px 10px;border:1px dashed var(--line);border-radius:8px;
   font-size:12px;color:var(--dim)}
@@ -1445,19 +1455,21 @@ body.zieht-gerade .zk:hover,body.zieht-gerade .zk:focus-within{transform:none}
 /* ---- Spielerkacheln: flach statt gestapelt ----
    Avatar, Name/Deck und Lebenspunkte nebeneinander; gestapelt füllten vier
    Mitspieler den halben Schirm, bevor die eigenen Karten anfingen. */
-/* Zwei Zeilen statt fünf: links Avatar und Name/Deck, rechts die Lebenszahl
-   über ihren Knöpfen. Nebeneinander blieben für den Namen keine 50 px übrig —
-   die Knopfreihe allein ist rund 100 px breit. */
+/* EINE Zeile, vier Spalten: Avatar, Name/Deck, Schieberegler, Lebenszahl.
+   Vorher waren es zwei — unter der Zahl saßen vier Knöpfe (−5 −1 +1 +5), und
+   die brauchten eine eigene Zeile, weil nebeneinander für den Namen keine
+   50 px übrig blieben (die Knopfreihe allein ist rund 100 px breit). Der
+   Regler setzt den Stand direkt statt ihn zu verschieben und passt neben die
+   Zahl; damit ist die Kachel so hoch wie ihr Avatar. */
 .sp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:8px;margin-top:10px}
-.sp-card{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;
-  gap:2px 10px;padding:7px 10px;text-align:left;
+.sp-card{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(56px,110px) auto;
+  align-items:center;gap:2px 10px;padding:7px 10px;text-align:left;
   border:1px solid var(--line);border-radius:10px;background:var(--panel2)}
-.sp-card>:first-child{grid-row:1/3}                 /* Avatar über beide Zeilen */
 /* Das Auge am Avatar: die Matte dieses Mitspielers ansehen. Es sitzt AUF der
    unteren rechten Ecke des Bildes, weil das die einzige Stelle ist, die in
    beiden Anordnungen frei bleibt — in der Mattenreihe ist eine Kachel bei vier
-   Mitspielern nur 141 px breit, und um die ringen Name, Lebenszahl und vier
-   Knöpfe schon ohne einen fünften. Der Avatar dagegen ist überall 38 px. */
+   Mitspielern nur 141 px breit, und um die ringen Name, Regler und Lebenszahl
+   schon ohne einen vierten Mitbewerber. Der Avatar dagegen ist überall 38 px. */
 .sp-avatar{position:relative;flex:none;line-height:0}
 
 /* ===== Mitgliederliste =====
@@ -1574,13 +1586,18 @@ body.zieht-gerade .zk:hover,body.zieht-gerade .zk:focus-within{transform:none}
 .sp-matte.an{background:var(--acc);border-color:var(--acc)}
 .sp-matte:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 
-.sp-mitte{grid-column:2;grid-row:1/3;min-width:0}
+.sp-mitte{grid-column:2;min-width:0}
 .sp-name{font-size:13px;font-weight:600;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sp-life{grid-column:3;grid-row:1;justify-self:end;font-size:24px;font-weight:800;line-height:1.1;
+/* Der Regler: OHNE appearance:none. Setzt man die, verschwindet in WebKit
+   auch die Bahn, und man baut Bahn und Griff mit je zwei herstellereigenen
+   Pseudoelementen nach — fünfmal so viel Text, und in Firefox sähe es danach
+   trotzdem anders aus. accent-color färbt beides in einer Zeile. */
+.sp-schieber{grid-column:3;width:100%;min-width:0;height:18px;margin:0;
+  accent-color:var(--acc);cursor:pointer}
+.sp-schieber:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px}
+.sp-life{grid-column:4;justify-self:end;font-size:24px;font-weight:800;line-height:1.1;
   font-variant-numeric:tabular-nums}
-.sp-ctrl{grid-column:3;grid-row:2;display:flex;gap:3px}
-.sp-ctrl .btn{padding:3px 5px;font-size:11px}
-.sp-wait{grid-column:3;grid-row:1/3;justify-self:end;font-size:12px;color:var(--dim)}
+.sp-wait{grid-column:3/5;justify-self:end;font-size:12px;color:var(--dim)}
 .sp-deck{display:flex;align-items:center;gap:5px;max-width:100%;margin-top:1px;cursor:help}
 .sp-cmd{width:20px;height:28px;object-fit:cover;border-radius:3px;border:1px solid var(--line);
   box-shadow:0 2px 6px rgba(0,0,0,.45);transition:transform .12s;flex:none}
