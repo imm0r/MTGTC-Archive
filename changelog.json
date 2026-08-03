@@ -1,5 +1,11 @@
 [
  {
+  "am": "2026-08-04T00:50:00+02:00",
+  "art": "behoben",
+  "text": "Der Ladebalken der Deck-Suchen stand bisher im Ergebniskasten — und der liegt unter der Kartenliste, bei hundert Karten also weit außerhalb des Bildes. Zu sehen blieb das kleine Zahnrad am Knopf. Jetzt erscheint er direkt unter den Knöpfen, wo man gerade geklickt hat.",
+  "pr": 208
+ },
+ {
   "am": "2026-08-04T00:12:00+02:00",
   "art": "verbessert",
   "text": "Suchen, die dauern, zeigen jetzt einen Ladebalken über die volle Breite statt eines kleinen drehenden Zahnrads — bei den KI-Synergien steht zusätzlich dabei, dass die Wartezeit bei einem vollen Deck normal ist. Vorher sah es leicht so aus, als wäre etwas schiefgegangen.",

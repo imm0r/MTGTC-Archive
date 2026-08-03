@@ -1780,9 +1780,24 @@ genau die Auskunft, die hier zu haben ist.
 **Bei `prefers-reduced-motion` wird er langsamer, nicht angehalten.** Ein
 stehender Ladebalken sieht genau nach dem aus, wovor er bewahren soll.
 
+**Am Deck steht er direkt unter den Knöpfen**, nicht in dem Kasten, der später
+das Ergebnis aufnimmt. Der liegt nämlich *unter* der Kartentabelle — bei
+hundert Karten gemessene **6672 Pixel** tiefer, in einem Fenster von 900. Ein
+Balken dort ist gezeichnet und trotzdem unsichtbar, und zu sehen bleibt das
+Zahnrad am Knopf: also genau das, was er ersetzen sollte. Es ist dasselbe
+Problem, aus dem der [Deck-Verlauf](#verlauf-je-deck-zurück-auf-einen-älteren-stand)
+über der Tabelle steht.
+
+Deshalb misst die Prüfung nicht „gibt es den Balken", sondern **wie weit er vom
+Knopf entfernt ist** — und als Gegenprobe, dass der Ergebniskasten wirklich
+außerhalb des Bildes liegt. Rutschte der eines Tages nach oben, wäre die erste
+Messung grün, ohne noch etwas zu zeigen.
+
 Das Zahnrad bleibt, wo es hingehört: in Knöpfen und bei allem, was in einem
-Wimpernschlag da ist. Den Balken bekommen die vier Suchen, auf die man wartet —
-Synergien, KI-Synergien, Combos und die Deck-Analyse.
+Wimpernschlag da ist. Am Knopf markiert es weiterhin, *welche* Suche läuft —
+neben dem Balken ist es jetzt die Nebenauskunft und nicht mehr die einzige.
+Den Balken bekommen alle Suchen, auf die man wartet: Synergien, KI-Synergien,
+Combos, Deck-Analyse und die Legalitätsprüfung.
 
 ## Tauschen: den Schnitt-Vorschlag ausführen
 
