@@ -7775,6 +7775,13 @@ function schnittHinweisHtml(schnitt, deckId, karte) {
     <span class="syn-cut-why${schnitt.unbelegt ? " strich" : ""}">${esc(warum)}</span>${marke}${tausch}</div>`;
 }
 
+/* Zeilen, die in dieser Sitzung durch einen Tausch ins Deck gekommen sind.
+   Sie dürfen beim Neurechnen nicht als Schnitt vorgeschlagen werden: Eine
+   frisch aufgenommene Wunschkarte hat Bestand 0, und „nicht besessen" ist das
+   erste Argument der Heuristik — der nächste Vorschlag hieße also, die eben
+   gewählte Karte wieder herauszunehmen. */
+const TAUSCH_NEU = new Set();
+
 /* Nach einem Tausch: Die übrigen Vorschläge desselben Decks nennen womöglich
    die Karte, die gerade herausgegangen ist. Wer dort weiterklickte, liefe in
    „liegt nicht in diesem Deck" — die Zeile sähe bis dahin gültig aus.
@@ -7786,14 +7793,6 @@ function schnittHinweisHtml(schnitt, deckId, karte) {
 
    Angefasst werden nur die veralteten Zeilen. Alle neu zu zeichnen würde auch
    die eben getauschte überschreiben und den Erfolg wieder wegnehmen. */
-
-/* Zeilen, die in dieser Sitzung durch einen Tausch ins Deck gekommen sind.
-   Sie dürfen beim Neurechnen nicht als Schnitt vorgeschlagen werden: Eine
-   frisch aufgenommene Wunschkarte hat Bestand 0, und „nicht besessen" ist das
-   erste Argument der Heuristik — der nächste Vorschlag hieße also, die eben
-   gewählte Karte wieder herauszunehmen. */
-const TAUSCH_NEU = new Set();
-
 function schnitteAuffrischen(deckId) {
   const deck = DECKS.find(d => d.id === deckId);
   if (!deck) return;
