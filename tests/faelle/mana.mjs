@@ -211,7 +211,14 @@ export default async function ({ seite, adresse, stand }) {
   });
   stand.ist("die Marke steht am Schlachtfeld-Kopf", !!marke, marke?.text);
   stand.ist("mit denselben Zahlen", /9\+\/9\+/.test(marke?.text || ""), marke?.text);
-  stand.ist("und der Aufschlüsselung im Tooltip", /Sol Ring/.test(marke?.titel || ""));
+  /* Der gemessene Text steht IMMER dabei. Diese Zeile ist auf dem Prüfrechner
+     einmal rot geworden, während sie hier grün blieb — bei identischem Zustand
+     (dieselbe Zahl „9+/9+522" daneben). Ohne den Hinweis war nicht zu sehen,
+     WAS statt der Aufschlüsselung dort stand, und damit auch nicht, woran es
+     lag. Ein Hinweis kostet nichts und ist beim nächsten Mal der Unterschied
+     zwischen einer Diagnose und einer Vermutung. */
+  stand.ist("und der Aufschlüsselung im Tooltip", /Sol Ring/.test(marke?.titel || ""),
+    JSON.stringify(marke?.titel ?? null).slice(0, 200));
 
   /* --- Die Farbreihe auf der Matte ------------------------------------
      Sieben Mana sind wertlos, wenn der Zauber zwei blaue verlangt und kein
