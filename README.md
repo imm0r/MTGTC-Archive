@@ -2652,9 +2652,30 @@ node scripts/tag-index/themen.mjs --dry-run     # lädt und rechnet, schreibt ni
 node scripts/tag-index/themen.mjs --force       # auch bei unverändertem Stand
 ```
 
-> **Noch nicht verdrahtet.** Migration, Skript und Zeitplan stehen; die App
-> liest die Tabellen bisher nicht. Der nächste Schritt wäre die Detailansicht
-> (Themen einer Karte) und ein Filter über `cards_with_tag`.
+### In der App
+
+Zwei Stellen lesen den Index:
+
+* **Detailansicht → „Themen".** Klappt wie die Legalität erst beim Öffnen auf
+  und zeigt die Themen der Karte als Chips — direkte voll, über die Hierarchie
+  geerbte Ober-Themen gedimmt dahinter. Die Beschreibung des Taggers (wo es
+  eine gibt) hängt als Tooltip am Chip.
+* **Sammlung → Filter „Thema".** Ein Dropdown mit Suchfeld; gewählt wird eines
+  der ~1100 Themen ab 20 Karten (der Median liegt bei fünf — ein Filter voller
+  Einzelfälle wie `hate-typal-giant` wäre keine Auswahl). Die Liste zeigt dann
+  nur Karten, deren `oracle_id` im Thema steckt, Unter-Themen eingeschlossen.
+  Altbestand ohne `oracle_id` fällt bei gesetztem Thema heraus — ohne Kennung
+  lässt sich die Frage nicht beantworten, und „vielleicht" wäre gelogen.
+
+Ist der Index leer oder die Migration nicht eingespielt, verschwinden beide
+Stellen von selbst: die Filter-Gruppe bleibt versteckt, die Detailansicht sagt
+„keine Themen". Wie beim Deck-Verlauf hält eine fehlende Tabelle den Rest der
+App nicht auf.
+
+Die Synergie-Suche läuft weiterhin über ihre zehn Regex-Themen — sie auf den
+Index umzustellen ist ein eigenes Vorhaben: Eine Karte trägt im Mittel sechs
+Themen, darunter Kuriositäten wie `alliteration`, und die ungefiltert als
+Synergie-Haken zu nehmen ergäbe schlechtere Vorschläge als heute.
 
 ## Prüfungen
 

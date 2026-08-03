@@ -247,6 +247,28 @@
           </label>
         </div>
       </div>
+      <!-- Thema: was die Karte TUT (sacrifice-outlet, mana-rock, ramp …), aus
+           dem Themen-Index (Scryfall Tagger, Tabellen tags/card_tags). Die
+           Liste füllt app.js beim ersten Öffnen; ist der Index leer oder die
+           Migration nicht eingespielt, bleibt das Dropdown bei „Alle" und die
+           Gruppe verschwindet. Suchfeld statt nackter Liste: auch gefiltert
+           (ab 20 Karten) bleiben ~1100 Themen. -->
+      <div style="flex:none" class="ci-gruppe-abstand" id="thema-gruppe" hidden>
+        <label data-i18n="coll.theme">Thema</label>
+        <div class="set-select thema-select" id="thema-select">
+          <button type="button" class="set-trigger" id="thema-trigger" aria-haspopup="listbox" aria-expanded="false">
+            <span class="set-trigger-inner" id="thema-trigger-inner" data-i18n="coll.all">Alle</span>
+            <span class="set-caret" aria-hidden="true">&#9662;</span>
+          </button>
+          <!-- KEIN hidden-Attribut: Sichtbarkeit steuert .set-select.open über
+               die CSS; hidden gewönne mit !important und das Menü bliebe auch
+               offen unsichtbar. -->
+          <div class="set-menu thema-menu" id="thema-menu" role="listbox">
+            <input type="text" id="thema-suche" data-i18n-ph="coll.themeSearchPh" placeholder="Thema suchen…">
+            <ul id="thema-liste"></ul>
+          </div>
+        </div>
+      </div>
     </div>
     <div id="coll-combo-box"></div>
     <!-- Trefferzähler: wie viele Zeilen die aktuellen Filter zeigen, von allen
