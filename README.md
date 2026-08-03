@@ -585,6 +585,39 @@ Zuordnungen, Karten. Dieselben Policies wie bei `shared`, nur ohne die
 Freundschaftsprüfung: Ein Deck ohne seine Einteilung wäre eine Liste, mit ihr
 ein Bauplan.
 
+### Community steht jetzt oben
+
+Sie war ein Eintrag im Benutzermenü hinter Avatar und Name — einer Klappe, die
+man erst aufmachen muss. Für einen Nebenraum war das richtig. Inzwischen hängen
+Mitgliederliste, Community-Decks und der Live-Feed daran, und dann ist es keiner
+mehr: **Community ist der fünfte Punkt der obersten Navigation**, hinter „Card
+Management", mit `assets/community.PNG` als Sinnbild.
+
+Und **nur** dort. Der alte Eintrag im Benutzermenü ist weg; zwei Wege zur selben
+Ansicht sind zweimal dieselbe Frage, wo man jetzt eigentlich hindrückt.
+
+Zwei Dinge, die an dieser Leiste schon still danebengingen und die der Prüffall
+`navigation` seither festhält:
+
+* **Der Text gehört in ein eigenes `<span>`, nicht an den Knopf.**
+  `applyI18n()` setzt `textContent`, und das ersetzt den ganzen Inhalt — auch
+  das `<img>` daneben. Steht die Marke `data-i18n` am Knopf selbst, sind die
+  Sinnbilder beim ersten Sprachwechsel weg. Beim Laden sieht noch alles richtig
+  aus.
+* **Eine fehlende Bilddatei verschwindet nicht von allein.** Ein `<img>` mit
+  leerem `alt` und fester Größe bleibt als 32 px breites Loch neben dem Wort
+  stehen (im Prüfbrowser nachgemessen). `navSymboleAbsichern()` blendet es
+  deshalb aus — dann bleibt es beim Wort, und der Knopf sieht nicht kaputt aus.
+  Geprüft werden beide Reihenfolgen: War das Bild schon durchgefallen, bevor
+  jemand hinsah, meldet sich `error` nie mehr; dann verrät `complete` ohne
+  `naturalWidth`, was los ist.
+
+> Die Kopfzeile bricht dadurch etwas früher um: mit fünf Punkten unterhalb von
+> rund 980 px Fensterbreite statt vorher 860 px, und wächst dabei von 67 auf
+> 125 px. Das ist der Preis dafür, dass die Leiste seit den Sinnbildern 32 px
+> hohe Knöpfe trägt — `nav` bricht von sich aus um, ein eigener Umbruchpunkt
+> kam nicht dazu.
+
 ### Der Weg dorthin: Kacheln, die führen
 
 Zwei der Kennzahlen oben in der Community-Ansicht sind **Knöpfe**: „Mitglieder"
@@ -2159,6 +2192,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 | `anzeigename`    | Der Anzeigename als Pflicht: die Regel selbst (2–40, getrimmt), das Feld beim Anlegen, der Weg über die Nutzer-Metadaten bis ins frisch angelegte Profil, die Maske vor der App für alte Konten samt Ausweg — und dass das Profilfeld ihn nicht mehr leeren kann |
 | `mitgliederliste` | Die Mitgliederliste und das öffentliche Profil: dass die Abfrage `findable` achtet, die Gesamtzahl je Zeile mitzählt und das Verhältnis gleich mitliefert; die vier Knöpfe, Blättern und Suchen (samt Rücksprung auf Seite eins und Fokus im Feld) — und dass ein `javascript:`-Ziel kein Verweis wird und Markup im Steckbrief Text bleibt |
 | `communitydecks` | Community-Decks: dass die Migration bestehende Decks NICHT veröffentlicht (Reihenfolge der beiden ALTERs), dass die Rangliste glättet und trotzdem den echten Schnitt zeigt, dass das eigene Deck keine Knöpfe hat und die Datenbank es abweist — dazu Bewerten ohne Neuladen der Liste, Sortieren und Suchen über den Commander; dazu die beiden führenden Kacheln (und dass die übrigen keine sind), der Sprung im niedrigen Fenster samt Aufleuchten, und der Feed-Trigger, der beim Anlegen genau EINE der beiden Zeilen schreibt |
+| `navigation`     | Die oberste Leiste: dass Community dort steht (und nicht doppelt im Benutzermenü), dass das Wort in einem eigenen `<span>` sitzt und die fünf Sinnbilder einen Sprachwechsel überstehen, dass der Klick die Ansicht öffnet und genau einen Punkt markiert — und der Rückfall für eine fehlende Bilddatei in beiden Reihenfolgen, samt Gegenprobe, dass ein vorhandenes Sinnbild stehen bleibt |
 | `migrationen`    | Migrationen, die eine frühere Fassung fortschreiben: dass die Liste der Feed-Arten nie schrumpft, dass Tabellen-Constraint und Schreibweg dieselbe führen — und dass keine spätere Fassung die Sichtbarkeitsprüfung wieder herausnimmt (der Fall, den kein Datenbankfehler meldet) |
 
 ### Zwei Regeln, die dabei gelernt wurden

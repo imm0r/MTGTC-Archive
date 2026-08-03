@@ -62,7 +62,7 @@ nav button:hover{background:rgba(255,255,255,.055);color:var(--txt)}
 nav button.on,nav button.on:hover{background:var(--akt-flaeche);color:var(--acc2);
                font-weight:600;box-shadow:var(--akt-schein)}
 /* Die Sinnbilder der obersten Navigation sind gemalte Illustrationen, keine
-   flachen Piktogramme. Vier davon in voller Farbe nebeneinander machen aus
+   flachen Piktogramme. Fünf davon in voller Farbe nebeneinander machen aus
    einer ruhigen Kopfzeile einen Jahrmarkt — und dann sieht auch der Text
    daneben falsch aus.
    Deshalb: im Ruhezustand entsättigt und abgedunkelt, in voller Farbe erst
@@ -78,6 +78,9 @@ nav button.on,nav button.on:hover{background:var(--akt-flaeche);color:var(--acc2
   filter:saturate(.45) brightness(.85);transition:filter .15s ease-out;
   -webkit-user-drag:none;user-drag:none}
 nav button:hover .nav-sym,nav button.on .nav-sym{filter:none}
+/* Fehlt die Bilddatei, setzt navSymboleAbsichern() diese Klasse: sonst stünde
+   das nicht geladene <img> als 32 px breites Loch neben dem Wort. */
+.nav-sym.fehlt{display:none}
 @media(prefers-reduced-motion:reduce){ .nav-sym{transition:none} }
 /* Neben dem Logo: Statusseite und Version, zweizeilig untereinander. */
 .header-meta{display:inline-flex;flex-direction:column;align-items:flex-start;

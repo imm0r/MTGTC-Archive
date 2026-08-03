@@ -139,7 +139,7 @@
     <span class="header-version" id="header-version" hidden></span>
   </div>
   <nav>
-    <!-- Die vier obersten Punkte tragen ein Sinnbild. Der Text steht dabei in
+    <!-- Die obersten Punkte tragen ein Sinnbild. Der Text steht dabei in
          einem eigenen span und NICHT am Knopf: applyI18n() setzt textContent,
          und das löschte das Bild beim ersten Sprachwechsel gleich mit. -->
     <button data-v="coll" class="on"><img class="nav-sym" src="assets/sym_sammlung.PNG" alt=""><span data-i18n="nav.collection">Sammlung</span></button>
@@ -148,6 +148,12 @@
          noch nicht besessen ist. Die Zahl daneben füllt zeigeWunschZaehler(). -->
     <button data-v="wish"><img class="nav-sym" src="assets/sym_wishlist.PNG" alt=""><span data-i18n="nav.wishlist">Wunschliste</span><span id="wish-badge" class="menu-badge" hidden></span></button>
     <button data-v="more"><img class="nav-sym" src="assets/sym_cardmanagent.PNG" alt=""><span data-i18n="nav.cardmgmt">Card Management</span></button>
+    <!-- Community stand bis dahin im Benutzermenü und damit hinter einer
+         Klappe, die man erst finden muss. Sie ist inzwischen kein Nebenraum
+         mehr — Mitgliederliste, Community-Decks und der Live-Feed hängen
+         daran —, deshalb hier oben. Und NUR hier: zweimal derselbe Punkt an
+         zwei Stellen wäre zweimal dieselbe Frage, wo man ihn jetzt drückt. -->
+    <button data-v="community"><img class="nav-sym" src="assets/community.PNG" alt=""><span data-i18n="nav.community">Community</span></button>
     <!-- Profil, Freunde und Abmelden wohnen im Menü hinter Avatar + Name:
          aufklappen per Hover (Desktop) bzw. Klick (Touch). Die data-v-Knöpfe
          hier laufen über dieselbe Verdrahtung wie die Haupt-Navigation. -->
@@ -155,7 +161,6 @@
       <span id="who"></span>
       <div class="menu">
         <button data-v="dashboard" data-i18n="nav.dashboard">Dashboard</button>
-        <button data-v="community" data-i18n="nav.community">Community</button>
         <button data-v="profile" data-i18n="nav.profile">Profil</button>
         <button data-v="friends" data-i18n="nav.friends">Freunde</button>
         <button data-v="messages"><span data-i18n="nav.messages">Nachrichten</span><span id="dm-badge" class="menu-badge" hidden></span></button>
