@@ -1,5 +1,18 @@
 [
  {
+  "am": "2026-08-05T02:30:00+02:00",
+  "art": "verbessert",
+  "text": {
+   "de": "Die Tags einer Karte stehen jetzt nach Oberbegriff gruppiert: Der Sammeltag trägt die Zeile, darunter die Tags, die ihn begründen. Vorher standen sie flach in zwei Reihen, und was woraus folgte, musste man raten. Die Zahl am Tag zählt außerdem die Unterbegriffe mit — sie sagt damit dasselbe wie die Trefferliste, die ein Klick darauf liefert. Am Sammeltag steht keine mehr; dort stand oft eine 0, obwohl Tausende Karten darunter hängen.",
+   "en": "A card’s tags are now grouped by parent: the collective tag heads the row, the tags that put it there sit beneath it. Before, they stood flat in two rows and you had to guess what followed from what. The number on a tag now counts its sub-tags too, so it says the same as the result list you get by clicking it. The collective tag has no number any more — it often showed 0 although thousands of cards sit under it.",
+   "fr": "Les tags d’une carte sont désormais groupés par terme générique : le tag collectif porte la ligne, les tags qui le justifient figurent en dessous. Avant, tout était à plat sur deux rangées et il fallait deviner ce qui découlait de quoi. Le nombre sur un tag compte maintenant aussi ses sous-tags, il dit donc la même chose que la liste obtenue en cliquant. Le tag collectif n’a plus de nombre : il affichait souvent 0 alors que des milliers de cartes en relèvent.",
+   "es": "Las etiquetas de una carta se agrupan ahora por término general: la etiqueta colectiva encabeza la fila y debajo están las que la justifican. Antes iban planas en dos filas y había que adivinar qué se derivaba de qué. El número de una etiqueta cuenta además sus subetiquetas, así que dice lo mismo que la lista de resultados al pulsarla. La etiqueta colectiva ya no lleva número: solía mostrar 0 aunque miles de cartas cuelgan de ella.",
+   "it": "I tag di una carta sono ora raggruppati per termine generale: il tag collettivo apre la riga e sotto stanno i tag che lo giustificano. Prima erano piatti su due righe e bisognava indovinare cosa derivasse da cosa. Il numero su un tag conta anche i sottotag, quindi dice lo stesso della lista di risultati che ottieni cliccandolo. Il tag collettivo non ha più un numero: spesso mostrava 0 benché migliaia di carte gli appartengano."
+  },
+  "pr": 226,
+  "version": "0.83.0"
+ },
+ {
   "am": "2026-08-05T01:45:00+02:00",
   "art": "behoben",
   "text": {

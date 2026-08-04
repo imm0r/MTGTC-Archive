@@ -5555,17 +5555,49 @@ function renderDetail(c, id, fremd) {
 /* Alles, was nur die Karte selbst braucht und keinen Besitz voraussetzt:
    Synergien, KI-Synergien, Combos, Legalität, Deck-Sprünge. Eigener Abschnitt,
    damit auch die Ansicht einer fremden Karte ihn bekommt. */
-/* Die Themen-Chips einer Karte. Direkte Themen voll, geerbte (Ober-Themen aus
-   der Hierarchie) gedimmt und hinter einem Trenner — beides zu mischen sähe
-   nach doppelter Verschlagwortung aus, wo in Wahrheit eine Hierarchie steckt.
+/* Die Tag-Chips einer Karte, nach Sammeltag gruppiert.
+
+   VORHER standen sie flach in zwei Reihen: erst die direkt vergebenen, dann
+   hinter einem Trenner die geerbten. Welcher geerbte aus welchem direkten
+   folgte, musste man raten — und die Zwischenebenen der Hierarchie standen
+   als eigene Chips dazwischen, ohne etwas beizutragen. Gemessen an 300 echten
+   Karten waren das Ø 5,7 geerbte neben Ø 6,5 direkten, bei 30 % der Karten
+   mehr geerbte als direkte.
+
+   JETZT trägt der Sammeltag die Zeile als Überschrift und darunter stehen die
+   Tags, die ihn begründen. Ø 3,4 Gruppen je Karte.
+
+   AM SAMMELTAG STEHT KEINE ZAHL. Er ist ein Ordner, kein Etikett: Der Tagger
+   klebt ihn nie an eine Karte. Seine direkte Zahl wäre 0 gewesen und hätte
+   sich als „trifft auf keine Karte zu" gelesen, obwohl unter `burn` 3166
+   Karten hängen.
+
+   AN DEN TAGS STEHT DIE WIRKSAME ZAHL (cards_total), nicht die direkte. Nur
+   die deckt sich mit dem, was ein Klick darauf liefert — die Suche steigt die
+   Hierarchie hinab. Bei `burn player` sind das 1924 statt 883.
+
    Der title trägt die Beschreibung, sofern der Tagger eine führt (29 %). */
 function themenChipsHtml(themen) {
   if (!themen.length) return `<div class="empty">${esc(t("themen.none"))}</div>`;
-  const chip = th => `<span class="thema-chip${th.direkt ? "" : " geerbt"}"${
-    th.description ? ` title="${esc(th.description)}"` : ""}>${esc(th.label)}<i>${th.cards}</i></span>`;
-  const direkt = themen.filter(th => th.direkt), geerbt = themen.filter(th => !th.direkt);
-  return `<div class="thema-chips">${direkt.map(chip).join("")}${
-    geerbt.length ? `<span class="thema-trenner" title="${esc(t("themen.inheritedHint"))}">${esc(t("themen.inherited"))}</span>` + geerbt.map(chip).join("") : ""}</div>
+  const chip = th => `<span class="thema-chip"${
+    th.description ? ` title="${esc(th.description)}"` : ""}>${esc(th.label)}<i>${
+    th.cards_total ?? th.cards}</i></span>`;
+
+  // Reihenfolge kommt aus der Datenbank: ohne Oberbegriff zuerst, dann die
+  // Gruppen nach Namen. Hier wird nur zusammengefasst, nicht sortiert.
+  const gruppen = [];
+  for (const th of themen) {
+    const key = th.wurzel || "";
+    let g = gruppen.find(x => x.key === key);
+    if (!g) gruppen.push(g = { key, label: th.wurzel_label || "", tags: [] });
+    g.tags.push(th);
+  }
+
+  const zeile = g => `<div class="thema-gruppe">${
+    g.key ? `<span class="thema-ober" title="${esc(t("themen.inheritedHint"))}">${esc(g.label)}</span>` : ""
+  }<span class="thema-chips">${g.tags.map(chip).join("")}</span></div>`;
+
+  return `<div class="thema-gruppen">${gruppen.map(zeile).join("")}</div>
     <p class="hint" style="margin:6px 0 0">${t("themen.source")}</p>`;
 }
 
@@ -5826,19 +5858,28 @@ function versteckeCmdHover() { if (cmdHoverEl) cmdHoverEl.style.display = "none"
    (erster Lauf steht aus), verschwinden die Themen einfach aus der
    Oberfläche — wie beim Deck-Verlauf hält das den Rest der App nicht auf. */
 
-/* Alle Themen einer Karte, Ober-Themen eingeschlossen. tags_of_card rollt
-   die Hierarchie in der Datenbank hoch und markiert je Thema, ob es direkt
-   an der Karte hängt oder geerbt ist. Cache je oracle_id für die Sitzung:
-   Themen ändern sich täglich, nicht während man die Detailansicht öffnet. */
+/* Die Tags einer Karte, gruppiert nach oberster Kategorie. tag_groups_of_card
+   liefert eine Zeile je Paar (Sammeltag, direkt vergebener Tag); die
+   Zwischenebenen der Hierarchie fallen dabei weg.
+
+   `wurzel: null` heißt „hat keinen Oberbegriff" — diese Tags stehen oben,
+   ohne Überschrift.
+
+   Ein Tag kann in ZWEI Gruppen auftauchen. 684 der 4509 Tags haben mehrere
+   Eltern, und das ist keine Doppelung: `cycle-fin-adventure-land` hängt unter
+   `cycle` und unter `tapland`, die Karte ist beides.
+
+   Cache je oracle_id für die Sitzung: Tags ändern sich täglich, nicht während
+   man die Detailansicht offen hat. */
 const themenCache = new Map();
 async function themenVonKarte(oracleId) {
   if (!oracleId) return [];
   if (themenCache.has(oracleId)) return themenCache.get(oracleId);
   let liste = [];
   try {
-    const { data, error } = await sb.rpc("tags_of_card", { p_oracle_id: oracleId });
+    const { data, error } = await sb.rpc("tag_groups_of_card", { p_oracle_id: oracleId });
     if (!error && Array.isArray(data)) liste = data;
-  } catch { /* Tabelle fehlt oder Netz weg — dann eben ohne Themen */ }
+  } catch { /* Tabelle fehlt oder Netz weg — dann eben ohne Tags */ }
   themenCache.set(oracleId, liste);
   return liste;
 }

@@ -2715,6 +2715,64 @@ Anfragen und 2 GB gewesen. Die Bulk-Datei erledigt dasselbe mit einem Abruf —
 und bringt Beschreibungen und Hierarchie mit, die über die Suche gar nicht zu
 haben sind.
 
+### Angezeigt wird nach Sammeltag gruppiert
+
+In der Kartenansicht standen die Tags früher flach in zwei Reihen: erst die
+direkt vergebenen, dann hinter einem Trenner die geerbten. Welcher geerbte aus
+welchem direkten folgte, musste man raten — und die Zwischenebenen der
+Hierarchie standen als eigene Chips dazwischen, ohne etwas beizutragen.
+
+Gemessen an 300 echten Karten sind es **Ø 6,5 direkte und 5,7 geerbte** Tags,
+bei 30 % der Karten mehr geerbte als direkte, im Extremfall 19. Zusammengefasst
+auf die **oberste** Kategorie werden daraus Ø 3,4 Gruppen:
+
+```
+— ohne Oberbegriff —   pinger 764 · symmetrical 865 · mana value matters 1015
+burn                   burn player 1924
+hate                   hatebear 65
+triggered ability      cast trigger 1847
+```
+
+Warum die oberste und nicht das unmittelbare Elternteil: Nach dem
+unmittelbaren wären es 4,1 Gruppen und bis zu 18, mit allen Zwischenebenen
+dazwischen. Die Hierarchie ist bis zu sieben Ebenen tief; nach dem
+Zusammenfassen ist sie flach.
+
+Ein Tag kann unter **zwei** Sammeltags stehen — 684 der 4509 Tags haben
+mehrere Eltern. `cycle-fin-adventure-land` hängt unter `cycle` und unter
+`tapland`, und die Karte ist beides. Zwei richtige Aussagen, keine Doppelung.
+
+**Am Sammeltag steht keine Zahl.** Er ist ein Ordner, kein Etikett: Der Tagger
+klebt ihn nie an eine Karte, nur seine Unterbegriffe. Seine direkte Zahl wäre 0
+und läse sich als „trifft auf keine Karte zu", obwohl unter `burn` 3166 Karten
+hängen.
+
+### Die Zahl am Chip ist die wirksame
+
+Sie zeigte lange die **direkten** Zuordnungen — ein Klick darauf liefert aber
+alles, was `cards_with_tag` findet, und das steigt die Hierarchie hinab. Der
+Unterschied ist keine Kleinigkeit:
+
+| Tag | direkt | mit Unterbegriffen |
+| --- | --- | --- |
+| `triggered ability` | 7.852 | **17.141** |
+| `cycle` | 0 | **8.366** |
+| `hate` | 0 | **4.600** |
+| `burn` | 0 | **3.166** |
+| `burn player` | 883 | **1.924** |
+| `drawback` | 1.345 | **1.797** |
+
+Die rechte Spalte steht als `tags.cards_total` in der Tabelle und wird von
+`tag_rollup_berechnen()` gesetzt — **nach** dem Tausch, nicht darin. Gemessen
+dauert das Hochrollen rund zehn Sekunden (11.609 Vorfahr-Paare, verbunden mit
+231.000 Zuordnungen ergibt 472.000 Zeilen zum Zählen). Täglich zehn Sekunden
+sind belanglos; zehn Sekunden *innerhalb* der Tausch-Transaktion wären es
+nicht — die hält den ganzen Bestand gesperrt, und solange sähe die App eine
+Sammlung ohne Themen.
+
+Die direkte Zahl bleibt daneben stehen: Auf ihr beruht die Sperrliste der
+Winzlinge im Themen-Filter.
+
 ### Die Hierarchie ist nicht Zierde
 
 `sacrifice-outlet` hat **null eigene Karten** und acht Unterthemen
@@ -2723,10 +2781,6 @@ ausschließlich an den Kindern. Wer nur die direkten Zuordnungen ansieht, bekomm
 eine leere Liste. Deshalb rollen beide Lesefunktionen die Hierarchie ab:
 
 ```sql
-select * from tags_of_card('6ad8011d-…');   -- Sol Ring
---  full-refund │ mana-rock │ adds-multiple-mana │ activated-ability   (direkt)
---  mana-producer │ refund │ ramp                                      (geerbt)
-
 select count(*) from cards_with_tag('sacrifice-outlet');   -- 1502
 ```
 
