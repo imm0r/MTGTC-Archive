@@ -3,7 +3,8 @@
   "am": "2026-08-04T02:05:00+02:00",
   "art": "verbessert",
   "text": "Im Changelog steht jetzt hinter jedem Eintrag die Version, mit der die Änderung ausgeliefert wurde — die Antwort auf „habe ich das schon?“. Die Nummer oben im Kopf sagt, wo du selbst stehst.",
-  "pr": 212
+  "pr": 212,
+  "version": "0.77.0"
  },
  {
   "am": "2026-08-04T01:46:00+02:00",
