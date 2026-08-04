@@ -5433,17 +5433,34 @@ function detailHtml(c, hover) {
   const links = !hover
     ? `${cmLink(c.cm_id) ? `<a class="cm cm-logo" href="${esc(cmLink(c.cm_id))}" target="_blank" rel="noopener noreferrer" title="${esc(t("row.cmTitle"))}">${CM_LOGO}</a>` : ""}${sfLink(c) ? `<a class="cm sf-logo" href="${esc(sfLink(c))}" target="_blank" rel="noopener noreferrer" title="${esc(t("row.sfTitle"))}">${SF_LOGO}</a>` : ""}`
     : "";
-  // Werkzeuge nur im Dialog: gruppiert und beschriftet (Verwaltung / Vorschläge
-  // & Combos), Legalität und Preisverlauf aufklappbar. In der Hover-Vorschau
-  // bleibt nur der schlichte Preisgraph.
-  const block = !hover ? `
+  // Die Werkzeuge — Bearbeiten, Preis, Synergien, Combos — stehen als EINE
+  // Gruppe „Verwaltung" in der Info-Spalte NEBEN dem Bild: Es sind Knöpfe,
+  // die brauchen keine Breite, und unter dem Bild wäre ihr Platz an die
+  // Aufklapper verschenkt. Die tool-row bricht in der Spalte von selbst um.
+  //
+  // WICHTIG: innerhalb von .detail lassen — die Regeln, die die Goldsymbole
+  // im Knopf zentrieren und das Zahlenfeld auf Knopfhöhe bringen, hängen an
+  // `.detail .tool-row`. Der Umzug des Blocks unter das Bild (#227) hatte
+  // genau sie abgehängt: Symbole saßen hoch, das Feld war wieder zu hoch.
+  const werkzeuge = !hover ? `
         <div class="sec-sep"></div>
         <div class="tool-group"><span class="tool-label">${esc(t("detail.groupManage"))}</span>
           <div class="tool-row">
             <button class="btn ghost sm" id="dt-edit" title="${esc(t("row.editTitle"))}">${icoGold("stift")}${esc(t("detail.edit"))}</button>
             <button class="btn ghost sm" id="dt-price" title="${esc(t("detail.priceBtnTitle"))}">${icoGold("neu")}${esc(t("detail.priceBtn"))}</button>
+            <div class="field" style="width:118px"><label>${esc(t("deck.maxPerCard"))}</label>
+              <input type="number" id="syn-cap" min="0" step="0.5" value="${prefWert("capDefault") ?? ""}"
+                placeholder="${esc(t("syn.capPh"))}" title="${esc(t("syn.capTitle"))}"></div>
+            <button class="btn ghost sm syn-std-btn" id="dt-syn" title="${esc(t("syn.findTitle"))}">${icoGold("zahnraeder")}${esc(t("syn.find"))}</button>
+            <button class="btn ghost sm syn-ai-btn" id="dt-syn-ai" title="${esc(t("syn.aiTitle"))}">${icoGold("funken")}${esc(t("syn.ai"))}</button>
+            <button class="btn ghost sm" id="dt-combos" title="${esc(t("combo.cardTitle"))}">${icoGold("blitze")}${esc(t("combo.btn"))}</button>
           </div>
-        </div>
+        </div>` : "";
+  // Unter Bild UND Spalte, in voller Dialogbreite: nur, was die Breite auch
+  // nutzt — Legalität und Tags (das det-paar gibt den Tags den Löwenanteil),
+  // darunter Preisverlauf und die Ergebnis-Kästen. In der Hover-Vorschau
+  // bleibt an dieser Stelle der schlichte Preisgraph.
+  const block = !hover ? `
         <div class="sec-sep"></div>
         <div class="det-paar">
           <details class="legal-det" id="dt-legal"><summary><span class="det-sum">${icoGold("schild")}${esc(t("legal.title"))}</span></summary>
@@ -5452,17 +5469,6 @@ function detailHtml(c, hover) {
           <details class="legal-det" id="dt-themen"><summary><span class="det-sum">${icoGold("etikett")}${esc(t("themen.title"))}</span></summary>
             <div id="dt-themen-body"><div class="meta">${ico("laden", "syn-spin")} ${esc(t("themen.loading"))}</div></div>
           </details>
-        </div>
-        <div class="sec-sep"></div>
-        <div class="tool-group"><span class="tool-label">${esc(t("detail.groupTools"))}</span>
-          <div class="tool-row">
-            <div class="field" style="width:118px"><label>${esc(t("deck.maxPerCard"))}</label>
-              <input type="number" id="syn-cap" min="0" step="0.5" value="${prefWert("capDefault") ?? ""}"
-                placeholder="${esc(t("syn.capPh"))}" title="${esc(t("syn.capTitle"))}"></div>
-            <button class="btn ghost sm syn-std-btn" id="dt-syn" title="${esc(t("syn.findTitle"))}">${icoGold("zahnraeder")}${esc(t("syn.find"))}</button>
-            <button class="btn ghost sm syn-ai-btn" id="dt-syn-ai" title="${esc(t("syn.aiTitle"))}">${icoGold("funken")}${esc(t("syn.ai"))}</button>
-            <button class="btn ghost sm" id="dt-combos" title="${esc(t("combo.cardTitle"))}">${icoGold("blitze")}${esc(t("combo.btn"))}</button>
-          </div>
         </div>`
     : `<div style="margin-top:10px">
           <label style="margin-bottom:2px">${esc(t("detail.priceHistory"))}</label>
@@ -5481,12 +5487,12 @@ function detailHtml(c, hover) {
           ${rarityPill(c.rarity)}
           ${c.foil ? '<span class="pill foil">Foil</span>' : ""}
           <span class="pill">${flaggeHtml(c.lang, true)} ${esc(langName(c.lang))}</span>
-          ${condBadge(c.condition)}
-          <span class="pill">${esc(t("common.qtyLabel"))} ${c.qty}</span>
+          <span class="copy-mitte">${condBadge(c.condition)}<span class="pill">${esc(t("common.qtyLabel"))} ${c.qty}</span></span>
           <span class="detail-preis">${esc(t("detail.price"))}: <b>${eur(c.price)}</b></span>
           ${links}
         </div>
         ${!hover ? deckMembershipHtml(c) : ""}
+        ${werkzeuge}
         ${hover ? `<div class="hint" style="margin-top:10px">${esc(t("detail.added"))}: ${esc(dtShort(c.added))} ${esc(t("detail.addedSuffix"))}</div>` : ""}
       </div>
     </div>

@@ -157,13 +157,21 @@
 /* Legalität und Tags nebeneinander. Beide sind zugeklappt eine Zeile, und
    zwei einzeilige Aufklapper untereinander sind zwei Zeilen für nichts.
 
+   Das Paar steht UNTER Bild und Info-Spalte und hat die volle Dialogbreite
+   (gemessen 878 px innen bei 920 px Dialog). Die Legalität bekommt davon
+   fest 22.5em — das trägt ihre zwei Spalten unten samt dem breitesten Fall
+   („Commander" + „nicht legal", gemessen 172 px je Eintrag) — und die Tags
+   den Rest: gut 500 px, gegen 34 Zeichen längsten Tag-Namens (gemessen
+   ~250 px als Chip). Fest und nicht max-content, damit die Spalte beim Auf-
+   und Zuklappen nicht springt.
+
    align-items:start, nicht stretch: Klappt einer auf, soll der andere oben
    stehen bleiben statt auf dessen Höhe mitzuwachsen. Sonst hinge neben einer
    langen Legalitätsliste ein leerer Kasten in gleicher Höhe.
 
    Unter 620 px untereinander — zwei Spalten mit je einem Wort und einem
    Symbol sind dort schmaler als ihr Inhalt. */
-.det-paar{display:grid;grid-template-columns:minmax(0,13.5em) 1fr;gap:6px 22px;align-items:start}
+.det-paar{display:grid;grid-template-columns:minmax(0,22.5em) 1fr;gap:6px 22px;align-items:start}
 @media (max-width:620px){.det-paar{grid-template-columns:1fr}}
 
 /* Das Feld „max €/Karte" steht in einer Reihe mit kleinen Knöpfen und war
@@ -825,12 +833,13 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .legal-det>summary{cursor:pointer;font-size:12px;color:var(--dim);width:fit-content}
 .legal-det>summary:hover{color:var(--acc)}
 .legal-det[open]>summary{color:var(--txt);margin-bottom:6px}
-/* Eine Kategorie je Zeile, nicht zwei nebeneinander. Die Spalte darf dadurch
-   schmal bleiben — und der Platz, den sie nicht braucht, geht an die Tags
-   daneben, wo er gebraucht wird: Ein Tag-Name wird bis zu 34 Zeichen lang und
-   soll in seiner Pille nicht umbrechen. Acht Zeilen untereinander kosten
-   Höhe, aber die hat der Kasten; Breite hatte er nicht. */
-.legal-grid{display:flex;flex-direction:column;align-items:flex-start;gap:5px}
+/* Zwei Kategorien je Zeile, acht Formate in vier Zeilen. Die eine Spalte von
+   vorher stammt aus der Zeit, als das Paar neben dem Kartenbild um dessen
+   Restbreite kämpfte; seit es die volle Dialogbreite hat, tragen zwei Spalten
+   Legalität UND die längsten Tag-Namen daneben (nachgemessen, siehe
+   .det-paar). max-content, nicht 1fr: Die Pillen sollen so breit sein wie
+   ihr Inhalt, nicht wie ihre Spalte. */
+.legal-grid{display:grid;grid-template-columns:repeat(2,max-content);gap:5px 10px}
 .legal-item{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--txt);
   border:1px solid var(--line);border-radius:8px;padding:4px 8px;background:var(--panel2)}
 .legal-note{color:var(--acc2)}
@@ -3066,7 +3075,13 @@ dialog::backdrop{background:#000a}
    Abschnitts-Trenner und die Vorschlags-/Combo-Ergebnisse über die VOLLE Breite
    (außerhalb der rechten Spalte — beginnen linksbündig unter dem Kartenbild). */
 .detail-copy{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:12px 0}
-.detail-preis{margin-left:auto}
+/* Zustand und Anzahl mittig zwischen Sprache und Preis: Die beiden Auto-
+   Ränder der Mitte teilen sich den freien Platz der Zeile gleichmäßig, der
+   Preis wird vom rechten davon an den Rand gedrückt — er braucht sein
+   margin-left:auto von früher nicht mehr (und dürfte es nicht behalten:
+   ein dritter Auto-Rand bekäme ein Drittel des Platzes ab, und die Mitte
+   säße links davon statt mittig). */
+.copy-mitte{display:inline-flex;align-items:center;gap:6px;margin:0 auto}
 /* Deck-Zugehörigkeit der Karte: Label + anklickbare Deck-„Chips", die zum Deck
    springen. */
 .detail-decks{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:2px 0 4px}
