@@ -9,7 +9,8 @@
    "es": "Compartir, publicar y exportar en la cabecera del mazo llevan ahora también símbolos dorados: la carta con la flecha en arco, la carta que emite y la carpeta con la flecha. La cabecera del mazo queda así completamente en el estilo en relieve — y los botones muestran su símbolo en ambos estados, no solo al activarlos.",
    "it": "Condividi, pubblica ed esporta nell’intestazione del mazzo portano ora anch’essi simboli dorati: la carta con la freccia slanciata, la carta che trasmette e la cartella con la freccia. L’intestazione del mazzo è così completamente nello stile in rilievo — e i pulsanti mostrano il loro simbolo in entrambi gli stati, non solo da attivi."
   },
-  "pr": 233
+  "pr": 233,
+  "version": "0.85.1"
  },
  {
   "am": "2026-08-05T08:40:00+02:00",
