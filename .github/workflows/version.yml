@@ -105,7 +105,10 @@ jobs:
           fi
           echo "Basis aus $ZIEL: $basis"
           node scripts/version.mjs "$STUFE" "$basis"
-          if git diff --quiet -- index.html; then
+          # changelog.json gehört dazu: Das Skript stempelt dort die Fassung
+          # in Einträge ohne eigene — beim Schreiben des Eintrags ist sie noch
+          # nicht bekannt. Fehlte die Datei hier, bliebe der Stempel liegen.
+          if git diff --quiet -- index.html changelog.json; then
             echo "geaendert=nein" >> "$GITHUB_OUTPUT"
           else
             echo "geaendert=ja" >> "$GITHUB_OUTPUT"
@@ -119,7 +122,7 @@ jobs:
           set -euo pipefail
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add index.html
+          git add index.html changelog.json
           # „[skip ci]" im Betreff, und zwar aus einem handfesten Grund:
           #
           # Dieser Push ist selbst ein synchronize-Ereignis am Pull Request und
@@ -221,10 +224,14 @@ jobs:
             git fetch --no-tags origin "$zweig"
             git checkout -B "pr-$nr" "origin/$zweig"
             node scripts/version.mjs "$stufe" "$basis"
-            if git diff --quiet -- index.html; then
+            # changelog.json mit umgerechnet: Der Stempel dort kam von einem
+            # früheren Lauf dieses Zweigs und trüge sonst die alte Nummer,
+            # während index.html die neue führt. Beide sähen für sich
+            # genommen richtig aus.
+            if git diff --quiet -- index.html changelog.json; then
               echo "#$nr war schon auf Stand."
             else
-              git add index.html
+              git add index.html changelog.json
               # Marke im Betreff wie beim Lauf am Pull Request: Dieser Push ist
               # ein synchronize-Ereignis und legte sonst einen gelben,
               # freigabepflichtigen Leerlauf an.

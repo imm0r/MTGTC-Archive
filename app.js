@@ -11481,10 +11481,24 @@ async function zeigeChangelog() {
   // Badges der Sammlung.
   const zeile = e => {
     const art = CHANGELOG_ART[e.art] || { key: null, klasse: "" };
+    // Die Fassung, mit der die Änderung ausgeliefert wurde. Sie steht am ENDE
+    // der Kopfzeile, weil sie die Frage beantwortet, die man erst beim
+    // Weiterlesen stellt: „habe ich das schon?" — die Nummer im Kopf der App
+    // sagt, wo man selbst steht. Fehlt sie (Eintrag von Hand ergänzt, bevor
+    // der Workflow lief), bleibt der Platz leer statt „—" zu zeigen.
+    const pr = Number.isInteger(e.pr)
+      ? `<a class="cl-pr" href="https://github.com/imm0r/MTGTC-Archive/pull/${e.pr}"
+           target="_blank" rel="noopener noreferrer">#${e.pr}</a>` : "";
+    // Nach rechts geschoben wird das ERSTE der beiden (margin-left:auto).
+    // Stünde es an beiden, teilten sie sich den freien Platz und die
+    // PR-Nummer landete in der Mitte der Zeile.
+    const version = typeof e.version === "string" && e.version
+      ? `<span class="cl-version${pr ? "" : " allein"}"
+           title="${esc(t("changelog.versionTitle", { v: e.version }))}">${esc(e.version)}</span>` : "";
     return `<div class="cl-zeile">
       <div class="cl-kopf"><span class="cl-zeit">${esc(changelogZeit(e.am))}</span>
         <span class="cl-art ${art.klasse}">${esc(art.key ? t(art.key) : e.art)}</span>
-        ${Number.isInteger(e.pr) ? `<a class="cl-pr" href="https://github.com/imm0r/MTGTC-Archive/pull/${e.pr}" target="_blank" rel="noopener noreferrer">#${e.pr}</a>` : ""}</div>
+        ${pr}${version}</div>
       <div class="cl-text">${esc(e.text || "")}</div>
     </div>`;
   };
