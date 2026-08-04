@@ -174,9 +174,15 @@ Deno.serve(async (req) => {
 
   const antwort = () => teile.map((t, i) => speicher.get(hashes[i]) ?? null);
 
+  /* Wie viele Sätze der Client übersetzt haben wollte. Steht in JEDER Antwort,
+     denn erst im Verhältnis dazu sagt `neu` etwas: „12 neu" ist bei 12 Sätzen
+     ein voller Modellaufruf und bei 90 der Rest, den der Speicher nicht
+     hergab. */
+  const gefragt = teile.filter(t => t.frage).length;
+
   // Alles schon da: keine Kosten, kein Kontingent, keine Wartezeit. Das ist
   // der Regelfall, sobald eine Combo einmal jemand angesehen hat.
-  if (!offen.length) return json({ texte: antwort(), neu: 0 });
+  if (!offen.length) return json({ texte: antwort(), neu: 0, gesamt: gefragt });
 
   // ---- Erst jetzt kostet es etwas ---------------------------------------
   // Das Kontingent wird bewusst NICHT beansprucht, wenn alles aus dem Speicher
@@ -189,7 +195,8 @@ Deno.serve(async (req) => {
   if (!quota?.ok) {
     // Was schon im Speicher lag, geht trotzdem zurück — eine halb übersetzte
     // Anleitung ist besser als eine gar nicht übersetzte.
-    return json({ texte: antwort(), code: "quota", reset_at: quota?.reset_at ?? null, neu: 0 }, 200);
+    return json({ texte: antwort(), code: "quota", reset_at: quota?.reset_at ?? null,
+                  neu: 0, gesamt: gefragt }, 200);
   }
 
   const key = Deno.env.get("ANTHROPIC_API_KEY");
@@ -213,6 +220,11 @@ Deno.serve(async (req) => {
 
   const anthropic = new Anthropic({ apiKey: key });
   let ergebnis: { nr: number; text: string }[] = [];
+  /* Was der Aufruf gekostet hat. Geht an den Client, der daraus dieselbe Zeile
+     baut wie bei den KI-Synergien und der Regelfrage — die Zahlen dafür kann
+     nur der Server kennen. Bleibt null, wenn gar kein Aufruf nötig war; genau
+     das ist dort die Aussage „hat nichts gekostet". */
+  let usage: { input: number; output: number; model: string } | null = null;
   try {
     /* output_config statt tools/tool_choice — so rufen scan-card,
        card-synergy und rules-question das Modell auch auf. Ein Weg für alle
@@ -236,14 +248,15 @@ Deno.serve(async (req) => {
     if (res.stop_reason === "refusal" || res.stop_reason === "max_tokens") {
       console.error(`combo-uebersetzen: Antwort unbrauchbar (${res.stop_reason}), ` +
         `lang=${lang} offen=${offen.length} max_tokens=${maxTokens}`);
-      return json({ texte: antwort(), code: res.stop_reason, neu: 0 }, 200);
+      return json({ texte: antwort(), code: res.stop_reason, neu: 0, gesamt: gefragt }, 200);
     }
     const block = res.content.find(b => b.type === "text");
     if (!block || block.type !== "text") {
       console.error(`combo-uebersetzen: kein Textblock in der Antwort, stop_reason=${res.stop_reason}`);
-      return json({ texte: antwort(), code: "ki_fehler", neu: 0 }, 200);
+      return json({ texte: antwort(), code: "ki_fehler", neu: 0, gesamt: gefragt }, 200);
     }
     ergebnis = JSON.parse(block.text).texte ?? [];
+    usage = { input: res.usage.input_tokens, output: res.usage.output_tokens, model: res.model };
     /* `angefragt` steht mit im Protokoll, weil MAX_TEILE oben stillschweigend
        kappt: In einer Ansicht mit vielen Combos schickt der Client leicht
        neunzig Teile, und die dahinter bleiben englisch. Ohne diese Zahl sähe
@@ -262,7 +275,7 @@ Deno.serve(async (req) => {
        Ausfall im Dunkeln. */
     console.error("combo-uebersetzen: Modellaufruf fehlgeschlagen", e);
     // Was aus dem Speicher kam, geht trotzdem zurück.
-    return json({ texte: antwort(), code: "ki_fehler", neu: 0 }, 200);
+    return json({ texte: antwort(), code: "ki_fehler", neu: 0, gesamt: gefragt }, 200);
   }
 
   /* Prüfen, bevor gespeichert wird. Eine Übersetzung, die einen Platzhalter
@@ -287,5 +300,5 @@ Deno.serve(async (req) => {
       .upsert(neueZeilen, { onConflict: "hash,lang", ignoreDuplicates: true });
   }
 
-  return json({ texte: antwort(), neu: neueZeilen.length });
+  return json({ texte: antwort(), neu: neueZeilen.length, gesamt: gefragt, usage });
 });

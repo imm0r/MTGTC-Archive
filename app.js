@@ -7078,8 +7078,17 @@ function comboTeilHtml(roh, kartenNamen, alsText) {
 async function comboTexteNachreichen(wurzel) {
   if (!wurzel || typeof LANG !== "string" || LANG === "en") return;
   const huellen = [...wurzel.querySelectorAll("[data-cmb]")]
-    .filter(h => COMBO_TEILE.has(Number(h.dataset.cmb)));
+    .filter(h => COMBO_TEILE.has(Number(h.dataset.cmb)))
+    /* Schon einmal geschickt: nicht noch einmal. Gemerkt wird der VERSUCH,
+       nicht der Erfolg — ein Satz, den das Modell nicht brauchbar übersetzt
+       hat, käme sonst bei jedem Aufklappen erneut und kostete jedes Mal. */
+    .filter(h => !h.dataset.cmbGefragt)
+    /* Was zugeklappt ist, liest gerade niemand. Bezahlt wird, was jemand
+       aufmacht — dieselbe Zeile hält beim Zeichnen die Details heraus und
+       lässt sie beim Aufklappen durch. */
+    .filter(h => !h.closest("details.combo-det:not([open])"));
   if (!huellen.length) return;
+  huellen.forEach(h => { h.dataset.cmbGefragt = "1"; });
 
   const teile = huellen.map(h => ({ text: COMBO_TEILE.get(Number(h.dataset.cmb)).muster, frage: true }));
   let data;
@@ -7104,6 +7113,48 @@ async function comboTexteNachreichen(wurzel) {
     h.title = teil.roh;
     h.classList.add("cmb-uebersetzt");
   });
+
+  comboKostenZeigen(wurzel, data);
+}
+
+/* Was diese Übersetzung gekostet hat, über den Kacheln — dieselbe Auskunft wie
+   bei den KI-Synergien und der Regelfrage, damit niemand raten muss, was ein
+   Klick auslöst.
+
+   ZWEI FÄLLE, und der zweite ist der interessante: Kam alles aus dem
+   gemeinsamen Satzspeicher, gab es GAR KEINEN Modellaufruf — die Zeile sagt
+   das ausdrücklich, statt „$0,0000" zu zeigen. Genau dafür ist der Speicher
+   da, und ohne die Zeile sähe man ihm seine Wirkung nie an.
+
+   Nichts gesagt wird, wenn die Function eine Kennung mitschickt (Kontingent
+   alle, Antwort abgeschnitten, Aufruf gescheitert): Dann steht da das
+   englische Original, und eine Kostenzeile daneben behauptete eine
+   Übersetzung, die nicht stattgefunden hat. */
+function comboKostenZeigen(wurzel, data) {
+  wurzel.querySelector(":scope > .cmb-kosten")?.remove();
+  if (!data || data.code) return;
+  const gesamt = Number(data.gesamt);
+  if (!Number.isFinite(gesamt) || gesamt <= 0) return;
+
+  const k = kiKosten(data.usage);
+  const zahl = n => (n || 0).toLocaleString(LANG);
+  const text = k
+    ? t("combo.cost", { cost: "$" + k.usd.toFixed(4).replace(".", ","),
+                        in: zahl(k.input), out: zahl(k.output),
+                        neu: zahl(data.neu), gesamt: zahl(gesamt) })
+    : t("combo.costCache", { gesamt: zahl(gesamt) });
+
+  const zeile = document.createElement("div");
+  zeile.className = "hint cmb-kosten";
+  zeile.style.margin = "2px 0 8px";
+  zeile.textContent = text;
+  /* Über die Kacheln, unter die Kopfzeile — wie bei den KI-Synergien. Gesucht
+     wird das erste KIND, nicht das erste Vorkommen: Beim Deck stecken die
+     Gitter in <details>, und davor einfügen ginge ins Leere. */
+  const ziel = [...wurzel.children].find(el =>
+    el.classList.contains("combo-grid") || el.classList.contains("empty") ||
+    el.tagName === "DETAILS");
+  wurzel.insertBefore(zeile, ziel ?? null);
 }
 
 
@@ -7325,6 +7376,33 @@ function comboCardMini(card, deckId, alsAktion) {
   </div>`;
 }
 
+/* Übersetzt wird, was jemand aufmacht.
+
+   VORHER lief die Übersetzung einmal über den ganzen Kasten, sobald die Liste
+   stand. In einem Deck mit zehn Combos hieß das: neunzig Sätze auf einen
+   Schlag, für Anleitungen, die zugeklappt dastanden und die niemand gelesen
+   hat. Bezahlt wurde das Ermitteln der Liste, nicht das Lesen.
+
+   Die Obergrenze MAX_TEILE (vierzig) schnitt dabei mitten hindurch — die
+   vorderen Combos wurden deutsch, die hinteren blieben englisch, und
+   ausgerechnet das sah nach einem Fehler aus statt nach einer Grenze.
+
+   JETZT sind es zwei getrennte Anlässe: beim Zeichnen die sichtbaren
+   Ergebnis-Punkte (kurz, und über Combos hinweg dieselben — der Satzspeicher
+   greift dort fast immer), und beim ersten Aufklappen die Anleitung genau
+   dieser einen Combo. Damit liegt ein Aufruf bei rund einem halben Dutzend
+   Sätzen statt an der Obergrenze. */
+function wireComboDetails(box) {
+  if (!box) return;
+  box.querySelectorAll("details.combo-det").forEach(det => {
+    det.addEventListener("toggle", () => {
+      // Nur beim Aufmachen, und nur der Rumpf: Die Kostenzeile landet dann
+      // dort, wo die Kosten entstanden sind, statt über der ganzen Liste.
+      if (det.open) comboTexteNachreichen(det.querySelector(".combo-det-body"));
+    });
+  });
+}
+
 /* Die Hover-Vorschau (große Karte + Name) an die Combo-Kartenbilder hängen —
    dieselbe wie bei den Commander-Karten. Nur auf Hover-fähigen Geräten. */
 function wireComboHover(box) {
@@ -7448,6 +7526,7 @@ async function deckCombosAnzeigen(box, cards, deckId) {
   box.innerHTML = teile.join("");
   wireComboHover(box);
   wireComboKategorien(box);
+  wireComboDetails(box);
   comboTexteNachreichen(box);
 }
 
@@ -7483,6 +7562,7 @@ async function sammlungCombosAnzeigen(box, cards) {
   box.innerHTML = `<div class="meta">${esc(t("combo.collHave", { n: gesamt }))}</div>${note}
     ${included.length ? `<div class="combo-grid" style="margin-top:6px">${included.map(c => comboKachel(c, null, cardByName, "commander")).join("")}</div>` : `<div class="empty">${esc(t("combo.collNone"))}</div>`}`;
   wireComboHover(box);
+  wireComboDetails(box);
   comboTexteNachreichen(box);
 }
 
@@ -7519,6 +7599,7 @@ async function karteCombosAnzeigen(box, card) {
   box.innerHTML = `<div class="meta">${esc(t("combo.cardNote", { n: gesamt }))}</div>${note}${
     combos.length ? `<div class="combo-grid">${combos.map(c => comboKachel(c, null, cardByName, "commander")).join("")}</div>` : `<div class="empty">${esc(t("combo.cardNone"))}</div>`}`;
   wireComboHover(box);
+  wireComboDetails(box);
   comboTexteNachreichen(box);
 }
 

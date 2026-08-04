@@ -1,5 +1,18 @@
 [
  {
+  "am": "2026-08-04T23:00:00+02:00",
+  "art": "verbessert",
+  "text": {
+   "de": "Die Combo-Anleitungen werden erst übersetzt, wenn du sie aufklappst — vorher nur die Ergebnis-Punkte, die ohnehin sichtbar sind. In einem Deck mit zehn Combos lief das bisher beim Aufbau der Liste für alle zusammen, riss dabei an einer Obergrenze ab und ließ die hinteren englisch. Und unter jeder Übersetzung steht jetzt, was sie gekostet hat — oder dass sie aus dem Speicher kam und nichts gekostet hat.",
+   "en": "Combo instructions are only translated once you expand them — before that, just the result bullets that are visible anyway. In a deck with ten combos this used to run for all of them while the list was being built, hit a ceiling partway through and left the later ones in English. And under every translation you now see what it cost — or that it came from storage and cost nothing.",
+   "fr": "Les instructions de combo ne sont traduites qu'au moment où tu les déplies — avant cela, seulement les points de résultat, déjà visibles. Dans un deck de dix combos, cela se faisait jusqu'ici pour toutes à la construction de la liste, s'arrêtait à un plafond et laissait les dernières en anglais. Et sous chaque traduction figure désormais ce qu'elle a coûté — ou qu'elle venait de la mémoire et n'a rien coûté.",
+   "es": "Las instrucciones de combo solo se traducen cuando las despliegas — antes, únicamente los puntos de resultado, que ya se ven. En un mazo con diez combos esto ocurría hasta ahora para todas al construir la lista, chocaba con un tope y dejaba las últimas en inglés. Y debajo de cada traducción aparece ahora lo que ha costado — o que venía de la memoria y no ha costado nada.",
+   "it": "Le istruzioni delle combo vengono tradotte solo quando le apri — prima soltanto i punti del risultato, che sono comunque visibili. In un mazzo con dieci combo questo avveniva finora per tutte alla costruzione dell'elenco, si fermava a un limite e lasciava le ultime in inglese. E sotto ogni traduzione ora c'è quanto è costata — oppure che veniva dalla memoria e non è costata nulla."
+  },
+  "pr": 221,
+  "version": "0.82.0"
+ },
+ {
   "am": "2026-08-04T22:00:00+02:00",
   "art": "behoben",
   "text": {
