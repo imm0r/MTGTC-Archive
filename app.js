@@ -10276,7 +10276,7 @@ function renderDecks() {
              Kasten erst entstehen muss: siehe deckVerlaufKnopf(). -->
         <div class="deck-manage">
           <button class="btn ghost sm" data-share="${d.id}"
-            title="${d.shared ? esc(t("deck.unshareTitle")) : esc(t("deck.shareTitle"))}">${d.shared ? ico("gruppe") + " " + esc(t("deck.sharedBtn")) : esc(t("deck.share"))}</button>
+            title="${d.shared ? esc(t("deck.unshareTitle")) : esc(t("deck.shareTitle"))}">${icoGold("teilen")} ${d.shared ? esc(t("deck.sharedBtn")) : esc(t("deck.share"))}</button>
           <!-- Eine Ebene weiter als „Geteilt": das gibt nicht den Freunden
                frei, sondern allen. Deshalb daneben und nicht statt dessen. -->
           <!-- Ein übernommenes Deck lässt sich erst zeigen, wenn es auch ein
@@ -10286,9 +10286,9 @@ function renderDecks() {
           <button class="btn ghost sm${d.is_public ? " an" : ""}" data-public="${d.id}"${
             nochAendern ? " disabled" : ""}
             title="${nochAendern ? esc(t("deck.copyBlocked", { n: nochAendern }))
-              : d.is_public ? esc(t("deck.unpublicTitle")) : esc(t("deck.publicTitle"))}">${d.is_public ? ico("welt") + " " + esc(t("deck.publicBtn")) : esc(t("deck.public"))}</button>
+              : d.is_public ? esc(t("deck.unpublicTitle")) : esc(t("deck.publicTitle"))}">${icoGold("senden")} ${d.is_public ? esc(t("deck.publicBtn")) : esc(t("deck.public"))}</button>
           <button class="btn ghost sm" data-exportbtn="${d.id}"
-            title="${esc(t("exp.title", { name: d.name }))}">${ico("zwischenablage")} ${esc(t("exp.btn"))}</button>
+            title="${esc(t("exp.title", { name: d.name }))}">${icoGold("ordner")} ${esc(t("exp.btn"))}</button>
           <button class="btn ghost sm" data-ded="${d.id}"
             title="${esc(t("deck.editTitle"))}">${icoGold("stift")} ${esc(t("deck.editBtn"))}</button>
           <button class="btn ghost sm" data-histbtn="${d.id}"

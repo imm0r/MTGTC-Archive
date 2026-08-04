@@ -1,5 +1,17 @@
 [
  {
+  "am": "2026-08-05T09:30:00+02:00",
+  "art": "verbessert",
+  "text": {
+   "de": "Auch Teilen, Veröffentlichen und Exportieren im Deck-Kopf tragen jetzt goldene Symbole: die Karte mit dem Schwungpfeil, die sendende Karte und der Ordner mit dem Pfeil. Damit ist die Deck-Kopfzeile komplett im plastischen Stil — und die Knöpfe zeigen ihr Symbol nun in beiden Zuständen, nicht erst nach dem Einschalten.",
+   "en": "Share, publish and export in the deck header now carry gold icons too: the card with the sweeping arrow, the broadcasting card and the folder with the arrow. The deck header is now fully in the sculpted style — and the buttons show their icon in both states, not only once switched on.",
+   "fr": "Partager, publier et exporter dans l’en-tête du deck portent désormais aussi des symboles dorés : la carte à la flèche élancée, la carte qui émet et le dossier à la flèche. L’en-tête du deck est maintenant entièrement au style en relief — et les boutons montrent leur symbole dans les deux états, pas seulement une fois activés.",
+   "es": "Compartir, publicar y exportar en la cabecera del mazo llevan ahora también símbolos dorados: la carta con la flecha en arco, la carta que emite y la carpeta con la flecha. La cabecera del mazo queda así completamente en el estilo en relieve — y los botones muestran su símbolo en ambos estados, no solo al activarlos.",
+   "it": "Condividi, pubblica ed esporta nell’intestazione del mazzo portano ora anch’essi simboli dorati: la carta con la freccia slanciata, la carta che trasmette e la cartella con la freccia. L’intestazione del mazzo è così completamente nello stile in rilievo — e i pulsanti mostrano il loro simbolo in entrambi gli stati, non solo da attivi."
+  },
+  "pr": 233
+ },
+ {
   "am": "2026-08-05T08:40:00+02:00",
   "art": "verbessert",
   "text": {
