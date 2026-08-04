@@ -88,6 +88,9 @@ export default async function ({ seite, adresse, stand }) {
       werkzeuge: [...werk[0].querySelectorAll(".btn,.field input")].map(x => x.id),
       editBeimBild: !!edit.closest(".detail-bildtools")
         && edit.nextElementSibling === bildBtn,
+      // … und zwar linksbündig: Die Zeile beginnt an der linken Bildkante,
+      // nicht (wie zu Ein-Knopf-Zeiten) an der rechten.
+      bildtoolsLinks: Math.abs(edit.getBoundingClientRect().left - bild.left) <= 1,
       // EINE Zeile, immer: alle fünf Glieder auf derselben UNTERKANTE (die
       // Zeile richtet an flex-end aus — das Feld ist mit seinem Label höher
       // als die Knöpfe, die Oberkanten dürfen sich also unterscheiden), und
@@ -142,6 +145,7 @@ export default async function ({ seite, adresse, stand }) {
     erg.werkzeuge, ["dt-price", "syn-cap", "dt-syn", "dt-syn-ai", "dt-combos"]);
   stand.ist("Bearbeiten steht unter dem Bild, direkt vor „Bild ersetzen“",
     erg.editBeimBild);
+  stand.ist("die Zeile unter dem Bild beginnt linksbündig", erg.bildtoolsLinks);
   stand.ist("die fünf stehen in EINER Zeile und passen hinein",
     erg.eineZeile && erg.zeilePasst, `eineZeile ${erg.eineZeile}, passt ${erg.zeilePasst}`);
   stand.gleich("das Feld „max €/Karte“ ist vierstellenbreit, nicht datumsbreit",

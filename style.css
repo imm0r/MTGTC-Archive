@@ -2975,7 +2975,12 @@ dialog::backdrop{background:#000a}
    einzige Kind einer Spalte und darf die volle Breite nehmen. */
 .detail-bildspalte{display:flex;flex-direction:column;gap:7px;
   width:230px;max-width:100%;flex:none;align-self:flex-start}
-.detail-bildtools{display:flex;justify-content:flex-end}
+/* Linksbündig unter dem Bild, mit Luft zwischen den beiden Knöpfen. Das
+   flex-end von früher stammt aus der Zeit, als hier nur „Bild ersetzen"
+   stand — ein einzelner Knopf an der rechten Bildkante. Zu zweit
+   („Bearbeiten" wohnt seit #230 auch hier) beginnt die Zeile an der linken,
+   wie jede andere Werkzeugzeile der Ansicht. */
+.detail-bildtools{display:flex;justify-content:flex-start;gap:8px}
 /* display:block muss hier stehen, seit das Bild in .karte3d-blatt liegt: Als
    inline-Element setzt es sich auf die Grundlinie und lässt darunter den Platz
    für Unterlängen frei. Der Kasten wäre damit ein paar Pixel höher als das
