@@ -1,5 +1,18 @@
 [
  {
+  "am": "2026-08-05T04:30:00+02:00",
+  "art": "neu",
+  "text": {
+   "de": "Das Dashboard hat ein Themenprofil: zwölf Balken, die zeigen, worum die Sammlung eigentlich geht — Removal, Kartenvorteil, Ramp und so weiter, jeweils mit Anteil. Eine Karte zählt in jeder Kategorie, die auf sie passt, deshalb ergeben die Anteile zusammen mehr als 100 Prozent. Reine Struktur-Angaben wie „hat eine ausgelöste Fähigkeit\" sind ausgeblendet; sie träfen auf fast jede Sammlung gleich zu.",
+   "en": "The dashboard has a theme profile: twelve bars showing what the collection is actually about — removal, card advantage, ramp and so on, each with its share. A card counts in every category that fits it, so the shares add up to more than 100 percent. Purely structural entries such as “has a triggered ability” are hidden; they would apply to almost any collection alike.",
+   "fr": "Le tableau de bord a un profil thématique : douze barres qui montrent de quoi la collection parle vraiment — removal, avantage de cartes, ramp et ainsi de suite, chacune avec sa part. Une carte compte dans chaque catégorie qui lui correspond, le total dépasse donc 100 pour cent. Les mentions purement structurelles comme « possède une capacité déclenchée » sont masquées ; elles vaudraient pareil pour presque toute collection.",
+   "es": "El panel tiene un perfil temático: doce barras que muestran de qué va realmente la colección — removal, ventaja de cartas, ramp y demás, cada una con su proporción. Una carta cuenta en cada categoría que le corresponde, así que la suma supera el 100 por ciento. Las indicaciones puramente estructurales como «tiene una habilidad disparada» están ocultas; valdrían igual para casi cualquier colección.",
+   "it": "La dashboard ha un profilo tematico: dodici barre che mostrano di cosa parla davvero la collezione — removal, vantaggio di carte, ramp e così via, ciascuna con la sua quota. Una carta conta in ogni categoria che le si adatta, quindi la somma supera il 100 per cento. Le indicazioni puramente strutturali come «ha un’abilità innescata» sono nascoste; varrebbero uguali per quasi ogni collezione."
+  },
+  "pr": 228,
+  "version": "0.84.0"
+ },
+ {
   "am": "2026-08-05T03:15:00+02:00",
   "art": "verbessert",
   "text": {
