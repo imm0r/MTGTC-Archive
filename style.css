@@ -152,8 +152,13 @@
    summary selbst flex wird, sondern ein span darin — ein summary mit
    display:flex verliert seine Markierung. */
 .gic{width:20px;height:20px;flex:none}
-/* Überall, wo Goldsymbole in Knöpfen stehen: Kartendetails UND die drei
-   Knopfleisten der Decks (Werkzeuge, Kopfzeile, Gruppieren/Ansicht). */
+/* Jeder Knopf mit Goldsymbol wird zum Flex-Kasten — seit dem App-weiten
+   Rollout über :has, nicht mehr über eine Containerliste je Bereich. Der
+   Ladering behält die Klasse gic (ico("laden","syn-spin gic")), damit die
+   Regel auch WÄHREND des Ladens greift und nichts springt. Die Containerliste
+   darunter bleibt für die Leisten, in denen ein nackter .ic-Ladering die
+   Stelle des Symbols hält (Deck-Analyse, Legalität, Bracket). */
+.btn:has(>.gic){display:inline-flex;align-items:center;gap:7px}
 .detail .tool-row .btn,.detail-bildtools .btn,
 .deck-tools .btn,.deck-manage .btn,.deck-gruppe-leiste .btn{
   display:inline-flex;align-items:center;gap:7px}

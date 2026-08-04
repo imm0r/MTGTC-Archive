@@ -1,5 +1,17 @@
 [
  {
+  "am": "2026-08-05T10:40:00+02:00",
+  "art": "verbessert",
+  "text": {
+   "de": "Die goldenen Symbole erreichen den Rest der App: Kamera und Mehrfach-Scan im Card Management, Einspielen als Ordner mit aufsteigendem Pfeil, Klemmbrett für alle Kopieren-Knöpfe, Pfeil in die Schale fürs Herunterladen, Brief für Nachrichten, Zurückdreh-Pfeil fürs Wiederherstellen — dazu Preise aktualisieren, Deck importieren und die Export-Dialoge. Volle (goldene) Knöpfe bleiben bewusst ohne Symbol: Gold auf Gold verschwände.",
+   "en": "The gold icons reach the rest of the app: camera and multi-scan in card management, importing as a folder with a rising arrow, a clipboard for every copy button, an arrow into a tray for downloads, an envelope for messages, a turn-back arrow for restoring — plus price updates, deck import and the export dialogs. Solid (gold) buttons deliberately stay without icons: gold on gold would vanish.",
+   "fr": "Les symboles dorés gagnent le reste de l’appli : caméra et scan multiple dans la gestion des cartes, l’import en dossier à flèche montante, un presse-papiers pour chaque bouton de copie, une flèche vers un bac pour les téléchargements, une enveloppe pour les messages, une flèche de retour pour la restauration — plus la mise à jour des prix, l’import de deck et les dialogues d’export. Les boutons pleins (dorés) restent volontairement sans symbole : l’or sur l’or disparaîtrait.",
+   "es": "Los símbolos dorados llegan al resto de la app: cámara y escaneo múltiple en la gestión de cartas, importar como carpeta con flecha ascendente, un portapapeles para cada botón de copiar, una flecha a la bandeja para descargas, un sobre para los mensajes, una flecha de retroceso para restaurar — más actualizar precios, importar mazos y los diálogos de exportación. Los botones llenos (dorados) quedan sin símbolo a propósito: oro sobre oro desaparecería.",
+   "it": "I simboli dorati raggiungono il resto dell’app: fotocamera e scansione multipla nella gestione carte, l’importazione come cartella con freccia ascendente, un blocco appunti per ogni pulsante di copia, una freccia nel vassoio per i download, una busta per i messaggi, una freccia di ritorno per il ripristino — più aggiorna prezzi, importa mazzo e i dialoghi di esportazione. I pulsanti pieni (dorati) restano senza simbolo di proposito: oro su oro sparirebbe."
+  },
+  "pr": 234
+ },
+ {
   "am": "2026-08-05T09:30:00+02:00",
   "art": "verbessert",
   "text": {
