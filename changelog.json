@@ -9,7 +9,8 @@
    "es": "Los símbolos dorados de los detalles de carta llegan también a los mazos: cada botón de herramienta — estadísticas, bracket, legalidad, compra, sinergias, análisis y combos — lleva el estilo en relieve. Cinco símbolos se dibujaron nuevos para ello: análisis de mazo, estadísticas, carrito, engranaje automático y árbol de torneo.",
    "it": "I simboli dorati dei dettagli della carta arrivano anche nei mazzi: ogni pulsante degli strumenti — statistiche, bracket, legalità, acquisto, sinergie, analisi e combo — porta lo stile in rilievo. Cinque simboli sono stati disegnati apposta: analisi del mazzo, statistiche, carrello, ingranaggio automatico e albero del torneo."
   },
-  "pr": 232
+  "pr": 232,
+  "version": "0.85.0"
  },
  {
   "am": "2026-08-05T07:20:00+02:00",
