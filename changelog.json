@@ -9,7 +9,8 @@
    "es": "El panel tiene un perfil temático: doce barras que muestran de qué va realmente la colección — removal, ventaja de cartas, ramp y demás, cada una con su proporción. Una carta cuenta en cada categoría que le corresponde, así que la suma supera el 100 por ciento. Las indicaciones puramente estructurales como «tiene una habilidad disparada» están ocultas; valdrían igual para casi cualquier colección.",
    "it": "La dashboard ha un profilo tematico: dodici barre che mostrano di cosa parla davvero la collezione — removal, vantaggio di carte, ramp e così via, ciascuna con la sua quota. Una carta conta in ogni categoria che le si adatta, quindi la somma supera il 100 per cento. Le indicazioni puramente strutturali come «ha un’abilità innescata» sono nascoste; varrebbero uguali per quasi ogni collezione."
   },
-  "pr": 228
+  "pr": 228,
+  "version": "0.84.0"
  },
  {
   "am": "2026-08-05T03:15:00+02:00",
