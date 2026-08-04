@@ -9,7 +9,8 @@
    "es": "La lista de venta tiene su propio símbolo: la carta con etiqueta de precio colgante — en el botón de filtro, el contador y el interruptor de cada fila (sustituye a la moneda de euro). Y «Tus combos» en la colección lleva ahora los mismos rayos dorados que el botón de combos de los detalles de carta.",
    "it": "La lista di vendita ha il suo simbolo: la carta con il cartellino del prezzo appeso — sul pulsante del filtro, sul contatore e sull’interruttore di ogni riga (sostituisce la moneta in euro). E «Le tue combo» nella collezione porta ora gli stessi fulmini dorati del pulsante combo dei dettagli della carta."
   },
-  "pr": 236
+  "pr": 236,
+  "version": "0.86.2"
  },
  {
   "am": "2026-08-05T11:30:00+02:00",
