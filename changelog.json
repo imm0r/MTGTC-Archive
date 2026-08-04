@@ -1,5 +1,17 @@
 [
  {
+  "am": "2026-08-05T03:15:00+02:00",
+  "art": "verbessert",
+  "text": {
+   "de": "In den Kartendetails nutzt der Bereich unter dem Bild jetzt die volle Breite. Legalität steht dort schmal, mit einer Kategorie je Zeile — der frei gewordene Platz geht an die Tags, deren Pillen nun nicht mehr mitten im Namen umbrechen. Aufgeschlüsselt und Fähigkeiten haben außerdem ein eigenes goldenes Symbol bekommen.",
+   "en": "In the card details, the area below the image now uses the full width. Legality sits there narrow, one category per row — the space this frees up goes to the Tags, whose pills no longer break in the middle of a name. Broken down and Abilities have also been given a gold icon of their own.",
+   "fr": "Dans les détails d’une carte, la zone sous l’image occupe désormais toute la largeur. La Légalité y tient dans une colonne étroite, une catégorie par ligne — la place ainsi libérée revient aux Tags, dont les pastilles ne se coupent plus au milieu d’un nom. Décomposé et Capacités ont par ailleurs reçu leur propre symbole doré.",
+   "es": "En los detalles de una carta, la zona bajo la imagen ocupa ahora todo el ancho. La Legalidad queda en una columna estrecha, con una categoría por fila; el espacio liberado pasa a los Tags, cuyas píldoras ya no se parten a mitad del nombre. Desglosado y Habilidades tienen además un símbolo dorado propio.",
+   "it": "Nei dettagli di una carta, l’area sotto l’immagine occupa ora tutta la larghezza. La Legalità sta in una colonna stretta, una categoria per riga; lo spazio liberato va ai Tags, le cui pillole non vanno più a capo in mezzo al nome. Scomposto e Abilità hanno inoltre un simbolo dorato tutto loro."
+  },
+  "pr": 227
+ },
+ {
   "am": "2026-08-05T02:30:00+02:00",
   "art": "verbessert",
   "text": {

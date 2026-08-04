@@ -5110,7 +5110,7 @@ function faehigkeitenHtml(c, kompakt) {
     const abweichend = gedruckt != null && gedruckt !== c.oracle_text;
     if (ab.length) teile.push(`
       <details class="faehig">
-        <summary>${esc(t("detail.abBreakdown"))} <span class="hint" style="display:inline">${
+        <summary><span class="det-sum">${icoGold("schluessel")}${esc(t("detail.abBreakdown"))}</span> <span class="hint" style="display:inline">${
           esc(t(abweichend ? "detail.abAutoOracle" : "detail.abAuto"))}</span></summary>
         <table class="faehig-tbl"><thead><tr>
           <th>${esc(t("common.name"))}</th><th>${esc(t("detail.abType"))}</th><th>${esc(t("detail.abCost"))}</th><th>${esc(t("detail.abEffect"))}</th></tr></thead>
@@ -5122,7 +5122,8 @@ function faehigkeitenHtml(c, kompakt) {
       </details>`);
   }
   if (!teile.length) return "";
-  return `<div style="margin-top:10px"><label style="margin-bottom:4px">${esc(t("detail.abilities"))}</label>${teile.join("")}</div>`;
+  return `<div style="margin-top:10px"><label style="margin-bottom:4px"><span class="det-sum">${
+    icoGold("stern")}${esc(t("detail.abilities"))}</span></label>${teile.join("")}</div>`;
 }
 
 /* ------------------------------------------ Zweiseitige Karten ------ */
@@ -5474,10 +5475,10 @@ function detailHtml(c, hover) {
           ${links}
         </div>
         ${!hover ? deckMembershipHtml(c) : ""}
-        ${block}
         ${hover ? `<div class="hint" style="margin-top:10px">${esc(t("detail.added"))}: ${esc(dtShort(c.added))} ${esc(t("detail.addedSuffix"))}</div>` : ""}
       </div>
     </div>
+    ${block}
     ${!hover ? `<details class="legal-det dt-price-full"><summary><span class="det-sum">${icoGold("verlauf")}${esc(t("detail.priceHistory"))}</span></summary>
       <div class="pverlauf" id="dt-pverlauf">${preisVerlaufHtml(c, "30t")}</div>
     </details>
