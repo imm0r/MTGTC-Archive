@@ -2883,6 +2883,14 @@ Zeile derselben Combo endet** — die kennt die Function ja, sie steht im
 Speicher. Der Anhang wird abgetrennt, und zwar nur an einer Satzgrenze, nur
 wenn danach etwas Sinnvolles übrig bleibt und kein Platzhalter verloren geht.
 
+**Geprüft wird bei jedem Anzeigen, nicht nur beim Übersetzen.** Das ist der
+Punkt, an dem die erste Fassung wirkungslos blieb: Sie sah nur frisch
+Übersetztes an. Ein einmal falsch gespeicherter Satz wird aber **nie wieder
+übersetzt** — er kommt beim nächsten Aufklappen aus dem Speicher, und zwar für
+alle. Einmal falsch hieß für immer falsch, bis jemand die Zeile von Hand
+löscht. Jetzt wird geprüft, was in dieser Combo *angezeigt* werden soll, und
+eine Korrektur geht zurück in die Tabelle: Der Speicher heilt sich beim Lesen.
+
 Abgetrennt statt verworfen, weil der Rest des Satzes in Ordnung ist: Verwerfen
 hieße, ihn englisch stehen zu lassen, und beim nächsten Versuch käme derselbe
 Zusammenzug wieder.

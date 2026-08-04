@@ -204,9 +204,74 @@ Deno.serve(async (req) => {
      hergab. */
   const gefragt = teile.filter(t => t.frage).length;
 
+  const platz = (s: string) => (s.match(/\[\[\d+\]\]/g) ?? []).sort().join(",");
+
+  /* ---- Die hineingezogene Nachbarzeile wieder abtrennen ------------------
+     Das Modell hängt an einen Schritt manchmal den nächsten an: „Activate
+     [[1]] by paying {3} and untapping it, giving it +2/+2 until end of turn."
+     kam ZWEIMAL — einmal vor und einmal nach einer eigens dafür geschärften
+     Anweisung — als „… +2/+2. Wiederhole." zurück, und dieses „Wiederhole."
+     ist der nächste Schritt. Die Anleitung liest sich dann, als sei Schritt 3
+     in Schritt 2 schon erledigt.
+
+     Erkannt daran, dass der Satz GENAU auf die Übersetzung einer ANDEREN Zeile
+     derselben Combo endet — die kennen wir, sie steht im Speicher. Gemessen an
+     56 gespeicherten deutschen Zeilen trifft das auf genau eine zu, nämlich
+     die kaputte: kein Fehltreffer. (Auf die bloße Satzzahl zu prüfen wäre der
+     naheliegende Weg gewesen und ist ebenfalls gemessen worden: sechs Treffer,
+     fünf davon zu Unrecht — ein langer englischer Satz wird im Deutschen zu
+     Recht zu zweien.)
+
+     ÜBER ALLE ZEILEN, NICHT NUR ÜBER NEUE. Daran ist die erste Fassung
+     gescheitert: Sie lief nur über frisch Übersetztes. Ein falsch
+     gespeicherter Satz wird aber nie wieder übersetzt — er kommt beim nächsten
+     Aufklappen aus dem Speicher, und zwar für alle. Einmal falsch hieß für
+     immer falsch, bis jemand die Zeile von Hand löscht. Geprüft wird deshalb,
+     was in DIESER Combo angezeigt werden soll, und die Korrektur geht zurück
+     in die Tabelle.
+
+     Abgetrennt statt verworfen: Der Rest des Satzes ist in Ordnung, verwerfen
+     ließe ihn englisch. Geschnitten wird nur an einer Satzgrenze, nur wenn
+     danach etwas Sinnvolles übrig bleibt und kein Platzhalter verloren geht. */
+  const entwirren = () => {
+    const alle = teile
+      .map((t, i) => ({ hash: hashes[i], muster: t.text, text: speicher.get(hashes[i]) }))
+      .filter(z => typeof z.text === "string" && z.text.trim().length > 0);
+    const geheilt: { hash: string; lang: string; muster: string; text: string }[] = [];
+    for (const z of alle) {
+      const t = String(z.text).trim();
+      let treffer = "";
+      for (const a of alle) {
+        const b = String(a.text).trim();
+        if (a.hash === z.hash || b.length < 6 || t.length <= b.length) continue;
+        if (t.endsWith(b) && b.length > treffer.length) treffer = b;
+      }
+      if (!treffer) continue;
+      const kurz = t.slice(0, t.length - treffer.length).trim();
+      if (kurz.length < 10 || !/[.!?]$/.test(kurz)) continue;
+      if (platz(kurz) !== platz(z.muster)) continue;
+      console.warn(`combo-uebersetzen: „${treffer}" war die nächste Zeile, abgetrennt`);
+      speicher.set(z.hash, kurz);
+      geheilt.push({ hash: z.hash, lang, muster: z.muster, text: kurz });
+    }
+    return geheilt;
+  };
+
+  /* Eine Korrektur an einem BESTEHENDEN Satz muss überschreiben. Beim Anlegen
+     neuer Sätze ist ignoreDuplicates richtig — zwei Leute klappen dieselbe
+     Combo gleichzeitig auf, das Ergebnis ist dasselbe. Hier wäre es genau
+     falsch: Der alte, kaputte Stand bliebe stehen. */
+  const heilenSchreiben = async (geheilt: { hash: string }[]) => {
+    if (geheilt.length) await dienst.from("combo_saetze").upsert(geheilt, { onConflict: "hash,lang" });
+  };
+
   // Alles schon da: keine Kosten, kein Kontingent, keine Wartezeit. Das ist
-  // der Regelfall, sobald eine Combo einmal jemand angesehen hat.
-  if (!offen.length) return json({ texte: antwort(), neu: 0, gesamt: gefragt });
+  // der Regelfall, sobald eine Combo einmal jemand angesehen hat — und genau
+  // deshalb wird AUCH HIER entwirrt, nicht nur nach einem Modellaufruf.
+  if (!offen.length) {
+    await heilenSchreiben(entwirren());
+    return json({ texte: antwort(), neu: 0, gesamt: gefragt });
+  }
 
   // ---- Erst jetzt kostet es etwas ---------------------------------------
   // Das Kontingent wird bewusst NICHT beansprucht, wenn alles aus dem Speicher
@@ -323,11 +388,8 @@ Deno.serve(async (req) => {
      wegzuwerfen, um eine schlechte zu fangen, ist der schlechtere Tausch —
      zumal die verworfenen bei jedem Nachfassen erneut Geld kosten würden.
 
-     Gegen das Hineinziehen hilft deshalb die Anweisung („EINE ZEILE, EIN
-     EINTRAG"), nicht ein Filter. Das ist schwächer, und es steht hier, damit
-     der Nächste nicht dieselbe Prüfung noch einmal einbaut. */
-  const platz = (s: string) => (s.match(/\[\[\d+\]\]/g) ?? []).sort().join(",");
-
+     Gegen das Hineinziehen hilft die Anweisung („EINE ZEILE, EIN EINTRAG") und
+     — weil die nachweislich nicht reicht — `entwirren` weiter oben. */
   const neueZeilen: { hash: string; lang: string; muster: string; text: string }[] = [];
   let verworfen = 0;
   const uebernehmen = (zeilen: Antwortzeile[], liste: typeof offen) => {
@@ -340,48 +402,6 @@ Deno.serve(async (req) => {
       if (platz(e.text) !== platz(t.text)) { verworfen++; continue; }
       speicher.set(hashes[t.i], e.text);
       neueZeilen.push({ hash: hashes[t.i], lang, muster: t.text, text: e.text });
-    }
-  };
-
-  /* ---- Die hineingezogene Nachbarzeile wieder abtrennen ------------------
-     Die Anweisung allein reicht nicht. Nachgemessen: „Activate [[1]] by paying
-     {3} and untapping it, giving it +2/+2 until end of turn." kam ZWEIMAL —
-     einmal vor und einmal nach der geschärften Anweisung — als „… +2/+2.
-     Wiederhole." zurück, und dieses „Wiederhole." ist der nächste Schritt. Die
-     Anleitung liest sich dann, als sei Schritt 3 in Schritt 2 schon erledigt.
-
-     Erkannt wird es daran, dass der Satz GENAU auf die Übersetzung einer
-     ANDEREN Zeile derselben Combo endet — die kennen wir ja, sie steht im
-     Speicher. Gemessen an den 56 damals gespeicherten deutschen Zeilen trifft
-     das auf GENAU EINE zu, nämlich die kaputte: kein einziger Fehltreffer.
-
-     (Eine Prüfung auf die bloße Satzzahl wäre der naheliegende Weg gewesen und
-     ist gemessen worden: sechs Treffer, fünf davon zu Unrecht — ein langer
-     englischer Satz wird im Deutschen zu Recht zu zweien. Deshalb dieser
-     genauere Weg statt jenes groben.)
-
-     Abgetrennt statt verworfen: Der Rest des Satzes ist in Ordnung, und
-     verwerfen hieße, ihn englisch stehen zu lassen — beim nächsten Versuch
-     käme derselbe Zusammenzug wieder. Geschnitten wird nur an einer
-     Satzgrenze, und nur wenn danach noch etwas Sinnvolles übrig bleibt und
-     kein Platzhalter verloren geht. */
-  const entwirren = () => {
-    const andere = [...speicher.values()].map(s => String(s).trim()).filter(s => s.length >= 6);
-    for (const z of neueZeilen) {
-      const t = z.text.trim();
-      let treffer = "";
-      for (const a of andere) {
-        if (a === t || t.length <= a.length) continue;
-        if (t.endsWith(a) && a.length > treffer.length) treffer = a;
-      }
-      if (!treffer) continue;
-      const kurz = t.slice(0, t.length - treffer.length).trim();
-      // Nur an einer Satzgrenze, und es muss etwas übrig bleiben.
-      if (kurz.length < 10 || !/[.!?]$/.test(kurz)) continue;
-      if (platz(kurz) !== platz(z.muster)) continue;
-      console.warn(`combo-uebersetzen: „${treffer}" war die nächste Zeile, abgetrennt`);
-      z.text = kurz;
-      speicher.set(z.hash, kurz);
     }
   };
 
@@ -399,18 +419,30 @@ Deno.serve(async (req) => {
        übersetzte Schritt 1. Der Satz blieb englisch, mitten in einer sonst
        deutschen Anleitung, und nichts wies darauf hin.
 
-       Gefragt wird nur noch nach dem, was fehlt (auch nach dem, was ein
-       Wächter verworfen hat — vielleicht klappt es im zweiten Anlauf). Ein
-       Nachschlag, nicht mehr: Sonst könnte ein Satz, an dem das Modell
-       beständig scheitert, beliebig oft Geld kosten. Ein zweites Kontingent
-       wird dafür NICHT beansprucht — bezahlt war eine vollständige Antwort. */
+       Gefragt wird nur noch nach dem, was fehlt (auch nach dem, was der
+       Platzhalter-Wächter verworfen hat — vielleicht klappt es im zweiten
+       Anlauf). Ein Nachschlag, nicht mehr: Sonst könnte ein Satz, an dem das
+       Modell beständig scheitert, beliebig oft Geld kosten. Ein zweites
+       Kontingent wird dafür NICHT beansprucht — bezahlt war eine vollständige
+       Antwort. */
     const fehlend = offen.filter(t => !speicher.has(hashes[t.i]));
     if (fehlend.length) {
       console.warn(`combo-uebersetzen: ${fehlend.length} von ${offen.length} Sätzen fehlten, frage nach`);
       const zweite = await fragen(fehlend);
       if (!zweite.code) uebernehmen(zweite.zeilen ?? [], fehlend);
     }
-    entwirren();
+
+    /* Auch nach einem Modellaufruf: Der Zusammenzug kann in einem frisch
+       übersetzten Satz stecken — oder in einem, der schon im Speicher lag und
+       hier zum ersten Mal neben seinem Nachbarn steht. Die Korrekturen an
+       BESTEHENDEN Zeilen gehen sofort zurück; die an neuen sind ohnehin in
+       `neueZeilen`, die weiter unten geschrieben werden. */
+    const geheilt = entwirren();
+    for (const g of geheilt) {
+      const n = neueZeilen.find(x => x.hash === g.hash);
+      if (n) n.text = g.text;
+    }
+    await heilenSchreiben(geheilt.filter(g => !neueZeilen.some(x => x.hash === g.hash)));
 
     const offenGeblieben = offen.filter(t => !speicher.has(hashes[t.i])).length;
     if (offenGeblieben) {
