@@ -2,7 +2,7 @@
  {
   "am": "2026-08-04T17:00:00+02:00",
   "art": "verbessert",
-  "text": "Während die KI nach Synergien sucht, funkeln die drei Sterne des Knopfes, statt dass ein Ladering an ihre Stelle tritt. Das Warten wird am Bild erzählt, das ohnehin schon dasteht.",
+  "text": "Die Knöpfe der Kartendetails zeigen das Warten jetzt mit ihrem eigenen Bild, statt es gegen einen Ladering zu tauschen: Beim Preis dreht sich das Auffrisch-Zeichen, bei den Synergien greifen die Zahnräder ineinander, bei den KI-Synergien funkeln die drei Sterne, und bei den Combos zucken die beiden Blitze abwechselnd. Der Preis-Knopf hatte bisher überhaupt keine Rückmeldung — bei einer trägen Antwort sah der Klick aus, als wäre er ins Leere gegangen.",
   "pr": 216,
   "version": "0.80.1"
  },

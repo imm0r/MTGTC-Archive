@@ -5533,14 +5533,21 @@ function renderDetail(c, id, fremd) {
   $("#dt-edit").onclick = () => { $("#detail-dlg").close(); editCard(id); };
   const pb = $("#dt-price");
   pb.onclick = async () => {
-    pb.disabled = true;
+    // Solange der Preis geholt wird, dreht das Auffrisch-Zeichen. Vorher war
+    // der Knopf nur gesperrt — bei einer trägen Antwort sah das aus, als wäre
+    // der Klick ins Leere gegangen.
+    const lbl = t("detail.priceBtn");
+    synBtnBusy(pb, lbl, true, icoGold("neu"), icoGold("neu-laed"));
     try {
       const p = await preisNeuZiehen(c);
       await reload(); renderAll();
       toast(p == null ? t("toast.noPrice") : t("toast.priceUpdated", { p: eur(p) }));
       // Ansicht mit dem frischen Preis und dem neuen Kurvenpunkt neu zeichnen.
       if ($("#detail-dlg").open) showCardDetail(id);
-    } catch (e) { pb.disabled = false; toast(e.message); }
+    } catch (e) { toast(e.message); }
+    // Zurücksetzen in jedem Fall: Hat showCardDetail() neu gezeichnet, hängt
+    // pb nicht mehr im Baum und die Zuweisung läuft ins Leere — schadlos.
+    finally { synBtnBusy(pb, lbl, false, icoGold("neu")); }
   };
   wireDetailSynergien(c);
 }
@@ -5581,7 +5588,7 @@ function wireDetailSynergien(c) {
   const yb = $("#dt-syn");
   if (yb) yb.onclick = async () => {
     const lbl = t("syn.find");
-    synBtnBusy(yb, lbl, true, icoGold("zahnraeder"));
+    synBtnBusy(yb, lbl, true, icoGold("zahnraeder"), icoGold("zahnraeder-laed"));
     synGeschwister([$("#dt-syn-ai")], true);
     const weg = excludeVon([c]);   // nur die Ausgangskarte selbst raus, Besessenes darf auftauchen
     try {
@@ -5609,7 +5616,7 @@ function wireDetailSynergien(c) {
   const cb = $("#dt-combos");
   if (cb) cb.onclick = () => {
     const lbl = t("combo.btn");
-    synBtnBusy(cb, lbl, true, icoGold("blitze"));
+    synBtnBusy(cb, lbl, true, icoGold("blitze"), icoGold("blitze-laed"));
     karteCombosAnzeigen($("#card-combo-box"), c)
       .finally(() => synBtnBusy(cb, lbl, false, icoGold("blitze")));
   };
