@@ -2883,7 +2883,17 @@ erzeugen würden.
 
 Ein Klick auf die Versionsnummer oben rechts zeigt, was sich wann geändert hat:
 Datum/Uhrzeit, eine Art (**Neu** / **Verbessert** / **Behoben**) und zwei bis
-drei Zeilen aus Nutzersicht.
+drei Zeilen aus Nutzersicht — in allen fünf Sprachen der Oberfläche, und ein
+Sprachwechsel bei offenem Fenster zieht mit.
+
+Das Feld `text` darf dafür zweierlei sein: ein blanker String (gilt als
+„Deutsch, sonst nichts") oder ein Objekt mit `de`/`en`/`fr`/`es`/`it`. Die
+erste Form stand von Anfang an in der Datei und bleibt gültig; fehlt eine
+einzelne Sprache, steht Deutsch da. Das ist Nachsicht beim **Lesen** — ein
+halb gepflegter Eintrag soll nicht die ganze Liste killen. Beim Schreiben
+besteht die Prüfung `changelog` auf allen fünf, denn ein vergessenes Feld sähe
+im Dialog richtig aus, nämlich deutsch, und niemand mit deutscher Oberfläche
+würde es je bemerken.
 
 Quelle ist `changelog.json` im Wurzelverzeichnis — eine von Hand gepflegte
 Liste, je Pull Request ein Eintrag vorn (die Regel steht in CLAUDE.md, die

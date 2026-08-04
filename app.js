@@ -11626,6 +11626,28 @@ function ladeChangelog() {
   })().catch(e => { changelogP = null; throw e; }));
 }
 
+/* Der Text eines Eintrags in der eingestellten Sprache.
+
+   Zwei Formen sind erlaubt, und das ist Absicht:
+
+     "text": "Zwei Zeilen …"                      — nur Deutsch
+     "text": { "de": "…", "en": "…", "fr": … }    — je Sprache
+
+   Die erste stand hier von Anfang an, und das Changelog ist eine Datei mit
+   Verlauf — sie im Nachhinein für ungültig zu erklären hieße, jeden alten
+   Eintrag anfassen zu müssen, bevor irgendetwas wieder läuft. Sie gilt
+   deshalb weiter als „Deutsch, sonst nichts".
+
+   Fehlt eine Sprache, steht Deutsch da. Ein leerer Kasten wäre die schlechtere
+   Auskunft: Wer die Zeile nicht lesen kann, sieht wenigstens, DASS sich etwas
+   geändert hat, und woran. */
+function changelogText(e) {
+  const txt = e && e.text;
+  if (typeof txt === "string") return txt;
+  if (txt && typeof txt === "object") return txt[LANG] || txt.de || "";
+  return "";
+}
+
 /* Datum/Uhrzeit einer Änderung, in der Sprache der Oberfläche. Eigene
    Formatierung statt dtShort: dort hängt „Uhr"-Logik für die Sammlung dran,
    hier reicht die Ortskonvention des Browsers. */
@@ -11647,7 +11669,10 @@ async function zeigeChangelog() {
   if (!dlg || !body) return;
   body.innerHTML = `<h3 style="margin:0 0 10px">${esc(t("changelog.title"))}</h3>
     <div class="meta">${ico("laden", "syn-spin")} ${esc(t("changelog.loading"))}</div>`;
-  dlg.showModal();
+  // Nur öffnen, wenn zu: Nach einem Sprachwechsel ruft onLangChange dieselbe
+  // Funktion noch einmal auf, um den Inhalt neu zu bauen — und showModal auf
+  // einen offenen Dialog wirft.
+  if (!dlg.open) dlg.showModal();
   // Gesehen ist gesehen: Die Nummer im Kopf verliert ihre Farbe, und erst die
   // nächste Fassung bringt sie zurück. Hier und nicht beim Schließen — wer
   // den Dialog geöffnet hat, hat das Angebot wahrgenommen; ob er ihn zu Ende
@@ -11684,7 +11709,7 @@ async function zeigeChangelog() {
       <div class="cl-kopf"><span class="cl-zeit">${esc(changelogZeit(e.am))}</span>
         <span class="cl-art ${art.klasse}">${esc(art.key ? t(art.key) : e.art)}</span>
         ${pr}${version}</div>
-      <div class="cl-text">${esc(e.text || "")}</div>
+      <div class="cl-text">${esc(changelogText(e))}</div>
     </div>`;
   };
   body.innerHTML = `<h3 style="margin:0 0 10px">${esc(t("changelog.title"))}</h3>
@@ -17951,6 +17976,12 @@ function wireApp() {
 /* Nach einem Sprachwechsel (Einstellungen): statischen Text hat i18n.js schon
    gesetzt, hier die dynamisch gebauten Ansichten neu zeichnen. */
 function onLangChange() {
+  // Das Changelog steht in allen fünf Sprachen in der Datei; ist es gerade
+  // offen, wechselt es mit. Die Datei ist längst geladen (einmal je Sitzung),
+  // der Aufruf kostet also nur das Neuzeichnen. Bewusst VOR der Anmelde-
+  // prüfung: Der Dialog hängt an keinem Konto, und hinter ihr bliebe er beim
+  // Sprachwechsel auf der alten Sprache stehen.
+  if ($("#changelog-dlg")?.open) zeigeChangelog();
   if (typeof USER === "undefined" || !USER) return;   // vor Login nur statischer Text
   renderWho();
   zeigeKopfVersion();

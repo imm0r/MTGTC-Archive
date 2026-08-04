@@ -1,414 +1,781 @@
 [
  {
+  "am": "2026-08-04T21:30:00+02:00",
+  "art": "behoben",
+  "text": {
+   "de": "Das Changelog gab es nur auf Deutsch — auch wer die App auf Englisch, Französisch, Spanisch oder Italienisch gestellt hatte, bekam beim Klick auf die Versionsnummer deutsche Sätze. Jetzt steht jeder Eintrag in allen fünf Sprachen, und ein Sprachwechsel bei offenem Fenster zieht mit.",
+   "en": "The changelog was only available in German — even with the app set to English, French, Spanish or Italian, clicking the version number produced German sentences. Every entry now exists in all five languages, and switching language with the window open switches along.",
+   "fr": "Le journal des modifications n'existait qu'en allemand — même avec l'application en anglais, français, espagnol ou italien, le clic sur le numéro de version affichait des phrases allemandes. Chaque entrée existe désormais dans les cinq langues, et un changement de langue fenêtre ouverte suit le mouvement.",
+   "es": "El registro de cambios solo existía en alemán — incluso con la aplicación en inglés, francés, español o italiano, al pulsar el número de versión aparecían frases en alemán. Ahora cada entrada está en los cinco idiomas, y cambiar de idioma con la ventana abierta las cambia también.",
+   "it": "Il registro delle modifiche esisteva solo in tedesco — anche con l'app in inglese, francese, spagnolo o italiano, il clic sul numero di versione mostrava frasi tedesche. Ora ogni voce c'è in tutte e cinque le lingue, e cambiare lingua a finestra aperta le fa cambiare con sé."
+  },
+  "pr": 219,
+  "version": "0.81.1"
+ },
+ {
   "am": "2026-08-04T19:15:00+02:00",
   "art": "neu",
-  "text": "Combo-Anleitungen lassen sich in deiner Sprache anzeigen — Ergebnis, Voraussetzungen und die einzelnen Schritte. Kartennamen erscheinen so, wie sie auf deinen Karten gedruckt sind; das englische Original steht weiter beim Überfahren daneben. Muss vom Betreiber freigeschaltet werden, bis dahin bleibt alles wie bisher.",
+  "text": {
+   "de": "Combo-Anleitungen lassen sich in deiner Sprache anzeigen — Ergebnis, Voraussetzungen und die einzelnen Schritte. Kartennamen erscheinen so, wie sie auf deinen Karten gedruckt sind; das englische Original steht weiter beim Überfahren daneben. Muss vom Betreiber freigeschaltet werden, bis dahin bleibt alles wie bisher.",
+   "en": "Combo instructions can now be shown in your language — result, prerequisites and the individual steps. Card names appear as they are printed on your cards; the English original stays available on hover. Has to be enabled by the operator; until then nothing changes.",
+   "fr": "Les instructions de combo peuvent s'afficher dans ta langue — résultat, prérequis et les étapes une à une. Les noms de cartes apparaissent tels qu'ils sont imprimés sur tes cartes ; l'original anglais reste accessible au survol. Doit être activé par l'exploitant, d'ici là rien ne change.",
+   "es": "Las instrucciones de combo pueden mostrarse en tu idioma — resultado, requisitos y cada uno de los pasos. Los nombres de las cartas aparecen tal como están impresos en tus cartas; el original en inglés sigue disponible al pasar el ratón. Debe activarlo el operador; hasta entonces todo queda igual.",
+   "it": "Le istruzioni delle combo possono comparire nella tua lingua — risultato, requisiti e i singoli passaggi. I nomi delle carte appaiono come sono stampati sulle tue carte; l'originale inglese resta disponibile al passaggio del mouse. Deve essere attivato dal gestore, fino ad allora nulla cambia."
+  },
   "pr": 218,
   "version": "0.81.0"
  },
  {
   "am": "2026-08-04T17:45:00+02:00",
   "art": "behoben",
-  "text": "Die Ausgangszonen einer Combo standen in jeder Sprache auf Englisch — „Battlefield“ statt „Schlachtfeld“, obwohl die App dieselben Wörter auf der Spielmatte längst übersetzt. Jetzt stehen sie überall in deiner Sprache.",
+  "text": {
+   "de": "Die Ausgangszonen einer Combo standen in jeder Sprache auf Englisch — „Battlefield“ statt „Schlachtfeld“, obwohl die App dieselben Wörter auf der Spielmatte längst übersetzt. Jetzt stehen sie überall in deiner Sprache.",
+   "en": "A combo's starting zones were in English in every language — \"Battlefield\" instead of \"Schlachtfeld\", even though the app has long translated the same words on the play mat. They now appear in your language everywhere.",
+   "fr": "Les zones de départ d'une combo restaient en anglais dans toutes les langues — « Battlefield » au lieu de « Champ de bataille », alors que l'application traduit ces mêmes mots sur le tapis de jeu depuis longtemps. Elles sont désormais dans ta langue partout.",
+   "es": "Las zonas de inicio de una combo aparecían en inglés en todos los idiomas — «Battlefield» en lugar de «Campo de batalla», aunque la aplicación traduce esas mismas palabras en el tapete desde hace tiempo. Ahora aparecen en tu idioma en todas partes.",
+   "it": "Le zone di partenza di una combo restavano in inglese in ogni lingua — «Battlefield» invece di «Campo di battaglia», benché l'app traduca da tempo le stesse parole sul tappetino. Ora compaiono nella tua lingua ovunque."
+  },
   "pr": 217,
   "version": "0.80.2"
  },
  {
   "am": "2026-08-04T17:00:00+02:00",
   "art": "verbessert",
-  "text": "Die Knöpfe der Kartendetails zeigen das Warten jetzt mit ihrem eigenen Bild, statt es gegen einen Ladering zu tauschen: Beim Preis dreht sich das Auffrisch-Zeichen, bei den Synergien greifen die Zahnräder ineinander, bei den KI-Synergien funkeln die drei Sterne, und bei den Combos zucken die beiden Blitze abwechselnd. Der Preis-Knopf hatte bisher überhaupt keine Rückmeldung — bei einer trägen Antwort sah der Klick aus, als wäre er ins Leere gegangen.",
+  "text": {
+   "de": "Die Knöpfe der Kartendetails zeigen das Warten jetzt mit ihrem eigenen Bild, statt es gegen einen Ladering zu tauschen: Beim Preis dreht sich das Auffrisch-Zeichen, bei den Synergien greifen die Zahnräder ineinander, bei den KI-Synergien funkeln die drei Sterne, und bei den Combos zucken die beiden Blitze abwechselnd. Der Preis-Knopf hatte bisher überhaupt keine Rückmeldung — bei einer trägen Antwort sah der Klick aus, als wäre er ins Leere gegangen.",
+   "en": "The buttons in the card details now show that they're working using their own picture instead of swapping it for a loading ring: the refresh sign turns for the price, the gears mesh for synergies, the three stars twinkle for AI synergies, and the two bolts flash alternately for combos. The price button had no feedback at all until now — with a slow response the click looked as if it had gone nowhere.",
+   "fr": "Les boutons des détails de carte montrent maintenant l'attente avec leur propre image au lieu de la remplacer par un anneau de chargement : le signe d'actualisation tourne pour le prix, les engrenages s'engrènent pour les synergies, les trois étoiles scintillent pour les synergies IA, et les deux éclairs clignotent en alternance pour les combos. Le bouton du prix n'avait jusqu'ici aucun retour — avec une réponse lente, le clic semblait tomber dans le vide.",
+   "es": "Los botones de los detalles de carta muestran ahora la espera con su propia imagen en vez de cambiarla por un anillo de carga: el signo de actualizar gira para el precio, los engranajes encajan para las sinergias, las tres estrellas brillan para las sinergias con IA, y los dos rayos parpadean alternándose para los combos. El botón de precio no daba ninguna respuesta hasta ahora — con una respuesta lenta, el clic parecía caer en el vacío.",
+   "it": "I pulsanti dei dettagli carta mostrano ora l'attesa con la propria immagine invece di sostituirla con un anello di caricamento: il segno di aggiornamento gira per il prezzo, gli ingranaggi si incastrano per le sinergie, le tre stelle scintillano per le sinergie IA, e i due fulmini lampeggiano alternati per le combo. Il pulsante del prezzo finora non dava alcun riscontro — con una risposta lenta il clic sembrava andare a vuoto."
+  },
   "pr": 216,
   "version": "0.80.1"
  },
  {
   "am": "2026-08-04T16:10:00+02:00",
   "art": "verbessert",
-  "text": "Die Kartendetails haben eigene, plastisch goldene Sinnbilder bekommen — Stift, Zahnräder, Blitze, Schild, Etikett, Diagramm. Sie sind größer als die schlichten Symbole der übrigen Oberfläche und stehen bewusst nur hier: Die Kartenansicht ist die Seite, auf der man eine Karte in Ruhe ansieht. Dazu aufgeräumt: „Themen“ heißen jetzt in allen Sprachen „Tags“ — so nennt der Scryfall Tagger sie selbst —, Legalität und Tags stehen nebeneinander statt untereinander, und das Feld „max €/Karte“ ist so hoch wie die Knöpfe daneben.",
+  "text": {
+   "de": "Die Kartendetails haben eigene, plastisch goldene Sinnbilder bekommen — Stift, Zahnräder, Blitze, Schild, Etikett, Diagramm. Sie sind größer als die schlichten Symbole der übrigen Oberfläche und stehen bewusst nur hier: Die Kartenansicht ist die Seite, auf der man eine Karte in Ruhe ansieht. Dazu aufgeräumt: „Themen“ heißen jetzt in allen Sprachen „Tags“ — so nennt der Scryfall Tagger sie selbst —, Legalität und Tags stehen nebeneinander statt untereinander, und das Feld „max €/Karte“ ist so hoch wie die Knöpfe daneben.",
+   "en": "The card details have their own moulded golden pictograms — pencil, gears, bolts, shield, tag, chart. They are larger than the plain symbols in the rest of the interface and deliberately appear only here: the card view is the page where you look at a card at leisure. Tidied up along the way: \"Themes\" are now called \"Tags\" in every language — that is what the Scryfall Tagger calls them —, legality and tags sit side by side instead of stacked, and the \"max €/card\" field is as tall as the buttons next to it.",
+   "fr": "Les détails de carte ont leurs propres pictogrammes dorés en relief — crayon, engrenages, éclairs, bouclier, étiquette, graphique. Ils sont plus grands que les symboles sobres du reste de l'interface et n'apparaissent volontairement qu'ici : la vue carte est la page où l'on regarde une carte tranquillement. Rangé au passage : les « thèmes » s'appellent désormais « tags » dans toutes les langues — c'est ainsi que le Scryfall Tagger les nomme —, légalité et tags sont côte à côte au lieu d'être empilés, et le champ « max €/carte » a la même hauteur que les boutons voisins.",
+   "es": "Los detalles de carta tienen sus propios pictogramas dorados en relieve — lápiz, engranajes, rayos, escudo, etiqueta, gráfico. Son más grandes que los símbolos sobrios del resto de la interfaz y aparecen deliberadamente solo aquí: la vista de carta es la página donde miras una carta con calma. De paso, ordenado: los «temas» se llaman ahora «tags» en todos los idiomas — así los llama el propio Scryfall Tagger —, legalidad y tags están uno al lado del otro en vez de apilados, y el campo «máx €/carta» tiene la misma altura que los botones contiguos.",
+   "it": "I dettagli carta hanno pittogrammi dorati in rilievo tutti loro — matita, ingranaggi, fulmini, scudo, etichetta, grafico. Sono più grandi dei simboli sobri del resto dell'interfaccia e compaiono volutamente solo qui: la vista carta è la pagina dove si guarda una carta con calma. Sistemato per l'occasione: i «temi» si chiamano ora «tag» in tutte le lingue — è così che li chiama lo Scryfall Tagger —, legalità e tag stanno affiancati invece che impilati, e il campo «max €/carta» è alto quanto i pulsanti accanto."
+  },
   "pr": 215,
   "version": "0.80.0"
  },
  {
   "am": "2026-08-04T15:05:00+02:00",
   "art": "verbessert",
-  "text": "Wo nichts ist, steht jetzt auch ein Bild: Leere Listen — keine Combos, noch keine Decks, keine Freunde — zeigen einen Kartenrücken über dem Satz statt einer nackten Fläche mit einer Zeile Kleingedrucktem. Karten ohne Bild bekommen denselben Rücken, gut sichtbar statt als winziges Zeichen in der Ecke.",
+  "text": {
+   "de": "Wo nichts ist, steht jetzt auch ein Bild: Leere Listen — keine Combos, noch keine Decks, keine Freunde — zeigen einen Kartenrücken über dem Satz statt einer nackten Fläche mit einer Zeile Kleingedrucktem. Karten ohne Bild bekommen denselben Rücken, gut sichtbar statt als winziges Zeichen in der Ecke.",
+   "en": "Where there is nothing, there is now a picture too: empty lists — no combos, no decks yet, no friends — show a card back above the sentence instead of a bare surface with one line of small print. Cards without an image get the same back, clearly visible instead of a tiny mark in the corner.",
+   "fr": "Là où il n'y a rien, il y a désormais aussi une image : les listes vides — pas de combos, pas encore de decks, pas d'amis — affichent un dos de carte au-dessus de la phrase, au lieu d'une surface nue avec une ligne en petits caractères. Les cartes sans image reçoivent le même dos, bien visible au lieu d'un minuscule signe dans un coin.",
+   "es": "Donde no hay nada, ahora también hay una imagen: las listas vacías — sin combos, sin mazos todavía, sin amigos — muestran un dorso de carta sobre la frase en vez de una superficie desnuda con una línea en letra pequeña. Las cartas sin imagen reciben ese mismo dorso, bien visible en lugar de un signo diminuto en la esquina.",
+   "it": "Dove non c'è nulla, ora c'è anche un'immagine: gli elenchi vuoti — nessuna combo, nessun mazzo ancora, nessun amico — mostrano un dorso di carta sopra la frase invece di una superficie nuda con una riga in caratteri piccoli. Le carte senza immagine ricevono lo stesso dorso, ben visibile invece di un segno minuscolo nell'angolo."
+  },
   "pr": 214,
   "version": "0.79.0"
  },
  {
   "am": "2026-08-04T14:20:00+02:00",
   "art": "verbessert",
-  "text": "Die Sinnbilder der ganzen App sind jetzt selbst gezeichnet statt aus Emoji zusammengesucht. Sie folgen alle demselben Raster und derselben Strichstärke, nehmen die Farbe ihrer Umgebung an und sehen auf jedem Gerät gleich aus. Am deutlichsten in den Kartendetails, wo bisher ein Dutzend Bildchen aus einem Dutzend Zeichenstilen nebeneinanderstanden.",
+  "text": {
+   "de": "Die Sinnbilder der ganzen App sind jetzt selbst gezeichnet statt aus Emoji zusammengesucht. Sie folgen alle demselben Raster und derselben Strichstärke, nehmen die Farbe ihrer Umgebung an und sehen auf jedem Gerät gleich aus. Am deutlichsten in den Kartendetails, wo bisher ein Dutzend Bildchen aus einem Dutzend Zeichenstilen nebeneinanderstanden.",
+   "en": "The pictograms throughout the app are now drawn in‑house instead of scraped together from emoji. They all follow the same grid and the same stroke weight, take on the colour of their surroundings and look identical on every device. Most obvious in the card details, where a dozen little pictures from a dozen drawing styles used to sit side by side.",
+   "fr": "Les pictogrammes de toute l'application sont désormais dessinés maison au lieu d'être glanés parmi les emoji. Ils suivent tous la même grille et la même épaisseur de trait, prennent la couleur de leur environnement et sont identiques sur tous les appareils. C'est le plus visible dans les détails de carte, où une douzaine de petites images issues d'une douzaine de styles se côtoyaient.",
+   "es": "Los pictogramas de toda la aplicación están ahora dibujados por nosotros en lugar de recogidos entre emoji. Todos siguen la misma retícula y el mismo grosor de trazo, adoptan el color de su entorno y se ven igual en cualquier dispositivo. Se nota sobre todo en los detalles de carta, donde antes convivían una docena de dibujitos de una docena de estilos.",
+   "it": "I pittogrammi di tutta l'app sono ora disegnati da noi invece di essere raccolti tra le emoji. Seguono tutti la stessa griglia e lo stesso spessore di tratto, assumono il colore di ciò che li circonda e appaiono identici su ogni dispositivo. Si vede soprattutto nei dettagli carta, dove prima stavano affiancate una dozzina di immaginette da una dozzina di stili."
+  },
   "pr": 213,
   "version": "0.78.0"
  },
  {
   "am": "2026-08-04T02:05:00+02:00",
   "art": "verbessert",
-  "text": "Im Changelog steht jetzt hinter jedem Eintrag die Version, mit der die Änderung ausgeliefert wurde — die Antwort auf „habe ich das schon?“. Die Nummer oben im Kopf sagt, wo du selbst stehst.",
+  "text": {
+   "de": "Im Changelog steht jetzt hinter jedem Eintrag die Version, mit der die Änderung ausgeliefert wurde — die Antwort auf „habe ich das schon?“. Die Nummer oben im Kopf sagt, wo du selbst stehst.",
+   "en": "The changelog now shows, after every entry, the version the change shipped with — the answer to \"do I already have this?\". The number at the top of the header says where you stand yourself.",
+   "fr": "Le journal des modifications indique désormais, après chaque entrée, la version avec laquelle le changement a été livré — la réponse à « est-ce que je l'ai déjà ? ». Le numéro en haut de l'en‑tête dit où tu en es, toi.",
+   "es": "El registro de cambios muestra ahora, tras cada entrada, la versión con la que se entregó el cambio — la respuesta a «¿ya lo tengo?». El número en la cabecera dice dónde estás tú.",
+   "it": "Il registro delle modifiche mostra ora, dopo ogni voce, la versione con cui la modifica è stata rilasciata — la risposta a «ce l'ho già?». Il numero in alto nell'intestazione dice a che punto sei tu."
+  },
   "pr": 212,
   "version": "0.77.0"
  },
  {
   "am": "2026-08-04T01:46:00+02:00",
   "art": "behoben",
-  "text": "Die goldene Versionsnummer blieb ausgerechnet bei der Fassung aus, die sie eingeführt hat: Wer schon vorher da war, sah für die App wie ein Neuling aus und bekam keinen Hinweis. Jetzt erkennt sie den Unterschied.",
+  "text": {
+   "de": "Die goldene Versionsnummer blieb ausgerechnet bei der Fassung aus, die sie eingeführt hat: Wer schon vorher da war, sah für die App wie ein Neuling aus und bekam keinen Hinweis. Jetzt erkennt sie den Unterschied.",
+   "en": "The golden version number failed to appear for precisely the release that introduced it: anyone who had been there before looked like a newcomer to the app and got no hint. It now tells the difference.",
+   "fr": "Le numéro de version doré ne s'affichait justement pas pour la version qui l'a introduit : celui qui était déjà là passait pour un nouveau venu aux yeux de l'application et n'avait aucun indice. Elle fait maintenant la différence.",
+   "es": "El número de versión dorado no aparecía precisamente en la versión que lo introdujo: quien ya estaba antes parecía un recién llegado para la aplicación y no recibía ningún aviso. Ahora sí distingue el caso.",
+   "it": "Il numero di versione dorato non compariva proprio nella versione che lo ha introdotto: chi c'era già sembrava un nuovo arrivato all'app e non riceveva alcun avviso. Ora riconosce la differenza."
+  },
   "pr": 211,
   "version": "0.76.1"
  },
  {
   "am": "2026-08-04T01:35:00+02:00",
   "art": "neu",
-  "text": "Ist seit deinem letzten Besuch eine neue Fassung der App da, steht die Versionsnummer oben rechts in Gold statt in Grau — der Hinweis, dass es im Changelog etwas zu lesen gibt. Ein Blick hinein nimmt die Farbe wieder weg.",
+  "text": {
+   "de": "Ist seit deinem letzten Besuch eine neue Fassung der App da, steht die Versionsnummer oben rechts in Gold statt in Grau — der Hinweis, dass es im Changelog etwas zu lesen gibt. Ein Blick hinein nimmt die Farbe wieder weg.",
+   "en": "If a new version of the app has appeared since your last visit, the version number at the top right is gold instead of grey — the hint that there is something to read in the changelog. One look inside takes the colour away again.",
+   "fr": "Si une nouvelle version de l'application est arrivée depuis ta dernière visite, le numéro de version en haut à droite passe du gris au doré — l'indice qu'il y a quelque chose à lire dans le journal. Un coup d'œil suffit à faire disparaître la couleur.",
+   "es": "Si desde tu última visita hay una versión nueva de la aplicación, el número arriba a la derecha aparece en dorado en vez de gris — la señal de que hay algo que leer en el registro de cambios. Con echarle un vistazo, el color desaparece.",
+   "it": "Se dalla tua ultima visita è arrivata una nuova versione dell'app, il numero in alto a destra è dorato invece che grigio — il segnale che nel registro c'è qualcosa da leggere. Basta dargli un'occhiata e il colore sparisce."
+  },
   "pr": 210,
   "version": "0.76.0"
  },
  {
   "am": "2026-08-04T01:13:00+02:00",
   "art": "behoben",
-  "text": "Ladebalken und Text der Deck-Suchen standen doppelt: einmal oben bei den Knöpfen und noch einmal unter der Kartenliste. Beim Scrollen fand man den unteren zuerst — also den an der falschen Stelle. Jetzt gibt es nur noch den oberen.",
+  "text": {
+   "de": "Ladebalken und Text der Deck-Suchen standen doppelt: einmal oben bei den Knöpfen und noch einmal unter der Kartenliste. Beim Scrollen fand man den unteren zuerst — also den an der falschen Stelle. Jetzt gibt es nur noch den oberen.",
+   "en": "The progress bar and text of the deck searches appeared twice: once at the top by the buttons and again below the card list. While scrolling you found the lower one first — the one in the wrong place. Only the upper one remains.",
+   "fr": "La barre de chargement et le texte des recherches de deck apparaissaient deux fois : une fois en haut près des boutons et une seconde fois sous la liste des cartes. En faisant défiler, on tombait d'abord sur celle du bas — donc celle au mauvais endroit. Il ne reste que celle du haut.",
+   "es": "La barra de carga y el texto de las búsquedas del mazo salían dos veces: una arriba junto a los botones y otra debajo de la lista de cartas. Al desplazarte encontrabas antes la de abajo — es decir, la que estaba en el sitio equivocado. Ahora solo queda la de arriba.",
+   "it": "La barra di caricamento e il testo delle ricerche del mazzo comparivano due volte: una in alto vicino ai pulsanti e una sotto l'elenco delle carte. Scorrendo si incontrava prima quella in basso — cioè quella nel posto sbagliato. Ora resta solo quella in alto."
+  },
   "pr": 209,
   "version": "0.75.2"
  },
  {
   "am": "2026-08-04T00:50:00+02:00",
   "art": "behoben",
-  "text": "Der Ladebalken der Deck-Suchen stand bisher im Ergebniskasten — und der liegt unter der Kartenliste, bei hundert Karten also weit außerhalb des Bildes. Zu sehen blieb das kleine Zahnrad am Knopf. Jetzt erscheint er direkt unter den Knöpfen, wo man gerade geklickt hat.",
+  "text": {
+   "de": "Der Ladebalken der Deck-Suchen stand bisher im Ergebniskasten — und der liegt unter der Kartenliste, bei hundert Karten also weit außerhalb des Bildes. Zu sehen blieb das kleine Zahnrad am Knopf. Jetzt erscheint er direkt unter den Knöpfen, wo man gerade geklickt hat.",
+   "en": "The progress bar for deck searches used to sit in the results box — and that sits below the card list, so with a hundred cards it was far outside the view. All you could see was the little gear on the button. It now appears directly below the buttons, where you just clicked.",
+   "fr": "La barre de chargement des recherches de deck se trouvait jusqu'ici dans le cadre des résultats — lequel est sous la liste des cartes, donc bien hors de l'écran avec cent cartes. On ne voyait que le petit engrenage sur le bouton. Elle apparaît maintenant juste sous les boutons, là où l'on vient de cliquer.",
+   "es": "La barra de carga de las búsquedas del mazo estaba en el cuadro de resultados — y ese queda debajo de la lista de cartas, así que con cien cartas caía muy fuera de la vista. Solo se veía el engranaje pequeño del botón. Ahora aparece justo debajo de los botones, donde acabas de pulsar.",
+   "it": "La barra di caricamento delle ricerche del mazzo stava nel riquadro dei risultati — che sta sotto l'elenco delle carte, quindi con cento carte finiva ben fuori dallo schermo. Si vedeva solo il piccolo ingranaggio sul pulsante. Ora compare subito sotto i pulsanti, dove hai appena cliccato."
+  },
   "pr": 208,
   "version": "0.75.1"
  },
  {
   "am": "2026-08-04T00:12:00+02:00",
   "art": "verbessert",
-  "text": "Suchen, die dauern, zeigen jetzt einen Ladebalken über die volle Breite statt eines kleinen drehenden Zahnrads — bei den KI-Synergien steht zusätzlich dabei, dass die Wartezeit bei einem vollen Deck normal ist. Vorher sah es leicht so aus, als wäre etwas schiefgegangen.",
+  "text": {
+   "de": "Suchen, die dauern, zeigen jetzt einen Ladebalken über die volle Breite statt eines kleinen drehenden Zahnrads — bei den KI-Synergien steht zusätzlich dabei, dass die Wartezeit bei einem vollen Deck normal ist. Vorher sah es leicht so aus, als wäre etwas schiefgegangen.",
+   "en": "Searches that take a while now show a full‑width progress bar instead of a small spinning gear — for AI synergies it also says that the wait is normal with a full deck. Before, it slightly looked as though something had gone wrong.",
+   "fr": "Les recherches qui durent affichent désormais une barre de chargement pleine largeur au lieu d'un petit engrenage qui tourne — pour les synergies IA, il est précisé en plus que l'attente est normale avec un deck complet. Avant, on avait un peu l'impression que quelque chose avait échoué.",
+   "es": "Las búsquedas que tardan muestran ahora una barra de carga a todo lo ancho en lugar de un pequeño engranaje girando — en las sinergias con IA se indica además que la espera es normal con un mazo completo. Antes parecía un poco que algo había fallado.",
+   "it": "Le ricerche che richiedono tempo mostrano ora una barra di caricamento a tutta larghezza invece di un piccolo ingranaggio che gira — per le sinergie IA viene anche detto che l'attesa è normale con un mazzo completo. Prima sembrava un po' che qualcosa fosse andato storto."
+  },
   "pr": 207,
   "version": "0.75.0"
  },
  {
   "am": "2026-08-03T23:50:00+02:00",
   "art": "behoben",
-  "text": "Beim Überfahren des „Tauschen“-Knopfes standen zwei Hinweisfenster übereinander: das der App und zusätzlich das des Browsers mit der Schnitt-Begründung. Jetzt ist es wieder eines.",
+  "text": {
+   "de": "Beim Überfahren des „Tauschen“-Knopfes standen zwei Hinweisfenster übereinander: das der App und zusätzlich das des Browsers mit der Schnitt-Begründung. Jetzt ist es wieder eines.",
+   "en": "Hovering the \"Swap\" button produced two tooltips on top of each other: the app's own and, on top, the browser's with the cut rationale. It is one again.",
+   "fr": "Au survol du bouton « Échanger », deux infobulles se superposaient : celle de l'application et, en plus, celle du navigateur avec la justification de la coupe. Il n'y en a de nouveau qu'une.",
+   "es": "Al pasar por encima del botón «Intercambiar» salían dos ventanitas superpuestas: la de la aplicación y además la del navegador con la justificación del recorte. Vuelve a ser una sola.",
+   "it": "Passando sopra il pulsante «Scambia» comparivano due suggerimenti sovrapposti: quello dell'app e in più quello del browser con la motivazione del taglio. È tornato a essere uno solo."
+  },
   "pr": 206,
   "version": "0.74.1"
  },
  {
   "am": "2026-08-03T23:30:00+02:00",
   "art": "neu",
-  "text": "Ist ein Commander-Deck voll, sagt der Synergie-Vorschlag nicht mehr nur, welche Karte dafür weichen könnte — ein Klick auf „Tauschen“ erledigt beides auf einmal: die genannte Karte raus, die vorgeschlagene rein, bei Bedarf als Wunschkarte. Das Deck bleibt dabei immer bei 100 Karten.",
+  "text": {
+   "de": "Ist ein Commander-Deck voll, sagt der Synergie-Vorschlag nicht mehr nur, welche Karte dafür weichen könnte — ein Klick auf „Tauschen“ erledigt beides auf einmal: die genannte Karte raus, die vorgeschlagene rein, bei Bedarf als Wunschkarte. Das Deck bleibt dabei immer bei 100 Karten.",
+   "en": "When a Commander deck is full, the synergy suggestion no longer only names the card that could make way — one click on \"Swap\" does both at once: the named card out, the suggested one in, as a wishlist card if needed. The deck always stays at 100 cards.",
+   "fr": "Quand un deck Commander est plein, la suggestion de synergie ne se contente plus de nommer la carte qui pourrait céder la place — un clic sur « Échanger » fait les deux d'un coup : la carte nommée sort, celle proposée entre, au besoin comme carte de la liste de souhaits. Le deck reste toujours à 100 cartes.",
+   "es": "Cuando un mazo de Commander está lleno, la sugerencia de sinergia ya no solo dice qué carta podría ceder el sitio — un clic en «Intercambiar» hace ambas cosas a la vez: sale la carta indicada, entra la propuesta, si hace falta como carta de la lista de deseos. El mazo se queda siempre en 100 cartas.",
+   "it": "Quando un mazzo Commander è pieno, il suggerimento di sinergia non si limita più a dire quale carta potrebbe lasciare il posto — un clic su «Scambia» fa entrambe le cose insieme: esce la carta indicata, entra quella proposta, se serve come carta della lista dei desideri. Il mazzo resta sempre a 100 carte."
+  },
   "pr": 205,
   "version": "0.74.0"
  },
  {
   "am": "2026-08-03T22:45:00+02:00",
   "art": "verbessert",
-  "text": "Die Synergie-Suche nutzt jetzt die Karten-Themen aus dem Scryfall Tagger statt zehn grober Textmuster. Rhystic Study findet damit Draw-Engines, Elvish Archdruid Elfen-Verstärker — vorher fanden beide fast nichts.",
+  "text": {
+   "de": "Die Synergie-Suche nutzt jetzt die Karten-Themen aus dem Scryfall Tagger statt zehn grober Textmuster. Rhystic Study findet damit Draw-Engines, Elvish Archdruid Elfen-Verstärker — vorher fanden beide fast nichts.",
+   "en": "The synergy search now uses the card tags from the Scryfall Tagger instead of ten crude text patterns. Rhystic Study now finds draw engines, Elvish Archdruid elf boosters — before, both found almost nothing.",
+   "fr": "La recherche de synergies utilise désormais les tags de cartes du Scryfall Tagger au lieu de dix motifs textuels grossiers. Rhystic Study trouve ainsi des moteurs de pioche, Elvish Archdruid des renforts d'elfes — auparavant, les deux ne trouvaient presque rien.",
+   "es": "La búsqueda de sinergias usa ahora los tags de carta del Scryfall Tagger en lugar de diez patrones de texto burdos. Rhystic Study encuentra así motores de robo, y Elvish Archdruid potenciadores de elfos — antes, ambas no encontraban casi nada.",
+   "it": "La ricerca di sinergie usa ora i tag delle carte dello Scryfall Tagger invece di dieci grezzi schemi testuali. Rhystic Study trova così motori di pesca, Elvish Archdruid potenziatori di elfi — prima entrambe non trovavano quasi nulla."
+  },
   "pr": 203,
   "version": "0.73.0"
  },
  {
   "am": "2026-08-03T22:40:00+02:00",
   "art": "verbessert",
-  "text": "Der Preisverlauf lässt sich jetzt auf 30 Tage, 3 Monate, 6 Monate, 1 Jahr oder alles einstellen. Über und unter dem Graphen stehen Hoch, Tief, Veränderung, Spanne und die Zahl der Messpunkte — jeweils für den gewählten Ausschnitt. Beim Überfahren zeigt die Kurve zusätzlich, wie viel Prozent sich seit diesem Tag getan hat.",
+  "text": {
+   "de": "Der Preisverlauf lässt sich jetzt auf 30 Tage, 3 Monate, 6 Monate, 1 Jahr oder alles einstellen. Über und unter dem Graphen stehen Hoch, Tief, Veränderung, Spanne und die Zahl der Messpunkte — jeweils für den gewählten Ausschnitt. Beim Überfahren zeigt die Kurve zusätzlich, wie viel Prozent sich seit diesem Tag getan hat.",
+   "en": "The price history can now be set to 30 days, 3 months, 6 months, 1 year or everything. Above and below the graph are high, low, change, range and the number of readings — each for the chosen span. On hover, the curve additionally shows how many percent have moved since that day.",
+   "fr": "L'historique des prix se règle désormais sur 30 jours, 3 mois, 6 mois, 1 an ou tout. Au-dessus et en dessous du graphique figurent le haut, le bas, la variation, l'amplitude et le nombre de relevés — chaque fois pour la plage choisie. Au survol, la courbe montre en plus le pourcentage de variation depuis ce jour-là.",
+   "es": "El historial de precios se puede ajustar ahora a 30 días, 3 meses, 6 meses, 1 año o todo. Encima y debajo del gráfico están el máximo, el mínimo, la variación, el rango y el número de mediciones — siempre para el tramo elegido. Al pasar el ratón, la curva muestra además cuánto por ciento se ha movido desde ese día.",
+   "it": "L'andamento dei prezzi si può ora impostare su 30 giorni, 3 mesi, 6 mesi, 1 anno o tutto. Sopra e sotto il grafico ci sono massimo, minimo, variazione, ampiezza e numero di rilevazioni — sempre per l'intervallo scelto. Al passaggio del mouse la curva mostra anche di quanti punti percentuali si è mossa da quel giorno."
+  },
   "pr": 202,
   "version": "0.72.0"
  },
  {
   "am": "2026-08-03T22:05:00+02:00",
   "art": "verbessert",
-  "text": "Die Karte in der Detailansicht neigt sich zum Mauszeiger und fängt dabei das Licht. Foils bekommen zusätzlich den Regenbogenschimmer, den sie im Regal auch haben — normale Karten bleiben matt.",
+  "text": {
+   "de": "Die Karte in der Detailansicht neigt sich zum Mauszeiger und fängt dabei das Licht. Foils bekommen zusätzlich den Regenbogenschimmer, den sie im Regal auch haben — normale Karten bleiben matt.",
+   "en": "The card in the detail view tilts towards the mouse pointer and catches the light as it does. Foils additionally get the rainbow shimmer they have on the shelf too — ordinary cards stay matte.",
+   "fr": "La carte, dans la vue détaillée, s'incline vers le pointeur et accroche la lumière au passage. Les foils reçoivent en plus le reflet arc-en-ciel qu'ils ont aussi dans la boîte — les cartes ordinaires restent mates.",
+   "es": "La carta, en la vista de detalle, se inclina hacia el puntero y capta la luz al hacerlo. Las foil reciben además el brillo iridiscente que también tienen en la estantería — las cartas normales siguen mates.",
+   "it": "La carta, nella vista dettagliata, si inclina verso il puntatore e cattura la luce mentre lo fa. Le foil ricevono in più il riflesso iridescente che hanno anche sullo scaffale — le carte normali restano opache."
+  },
   "pr": 201,
   "version": "0.71.0"
  },
  {
   "am": "2026-08-03T19:05:00+02:00",
   "art": "neu",
-  "text": "Die App hat ein Changelog: Ein Klick auf die Versionsnummer oben rechts zeigt, was sich wann geändert hat — rückwirkend bis Ende Juli.",
+  "text": {
+   "de": "Die App hat ein Changelog: Ein Klick auf die Versionsnummer oben rechts zeigt, was sich wann geändert hat — rückwirkend bis Ende Juli.",
+   "en": "The app has a changelog: one click on the version number at the top right shows what changed when — going back to the end of July.",
+   "fr": "L'application a un journal des modifications : un clic sur le numéro de version en haut à droite montre ce qui a changé et quand — rétroactivement jusqu'à fin juillet.",
+   "es": "La aplicación tiene un registro de cambios: un clic en el número de versión arriba a la derecha muestra qué cambió y cuándo — retroactivamente hasta finales de julio.",
+   "it": "L'app ha un registro delle modifiche: un clic sul numero di versione in alto a destra mostra cosa è cambiato e quando — a ritroso fino a fine luglio."
+  },
   "pr": 199,
   "version": "0.70.0"
  },
  {
   "am": "2026-08-03T18:45:33+02:00",
   "art": "neu",
-  "text": "Jede Karte zeigt in der Detailansicht ihre Themen aus dem Scryfall Tagger — was sie tut, nicht nur was auf ihr steht. Dazu ein Themen-Filter in der Sammlung: „Zeig mir alle Opferauslässe“ ist jetzt eine Auswahl statt einer Suche.",
+  "text": {
+   "de": "Jede Karte zeigt in der Detailansicht ihre Themen aus dem Scryfall Tagger — was sie tut, nicht nur was auf ihr steht. Dazu ein Themen-Filter in der Sammlung: „Zeig mir alle Opferauslässe“ ist jetzt eine Auswahl statt einer Suche.",
+   "en": "Every card shows its tags from the Scryfall Tagger in the detail view — what it does, not just what is written on it. Plus a tag filter in the collection: \"show me all sacrifice outlets\" is now a selection instead of a search.",
+   "fr": "Chaque carte affiche ses tags du Scryfall Tagger dans la vue détaillée — ce qu'elle fait, pas seulement ce qui est écrit dessus. S'y ajoute un filtre par tag dans la collection : « montre-moi tous les exutoires à sacrifice » est désormais une sélection et non une recherche.",
+   "es": "Cada carta muestra sus tags del Scryfall Tagger en la vista de detalle — lo que hace, no solo lo que pone en ella. Además, un filtro por tag en la colección: «enséñame todos los sacrificaderos» ya es una selección y no una búsqueda.",
+   "it": "Ogni carta mostra i suoi tag dallo Scryfall Tagger nella vista dettagliata — cosa fa, non solo cosa c'è scritto sopra. In più un filtro per tag nella collezione: «mostrami tutti gli sbocchi da sacrificio» ora è una scelta e non una ricerca."
+  },
   "pr": 198,
   "version": "0.69.0"
  },
  {
   "am": "2026-08-03T17:57:10+02:00",
   "art": "behoben",
-  "text": "Der erste Themen-Abgleich scheiterte an einer Schutzregel der Datenbank — behoben, der Themen-Bestand füllt sich seitdem täglich.",
+  "text": {
+   "de": "Der erste Themen-Abgleich scheiterte an einer Schutzregel der Datenbank — behoben, der Themen-Bestand füllt sich seitdem täglich.",
+   "en": "The first tag sync failed against a protection rule in the database — fixed; the tag store has been filling daily ever since.",
+   "fr": "La première synchronisation des tags a échoué sur une règle de protection de la base — corrigé ; le stock de tags se remplit quotidiennement depuis.",
+   "es": "La primera sincronización de tags falló por una regla de protección de la base de datos — corregido; desde entonces el catálogo de tags se llena a diario.",
+   "it": "Il primo allineamento dei tag è fallito contro una regola di protezione del database — risolto; da allora l'archivio dei tag si riempie ogni giorno."
+  },
   "pr": 197,
   "version": "0.68.1"
  },
  {
   "am": "2026-08-03T17:28:38+02:00",
   "art": "neu",
-  "text": "Grundlage für Karten-Themen: Die App kennt jetzt die rund 4500 Themen des Scryfall Tagger (Opferauslass, Mana-Stein, Ramp …) und hält sie täglich aktuell.",
+  "text": {
+   "de": "Grundlage für Karten-Themen: Die App kennt jetzt die rund 4500 Themen des Scryfall Tagger (Opferauslass, Mana-Stein, Ramp …) und hält sie täglich aktuell.",
+   "en": "Groundwork for card tags: the app now knows the roughly 4500 tags of the Scryfall Tagger (sacrifice outlet, mana rock, ramp …) and keeps them up to date daily.",
+   "fr": "Base pour les tags de cartes : l'application connaît désormais les quelque 4500 tags du Scryfall Tagger (exutoire à sacrifice, mana rock, ramp …) et les tient à jour chaque jour.",
+   "es": "Base para los tags de carta: la aplicación conoce ahora los unos 4500 tags del Scryfall Tagger (sacrificadero, mana rock, ramp …) y los mantiene al día a diario.",
+   "it": "Base per i tag delle carte: l'app conosce ora i circa 4500 tag dello Scryfall Tagger (sbocco da sacrificio, mana rock, ramp …) e li tiene aggiornati ogni giorno."
+  },
   "pr": 196,
   "version": "0.68.0"
  },
  {
   "am": "2026-08-03T15:45:11+02:00",
   "art": "verbessert",
-  "text": "Auflagen beim Überfahren groß zeigen, mit dem was sie trennt",
+  "text": {
+   "de": "Auflagen beim Überfahren groß zeigen, mit dem was sie trennt",
+   "en": "Show printings large on hover, with what sets them apart",
+   "fr": "Afficher les éditions en grand au survol, avec ce qui les distingue",
+   "es": "Mostrar las ediciones en grande al pasar el ratón, con lo que las diferencia",
+   "it": "Mostrare le edizioni in grande al passaggio del mouse, con ciò che le distingue"
+  },
   "pr": 195,
   "version": "0.67.0"
  },
  {
   "am": "2026-08-03T14:24:05+02:00",
   "art": "verbessert",
-  "text": "Auflage wählen, wenn das Foto nur den Kartennamen hergab",
+  "text": {
+   "de": "Auflage wählen, wenn das Foto nur den Kartennamen hergab",
+   "en": "Choose the printing when the photo only yielded the card name",
+   "fr": "Choisir l'édition quand la photo n'a donné que le nom de la carte",
+   "es": "Elegir la edición cuando la foto solo dio el nombre de la carta",
+   "it": "Scegliere l'edizione quando la foto ha dato solo il nome della carta"
+  },
   "pr": 194,
   "version": "0.66.0"
  },
  {
   "am": "2026-08-03T14:05:03+02:00",
   "art": "verbessert",
-  "text": "Der Feed-Satz nennt das Deck beim Wort und setzt den Namen in Anführungszeichen",
+  "text": {
+   "de": "Der Feed-Satz nennt das Deck beim Wort und setzt den Namen in Anführungszeichen",
+   "en": "The feed sentence names the deck outright and puts the name in quotation marks",
+   "fr": "La phrase du fil nomme le deck explicitement et met le nom entre guillemets",
+   "es": "La frase del feed nombra el mazo directamente y pone el nombre entre comillas",
+   "it": "La frase del feed nomina il mazzo per esteso e mette il nome tra virgolette"
+  },
   "pr": 193,
   "version": "0.65.2"
  },
  {
   "am": "2026-08-03T13:48:57+02:00",
   "art": "verbessert",
-  "text": "Auch die Meldung nennt das geteilte Deck beim Namen und ist anklickbar",
+  "text": {
+   "de": "Auch die Meldung nennt das geteilte Deck beim Namen und ist anklickbar",
+   "en": "The notification also names the shared deck and is clickable",
+   "fr": "La notification nomme elle aussi le deck partagé et est cliquable",
+   "es": "El aviso también nombra el mazo compartido y se puede pulsar",
+   "it": "Anche la notifica nomina il mazzo condiviso ed è cliccabile"
+  },
   "pr": 192,
   "version": "0.65.1"
  },
  {
   "am": "2026-08-03T13:31:47+02:00",
   "art": "verbessert",
-  "text": "Geteiltes Deck im Live-Feed anklickbar, Prüfungen laufen gleichzeitig",
+  "text": {
+   "de": "Geteiltes Deck im Live-Feed anklickbar, Prüfungen laufen gleichzeitig",
+   "en": "Shared deck clickable in the live feed, checks run concurrently",
+   "fr": "Deck partagé cliquable dans le fil en direct, les vérifications tournent en parallèle",
+   "es": "Mazo compartido pulsable en el feed en vivo, las comprobaciones corren en paralelo",
+   "it": "Mazzo condiviso cliccabile nel feed dal vivo, i controlli girano in parallelo"
+  },
   "pr": 191,
   "version": "0.65.0"
  },
  {
   "am": "2026-08-03T12:24:38+02:00",
   "art": "verbessert",
-  "text": "Lade bleibt nach dem Zug offen, Steuer in die Kopfzeile, Würfel nach vorn",
+  "text": {
+   "de": "Lade bleibt nach dem Zug offen, Steuer in die Kopfzeile, Würfel nach vorn",
+   "en": "The drawer stays open after a draw, tax moves into the header, dice to the front",
+   "fr": "Le tiroir reste ouvert après une pioche, la taxe passe dans l'en-tête, le dé à l'avant",
+   "es": "El cajón sigue abierto tras robar, el impuesto pasa a la cabecera, el dado al frente",
+   "it": "Il cassetto resta aperto dopo la pescata, la tassa va nell'intestazione, il dado davanti"
+  },
   "pr": 190,
   "version": "0.64.0"
  },
  {
   "am": "2026-08-03T10:47:30+02:00",
   "art": "verbessert",
-  "text": "Emblemleiste nach links unten, höherer Länderstreifen, Steuer je Commander",
+  "text": {
+   "de": "Emblemleiste nach links unten, höherer Länderstreifen, Steuer je Commander",
+   "en": "Emblem bar to the bottom left, taller land strip, tax per commander",
+   "fr": "Barre d'emblèmes en bas à gauche, bande de terrains plus haute, taxe par commandant",
+   "es": "Barra de emblemas abajo a la izquierda, franja de tierras más alta, impuesto por comandante",
+   "it": "Barra degli emblemi in basso a sinistra, striscia delle terre più alta, tassa per comandante"
+  },
   "pr": 189,
   "version": "0.63.0"
  },
  {
   "am": "2026-08-03T08:41:53+02:00",
   "art": "verbessert",
-  "text": "Lebenspunkte per Schieberegler, Kopfkasten unter die Matte",
+  "text": {
+   "de": "Lebenspunkte per Schieberegler, Kopfkasten unter die Matte",
+   "en": "Life totals via slider, header box below the mat",
+   "fr": "Points de vie au curseur, cadre d'en-tête sous le tapis",
+   "es": "Puntos de vida con deslizador, cuadro de cabecera bajo el tapete",
+   "it": "Punti vita con cursore, riquadro d'intestazione sotto il tappetino"
+  },
   "pr": 188,
   "version": "0.62.0"
  },
  {
   "am": "2026-08-03T07:43:03+02:00",
   "art": "verbessert",
-  "text": "Die Matte umgeräumt: Bibliothek als Lade, Mana zu den Ländern, Leiste nach rechts",
+  "text": {
+   "de": "Die Matte umgeräumt: Bibliothek als Lade, Mana zu den Ländern, Leiste nach rechts",
+   "en": "Mat rearranged: library as a drawer, mana next to the lands, bar to the right",
+   "fr": "Tapis réorganisé : bibliothèque en tiroir, mana près des terrains, barre à droite",
+   "es": "Tapete reordenado: biblioteca como cajón, maná junto a las tierras, barra a la derecha",
+   "it": "Tappetino riorganizzato: biblioteca come cassetto, mana vicino alle terre, barra a destra"
+  },
   "pr": 187,
   "version": "0.61.0"
  },
  {
   "am": "2026-08-03T06:55:18+02:00",
   "art": "neu",
-  "text": "Regler für die Kartengröße in der Deck-Kartenansicht",
+  "text": {
+   "de": "Regler für die Kartengröße in der Deck-Kartenansicht",
+   "en": "Slider for the card size in the deck's card view",
+   "fr": "Curseur pour la taille des cartes dans la vue cartes du deck",
+   "es": "Control deslizante para el tamaño de las cartas en la vista de cartas del mazo",
+   "it": "Cursore per la dimensione delle carte nella vista carte del mazzo"
+  },
   "pr": 186,
   "version": "0.60.0"
  },
  {
   "am": "2026-08-03T06:13:08+02:00",
   "art": "verbessert",
-  "text": "Sinnbilder größer, großes Sinnbild im Seitenrand, Kartenansichten schmaler",
+  "text": {
+   "de": "Sinnbilder größer, großes Sinnbild im Seitenrand, Kartenansichten schmaler",
+   "en": "Larger emblems, a big emblem in the side margin, narrower card views",
+   "fr": "Emblèmes agrandis, grand emblème dans la marge, vues cartes plus étroites",
+   "es": "Emblemas más grandes, un emblema grande en el margen lateral, vistas de cartas más estrechas",
+   "it": "Emblemi più grandi, un grande emblema nel margine laterale, viste carte più strette"
+  },
   "pr": 185,
   "version": "0.59.0"
  },
  {
   "am": "2026-08-03T05:30:34+02:00",
   "art": "verbessert",
-  "text": "Sperre für übernommene Decks, Regelfrage und live Partie nach oben",
+  "text": {
+   "de": "Sperre für übernommene Decks, Regelfrage und live Partie nach oben",
+   "en": "A lock for adopted decks; Rules question and Game night moved up",
+   "fr": "Un verrou pour les decks repris ; Question de règles et Partie remontées",
+   "es": "Bloqueo para los mazos copiados; Duda de reglas y Partida suben",
+   "it": "Blocco per i mazzi copiati; Domanda di regole e Partita spostate in alto"
+  },
   "pr": 184,
   "version": "0.58.0"
  },
  {
   "am": "2026-08-03T04:10:04+02:00",
   "art": "neu",
-  "text": "Community-Decks ansehen und übernehmen",
+  "text": {
+   "de": "Community-Decks ansehen und übernehmen",
+   "en": "View and adopt Community decks",
+   "fr": "Consulter et reprendre les decks de la Community",
+   "es": "Ver y copiar mazos de la Community",
+   "it": "Vedere e copiare i mazzi della Community"
+  },
   "pr": 183,
   "version": "0.57.0"
  },
  {
   "am": "2026-08-03T03:31:32+02:00",
   "art": "verbessert",
-  "text": "Community als eigener Punkt in der obersten Navigation",
+  "text": {
+   "de": "Community als eigener Punkt in der obersten Navigation",
+   "en": "Community as its own item in the top navigation",
+   "fr": "Community comme rubrique à part dans la navigation principale",
+   "es": "Community como apartado propio en la navegación principal",
+   "it": "Community come voce a sé nella navigazione principale"
+  },
   "pr": 182,
   "version": "0.56.0"
  },
  {
   "am": "2026-08-03T02:34:14+02:00",
   "art": "behoben",
-  "text": "Migration reparieren: verlorene Feed-Arten und die Sichtbarkeitsprüfung",
+  "text": {
+   "de": "Migration reparieren: verlorene Feed-Arten und die Sichtbarkeitsprüfung",
+   "en": "Migration repaired: lost feed kinds and the visibility check",
+   "fr": "Migration réparée : types d'activité perdus dans le fil et contrôle de visibilité",
+   "es": "Migración reparada: tipos de actividad perdidos en el feed y la comprobación de visibilidad",
+   "it": "Migrazione riparata: tipi di attività persi nel feed e il controllo di visibilità"
+  },
   "pr": 181,
   "version": "0.55.1"
  },
  {
   "am": "2026-08-03T02:19:07+02:00",
   "art": "neu",
-  "text": "Kacheln, die zu den Listen führen, und geteilte Decks im Feed",
+  "text": {
+   "de": "Kacheln, die zu den Listen führen, und geteilte Decks im Feed",
+   "en": "Tiles that lead to the lists, and shared decks in the feed",
+   "fr": "Des cases qui mènent aux listes, et les decks partagés dans le fil",
+   "es": "Destacados que llevan a las listas, y los mazos compartidos en el feed",
+   "it": "Riquadri che portano agli elenchi e i mazzi condivisi nel feed"
+  },
   "pr": 180,
   "version": "0.55.0"
  },
  {
   "am": "2026-08-03T01:49:14+02:00",
   "art": "neu",
-  "text": "Community-Decks mit Sternen und Rangliste",
+  "text": {
+   "de": "Community-Decks mit Sternen und Rangliste",
+   "en": "Community decks with stars and a ranking",
+   "fr": "Decks de la Community avec des étoiles et un classement",
+   "es": "Mazos de la Community con estrellas y clasificación",
+   "it": "Mazzi della Community con stelle e classifica"
+  },
   "pr": 179,
   "version": "0.54.0"
  },
  {
   "am": "2026-08-03T00:39:00+02:00",
   "art": "neu",
-  "text": "Mitgliederliste und öffentliches Profil",
+  "text": {
+   "de": "Mitgliederliste und öffentliches Profil",
+   "en": "Member list and public profile",
+   "fr": "Liste des membres et profil public",
+   "es": "Lista de miembros y perfil público",
+   "it": "Elenco dei membri e profilo pubblico"
+  },
   "pr": 178,
   "version": "0.53.0"
  },
  {
   "am": "2026-08-03T00:15:52+02:00",
   "art": "verbessert",
-  "text": "Der Anzeigename wird Pflicht",
+  "text": {
+   "de": "Der Anzeigename wird Pflicht",
+   "en": "The display name is now required",
+   "fr": "Le nom affiché devient obligatoire",
+   "es": "El nombre visible pasa a ser obligatorio",
+   "it": "Il nome visualizzato diventa obbligatorio"
+  },
   "pr": 177,
   "version": "0.52.0"
  },
  {
   "am": "2026-08-02T23:46:25+02:00",
   "art": "verbessert",
-  "text": "Die Mitgliederliste kennt keine Sichtbarkeitsstufen",
+  "text": {
+   "de": "Die Mitgliederliste kennt keine Sichtbarkeitsstufen",
+   "en": "The member list no longer has visibility levels",
+   "fr": "La liste des membres n'a plus de niveaux de visibilité",
+   "es": "La lista de miembros ya no tiene niveles de visibilidad",
+   "it": "L'elenco dei membri non ha più livelli di visibilità"
+  },
   "pr": 176,
   "version": "0.51.0"
  },
  {
   "am": "2026-08-02T22:42:47+02:00",
   "art": "verbessert",
-  "text": "Verlauf und Exportieren in die Kopfleiste des Decks",
+  "text": {
+   "de": "Verlauf und Exportieren in die Kopfleiste des Decks",
+   "en": "History and export moved into the deck's header bar",
+   "fr": "Historique et export dans la barre d'en-tête du deck",
+   "es": "Historial y exportación en la barra superior del mazo",
+   "it": "Cronologia ed esportazione nella barra superiore del mazzo"
+  },
   "pr": 175,
   "version": "0.50.1"
  },
  {
   "am": "2026-08-02T22:09:35+02:00",
   "art": "neu",
-  "text": "Deck als Deckliste ausgeben",
+  "text": {
+   "de": "Deck als Deckliste ausgeben",
+   "en": "Export a deck as a decklist",
+   "fr": "Exporter un deck en liste de deck",
+   "es": "Exportar un mazo como lista de mazo",
+   "it": "Esportare un mazzo come lista mazzo"
+  },
   "pr": 174,
   "version": "0.50.0"
  },
  {
   "am": "2026-08-02T21:30:47+02:00",
   "art": "neu",
-  "text": "Erzeugtes Mana nach Farben aufschlüsseln",
+  "text": {
+   "de": "Erzeugtes Mana nach Farben aufschlüsseln",
+   "en": "Break down produced mana by colour",
+   "fr": "Détailler le mana produit par couleur",
+   "es": "Desglosar el maná producido por colores",
+   "it": "Scomporre il mana prodotto per colori"
+  },
   "pr": 173,
   "version": "0.49.0"
  },
  {
   "am": "2026-08-02T20:54:45+02:00",
   "art": "neu",
-  "text": "Mana in diesem Zug auf der Matte anzeigen",
+  "text": {
+   "de": "Mana in diesem Zug auf der Matte anzeigen",
+   "en": "Show this turn's mana on the play mat",
+   "fr": "Afficher le mana de ce tour sur le tapis",
+   "es": "Mostrar el maná de este turno en el tapete",
+   "it": "Mostrare il mana di questo turno sul tappetino"
+  },
   "pr": 172,
   "version": "0.48.0"
  },
  {
   "am": "2026-08-02T13:03:27+02:00",
   "art": "neu",
-  "text": "Die Matte eines Mitspielers ansehen",
+  "text": {
+   "de": "Die Matte eines Mitspielers ansehen",
+   "en": "Look at another player's play mat",
+   "fr": "Regarder le tapis d'un autre joueur",
+   "es": "Ver el tapete de otro jugador",
+   "it": "Guardare il tappetino di un altro giocatore"
+  },
   "pr": 171,
   "version": "0.47.0"
  },
  {
   "am": "2026-08-02T12:11:12+02:00",
   "art": "neu",
-  "text": "Zufällig ziehen in der Spielrunde",
+  "text": {
+   "de": "Zufällig ziehen in der Spielrunde",
+   "en": "Draw at random during a game night",
+   "fr": "Piocher au hasard pendant la partie",
+   "es": "Robar al azar durante la partida",
+   "it": "Pescare a caso durante la partita"
+  },
   "pr": 170,
   "version": "0.46.0"
  },
  {
   "am": "2026-08-02T10:32:54+02:00",
   "art": "verbessert",
-  "text": "Synergie-Vorschläge bleiben je Deck liegen",
+  "text": {
+   "de": "Synergie-Vorschläge bleiben je Deck liegen",
+   "en": "Synergy suggestions are kept per deck",
+   "fr": "Les suggestions de synergies sont conservées deck par deck",
+   "es": "Las sugerencias de sinergias se conservan por mazo",
+   "it": "I suggerimenti di sinergie restano salvati per mazzo"
+  },
   "pr": 169,
   "version": "0.45.0"
  },
  {
   "am": "2026-08-02T09:15:42+02:00",
   "art": "neu",
-  "text": "Eine Karte direkt auf die Wunschliste setzen",
+  "text": {
+   "de": "Eine Karte direkt auf die Wunschliste setzen",
+   "en": "Put a card straight on the wishlist",
+   "fr": "Mettre une carte directement dans la liste de souhaits",
+   "es": "Poner una carta directamente en la lista de deseos",
+   "it": "Mettere una carta direttamente nella lista dei desideri"
+  },
   "pr": 168,
   "version": "0.44.0"
  },
  {
   "am": "2026-08-02T08:23:02+02:00",
   "art": "behoben",
-  "text": "Der Verlaufskasten stand außerhalb des Bildes",
+  "text": {
+   "de": "Der Verlaufskasten stand außerhalb des Bildes",
+   "en": "The history box sat outside the visible area",
+   "fr": "L'encadré d'historique se trouvait hors de l'écran",
+   "es": "El cuadro del historial quedaba fuera de la pantalla",
+   "it": "Il riquadro della cronologia finiva fuori dallo schermo"
+  },
   "pr": 167,
   "version": "0.43.1"
  },
  {
   "am": "2026-08-02T08:03:42+02:00",
   "art": "neu",
-  "text": "Verlauf je Deck, mit dem Weg zurück",
+  "text": {
+   "de": "Verlauf je Deck, mit dem Weg zurück",
+   "en": "History per deck, with a way back",
+   "fr": "Un historique par deck, avec le chemin du retour",
+   "es": "Historial por mazo, con el camino de vuelta",
+   "it": "Cronologia per mazzo, con la via del ritorno"
+  },
   "pr": 166,
   "version": "0.43.0"
  },
  {
   "am": "2026-08-02T07:40:18+02:00",
   "art": "neu",
-  "text": "Sammlung: ausblenden, was schon in Decks steckt",
+  "text": {
+   "de": "Sammlung: ausblenden, was schon in Decks steckt",
+   "en": "Collection: hide what is already in decks",
+   "fr": "Collection : masquer ce qui est déjà dans des decks",
+   "es": "Colección: ocultar lo que ya está en mazos",
+   "it": "Collezione: nascondere ciò che è già nei mazzi"
+  },
   "pr": 165,
   "version": "0.42.0"
  },
  {
   "am": "2026-07-29T14:56:13+02:00",
   "art": "verbessert",
-  "text": "Der Würfel rollt blank über die Matte, die Zahl bleibt am Emblem",
+  "text": {
+   "de": "Der Würfel rollt blank über die Matte, die Zahl bleibt am Emblem",
+   "en": "The die rolls bare across the mat, the number stays on the emblem",
+   "fr": "Le dé roule à nu sur le tapis, le nombre reste sur l'emblème",
+   "es": "El dado rueda desnudo por el tapete, el número se queda en el emblema",
+   "it": "Il dado rotola nudo sul tappetino, il numero resta sull'emblema"
+  },
   "pr": 164,
   "version": "0.41.0"
  },
  {
   "am": "2026-07-29T14:23:09+02:00",
   "art": "verbessert",
-  "text": "Lebenspunkte unter die Länder, der Würfel auf die ganze Matte",
+  "text": {
+   "de": "Lebenspunkte unter die Länder, der Würfel auf die ganze Matte",
+   "en": "Life totals below the lands, the die across the whole mat",
+   "fr": "Points de vie sous les terrains, le dé sur tout le tapis",
+   "es": "Vidas debajo de las tierras, el dado por todo el tapete",
+   "it": "Punti vita sotto le terre, il dado su tutto il tappetino"
+  },
   "pr": 163,
   "version": "0.40.0"
  },
  {
   "am": "2026-07-29T13:12:54+02:00",
   "art": "verbessert",
-  "text": "Auch das Exil wird eine Lade, jede an ihrer alten Stelle",
+  "text": {
+   "de": "Auch das Exil wird eine Lade, jede an ihrer alten Stelle",
+   "en": "Exile becomes a drawer too, each one in its old place",
+   "fr": "L'exil devient lui aussi un tiroir, chacun à son ancienne place",
+   "es": "El exilio también pasa a ser un cajón, cada uno en su sitio de antes",
+   "it": "Anche l'esilio diventa un cassetto, ognuno al suo vecchio posto"
+  },
   "pr": 162,
   "version": "0.39.0"
  },
  {
   "am": "2026-07-29T12:34:55+02:00",
   "art": "verbessert",
-  "text": "Friedhof wird ebenfalls eine Lade, beide rücken neben Exil",
+  "text": {
+   "de": "Friedhof wird ebenfalls eine Lade, beide rücken neben Exil",
+   "en": "The graveyard becomes a drawer as well; both move next to exile",
+   "fr": "Le cimetière devient lui aussi un tiroir ; les deux passent à côté de l'exil",
+   "es": "El cementerio también pasa a ser un cajón; ambos se colocan junto al exilio",
+   "it": "Anche il cimitero diventa un cassetto; entrambi si spostano accanto all'esilio"
+  },
   "pr": 161,
   "version": "0.38.0"
  },
  {
   "am": "2026-07-29T12:03:13+02:00",
   "art": "verbessert",
-  "text": "Die Handlade trägt ihr Emblem, die Kartenzahl steht darauf",
+  "text": {
+   "de": "Die Handlade trägt ihr Emblem, die Kartenzahl steht darauf",
+   "en": "The hand drawer carries its emblem, with the card count on it",
+   "fr": "Le tiroir de la main porte son emblème, le nombre de cartes est dessus",
+   "es": "El cajón de la mano lleva su emblema, con el número de cartas encima",
+   "it": "Il cassetto della mano porta il suo emblema, con il numero di carte sopra"
+  },
   "pr": 160,
   "version": "0.37.1"
  },
  {
   "am": "2026-07-29T11:32:29+02:00",
   "art": "verbessert",
-  "text": "Die Hand der Spielrunde wird eine schwebende Lade",
+  "text": {
+   "de": "Die Hand der Spielrunde wird eine schwebende Lade",
+   "en": "The hand in a game night becomes a floating drawer",
+   "fr": "La main de la partie devient un tiroir flottant",
+   "es": "La mano de la partida pasa a ser un cajón flotante",
+   "it": "La mano della partita diventa un cassetto fluttuante"
+  },
   "pr": 159,
   "version": "0.37.0"
  },
  {
   "am": "2026-07-29T01:45:11+02:00",
   "art": "verbessert",
-  "text": "Karten in der Spielrunde ziehen statt schieben, Klick tappt",
+  "text": {
+   "de": "Karten in der Spielrunde ziehen statt schieben, Klick tappt",
+   "en": "Drag cards in a game night instead of pushing them; a click taps",
+   "fr": "Faire glisser les cartes en partie au lieu de les pousser ; un clic engage",
+   "es": "Arrastrar las cartas en la partida en vez de empujarlas; un clic gira",
+   "it": "Trascinare le carte in partita invece di spingerle; un clic TAPpa"
+  },
   "pr": 156,
   "version": "0.36.0"
  }
