@@ -6971,6 +6971,142 @@ async function comboKartenLaden(namen) {
   return byLower;
 }
 
+/* ================== Combo-Texte in der eigenen Sprache ==================
+   Commander Spellbook liefert ausschließlich Englisch. Übersetzt wird über die
+   Edge Function „combo-uebersetzen"; hier steht der Teil, der ohne sie läuft:
+   das Zerlegen in wiederverwendbare Sätze und der Rückweg.
+
+   DIE IDEE. Combo-Anleitungen sind formelhaft. „Repeat." kam in einer Stichprobe
+   von 600 Combos 296-mal vor. Ersetzt man die Kartennamen durch Platzhalter,
+   werden aus 3210 Sätzen 1899 Muster — 41 % weniger, die je Sprache genau
+   EINMAL übersetzt werden müssen, für alle Nutzer und für immer.
+
+   Nachgemessen ist auch, was die Platzhalter NICHT bringen: gegenüber einem
+   schlichten Satzvergleich ohne sie sind es nur 7 Prozentpunkte, weil 77 % der
+   Muster ohnehin nur einmal vorkommen — nach dem Kartennamen bleibt meist noch
+   etwas Kartenspezifisches stehen. Ihr eigentlicher Nutzen ist ein anderer:
+
+   DER GESPEICHERTE SATZ WIRD DAMIT NAMENSFREI. Stünde „Basalt Monolith" mit im
+   Speicher, wäre der Satz für die deutsche Ansicht wertlos. So wird beim
+   Anzeigen der Name eingesetzt, den der Betrachter kennt — der gedruckte aus
+   seiner eigenen Sammlung.
+
+   WARUM [[1]] UND NICHT {1}. mitSymbolen() macht aus JEDEM {…} ein Manasymbol;
+   aus {1} würde ein Mana-Icon statt eines Kartennamens. Die Anleitungen sind
+   voller echter Symbole ({C}, {3}, {T}), die unangetastet durchlaufen müssen —
+   der Platzhalter muss ihnen also ausweichen, nicht umgekehrt. */
+
+const COMBO_PLATZ = /\[\[(\d+)\]\]/g;
+
+/* Kartennamen → [[1]], [[2]], … NUMMERIERT NACH ERSTEM AUFTRETEN IM SATZ,
+   nicht global über die Combo. Der Unterschied ist gemessen: „Play {Karte}."
+   wird so immer zu „Play [[1]].", egal welche Karte gemeint ist, und nicht
+   mal zu [[1]] und mal zu [[3]], je nachdem wie viele längere Namen die Combo
+   sonst noch führt. Über 3210 Sätze macht das 1638 statt 1899 Muster — noch
+   einmal 14 % weniger zu übersetzen.
+
+   Überlappungen: An derselben Stelle gewinnt der LÄNGERE Name. Sonst frisst
+   „Monolith" den „Basalt Monolith" und übrig bliebe „Basalt [[1]]". */
+function comboMuster(text, namen) {
+  const kandidaten = [...new Set((namen || []).filter(Boolean))].sort((a, b) => b.length - a.length);
+  const treffer = [];
+  for (const n of kandidaten) {
+    let i = text.indexOf(n);
+    while (i !== -1) { treffer.push({ n, i }); i = text.indexOf(n, i + n.length); }
+  }
+  treffer.sort((a, b) => a.i - b.i || b.n.length - a.n.length);
+
+  const reihenfolge = [];
+  let out = "", bis = 0;
+  for (const tr of treffer) {
+    if (tr.i < bis) continue;                    // steckt schon in einem längeren Treffer
+    if (!reihenfolge.includes(tr.n)) reihenfolge.push(tr.n);
+    out += text.slice(bis, tr.i) + `[[${reihenfolge.indexOf(tr.n) + 1}]]`;
+    bis = tr.i + tr.n.length;
+  }
+  return { muster: out + text.slice(bis), namen: reihenfolge };
+}
+
+/* Der Rückweg. Ohne Übersetzung ist `text` das englische Original — dann setzt
+   dieselbe Funktion die Namen wieder ein und liefert es unverändert zurück.
+   Ein unbekannter Platzhalter bleibt stehen statt zu verschwinden: Eine Lücke
+   mitten in einer Anleitung wäre schlimmer als eine sichtbare Marke. */
+function comboEinsetzen(text, namen, anzeigeName) {
+  return String(text ?? "").replace(COMBO_PLATZ, (ganz, nr) => {
+    const n = namen[Number(nr) - 1];
+    return n == null ? ganz : (anzeigeName ? anzeigeName(n) : n);
+  });
+}
+
+/* Der Name, den der Betrachter kennt. Besitzt er die Karte, steht in seiner
+   Sammlung der gedruckte Name — auf Deutsch also „Basaltmonolith". Besitzt er
+   sie nicht, bleibt der englische: Das ist auch der Name, unter dem Scryfall
+   und Spellbook sie führen, und damit der brauchbarere von beiden. */
+function comboKartenName(englisch) {
+  const tref = (typeof CARDS !== "undefined" ? CARDS : [])
+    .find(c => (c.name || "").toLowerCase() === englisch.toLowerCase());
+  return (tref && tref.disp) || englisch;
+}
+/* Jeder übersetzbare Textbaustein bekommt beim Zeichnen eine Nummer und wird
+   in ein <span data-cmb> gehüllt. Angezeigt wird zunächst das ENGLISCHE
+   Original — die Übersetzung kommt später und tauscht nur den Inhalt dieser
+   Hüllen aus.
+
+   Warum nicht auf die Übersetzung warten: Eine Combo ist auch auf Englisch
+   lesbar, ein leerer Kasten ist es nicht. Und die Antwort kann aus dem
+   Zwischenspeicher in Millisekunden kommen oder eine KI-Anfrage bedeuten —
+   auf den schlechteren Fall zu warten hieße, den besseren zu verschenken. */
+let comboTeilNr = 0;
+const COMBO_TEILE = new Map();
+
+function comboTeilHtml(roh, kartenNamen, alsText) {
+  const { muster, namen } = comboMuster(roh, kartenNamen);
+  const nr = ++comboTeilNr;
+  COMBO_TEILE.set(nr, { muster, namen, roh });
+  const inhalt = alsText ? esc(roh) : mitSymbolen(roh);
+  return `<span data-cmb="${nr}">${inhalt}</span>`;
+}
+
+/* Übersetzung nachreichen. Läuft NACH dem Zeichnen und ändert nur Textinhalte
+   — die Kacheln, die Bilder und ein bereits aufgeklapptes <details> bleiben
+   unangetastet.
+
+   Stillschweigend nichts tun ist hier der richtige Fehlerfall: Die Funktion
+   ist womöglich gar nicht ausgeliefert, der Schalter steht vielleicht aus,
+   oder das Kontingent ist alle. In allen drei Fällen steht das englische
+   Original bereits da, und das ist eine vollständige Auskunft. */
+async function comboTexteNachreichen(wurzel) {
+  if (!wurzel || typeof LANG !== "string" || LANG === "en") return;
+  const huellen = [...wurzel.querySelectorAll("[data-cmb]")]
+    .filter(h => COMBO_TEILE.has(Number(h.dataset.cmb)));
+  if (!huellen.length) return;
+
+  const teile = huellen.map(h => ({ text: COMBO_TEILE.get(Number(h.dataset.cmb)).muster, frage: true }));
+  let data;
+  try {
+    const r = await sb.functions.invoke("combo-uebersetzen", { body: { lang: LANG, teile } });
+    if (r.error) return;
+    data = r.data;
+  } catch { return; }
+  if (!data || !Array.isArray(data.texte)) return;
+
+  huellen.forEach((h, i) => {
+    const uebersetzt = data.texte[i];
+    if (!uebersetzt) return;                       // nicht übersetzt: Original bleibt
+    const teil = COMBO_TEILE.get(Number(h.dataset.cmb));
+    // Erst jetzt die Kartennamen einsetzen, und zwar die, die der Betrachter
+    // kennt. Im englischen Original stehen sie noch englisch — auf halbem Weg
+    // wäre die Mischung schlimmer als jede der beiden Seiten.
+    const fertig = comboEinsetzen(uebersetzt, teil.namen, comboKartenName);
+    h.innerHTML = mitSymbolen(fertig);
+    // Das Original bleibt erreichbar. Eine falsch übersetzte Anleitung ist
+    // schlimmer als eine englische — wer zweifelt, fährt darüber.
+    h.title = teil.roh;
+    h.classList.add("cmb-uebersetzt");
+  });
+}
+
+
 /* Zonen-Kürzel von Commander Spellbook → Klartext (für „Initial Card State").
    Die Zustandsnotizen selbst (u.state) kommen englisch von CSB. */
 /* CSB gibt die Ausgangszone als einzelnen Buchstaben. Die Wörter dazu hat die
@@ -7226,8 +7362,9 @@ function comboKachel(combo, deckId, cardByName, legKey) {
   }).join("");
 
   const produces = combo.produces || [];
+  const kartenNamen = (combo.uses || []).map(u => u.name).filter(Boolean);
   const ergebnis = produces.length
-    ? `<ul class="combo-results">${produces.map(p => `<li>${esc(p)}</li>`).join("")}</ul>`
+    ? `<ul class="combo-results">${produces.map(p => `<li>${comboTeilHtml(p, kartenNamen, true)}</li>`).join("")}</ul>`
     : `<div class="combo-results-1">${esc(t("combo.result"))}</div>`;
 
   // Ausgangszustand je Karte: Zone(n) + evtl. Zustandsnotiz (beides von CSB).
@@ -7242,9 +7379,9 @@ function comboKachel(combo, deckId, cardByName, legKey) {
   const schritte = (combo.description || "").split("\n").map(s => s.trim()).filter(Boolean);
   const details = [
     zustand ? `<div><b>${esc(t("combo.cardState"))}:</b><ul class="combo-steps">${zustand}</ul></div>` : "",
-    prereq ? `<div><b>${esc(t("combo.prereq"))}:</b> ${mitSymbolen(prereq)}</div>` : "",
+    prereq ? `<div><b>${esc(t("combo.prereq"))}:</b> ${comboTeilHtml(prereq, kartenNamen)}</div>` : "",
     schritte.length ? `<div><b>${esc(t("combo.steps"))}:</b><ol class="combo-steps">${
-      schritte.map(s => `<li>${mitSymbolen(s)}</li>`).join("")}</ol></div>` : "",
+      schritte.map(s => `<li>${comboTeilHtml(s, kartenNamen)}</li>`).join("")}</ol></div>` : "",
   ].filter(Boolean).join("");
 
   return `<div class="combo">
@@ -7311,6 +7448,7 @@ async function deckCombosAnzeigen(box, cards, deckId) {
   box.innerHTML = teile.join("");
   wireComboHover(box);
   wireComboKategorien(box);
+  comboTexteNachreichen(box);
 }
 
 /* Combos in der GESAMTEN Sammlung: alle besessenen Karten (nach Name
@@ -7345,6 +7483,7 @@ async function sammlungCombosAnzeigen(box, cards) {
   box.innerHTML = `<div class="meta">${esc(t("combo.collHave", { n: gesamt }))}</div>${note}
     ${included.length ? `<div class="combo-grid" style="margin-top:6px">${included.map(c => comboKachel(c, null, cardByName, "commander")).join("")}</div>` : `<div class="empty">${esc(t("combo.collNone"))}</div>`}`;
   wireComboHover(box);
+  comboTexteNachreichen(box);
 }
 
 /* Combos, in denen eine einzelne Karte vorkommt (Modus variants). Kein
@@ -7380,6 +7519,7 @@ async function karteCombosAnzeigen(box, card) {
   box.innerHTML = `<div class="meta">${esc(t("combo.cardNote", { n: gesamt }))}</div>${note}${
     combos.length ? `<div class="combo-grid">${combos.map(c => comboKachel(c, null, cardByName, "commander")).join("")}</div>` : `<div class="empty">${esc(t("combo.cardNone"))}</div>`}`;
   wireComboHover(box);
+  comboTexteNachreichen(box);
 }
 
 /* Analyse in einen Container zeichnen: Balken je Kategorie, darunter Vorschläge

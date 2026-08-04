@@ -1,5 +1,11 @@
 [
  {
+  "am": "2026-08-04T19:15:00+02:00",
+  "art": "neu",
+  "text": "Combo-Anleitungen lassen sich in deiner Sprache anzeigen — Ergebnis, Voraussetzungen und die einzelnen Schritte. Kartennamen erscheinen so, wie sie auf deinen Karten gedruckt sind; das englische Original steht weiter beim Überfahren daneben. Muss vom Betreiber freigeschaltet werden, bis dahin bleibt alles wie bisher.",
+  "pr": 218
+ },
+ {
   "am": "2026-08-04T17:45:00+02:00",
   "art": "behoben",
   "text": "Die Ausgangszonen einer Combo standen in jeder Sprache auf Englisch — „Battlefield“ statt „Schlachtfeld“, obwohl die App dieselben Wörter auf der Spielmatte längst übersetzt. Jetzt stehen sie überall in deiner Sprache.",

@@ -2793,6 +2793,92 @@ Suche verstummt nicht. Eine Karte, die der Tagger schlicht nicht kennt,
 bekommt dagegen **keine** geratenen Themen untergemischt: Kuratiertes und
 Geratenes zu mischen wäre schlechter als beides einzeln.
 
+## Combo-Anleitungen in der eigenen Sprache
+
+Commander Spellbook liefert seine Anleitungen ausschließlich auf Englisch —
+Ergebnis, Voraussetzungen und die Schritte. Übersetzt werden sie von der Edge
+Function `combo-uebersetzen`.
+
+**Warum eine KI und kein Übersetzer.** Das ist Regeltext, und daran scheitert
+eine allgemeine Übersetzung an drei Stellen gleichzeitig:
+
+* **Fachvokabular.** „exile" heißt „ins Exil schicken", nicht „Exil"; „untap"
+  ist „enttappen", „target" ist „Ziel". Frei übersetzt entstehen Anleitungen,
+  die beim Nachspielen nicht aufgehen.
+* **Manasymbole.** `{C}`, `{3}`, `{T}` müssen zeichengenau durchlaufen — die
+  App rendert sie als Symbole, und ein übersetztes `{Farblos}` wäre dort ein
+  kaputtes Icon.
+* **Kartennamen.** „Basalt Monolith" muss im Deutschen „Basaltmonolith" heißen,
+  sonst findet niemand die Karte in seiner Sammlung wieder.
+
+### Gespeichert wird je Satz, nicht je Combo
+
+Combo-Anleitungen sind formelhaft. Gemessen an 600 Combos mit 3210 Sätzen:
+
+| | |
+| --- | --- |
+| Sätze insgesamt | 3210 |
+| verschieden, roh | 2040 |
+| verschieden, mit Platzhaltern **global** nummeriert | 1899 |
+| verschieden, mit Platzhaltern **je Satz** nummeriert | **1638** |
+
+Also **49 % weniger** zu übersetzen — und der Anteil wächst, je mehr Combos
+über die Zeit angesehen werden. `Repeat.` allein kam **296-mal** vor.
+
+Die Kartennamen werden dafür durch `[[1]]`, `[[2]]` ersetzt, **nummeriert nach
+erstem Auftreten im Satz**. Dadurch ergeben „Play Basalt Monolith." und „Play
+Rings of Brighthearth." dasselbe Muster `Play [[1]].` — das sind die 14 %
+Unterschied zwischen den letzten beiden Zeilen der Tabelle.
+
+Der zweite, wichtigere Nutzen der Platzhalter ist aber **Korrektheit**: Der
+gespeicherte Satz wird dadurch namensfrei. Eingesetzt wird erst beim Anzeigen,
+und zwar der Name, den der Betrachter kennt — der gedruckte aus seiner eigenen
+Sammlung.
+
+**`[[1]]` und nicht `{1}`**, weil `mitSymbolen()` aus *jedem* `{…}` ein
+Manasymbol macht. Aus einem Kartennamen würde dort ein Mana-Icon.
+
+### Übersetzt wird trotzdem im Zusammenhang
+
+Ans Modell gehen nur die noch unbekannten Sätze — aber **mit der ganzen Combo
+davor und dahinter**. „Resolve the copy of its last ability, untapping it." ist
+ohne den Faden davor nicht richtig zu übersetzen. Kontext für die Qualität,
+Satzspeicher für die Kosten.
+
+Kommt eine Übersetzung zurück, die einen Platzhalter **verloren oder erfunden**
+hat, wird sie verworfen und der Satz bleibt englisch. Sie landete sonst im
+gemeinsamen Speicher und würde allen anderen ausgeliefert.
+
+### Das Original bleibt erreichbar
+
+Eine falsch übersetzte Anleitung ist schlimmer als eine englische: Wer nach
+einem Satz spielt, der etwas anderes meinte, verliert die Partie und weiß nicht
+warum. Übersetzte Bausteine tragen deshalb einen gepunkteten Unterstrich und
+das englische Original im `title`.
+
+### Einrichten
+
+1. Supabase → **Edge Functions → Deploy a new function**, Name
+   `combo-uebersetzen`, Inhalt von
+   `supabase/functions/combo-uebersetzen/index.ts` einfügen.
+2. Das Secret `ANTHROPIC_API_KEY` ist durch `scan-card` bereits gesetzt und
+   wird mitgenutzt.
+3. Migration `supabase/migrations/20260804180000_combo_saetze.sql` ausführen —
+   sie legt die Tabelle `combo_saetze` an, erweitert das Kontingent um die Art
+   `combo_text` und trägt den Schalter `ki_combo_text` ein.
+4. Der Schalter steht auf **aus**. Erst `update public.feature_flags set
+   enabled = true where key = 'ki_combo_text';` schaltet die Übersetzung frei.
+
+Bis dahin — und wenn die Funktion fehlt, der Schalter aus ist oder das
+Kontingent alle ist — zeigt die App das englische Original. Kein Fehler, keine
+Meldung: Das Original ist eine vollständige Auskunft.
+
+**Kosten.** Ein Modell-Aufruf je Combo, die *neue* Sätze mitbringt; Combos
+ohne neue Sätze kosten nichts und verbrauchen kein Kontingent. Das Kontingent
+liegt bei 20 Aufrufen je Stunde und Person — nötig, weil der Zwischenspeicher
+nur bei bekannten Sätzen greift und beliebige Zeichenketten lauter neue Muster
+erzeugen würden.
+
 ## Changelog
 
 Ein Klick auf die Versionsnummer oben rechts zeigt, was sich wann geändert hat:
