@@ -1,5 +1,18 @@
 [
  {
+  "am": "2026-08-05T05:45:00+02:00",
+  "art": "verbessert",
+  "text": {
+   "de": "Die Kartendetails sind aufgeräumt: Alle Werkzeuge — Bearbeiten, Preis, Synergien, Combos — stehen jetzt als eine Gruppe „Verwaltung\" neben dem Bild, Legalität und Tags nutzen darunter die volle Breite. Die Legalität zeigt ihre acht Formate wieder zweispaltig. Zustand und Anzahl stehen mittig zwischen Sprache und Preis, und die goldenen Symbole sitzen wieder sauber mittig in ihren Knöpfen.",
+   "en": "The card details are tidied up: all tools — edit, price, synergies, combos — now sit as one “Manage” group next to the image, while legality and tags use the full width below. Legality shows its eight formats in two columns again. Condition and quantity sit centred between language and price, and the gold icons are neatly centred in their buttons again.",
+   "fr": "Les détails de carte sont rangés : tous les outils — modifier, prix, synergies, combos — forment désormais un seul groupe « Gestion » à côté de l’image, tandis que la légalité et les tags occupent toute la largeur en dessous. La légalité affiche de nouveau ses huit formats sur deux colonnes. État et quantité sont centrés entre la langue et le prix, et les symboles dorés sont de nouveau bien centrés dans leurs boutons.",
+   "es": "Los detalles de carta están ordenados: todas las herramientas — editar, precio, sinergias, combos — forman ahora un solo grupo «Gestión» junto a la imagen, mientras legalidad y tags usan todo el ancho debajo. La legalidad vuelve a mostrar sus ocho formatos en dos columnas. Estado y cantidad quedan centrados entre idioma y precio, y los símbolos dorados vuelven a estar bien centrados en sus botones.",
+   "it": "I dettagli della carta sono in ordine: tutti gli strumenti — modifica, prezzo, sinergie, combo — formano ora un unico gruppo «Gestione» accanto all’immagine, mentre legalità e tag usano tutta la larghezza sotto. La legalità mostra di nuovo i suoi otto formati su due colonne. Condizione e quantità stanno centrate tra lingua e prezzo, e i simboli dorati sono di nuovo ben centrati nei loro pulsanti."
+  },
+  "pr": 229,
+  "version": "0.84.1"
+ },
+ {
   "am": "2026-08-05T04:30:00+02:00",
   "art": "neu",
   "text": {

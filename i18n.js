@@ -3825,11 +3825,11 @@ Object.assign(I18N.it, {
 });
 
 /* ---- Teil 22: Kartendetail aufgeräumt (Werkzeug-Gruppen) ---- */
-Object.assign(I18N.de, { "detail.groupManage": "Verwaltung", "detail.groupTools": "Vorschläge & Combos" });
-Object.assign(I18N.en, { "detail.groupManage": "Manage", "detail.groupTools": "Suggestions & combos" });
-Object.assign(I18N.fr, { "detail.groupManage": "Gestion", "detail.groupTools": "Suggestions & combos" });
-Object.assign(I18N.es, { "detail.groupManage": "Gestión", "detail.groupTools": "Sugerencias y combos" });
-Object.assign(I18N.it, { "detail.groupManage": "Gestione", "detail.groupTools": "Suggerimenti e combo" });
+Object.assign(I18N.de, { "detail.groupManage": "Verwaltung" });
+Object.assign(I18N.en, { "detail.groupManage": "Manage" });
+Object.assign(I18N.fr, { "detail.groupManage": "Gestion" });
+Object.assign(I18N.es, { "detail.groupManage": "Gestión" });
+Object.assign(I18N.it, { "detail.groupManage": "Gestione" });
 
 /* ---- Teil 23: Deck-Import (Text-Deckliste, z. B. mtgsalvation.com) ---- */
 Object.assign(I18N.de, {
