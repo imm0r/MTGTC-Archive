@@ -1,5 +1,18 @@
 [
  {
+  "am": "2026-08-05T01:45:00+02:00",
+  "art": "behoben",
+  "text": {
+   "de": "Ein einmal falsch gespeicherter Combo-Satz blieb falsch: Er wird nie wieder übersetzt, sondern kommt beim Aufklappen aus dem Zwischenspeicher — für alle. Deshalb blieb der doppelte Schritt („… +2/+2. Wiederhole.\") stehen, obwohl die Prüfung dagegen schon eingebaut war. Sie greift jetzt beim Anzeigen statt nur beim Übersetzen und schreibt die Berichtigung zurück.",
+   "en": "A combo sentence that was once stored wrong stayed wrong: it never gets translated again, it comes out of the cache when you expand — for everyone. That is why the doubled step (“… +2/+2. Repeat.”) was still there although the check against it was already built in. It now runs when the text is shown, not only when it is translated, and writes the correction back.",
+   "fr": "Une phrase de combo enregistrée une fois de travers le restait : elle n'est plus jamais traduite, elle sort du cache au dépliage — pour tout le monde. C'est pourquoi l'étape en double (« … +2/+2. Recommence. ») était toujours là bien que le contrôle existe déjà. Il s'applique désormais à l'affichage, et pas seulement à la traduction, et renvoie la correction en mémoire.",
+   "es": "Una frase de combo guardada mal una vez se quedaba mal: ya no se vuelve a traducir, sale de la memoria al desplegar — para todos. Por eso el paso duplicado («… +2/+2. Repite.») seguía ahí aunque la comprobación ya estaba puesta. Ahora actúa al mostrar el texto, no solo al traducirlo, y devuelve la corrección a la memoria.",
+   "it": "Una frase di combo salvata male una volta restava sbagliata: non viene più tradotta, esce dalla memoria quando apri — per tutti. Per questo il passaggio doppio («… +2/+2. Ripeti.») era ancora lì benché il controllo fosse già presente. Ora agisce alla visualizzazione, non solo alla traduzione, e riscrive la correzione in memoria."
+  },
+  "pr": 225,
+  "version": "0.82.4"
+ },
+ {
   "am": "2026-08-05T01:00:00+02:00",
   "art": "behoben",
   "text": {
