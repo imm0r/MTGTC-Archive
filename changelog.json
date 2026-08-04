@@ -1,5 +1,18 @@
 [
  {
+  "am": "2026-08-05T01:00:00+02:00",
+  "art": "behoben",
+  "text": {
+   "de": "In übersetzten Combo-Anleitungen hängte ein Schritt manchmal den nächsten mit an — „… +2/+2. Wiederhole.\", obwohl das Wiederholen erst Schritt 3 ist. Der Anhang wird jetzt erkannt und abgetrennt. Außerdem kennt die Übersetzung ein Fachwortverzeichnis: wirken statt auswerfen, enttappen statt untappen, und dieselben Wörter wie die Oberfläche.",
+   "en": "In translated combo instructions a step would sometimes drag the next one along with it — “… +2/+2. Repeat.”, even though repeating is only step 3. That tail is now recognised and cut off. The translation also has a glossary now, so it uses the same wording as the rest of the interface instead of near-misses.",
+   "fr": "Dans les instructions de combo traduites, une étape entraînait parfois la suivante avec elle — « … +2/+2. Recommence. », alors que recommencer n'est que l'étape 3. Cet ajout est désormais détecté et retiré. La traduction dispose en outre d'un lexique : elle emploie les mêmes termes que le reste de l'interface.",
+   "es": "En las instrucciones de combo traducidas, un paso a veces arrastraba consigo el siguiente — «… +2/+2. Repite.», aunque repetir es solo el paso 3. Ese añadido ahora se detecta y se recorta. Además la traducción tiene un glosario: usa las mismas palabras que el resto de la interfaz.",
+   "it": "Nelle istruzioni delle combo tradotte un passaggio a volte si tirava dietro il successivo — «… +2/+2. Ripeti.», anche se ripetere è solo il passaggio 3. Quella coda ora viene riconosciuta e tagliata. La traduzione ha inoltre un glossario: usa le stesse parole del resto dell'interfaccia."
+  },
+  "pr": 224,
+  "version": "0.82.3"
+ },
+ {
   "am": "2026-08-05T00:15:00+02:00",
   "art": "behoben",
   "text": {

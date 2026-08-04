@@ -91,7 +91,24 @@ const SCHEMA = {
   additionalProperties: false,
 } as const;
 
-const anweisung = (ziel: string) => `Du übersetzt Anleitungen für Magic-the-Gathering-Combos aus dem Englischen nach ${ziel}.
+/* Fachwörter, die das Modell zuverlässig daneben übersetzt hat: „Cast" wurde
+   „Wirf … aus" (das heißt ablegen, nicht wirken), „untapping" wurde „untappst".
+   Beides ist beim Nachspielen irreführend, und beides fällt nur jemandem auf,
+   der das Original daneben hält.
+
+   Die Wörter sind DIESELBEN wie in i18n.js — Friedhof/Graveyard/Cimetière,
+   getappt/tapped/engagée/girada/TAPpata. Stünde in der Anleitung ein anderes
+   Wort als auf dem Knopf zwei Ansichten weiter, wäre für den Leser nicht
+   erkennbar, dass dasselbe gemeint ist. */
+const GLOSSAR: Record<string, string> = {
+  de: "cast → wirken (NICHT „auswerfen\" oder „werfen\"); tap → tappen; untap → enttappen (NICHT „untappen\"); exile → ins Exil schicken; sacrifice → opfern; graveyard → Friedhof; battlefield → Schlachtfeld; library → Bibliothek; hand → Hand; token → Spielstein; nontoken permanent → bleibende Karte, die kein Spielstein ist; trigger → auslösen; draw → ziehen; mana pool → Manapool; target → Ziel; until end of turn → bis zum Ende des Zuges",
+  en: "",
+  fr: "cast → lancer; tap → engager; untap → dégager; exile → exiler; sacrifice → sacrifier; graveyard → cimetière; battlefield → champ de bataille; library → bibliothèque; hand → main; token → jeton; nontoken permanent → permanent non-jeton; trigger → se déclencher; draw → piocher; mana pool → réserve de mana; target → ciblé",
+  es: "cast → lanzar; tap → girar; untap → enderezar; exile → exiliar; sacrifice → sacrificar; graveyard → cementerio; battlefield → campo de batalla; library → biblioteca; hand → mano; token → ficha; nontoken permanent → permanente que no sea ficha; trigger → activarse; draw → robar; mana pool → reserva de maná; target → objetivo",
+  it: "cast → lanciare; tap → TAPpare; untap → STAPpare; exile → esiliare; sacrifice → sacrificare; graveyard → cimitero; battlefield → campo di battaglia; library → grimorio; hand → mano; token → pedina; nontoken permanent → permanente non pedina; trigger → innescarsi; draw → pescare; mana pool → riserva di mana; target → bersaglio",
+};
+
+const anweisung = (ziel: string, lang: string) => `Du übersetzt Anleitungen für Magic-the-Gathering-Combos aus dem Englischen nach ${ziel}.
 
 Das ist Regeltext. Halte dich an das offizielle Vokabular von Magic in ${ziel} — so, wie es auf gedruckten Karten dieser Sprache steht. Nicht frei formulieren.
 
@@ -109,7 +126,8 @@ EINE ZEILE, EIN EINTRAG. Daran halte dich streng:
 
 · Zu JEDER nummerierten Zeile gehört genau ein Eintrag mit ihrer Nummer. Auch dann, wenn zwei Zeilen fast gleich lauten („Cast [[1]] by paying its mana cost." und „Cast the nontoken permanent returned in step 2 by paying its mana cost.") — das sind zwei Schritte, und beide werden gebraucht. Fasse nichts zusammen und lass nichts weg.
 · Übersetze NUR den Inhalt der eigenen Zeile. Nimm nichts aus der Zeile davor oder danach mit hinein, auch wenn es inhaltlich dazugehört. Ein angehängtes „Wiederhole." in Schritt 2, das eigentlich Schritt 3 ist, macht die Anleitung falsch.
-· Ein Satz bleibt ein Satz. Steht in der Zeile ein Satz, gib einen zurück, keine zwei.`;
+· Ein Satz bleibt ein Satz. Steht in der Zeile ein Satz, gib einen zurück, keine zwei.
+${GLOSSAR[lang] ? `\nDIESE WÖRTER GENAU SO, das ist das Vokabular der Oberfläche:\n\n${GLOSSAR[lang]}` : ""}`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -243,7 +261,7 @@ Deno.serve(async (req) => {
     const res = await anthropic.messages.create({
       model: MODEL,
       max_tokens: maxTokens,
-      system: anweisung(SPRACHE[lang]),
+      system: anweisung(SPRACHE[lang], lang),
       output_config: { format: { type: "json_schema", schema: SCHEMA } },
       messages: [{
         role: "user",
@@ -325,6 +343,48 @@ Deno.serve(async (req) => {
     }
   };
 
+  /* ---- Die hineingezogene Nachbarzeile wieder abtrennen ------------------
+     Die Anweisung allein reicht nicht. Nachgemessen: „Activate [[1]] by paying
+     {3} and untapping it, giving it +2/+2 until end of turn." kam ZWEIMAL —
+     einmal vor und einmal nach der geschärften Anweisung — als „… +2/+2.
+     Wiederhole." zurück, und dieses „Wiederhole." ist der nächste Schritt. Die
+     Anleitung liest sich dann, als sei Schritt 3 in Schritt 2 schon erledigt.
+
+     Erkannt wird es daran, dass der Satz GENAU auf die Übersetzung einer
+     ANDEREN Zeile derselben Combo endet — die kennen wir ja, sie steht im
+     Speicher. Gemessen an den 56 damals gespeicherten deutschen Zeilen trifft
+     das auf GENAU EINE zu, nämlich die kaputte: kein einziger Fehltreffer.
+
+     (Eine Prüfung auf die bloße Satzzahl wäre der naheliegende Weg gewesen und
+     ist gemessen worden: sechs Treffer, fünf davon zu Unrecht — ein langer
+     englischer Satz wird im Deutschen zu Recht zu zweien. Deshalb dieser
+     genauere Weg statt jenes groben.)
+
+     Abgetrennt statt verworfen: Der Rest des Satzes ist in Ordnung, und
+     verwerfen hieße, ihn englisch stehen zu lassen — beim nächsten Versuch
+     käme derselbe Zusammenzug wieder. Geschnitten wird nur an einer
+     Satzgrenze, und nur wenn danach noch etwas Sinnvolles übrig bleibt und
+     kein Platzhalter verloren geht. */
+  const entwirren = () => {
+    const andere = [...speicher.values()].map(s => String(s).trim()).filter(s => s.length >= 6);
+    for (const z of neueZeilen) {
+      const t = z.text.trim();
+      let treffer = "";
+      for (const a of andere) {
+        if (a === t || t.length <= a.length) continue;
+        if (t.endsWith(a) && a.length > treffer.length) treffer = a;
+      }
+      if (!treffer) continue;
+      const kurz = t.slice(0, t.length - treffer.length).trim();
+      // Nur an einer Satzgrenze, und es muss etwas übrig bleiben.
+      if (kurz.length < 10 || !/[.!?]$/.test(kurz)) continue;
+      if (platz(kurz) !== platz(z.muster)) continue;
+      console.warn(`combo-uebersetzen: „${treffer}" war die nächste Zeile, abgetrennt`);
+      z.text = kurz;
+      speicher.set(z.hash, kurz);
+    }
+  };
+
   try {
     const erste = await fragen(offen);
     if (erste.code) return json({ texte: antwort(), code: erste.code, neu: 0, gesamt: gefragt }, 200);
@@ -350,6 +410,8 @@ Deno.serve(async (req) => {
       const zweite = await fragen(fehlend);
       if (!zweite.code) uebernehmen(zweite.zeilen ?? [], fehlend);
     }
+    entwirren();
+
     const offenGeblieben = offen.filter(t => !speicher.has(hashes[t.i])).length;
     if (offenGeblieben) {
       console.error(`combo-uebersetzen: ${offenGeblieben} von ${offen.length} Sätzen bleiben englisch ` +
