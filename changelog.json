@@ -1,5 +1,17 @@
 [
  {
+  "am": "2026-08-05T07:20:00+02:00",
+  "art": "verbessert",
+  "text": {
+   "de": "Unter dem Kartenbild rahmen die beiden Knöpfe jetzt das Bild: „Bearbeiten\" sitzt an der linken Bildkante, „Bild ersetzen\" an der rechten. In den Knöpfen mit goldenem Symbol rückt das Symbol zudem näher an den linken Rand.",
+   "en": "Below the card image, the two buttons now frame the picture: “Edit” sits at the image’s left edge, “Replace image” at its right. In buttons with a gold icon, the icon also moves closer to the left edge.",
+   "fr": "Sous l’image de la carte, les deux boutons encadrent désormais l’image : « Modifier » au bord gauche, « Remplacer l’image » au bord droit. Dans les boutons à symbole doré, le symbole se rapproche en outre du bord gauche.",
+   "es": "Bajo la imagen de la carta, los dos botones enmarcan ahora la imagen: «Editar» en el borde izquierdo, «Reemplazar imagen» en el derecho. En los botones con símbolo dorado, el símbolo se acerca además al borde izquierdo.",
+   "it": "Sotto l’immagine della carta i due pulsanti ora incorniciano l’immagine: «Modifica» sul bordo sinistro, «Sostituisci immagine» su quello destro. Nei pulsanti con simbolo dorato, il simbolo si avvicina inoltre al bordo sinistro."
+  },
+  "pr": 231
+ },
+ {
   "am": "2026-08-05T06:50:00+02:00",
   "art": "verbessert",
   "text": {

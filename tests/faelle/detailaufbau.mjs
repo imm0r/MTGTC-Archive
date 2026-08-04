@@ -88,9 +88,10 @@ export default async function ({ seite, adresse, stand }) {
       werkzeuge: [...werk[0].querySelectorAll(".btn,.field input")].map(x => x.id),
       editBeimBild: !!edit.closest(".detail-bildtools")
         && edit.nextElementSibling === bildBtn,
-      // … und zwar linksbündig: Die Zeile beginnt an der linken Bildkante,
-      // nicht (wie zu Ein-Knopf-Zeiten) an der rechten.
+      // … und die Zeile spannt sich über die Bildbreite: „Bearbeiten" an der
+      // linken Bildkante, „Bild ersetzen" an der rechten.
       bildtoolsLinks: Math.abs(edit.getBoundingClientRect().left - bild.left) <= 1,
+      bildtoolsRechts: Math.abs(bildBtn.getBoundingClientRect().right - bild.right) <= 1,
       // EINE Zeile, immer: alle fünf Glieder auf derselben UNTERKANTE (die
       // Zeile richtet an flex-end aus — das Feld ist mit seinem Label höher
       // als die Knöpfe, die Oberkanten dürfen sich also unterscheiden), und
@@ -134,6 +135,13 @@ export default async function ({ seite, adresse, stand }) {
       mitteIst: Math.round((mitte.left + mitte.right) / 2),
       feldHoehe: Math.round(cap.height), knopfHoehe: Math.round(knopf.height),
       symbolAbstand: Math.round((gic.top + gic.height / 2) - (knopf.top + knopf.height / 2)),
+      // Das Goldsymbol rückt an den linken Knopfrand: 1 px Rahmen + 7 px
+      // Polster. Ein Knopf OHNE Symbol behält die vollen 10 px.
+      symbolLinks: Math.round(gic.left - knopf.left),
+      ohneSymbolPolster: (() => {
+        const b = document.getElementById("dt-bild");
+        return Math.round(parseFloat(getComputedStyle(b).paddingLeft));
+      })(),
     };
   });
 
@@ -145,7 +153,9 @@ export default async function ({ seite, adresse, stand }) {
     erg.werkzeuge, ["dt-price", "syn-cap", "dt-syn", "dt-syn-ai", "dt-combos"]);
   stand.ist("Bearbeiten steht unter dem Bild, direkt vor „Bild ersetzen“",
     erg.editBeimBild);
-  stand.ist("die Zeile unter dem Bild beginnt linksbündig", erg.bildtoolsLinks);
+  stand.ist("die Zeile unter dem Bild spannt sich über die Bildbreite — Bearbeiten links, Bild ersetzen rechts",
+    erg.bildtoolsLinks && erg.bildtoolsRechts,
+    `links ${erg.bildtoolsLinks}, rechts ${erg.bildtoolsRechts}`);
   stand.ist("die fünf stehen in EINER Zeile und passen hinein",
     erg.eineZeile && erg.zeilePasst, `eineZeile ${erg.eineZeile}, passt ${erg.zeilePasst}`);
   stand.gleich("das Feld „max €/Karte“ ist vierstellenbreit, nicht datumsbreit",
@@ -183,4 +193,8 @@ export default async function ({ seite, adresse, stand }) {
   stand.gleich("das Feld „max €/Karte“ ist genau knopfhoch",
     erg.feldHoehe, erg.knopfHoehe);
   stand.gleich("das Goldsymbol sitzt senkrecht mittig im Knopf", erg.symbolAbstand, 0);
+  stand.gleich("und nah am linken Knopfrand (1 px Rahmen + 7 px Polster)",
+    erg.symbolLinks, 8);
+  stand.gleich("ein Knopf ohne Symbol behält sein volles Polster",
+    erg.ohneSymbolPolster, 10);
 }
