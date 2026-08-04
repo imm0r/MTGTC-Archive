@@ -110,6 +110,7 @@ export default async function ({ stand, wurzel }) {
 
   const benutzt = new Set();
   for (const m of appJs.matchAll(/\bico\(\s*"([a-z-]+)"/g)) benutzt.add(m[1]);
+  for (const m of appJs.matchAll(/\bicoGold\(\s*"([a-z-]+)"/g)) benutzt.add("g-" + m[1]);
   for (const m of indexHtml.matchAll(/<use href="#ic-([a-z-]+)"/g)) benutzt.add(m[1]);
 
   const insLeere = [...benutzt].filter(n => !vorhanden.has(n));
@@ -130,13 +131,50 @@ export default async function ({ stand, wurzel }) {
   stand.ist("alle Symbole auf demselben Raster", falschesRaster.length === 0,
             falschesRaster.length ? falschesRaster.join(", ") : "24×24");
 
-  // Erlaubt sind currentColor, var(--ic-akz) und none. Alles andere ist eine
-  // festgeschriebene Farbe und damit blind für die Umgebung.
-  const festeFarben = [...sprite.matchAll(/(?:fill|stroke)="([^"]+)"/g)]
-    .map(m => m[1])
-    .filter(w => !["currentColor", "none", "var(--ic-akz)"].includes(w));
-  stand.ist("kein Symbol bringt eine eigene Farbe mit", festeFarben.length === 0,
+  /* Zwei Sätze, zwei Regeln — und die Grenze dazwischen ist das eigentlich
+     Prüfenswerte.
+
+     Der FLACHE Satz (ic-…) darf nur currentColor, den Akzent und none
+     kennen. Ein festes „#c9a227" mitten darin wäre der Rückfall, den die
+     Umstellung beheben sollte: ein Symbol, das seine Farbe nicht mehr von
+     der Umgebung nimmt und deshalb in einer roten Warnung golden bliebe.
+
+     Der PLASTISCHE Satz (ic-g-…) darf und muss das Gegenteil: Er trägt
+     Verlauf, Glanz und Gravur und bringt sie mit. Dafür darf er nur dort
+     stehen, wo nichts eingefärbt wird — in den Kartendetails. */
+  const symbolBloecke = [...sprite.matchAll(/<symbol id="ic-([a-z-]+)"[^>]*>([\s\S]*?)<\/symbol>/g)];
+  const flach = symbolBloecke.filter(m => !m[1].startsWith("g-"));
+  const plastisch = symbolBloecke.filter(m => m[1].startsWith("g-"));
+
+  const festeFarben = flach.flatMap(m => [...m[2].matchAll(/(?:fill|stroke)="([^"]+)"/g)]
+    .map(t => t[1]).filter(w => !["currentColor", "none", "var(--ic-akz)"].includes(w)));
+  stand.ist("kein flaches Symbol bringt eine eigene Farbe mit", festeFarben.length === 0,
             festeFarben.length ? [...new Set(festeFarben)].join(", ") : "nur currentColor und der Akzent");
+
+  stand.ist("es gibt einen plastischen Satz", plastisch.length >= 8, plastisch.length + " Symbole");
+  const ohneVerlauf = plastisch.filter(m => !m[2].includes("url(#au")).map(m => m[1]);
+  stand.ist("jedes plastische Symbol trägt den Goldverlauf", ohneVerlauf.length === 0,
+            ohneVerlauf.length ? ohneVerlauf.join(", ") : "alle mit url(#au…)");
+
+  /* Die Grenze. Ein plastisches Symbol in einer roten Warnung oder auf dem
+     vollflächig goldenen Knopf sieht FÜR SICH GENOMMEN richtig aus — es
+     leuchtet ja. Auffallen würde es nur dem, der genau diesen Zustand
+     herstellt: die Warnung bliebe golden statt rot, das Gold auf Gold
+     verschwände. Beides ist leicht gebaut und schwer gesehen.
+
+     Geprüft wird deshalb der Zusammenhang, in dem der Aufruf steht: Eine
+     Zeile mit icoGold() darf keine der Klassen tragen, die selbst färben.
+     Der vollflächige Knopf zählt dazu — nur „btn ghost" ist unbedenklich, er
+     hat keine eigene Fläche. */
+  const faerbendeKlassen = /class="[^"]*\b(?:pill|legal-note|syn-owned|meta ok|meta err|regel-caveat)\b/;
+  const vollerKnopf = /class="btn(?![^"]*\bghost\b)[^"]*"/;
+  const daneben = appJs.split("\n")
+    .map((z, i) => ({ z, nr: i + 1 }))
+    .filter(({ z }) => z.includes("icoGold(") && (faerbendeKlassen.test(z) || vollerKnopf.test(z)));
+  stand.ist("kein plastisches Symbol in einem Zusammenhang, der selbst färbt",
+            daneben.length === 0,
+            daneben.length ? daneben.map(d => "Zeile " + d.nr).join(", ")
+                           : [...appJs.matchAll(/\bicoGold\(/g)].length + " Aufrufe geprüft");
 
   // ---- Zwei Zeichen gibt es doppelt --------------------------------------
   // Jeweils einmal als <symbol> und einmal als Maske in style.css, weil

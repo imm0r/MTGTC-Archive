@@ -29,6 +29,13 @@ const eur = n => (n == null ? "–" : Number(n).toFixed(2).replace(".", ",") + "
    Zweites Argument für zusätzliche Klassen (etwa "syn-spin" fürs Drehen).
    NICHT für Farbe oder Größe — die kommen aus der Umgebung, siehe .ic in
    style.css. */
+/* Der plastische Satz — acht Symbole, nur für die Kartendetails. Sie bringen
+   ihre Farbe selbst mit und stehen fest auf 20 px; warum, steht in index.html
+   beim Sprite und in style.css bei .gic. Eigener Helfer statt eines dritten
+   Arguments an ico(): Die beiden Sätze folgen verschiedenen Regeln, und ein
+   Schalter hätte an jeder Aufrufstelle die Frage aufgeworfen, welche gerade
+   gelten. */
+const icoGold = name => `<svg class="gic" aria-hidden="true"><use href="#ic-g-${name}"></use></svg>`;
 const ico = (name, extra) => `<svg class="ic${extra ? " " + extra : ""}" aria-hidden="true"><use href="#ic-${name}"></use></svg>`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const today = () => { const d = new Date();
@@ -5420,26 +5427,28 @@ function detailHtml(c, hover) {
         <div class="sec-sep"></div>
         <div class="tool-group"><span class="tool-label">${esc(t("detail.groupManage"))}</span>
           <div class="tool-row">
-            <button class="btn ghost sm" id="dt-edit" title="${esc(t("row.editTitle"))}">${ico("stift")} ${esc(t("detail.edit"))}</button>
-            <button class="btn ghost sm" id="dt-price" title="${esc(t("detail.priceBtnTitle"))}">${ico("neu")} ${esc(t("detail.priceBtn"))}</button>
+            <button class="btn ghost sm" id="dt-edit" title="${esc(t("row.editTitle"))}">${icoGold("stift")}${esc(t("detail.edit"))}</button>
+            <button class="btn ghost sm" id="dt-price" title="${esc(t("detail.priceBtnTitle"))}">${icoGold("neu")}${esc(t("detail.priceBtn"))}</button>
           </div>
         </div>
         <div class="sec-sep"></div>
-        <details class="legal-det" id="dt-legal"><summary>${ico("waage")} ${esc(t("legal.title"))}</summary>
-          <div id="dt-legal-body"><div class="meta">${ico("laden", "syn-spin")} ${esc(t("legal.loading"))}</div></div>
-        </details>
-        <details class="legal-det" id="dt-themen"><summary>${ico("etikett")} ${esc(t("themen.title"))}</summary>
-          <div id="dt-themen-body"><div class="meta">${ico("laden", "syn-spin")} ${esc(t("themen.loading"))}</div></div>
-        </details>
+        <div class="det-paar">
+          <details class="legal-det" id="dt-legal"><summary><span class="det-sum">${icoGold("schild")}${esc(t("legal.title"))}</span></summary>
+            <div id="dt-legal-body"><div class="meta">${ico("laden", "syn-spin")} ${esc(t("legal.loading"))}</div></div>
+          </details>
+          <details class="legal-det" id="dt-themen"><summary><span class="det-sum">${icoGold("etikett")}${esc(t("themen.title"))}</span></summary>
+            <div id="dt-themen-body"><div class="meta">${ico("laden", "syn-spin")} ${esc(t("themen.loading"))}</div></div>
+          </details>
+        </div>
         <div class="sec-sep"></div>
         <div class="tool-group"><span class="tool-label">${esc(t("detail.groupTools"))}</span>
           <div class="tool-row">
             <div class="field" style="width:118px"><label>${esc(t("deck.maxPerCard"))}</label>
               <input type="number" id="syn-cap" min="0" step="0.5" value="${prefWert("capDefault") ?? ""}"
                 placeholder="${esc(t("syn.capPh"))}" title="${esc(t("syn.capTitle"))}"></div>
-            <button class="btn ghost sm syn-std-btn" id="dt-syn" title="${esc(t("syn.findTitle"))}">${ico("lupe")} ${esc(t("syn.find"))}</button>
-            <button class="btn ghost sm syn-ai-btn" id="dt-syn-ai" title="${esc(t("syn.aiTitle"))}">${ico("ki")} ${esc(t("syn.ai"))}</button>
-            <button class="btn ghost sm" id="dt-combos" title="${esc(t("combo.cardTitle"))}">${ico("kette")} ${esc(t("combo.btn"))}</button>
+            <button class="btn ghost sm syn-std-btn" id="dt-syn" title="${esc(t("syn.findTitle"))}">${icoGold("zahnraeder")}${esc(t("syn.find"))}</button>
+            <button class="btn ghost sm syn-ai-btn" id="dt-syn-ai" title="${esc(t("syn.aiTitle"))}">${icoGold("funken")}${esc(t("syn.ai"))}</button>
+            <button class="btn ghost sm" id="dt-combos" title="${esc(t("combo.cardTitle"))}">${icoGold("blitze")}${esc(t("combo.btn"))}</button>
           </div>
         </div>`
     : `<div style="margin-top:10px">
@@ -5469,7 +5478,7 @@ function detailHtml(c, hover) {
         ${hover ? `<div class="hint" style="margin-top:10px">${esc(t("detail.added"))}: ${esc(dtShort(c.added))} ${esc(t("detail.addedSuffix"))}</div>` : ""}
       </div>
     </div>
-    ${!hover ? `<details class="legal-det dt-price-full"><summary>${ico("verlauf")} ${esc(t("detail.priceHistory"))}</summary>
+    ${!hover ? `<details class="legal-det dt-price-full"><summary><span class="det-sum">${icoGold("verlauf")}${esc(t("detail.priceHistory"))}</span></summary>
       <div class="pverlauf" id="dt-pverlauf">${preisVerlaufHtml(c, "30t")}</div>
     </details>
     <div id="syn-box" class="dt-results-full"></div>
@@ -5572,7 +5581,7 @@ function wireDetailSynergien(c) {
   const yb = $("#dt-syn");
   if (yb) yb.onclick = async () => {
     const lbl = t("syn.find");
-    synBtnBusy(yb, lbl, true);
+    synBtnBusy(yb, lbl, true, icoGold("zahnraeder"));
     synGeschwister([$("#dt-syn-ai")], true);
     const weg = excludeVon([c]);   // nur die Ausgangskarte selbst raus, Besessenes darf auftauchen
     try {
@@ -5583,26 +5592,26 @@ function wireDetailSynergien(c) {
       await synergieAnzeigen($("#syn-box"),
         synergyHooks(c, tm ? (tm.get(c.oracle_id) || []) : null),
         { excludeIds: weg.ids, excludeNames: weg.names, limit: 18, maxPrice: numVal($("#syn-cap")) });
-    } finally { synBtnBusy(yb, lbl, false); synGeschwister([$("#dt-syn-ai")], false); }
+    } finally { synBtnBusy(yb, lbl, false, icoGold("zahnraeder")); synGeschwister([$("#dt-syn-ai")], false); }
   };
   // KI-Synergien: implizite Vorschläge über die Edge Function. Solange sie läuft,
   // ist der Standard-Synergien-Knopf gesperrt (Konflikt um denselben Kasten).
   const ab = $("#dt-syn-ai");
   if (ab) ab.onclick = () => {
     const lbl = t("syn.ai");
-    synBtnBusy(ab, lbl, true, ico("ki"));
+    synBtnBusy(ab, lbl, true, icoGold("funken"));
     synGeschwister([$("#dt-syn")], true);
     kiSynergien(c, $("#syn-box"), { maxPrice: numVal($("#syn-cap")) })
-      .finally(() => { synBtnBusy(ab, lbl, false, ico("ki")); synGeschwister([$("#dt-syn")], false); });
+      .finally(() => { synBtnBusy(ab, lbl, false, icoGold("funken")); synGeschwister([$("#dt-syn")], false); });
   };
   // Combos, in denen diese Karte vorkommt (Commander Spellbook) — eigener
   // Kasten, unabhängig von den Synergie-Knöpfen.
   const cb = $("#dt-combos");
   if (cb) cb.onclick = () => {
     const lbl = t("combo.btn");
-    synBtnBusy(cb, lbl, true, ico("kette"));
+    synBtnBusy(cb, lbl, true, icoGold("blitze"));
     karteCombosAnzeigen($("#card-combo-box"), c)
-      .finally(() => synBtnBusy(cb, lbl, false, ico("kette")));
+      .finally(() => synBtnBusy(cb, lbl, false, icoGold("blitze")));
   };
   // Legalität: erst beim ersten Aufklappen von Scryfall laden (die Sammlung
   // speichert keine Legalitäten — sie wandern mit jeder Bannliste).

@@ -107,7 +107,6 @@
   <symbol id="ic-waage" viewBox="0 0 24 24"><circle cx="12" cy="4.6" r="1.5"/><path d="M12 6.1v13.3M7.4 19.4h9.2M3.4 8h17.2M6.4 8v4M17.6 8v4"/><path d="M2.6 12h7.6A3.8 2.9 0 0 1 2.6 12zM13.8 12h7.6A3.8 2.9 0 0 1 13.8 12z" stroke="var(--ic-akz)"/></symbol>
   <symbol id="ic-lupe" viewBox="0 0 24 24"><circle cx="10.6" cy="10.6" r="6.1"/><path d="M15.1 15.1 19.9 19.9" stroke="var(--ic-akz)"/></symbol>
   <symbol id="ic-kette" viewBox="0 0 24 24"><circle cx="9.2" cy="12" r="6.4"/><circle cx="14.8" cy="12" r="6.4" stroke="var(--ic-akz)"/></symbol>
-  <symbol id="ic-verlauf" viewBox="0 0 24 24"><path d="M4 3.8v16.4h16.2"/><path d="M7.2 16.4 10.8 12.2 13.8 14.8 19.4 7.4M15.6 7.4h3.8v3.8" stroke="var(--ic-akz)"/></symbol>
   <symbol id="ic-balken" viewBox="0 0 24 24"><path d="M4 3.8v16.4h16.2"/><path d="M8.2 17V11.6M12.2 17V7.8M16.2 17v-3.6" stroke="var(--ic-akz)"/></symbol>
   <symbol id="ic-ki" viewBox="0 0 24 24"><path d="M11.4 4.1 12.78 8.82 17.5 10.2 12.78 11.58 11.4 16.3 10.02 11.58 5.3 10.2 10.02 8.82Z"/><path d="M18.1 14.7 18.81 17.19 21.3 17.9 18.81 18.61 18.1 21.1 17.39 18.61 14.9 17.9 17.39 17.19Z" stroke="var(--ic-akz)"/></symbol>
 
@@ -129,6 +128,56 @@
   <symbol id="ic-totenkopf" viewBox="0 0 24 24"><path d="M12 3.4c-4.3 0-7.6 3.2-7.6 7.4 0 2.4 1.1 4.3 2.6 5.5v2.1a1.4 1.4 0 0 0 1.4 1.4h7.2a1.4 1.4 0 0 0 1.4-1.4v-2.1c1.5-1.2 2.6-3.1 2.6-5.5 0-4.2-3.3-7.4-7.6-7.4z"/><path d="M10.2 19.8v-2.4M13.8 19.8v-2.4"/><circle cx="9.4" cy="11" r="1.7" fill="var(--ic-akz)" stroke="none"/><circle cx="14.6" cy="11" r="1.7" fill="var(--ic-akz)" stroke="none"/></symbol>
   <symbol id="ic-kamera" viewBox="0 0 24 24"><path d="M2.8 9.4h3.4L7.5 7.2h9l1.3 2.2h3.4a1.5 1.5 0 0 1 1.5 1.5v7.4a1.5 1.5 0 0 1-1.5 1.5H2.8a1.5 1.5 0 0 1-1.5-1.5v-7.4a1.5 1.5 0 0 1 1.5-1.5z"/><circle cx="12" cy="14.2" r="3.4" stroke="var(--ic-akz)"/></symbol>
   <symbol id="ic-kamera-mehr" viewBox="0 0 24 24"><path d="M2.8 8.4h3.4L7.5 6.2h9l1.3 2.2h3.4a1.5 1.5 0 0 1 1.5 1.5v7.6a1.5 1.5 0 0 1-1.5 1.5H2.8a1.5 1.5 0 0 1-1.5-1.5V9.9a1.5 1.5 0 0 1 1.5-1.5z"/><path d="M11.4 10.8h3.4a.9.9 0 0 1 .9.9v4.4a.9.9 0 0 1-.9.9h-3.4a.9.9 0 0 1-.9-.9v-4.4a.9.9 0 0 1 .9-.9zM9.1 16.1a.9.9 0 0 1-.7-.9v-4.4a.9.9 0 0 1 .9-.9h3.1" stroke="var(--ic-akz)"/></symbol>
+  <!-- ------------------------------------------- Der plastische Satz -----
+       Acht Symbole für die Kartendetails, und NUR dafür. Sie sind gefüllt,
+       haben einen Verlauf von hell nach dunkel, eine Glanzkante und eine
+       vertiefte Gravur — deshalb bringen sie ihre Farbe mit, statt sie zu
+       erben. Das ist der Unterschied zum flachen Satz oben, und es ist auch
+       seine Grenze:
+
+         · Sie können nicht rot werden, wenn die Umgebung warnt, und nicht
+           grün, wenn etwas legal ist. In Pillen, Warnungen und auf dem
+           vollflächig goldenen Knopf haben sie deshalb nichts zu suchen.
+         · Unter 16 px fallen Verlauf, Glanz und Gravur auf zwei, drei Pixel
+           zusammen und werden zu einem Fleck. Sie stehen bei 20 px (.gic in
+           style.css), der flache Satz bei 13.
+
+       Die Kartendetails sind die Schaufensterseite der App — eine Karte, groß,
+       mit allem was man über sie wissen kann. Dort trägt der reiche Satz. Im
+       Arbeitsalltag der Listen und Leisten trägt der flache. Wer diese Grenze
+       verschiebt, verschiebt sie bewusst; tests/faelle/symbole.mjs hält sie
+       fest. -->
+    <symbol id="ic-g-verlauf" viewBox="0 0 24 24"><path d="M4.8 3v15.4a2 2 0 0 0 2 2h14.4" fill="none" stroke="url(#au)" stroke-width="2.9" stroke-linecap="round"/><path d="M4.8 3v15.4a2 2 0 0 0 2 2h14.4" fill="none" stroke="#fff6cf" stroke-width=".7" stroke-linecap="round" opacity=".45"/><path d="M8.2 15.8 11.6 11.2 15 13.8 20 6.6" fill="none" stroke="url(#auHell)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="11.6" cy="11.2" r="1.9" fill="url(#auHell)" stroke="#6b4d0e" stroke-width=".5"/><circle cx="15" cy="13.8" r="1.9" fill="url(#auHell)" stroke="#6b4d0e" stroke-width=".5"/><circle cx="20" cy="6.6" r="2.2" fill="url(#auHell)" stroke="#6b4d0e" stroke-width=".5"/></symbol>
+  <symbol id="ic-g-zahnraeder" viewBox="0 0 24 24"><path d="M19.25 10.06L21.03 10.88L20.26 12.8L18.4 12.16L17.43 13.16L18.1 15L16.2 15.8L15.34 14.04L13.94 14.05L13.12 15.83L11.2 15.06L11.84 13.2L10.84 12.23L9 12.9L8.2 11L9.96 10.14L9.95 8.74L8.17 7.92L8.94 6L10.8 6.64L11.77 5.64L11.1 3.8L13 3L13.86 4.76L15.26 4.75L16.08 2.97L18 3.74L17.36 5.6L18.36 6.57L20.2 5.9L21 7.8L19.24 8.66Z" fill="url(#au)" stroke="#6b4d0e" stroke-width=".55" stroke-linejoin="round"/><circle cx="14.6" cy="9.4" r="2.3" fill="#7d5a11"/><circle cx="14.6" cy="9.4" r="2.3" fill="none" stroke="#c9a842" stroke-width=".5"/><path d="M11.47 15.07L13.12 15.11L13.12 16.89L11.47 16.93L10.97 17.97L11.97 19.29L10.57 20.4L9.51 19.14L8.38 19.4L7.98 20.99L6.23 20.6L6.56 18.98L5.66 18.26L4.15 18.94L3.38 17.33L4.85 16.58L4.85 15.42L3.38 14.67L4.15 13.06L5.66 13.74L6.56 13.02L6.23 11.4L7.98 11.01L8.38 12.6L9.51 12.86L10.57 11.6L11.97 12.71L10.97 14.03Z" fill="url(#auHell)" stroke="#6b4d0e" stroke-width=".55" stroke-linejoin="round"/><circle cx="8.2" cy="16" r="1.7" fill="#7d5a11"/><path d="M10.6 5.4a6.6 6.6 0 0 0-2.9 3.2" fill="none" stroke="#fff6cf" stroke-width=".85" stroke-linecap="round" opacity=".6"/><path d="M4.6 3.3L5.24 5.56L7.5 6.2L5.24 6.84L4.6 9.1L3.96 6.84L1.7 6.2L3.96 5.56Z" fill="url(#auHell)" stroke="#6b4d0e" stroke-width=".4" stroke-linejoin="round"/><path d="M19.6 15.5L20.09 17.31L21.9 17.8L20.09 18.29L19.6 20.1L19.11 18.29L17.3 17.8L19.11 17.31Z" fill="url(#auHell)" stroke="#6b4d0e" stroke-width=".4" stroke-linejoin="round"/></symbol>
+  <symbol id="ic-g-blitze" viewBox="0 0 24 24"><path d="M12.05 7.1L5.93 13.32L9.2 13.32L7.16 17.7L13.07 11.69L9.81 11.69Z" fill="url(#au)" stroke="#6b4d0e" stroke-width=".55" stroke-linejoin="round"/><path d="M18.25 6.3L12.13 12.52L15.4 12.52L13.36 16.9L19.27 10.89L16.01 10.89Z" fill="url(#auHell)" stroke="#6b4d0e" stroke-width=".55" stroke-linejoin="round"/><path d="M10.6 8.4 7.6 11.6" fill="none" stroke="#fff6cf" stroke-width=".85" stroke-linecap="round" opacity=".6"/><path d="M4.4 2.5L4.97 4.43L6.9 5L4.97 5.57L4.4 7.5L3.83 5.57L1.9 5L3.83 4.43Z" fill="url(#auHell)" stroke="#6b4d0e" stroke-width=".4" stroke-linejoin="round"/><path d="M19.8 3.5L20.26 5.14L21.9 5.6L20.26 6.06L19.8 7.7L19.34 6.06L17.7 5.6L19.34 5.14Z" fill="url(#auHell)" stroke="#6b4d0e" stroke-width=".4" stroke-linejoin="round"/><path d="M18.6 17.7L18.99 19.01L20.3 19.4L18.99 19.79L18.6 21.1L18.21 19.79L16.9 19.4L18.21 19.01Z" fill="url(#auHell)" stroke="#6b4d0e" stroke-width=".4" stroke-linejoin="round"/></symbol>
+  <symbol id="ic-g-stift" viewBox="0 0 24 24"><path d="M3.6 20.4l1.3-4.7L15.6 5a2.3 2.3 0 0 1 3.2 0l1 1a2.3 2.3 0 0 1 0 3.2L8.3 19.1z" fill="url(#au)" stroke="#6b4d0e" stroke-width=".55" stroke-linejoin="round"/><path d="M3.6 20.4 4.5 17.1l2.4 2.4z" fill="#7d5a11"/><path d="M14.6 6l3.4 3.4" fill="none" stroke="#7d5a11" stroke-width="1.2" stroke-linecap="round"/><path d="M6.4 16.2 15.4 7.2" fill="none" stroke="#fff6cf" stroke-width=".85" stroke-linecap="round" opacity=".6"/></symbol>
+  <symbol id="ic-g-neu" viewBox="0 0 24 24"><path d="M19.4 8.4A8 8 0 0 0 5.2 9.6" fill="none" stroke="url(#au)" stroke-width="3.1" stroke-linecap="butt"/><path d="M4.6 15.6a8 8 0 0 0 14.2-1.2" fill="none" stroke="url(#auHell)" stroke-width="3.1" stroke-linecap="butt"/><path d="M20.8 4.6v5.6h-5.6z" fill="url(#au)" stroke="#6b4d0e" stroke-width=".55" stroke-linejoin="round"/><path d="M3.2 19.4v-5.6h5.6z" fill="url(#auHell)" stroke="#6b4d0e" stroke-width=".55" stroke-linejoin="round"/><path d="M7 7.6a8 8 0 0 1 3.6-2.4" fill="none" stroke="#fff6cf" stroke-width=".85" stroke-linecap="round" opacity=".6"/></symbol>
+  <symbol id="ic-g-schild" viewBox="0 0 24 24"><path d="M12 2.4 20.6 5.4v6.6c0 4.7-3.4 7.9-8.6 9.6-5.2-1.7-8.6-4.9-8.6-9.6V5.4z" fill="url(#au)" stroke="#6b4d0e" stroke-width=".55" stroke-linejoin="round"/><path d="M12 4.6 18.4 6.8v5.2c0 3.5-2.6 6-6.4 7.3" fill="none" stroke="#fff6cf" stroke-width=".85" stroke-linecap="round" opacity=".6"/><path d="M14.3 8.5a2.5 2.5 0 0 0-4.6 1.3c0 1.5 1.7 2 3 2.5M9.7 15.6a2.5 2.5 0 0 0 4.6-1.3c0-1.5-1.7-2-3-2.5"fill="none" stroke="#7d5a11" stroke-width="1.55" stroke-linecap="round"/></symbol>
+  <symbol id="ic-g-etikett" viewBox="0 0 24 24"><path d="M20.4 3.6h-6.6a2 2 0 0 0-1.4.6L3.9 12.7a2 2 0 0 0 0 2.8l4.6 4.6a2 2 0 0 0 2.8 0l8.5-8.5a2 2 0 0 0 .6-1.4z" fill="url(#au)" stroke="#6b4d0e" stroke-width=".55" stroke-linejoin="round"/><circle cx="16.9" cy="7.1" r="1.9" fill="#7d5a11"/><circle cx="16.9" cy="7.1" r="1.9" fill="none" stroke="#c9a842" stroke-width=".5"/><path d="M11.4 11.2L12.14 13.86L14.8 14.6L12.14 15.34L11.4 18L10.66 15.34L8 14.6L10.66 13.86Z" fill="#7d5a11"/><path d="M13.9 5.4 5.4 13.9" fill="none" stroke="#fff6cf" stroke-width=".85" stroke-linecap="round" opacity=".6"/></symbol>
+  <symbol id="ic-g-funken" viewBox="0 0 24 24"><path d="M10.8 2.6L12.57 8.63L18.6 10.4L12.57 12.17L10.8 18.2L9.03 12.17L3 10.4L9.03 8.63Z" fill="url(#au)" stroke="#6b4d0e" stroke-width=".55" stroke-linejoin="round"/><path d="M10.8 4.4 12 8.6" fill="none" stroke="#fff6cf" stroke-width=".85" stroke-linecap="round" opacity=".6"/><path d="M18.4 12.9L19.25 15.95L22.3 16.8L19.25 17.65L18.4 20.7L17.55 17.65L14.5 16.8L17.55 15.95Z" fill="url(#auHell)" stroke="#6b4d0e" stroke-width=".45" stroke-linejoin="round"/><path d="M5.2 16.2L5.77 18.23L7.8 18.8L5.77 19.37L5.2 21.4L4.63 19.37L2.6 18.8L4.63 18.23Z" fill="url(#auHell)" stroke="#6b4d0e" stroke-width=".4" stroke-linejoin="round"/></symbol>
+
+</svg>
+
+<!-- Die Goldverläufe des plastischen Satzes stehen BEWUSST außerhalb des
+     Sprites: Das trägt display:none, und ein Verlauf, der in einem
+     ausgeblendeten Baum definiert ist, wird beim Zeichnen nicht zuverlässig
+     aufgelöst — die Symbole erschienen dann blass bis unsichtbar, je nach
+     Browser und Symbol. Nachgestellt und fotografiert, bevor es hierher
+     verschoben wurde.
+
+     Dieses SVG ist deshalb nicht ausgeblendet, sondern nur null Pixel groß
+     und aus dem Fluss genommen. Es zeichnet nichts und nimmt keinen Platz. -->
+<svg class="ic-defs" width="0" height="0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="au" x1="0" y1="0" x2=".35" y2="1">
+    <stop offset="0" stop-color="#fdf1b6"/><stop offset=".34" stop-color="#f0c95d"/>
+    <stop offset=".66" stop-color="#c9992a"/><stop offset="1" stop-color="#8a6413"/>
+    </linearGradient>
+    <linearGradient id="auHell" x1="0" y1="0" x2=".25" y2="1">
+    <stop offset="0" stop-color="#fffbe4"/><stop offset=".45" stop-color="#f3d472"/>
+    <stop offset="1" stop-color="#b8891c"/>
+    </linearGradient>
+</defs>
 </svg>
 
 <!-- ================= Einrichtung / Login ================= -->
