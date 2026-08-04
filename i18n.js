@@ -418,6 +418,8 @@ const I18N = {
     "status.durMin": "{n} Min.", "status.durStd": "{n} Std.", "status.durTag": "{n} T.",
     "status.checkNote": "GitHub Actions prüft alle fünf Minuten und schreibt jede Messung fest. Verfügbarkeit und Antwortzeit stammen aus diesem Protokoll.",
     "status.rateLimit": "Verlauf und Störungen konnten nicht geladen werden — das Stundenkontingent der GitHub-API ist erschöpft. Die Kennzahlen oben stimmen trotzdem.",
+  "status.rateLimitBis": "Verlauf und Störungen konnten nicht geladen werden — das Stundenkontingent der GitHub-API ist erschöpft, ab {frei} Uhr geht es wieder. Die Kennzahlen oben stimmen trotzdem.",
+  "status.rateLimitAlt": "Verlauf und Störungen stammen von {stand} Uhr — das Stundenkontingent der GitHub-API ist gerade erschöpft, ab {frei} Uhr wird wieder aufgefrischt. Die Kennzahlen oben sind aktuell.",
   },
 
   // =============================== English ===============================
@@ -784,6 +786,8 @@ const I18N = {
     "status.durMin": "{n} min", "status.durStd": "{n} h", "status.durTag": "{n} d",
     "status.checkNote": "GitHub Actions checks every five minutes and records each measurement. Uptime and response time come from that log.",
     "status.rateLimit": "History and incidents could not be loaded — the GitHub API hourly quota is exhausted. The figures above are still accurate.",
+  "status.rateLimitBis": "History and incidents could not be loaded — the GitHub API hourly quota is exhausted, it resumes at {frei}. The figures above are still accurate.",
+  "status.rateLimitAlt": "History and incidents are from {stand} — the GitHub API hourly quota is currently exhausted, refreshing resumes at {frei}. The figures above are current.",
   },
 
   // =============================== Français ===============================
@@ -1150,6 +1154,8 @@ const I18N = {
     "status.durMin": "{n} min", "status.durStd": "{n} h", "status.durTag": "{n} j",
     "status.checkNote": "GitHub Actions vérifie toutes les cinq minutes et consigne chaque mesure. La disponibilité et le temps de réponse proviennent de ce journal.",
     "status.rateLimit": "L'historique et les incidents n'ont pas pu être chargés — le quota horaire de l'API GitHub est épuisé. Les chiffres ci-dessus restent exacts.",
+  "status.rateLimitBis": "L'historique et les incidents n'ont pas pu être chargés — le quota horaire de l'API GitHub est épuisé, il repart à {frei}. Les chiffres ci-dessus restent exacts.",
+  "status.rateLimitAlt": "L'historique et les incidents datent de {stand} — le quota horaire de l'API GitHub est épuisé pour l'instant, l'actualisation reprend à {frei}. Les chiffres ci-dessus sont à jour.",
   },
 
   // =============================== Español ===============================
@@ -1516,6 +1522,8 @@ const I18N = {
     "status.durMin": "{n} min", "status.durStd": "{n} h", "status.durTag": "{n} d",
     "status.checkNote": "GitHub Actions comprueba cada cinco minutos y registra cada medición. La disponibilidad y el tiempo de respuesta salen de ese registro.",
     "status.rateLimit": "No se pudieron cargar el historial ni las incidencias: la cuota horaria de la API de GitHub está agotada. Las cifras de arriba siguen siendo correctas.",
+  "status.rateLimitBis": "No se pudieron cargar el historial ni las incidencias: la cuota horaria de la API de GitHub está agotada y vuelve a las {frei}. Las cifras de arriba siguen siendo correctas.",
+  "status.rateLimitAlt": "El historial y las incidencias son de las {stand}: la cuota horaria de la API de GitHub está agotada ahora mismo y se actualizará de nuevo a las {frei}. Las cifras de arriba están al día.",
   },
 
   // =============================== Italiano ===============================
@@ -1882,6 +1890,8 @@ const I18N = {
     "status.durMin": "{n} min", "status.durStd": "{n} h", "status.durTag": "{n} g",
     "status.checkNote": "GitHub Actions controlla ogni cinque minuti e registra ogni misurazione. Disponibilità e tempo di risposta provengono da quel registro.",
     "status.rateLimit": "Storico e disservizi non sono stati caricati: la quota oraria dell'API GitHub è esaurita. I valori qui sopra restano corretti.",
+  "status.rateLimitBis": "Storico e disservizi non sono stati caricati: la quota oraria dell'API GitHub è esaurita, riparte alle {frei}. I valori qui sopra restano corretti.",
+  "status.rateLimitAlt": "Storico e disservizi sono delle {stand}: la quota oraria dell'API GitHub è esaurita al momento, si aggiorna di nuovo dalle {frei}. I valori qui sopra sono aggiornati.",
   },
 };
 
