@@ -9,7 +9,8 @@
    "es": "El botón «Actualizar» del estado del sitio se saboteaba solo: cada clic costaba seis peticiones a la API de GitHub y, tras unos diez clics por hora, desaparecían el gráfico, las barras diarias y la lista de incidencias. Ahora un clic se actualiza desde la fuente gratuita y normalmente no cuesta nada. Si aun así se agota la cuota, el historial que ya había se mantiene en pantalla, indicando de cuándo es y a partir de cuándo se reanuda.",
    "it": "Il pulsante «Aggiorna» dello stato del sito si autosabotava: ogni clic costava sei richieste all'API di GitHub e, dopo circa dieci clic all'ora, sparivano grafico, barre giornaliere ed elenco dei disservizi. Ora un clic si aggiorna dalla fonte gratuita e di norma non costa nulla. Se la quota si esaurisce comunque, lo storico già caricato resta a schermo, con l'indicazione di quando risale e da quando riprende."
   },
-  "pr": 223
+  "pr": 223,
+  "version": "0.82.2"
  },
  {
   "am": "2026-08-04T23:45:00+02:00",
