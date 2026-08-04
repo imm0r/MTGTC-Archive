@@ -9,7 +9,8 @@
    "es": "Los botones de las barras de filtros — actualizar precios, lista de venta, tus combos y sus vecinos — están ahora exactamente a la altura de los desplegables de al lado. Antes eran cinco píxeles más altos y sobresalían visiblemente sobre cada selección.",
    "it": "I pulsanti delle barre dei filtri — aggiorna prezzi, lista di vendita, le tue combo e i loro vicini — stanno ora esattamente all’altezza dei menu a tendina accanto. Prima erano cinque pixel più alti e sporgevano visibilmente sopra ogni selezione."
   },
-  "pr": 237
+  "pr": 237,
+  "version": "0.86.3"
  },
  {
   "am": "2026-08-05T12:20:00+02:00",
