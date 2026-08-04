@@ -888,6 +888,16 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .combo-det>summary:hover{color:var(--acc)}
 .combo-det[open]>summary{color:var(--txt);margin-bottom:4px}
 .combo-det-body{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--dim);line-height:1.45}
+/* Ein übersetzter Baustein trägt das englische Original im title. Der
+   gepunktete Unterstrich sagt, dass dort etwas zu holen ist — dezent, weil er
+   im Regelfall an JEDEM Satz einer Anleitung steht und sonst zum Muster würde.
+
+   Warum das Original überhaupt erreichbar bleibt: Eine falsch übersetzte
+   Combo-Anleitung ist schlimmer als eine englische. Wer nach einem Satz
+   spielt, der etwas anderes meinte, verliert die Partie und weiß nicht warum.
+   Der Weg zurück zum Original kostet hier eine Zeile CSS. */
+.cmb-uebersetzt{text-decoration:underline dotted var(--line);text-underline-offset:3px;cursor:help}
+.cmb-uebersetzt:hover{text-decoration-color:var(--acc)}
 /* Aufgeklappte Details SCHWEBEN unter der Kachel (absolut), damit die Grid-Zeile
    nicht wächst und die folgenden Kacheln nicht nach unten rutschen. */
 .combo-det[open]>.combo-det-body{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:20;
