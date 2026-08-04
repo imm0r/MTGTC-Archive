@@ -169,6 +169,10 @@
    gleichmäßiges Polster. */
 .btn:has(>.gic:first-child){padding-left:12px}
 .btn.sm:has(>.gic:first-child){padding-left:7px}
+/* Nur Symbol, kein Text (die Zeilenwerkzeuge der Sammlung): dann auch rechts
+   das knappe Polster, sonst hinge das Bild links in einem rechtslastigen
+   Knopf. */
+.btn.sm:has(>.gic:only-child){padding-right:7px}
 
 /* Die Werkzeugzeile bricht NICHT um — fünf Elemente, eine Zeile, immer.
    Vorher rutschte je nach Spaltenbreite mal der letzte Knopf in eine zweite

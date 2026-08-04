@@ -3216,13 +3216,13 @@ function cardRow(c, o = {}) {
           // Verkaufsliste — verkaufen lässt sich nur, was man hat. Der Preis
           // bleibt: er ist der Grund, eine Wunschliste zu führen.
           : wunsch
-          ? `<button class="btn ghost sm" data-price title="${esc(t("row.priceTitle"))}">${ico("neu")}</button>`
-          : `<button class="btn ghost sm" data-edit title="${esc(t("row.editTitle"))}">${ico("stift")}</button>
-        <button class="btn ghost sm" data-price title="${esc(t("row.priceTitle"))}">${ico("neu")}</button>
-        <button class="btn ghost sm sell-toggle${c.for_sale ? " on" : ""}" data-sell title="${esc(t("row.sellTitle"))}">&#8364;</button>`}
+          ? `<button class="btn ghost sm" data-price title="${esc(t("row.priceTitle"))}">${icoGold("neu")}</button>`
+          : `<button class="btn ghost sm" data-edit title="${esc(t("row.editTitle"))}">${icoGold("stift")}</button>
+        <button class="btn ghost sm" data-price title="${esc(t("row.priceTitle"))}">${icoGold("neu")}</button>
+        <button class="btn ghost sm sell-toggle${c.for_sale ? " on" : ""}" data-sell title="${esc(t("row.sellTitle"))}">${icoGold("euro")}</button>`}
         <button class="btn ghost sm" data-del title="${imDeck
           ? esc(t("row.removeFromDeck"))
-          : wunsch ? esc(t("wish.removeTitle")) : esc(t("row.removeRow"))}">&times;</button>
+          : wunsch ? esc(t("wish.removeTitle")) : esc(t("row.removeRow"))}">${icoGold("kreuz")}</button>
       </td>
     </tr>`;
 }

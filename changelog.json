@@ -1,5 +1,18 @@
 [
  {
+  "am": "2026-08-05T11:30:00+02:00",
+  "art": "verbessert",
+  "text": {
+   "de": "Auch die vier Werkzeuge in den Zeilen von Sammlung und Wunschliste sind jetzt golden: Bearbeiten, Preis holen, die Euro-Münze für die Verkaufsliste und das Kreuz zum Entfernen. Damit trägt die letzte Knopfleiste der App den plastischen Stil.",
+   "en": "The four tools in the collection and wishlist rows are now gold too: edit, fetch price, the euro coin for the sale list and the cross for removing. With that, the last button bar of the app carries the sculpted style.",
+   "fr": "Les quatre outils des lignes de la collection et de la liste de souhaits sont désormais dorés eux aussi : modifier, récupérer le prix, la pièce en euro pour la liste de vente et la croix pour retirer. La dernière barre de boutons de l’appli porte ainsi le style en relief.",
+   "es": "Las cuatro herramientas de las filas de la colección y la lista de deseos también son ahora doradas: editar, obtener precio, la moneda de euro para la lista de venta y la cruz para quitar. Con ello, la última barra de botones de la app lleva el estilo en relieve.",
+   "it": "Anche i quattro strumenti nelle righe della collezione e della lista dei desideri ora sono dorati: modifica, aggiorna prezzo, la moneta in euro per la lista di vendita e la croce per rimuovere. Con questo l’ultima barra di pulsanti dell’app porta lo stile in rilievo."
+  },
+  "pr": 235,
+  "version": "0.86.1"
+ },
+ {
   "am": "2026-08-05T10:40:00+02:00",
   "art": "verbessert",
   "text": {
