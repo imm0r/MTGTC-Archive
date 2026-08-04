@@ -131,9 +131,11 @@ Deno.serve(async (req) => {
   let lang = "de";
   type Teil = { text: string; frage: boolean };
   let teile: Teil[] = [];
+  let angefragt = 0;
   try {
     const body = await req.json();
     lang = SPRACHE[body.lang] ? String(body.lang) : "de";
+    angefragt = Array.isArray(body.teile) ? body.teile.length : 0;
     teile = (Array.isArray(body.teile) ? body.teile : [])
       .slice(0, MAX_TEILE)
       .map((x: { text?: unknown; frage?: unknown }) => ({
@@ -200,22 +202,55 @@ Deno.serve(async (req) => {
   const kontext = teile.map((t, i) =>
     nummer.has(i) ? `[${nummer.get(i)}] ${t.text}` : `    ${t.text}`).join("\n");
 
+  /* Das Budget wächst mit der Arbeit, wie bei card-synergy. Gemessen an 50
+     Combos von Spellbook: 40 Teile sind zusammen 1673 Zeichen. Deutsch ist
+     rund 15 % länger, ein Token fasst dort etwa drei Zeichen, und je Eintrag
+     kommen ~22 Zeichen JSON-Gerüst dazu — macht für diese 40 Teile knapp 950
+     Token. Eine feste Zahl wäre entweder für kurze Combos verschwendet oder
+     für lange zu knapp; abgeschnitten wird die Antwort unbrauchbar. */
+  const zeichen = offen.reduce((a, t) => a + t.text.length, 0);
+  const maxTokens = Math.min(8000, 500 + Math.ceil((zeichen * 1.15 + offen.length * 22) / 3));
+
   const anthropic = new Anthropic({ apiKey: key });
   let ergebnis: { nr: number; text: string }[] = [];
   try {
+    /* output_config statt tools/tool_choice — so rufen scan-card,
+       card-synergy und rules-question das Modell auch auf. Ein Weg für alle
+       vier: Wer den einen kennt, kennt sie alle, und was dort erprobt ist,
+       gilt hier mit. */
     const res = await anthropic.messages.create({
       model: MODEL,
-      max_tokens: 2000,
+      max_tokens: maxTokens,
       system: anweisung(SPRACHE[lang]),
-      tools: [{ name: "uebersetzung", description: "Die Übersetzungen zurückgeben.", input_schema: SCHEMA }],
-      tool_choice: { type: "tool", name: "uebersetzung" },
+      output_config: { format: { type: "json_schema", schema: SCHEMA } },
       messages: [{
         role: "user",
         content: `Die vollständige Combo-Anleitung. Übersetze NUR die Zeilen mit Nummer in eckigen Klammern, und gib zu jeder ihre Nummer zurück.\n\n${kontext}`,
       }],
     });
-    const block = res.content.find(c => c.type === "tool_use");
-    ergebnis = block && "input" in block ? (block.input as { texte: typeof ergebnis }).texte ?? [] : [];
+
+    /* Abgelehnt oder abgeschnitten: beides endet mit einer unbrauchbaren
+       Antwort, und beides soll im Protokoll stehen statt lautlos zu nichts zu
+       werden. Der Client bekommt trotzdem 200 und das englische Original — an
+       einer fehlgeschlagenen Übersetzung ist für ihn nichts zu tun. */
+    if (res.stop_reason === "refusal" || res.stop_reason === "max_tokens") {
+      console.error(`combo-uebersetzen: Antwort unbrauchbar (${res.stop_reason}), ` +
+        `lang=${lang} offen=${offen.length} max_tokens=${maxTokens}`);
+      return json({ texte: antwort(), code: res.stop_reason, neu: 0 }, 200);
+    }
+    const block = res.content.find(b => b.type === "text");
+    if (!block || block.type !== "text") {
+      console.error(`combo-uebersetzen: kein Textblock in der Antwort, stop_reason=${res.stop_reason}`);
+      return json({ texte: antwort(), code: "ki_fehler", neu: 0 }, 200);
+    }
+    ergebnis = JSON.parse(block.text).texte ?? [];
+    /* `angefragt` steht mit im Protokoll, weil MAX_TEILE oben stillschweigend
+       kappt: In einer Ansicht mit vielen Combos schickt der Client leicht
+       neunzig Teile, und die dahinter bleiben englisch. Ohne diese Zahl sähe
+       ein solcher Lauf aus wie ein vollständiger. */
+    console.log(`combo-uebersetzen: lang=${lang} angefragt=${angefragt} teile=${teile.length} ` +
+      `offen=${offen.length} zurück=${ergebnis.length} ` +
+      `token=${res.usage.input_tokens}/${res.usage.output_tokens} von ${maxTokens}`);
   } catch (e) {
     /* Die Meldung bleibt HIER. Sie kann enthalten, was ein Aufrufer nicht
        wissen soll — Anthropic legt in Fehlern schon mal Endpunkte, Modellnamen

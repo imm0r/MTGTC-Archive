@@ -1,5 +1,18 @@
 [
  {
+  "am": "2026-08-04T22:00:00+02:00",
+  "art": "behoben",
+  "text": {
+   "de": "Die Übersetzung der Combo-Anleitungen blieb aus, sobald viele Combos auf einmal auf der Seite standen: Bei einer einzelnen Combo in den Kartendetails klappte es, in der großen Ansicht kam nichts an. Der Platz für die Antwort war fest gesetzt und für lange Anleitungen zu knapp — jetzt wächst er mit der Menge an Text mit.",
+   "en": "The translation of combo instructions stayed away as soon as many combos were on the page at once: with a single combo in the card details it worked, in the big view nothing arrived. The room for the answer was fixed and too tight for long instructions — now it grows with the amount of text.",
+   "fr": "La traduction des instructions de combo ne venait pas dès que beaucoup de combos étaient affichées en même temps : avec une seule combo dans les détails de carte, cela marchait ; dans la grande vue, rien n'arrivait. La place pour la réponse était figée et trop juste pour de longues instructions — elle grandit désormais avec la quantité de texte.",
+   "es": "La traducción de las instrucciones de combo no llegaba en cuanto había muchos combos a la vez en la página: con un solo combo en los detalles de carta funcionaba, en la vista grande no aparecía nada. El espacio para la respuesta era fijo y demasiado justo para instrucciones largas — ahora crece con la cantidad de texto.",
+   "it": "La traduzione delle istruzioni delle combo non arrivava non appena molte combo stavano sulla pagina insieme: con una sola combo nei dettagli carta funzionava, nella vista grande non compariva nulla. Lo spazio per la risposta era fisso e troppo stretto per istruzioni lunghe — ora cresce con la quantità di testo."
+  },
+  "pr": 220,
+  "version": "0.81.2"
+ },
+ {
   "am": "2026-08-04T21:30:00+02:00",
   "art": "behoben",
   "text": {
