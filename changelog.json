@@ -3,7 +3,8 @@
   "am": "2026-08-04T17:45:00+02:00",
   "art": "behoben",
   "text": "Die Ausgangszonen einer Combo standen in jeder Sprache auf Englisch — „Battlefield“ statt „Schlachtfeld“, obwohl die App dieselben Wörter auf der Spielmatte längst übersetzt. Jetzt stehen sie überall in deiner Sprache.",
-  "pr": 217
+  "pr": 217,
+  "version": "0.80.2"
  },
  {
   "am": "2026-08-04T17:00:00+02:00",
