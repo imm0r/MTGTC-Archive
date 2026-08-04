@@ -1894,6 +1894,49 @@ html[data-syn-mode="ki"] .syn-std-btn{display:none}
 html[data-syn-mode="standard"] .syn-ai-btn{display:none}
 /* Globaler Admin-Schalter: KI-Synergien für ALLE aus → KI-Knopf überall weg. */
 html[data-ki-global="off"] .syn-ai-btn{display:none}
+/* ====================== Ladebilder aus dem Sinnbild ======================
+   Wo ein Knopf ein eigenes, sprechendes Sinnbild hat, erzählt es das Warten
+   selbst, statt einem allgemeinen Ladering zu weichen:
+
+     Preis          das Auffrisch-Zeichen dreht im Uhrzeigersinn
+     Synergien      die beiden Zahnräder drehen ineinandergreifend
+     KI-Synergien   die drei Funken blenden versetzt auf und ab
+
+   Ein Ring an ihrer Stelle sagt nur „es lädt". Das bewegte Bild sagt, WAS
+   lädt — und es erspart den Bildwechsel beim Klick.
+
+   WARUM DIE ANIMATION IM SPRITE STEHT und nicht hier: <use> holt den Inhalt
+   in einen Schattenbaum, und den erreicht kein Selektor von außen. Eine Regel
+   wie „.ic-g-funken-laed g" trifft nichts. Hinein reichen nur vererbte
+   Eigenschaften und Angaben am Element selbst — deshalb trägt jede bewegte
+   Gruppe im Sprite ihr eigenes style="animation:…". Die NAMEN lösen sich
+   global auf, und deshalb stehen die Muster hier.
+
+   Aus demselben Grund gibt es je zwei Symbole, ein ruhendes und ein bewegtes,
+   statt einer umschaltbaren Klasse: Von außen lässt sich am Schattenbaum
+   nichts anschalten, nur das ganze Symbol tauschen.
+
+   --ic-takt ist der gemeinsame Regler. Custom Properties WERDEN vererbt und
+   reichen deshalb als einzige in den Schattenbaum hinein — die Dauern stehen
+   dort als calc() darauf. Ohne diesen Umweg ließe sich das Tempo von hier
+   überhaupt nicht mehr anfassen, und „weniger Bewegung" bliebe wirkungslos.
+   So genügt EINE Zeile, um alle drei zu beruhigen — dieselbe Antwort, die
+   .syn-spin weiter unten für den Ring gibt. */
+:root{--ic-takt:1.15s}
+@media (prefers-reduced-motion:reduce){:root{--ic-takt:2.9s}}
+@keyframes ic-funkeln{0%,100%{opacity:1}50%{opacity:.2}}
+@keyframes ic-drehen{to{transform:rotate(360deg)}}
+@keyframes ic-drehen-rueck{to{transform:rotate(-360deg)}}
+/* Zucken statt Blenden: hart an, hart aus, den größten Teil der Runde dunkel.
+   Die beiden Blitze laufen um eine halbe Runde versetzt, also schlägt immer
+   nur einer ein. Das unterscheidet sie deutlich vom weichen Funkeln daneben —
+   dieselbe Bewegung an zwei Knöpfen wäre zweimal dieselbe Aussage.
+
+   Die halbe Runde hell ist mit Absicht so lang: Bei einem kurzen Aufblitzen
+   waren beide Blitze die meiste Zeit dunkel, und der Knopf sah dann leer aus
+   statt beschäftigt. So brennt immer genau einer. */
+@keyframes ic-blitzen{0%,48%{opacity:1}50%,100%{opacity:.22}}
+
 /* Sich drehender Ring, solange etwas lädt. Die Klasse sitzt am Symbol selbst,
    nicht an einer Hülle darum: Ein inline-block um ein 1em hohes Symbol ist so
    hoch wie die ZEILE, nicht wie das Symbol — der Drehpunkt läge damit unter

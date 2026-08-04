@@ -5533,14 +5533,21 @@ function renderDetail(c, id, fremd) {
   $("#dt-edit").onclick = () => { $("#detail-dlg").close(); editCard(id); };
   const pb = $("#dt-price");
   pb.onclick = async () => {
-    pb.disabled = true;
+    // Solange der Preis geholt wird, dreht das Auffrisch-Zeichen. Vorher war
+    // der Knopf nur gesperrt — bei einer trägen Antwort sah das aus, als wäre
+    // der Klick ins Leere gegangen.
+    const lbl = t("detail.priceBtn");
+    synBtnBusy(pb, lbl, true, icoGold("neu"), icoGold("neu-laed"));
     try {
       const p = await preisNeuZiehen(c);
       await reload(); renderAll();
       toast(p == null ? t("toast.noPrice") : t("toast.priceUpdated", { p: eur(p) }));
       // Ansicht mit dem frischen Preis und dem neuen Kurvenpunkt neu zeichnen.
       if ($("#detail-dlg").open) showCardDetail(id);
-    } catch (e) { pb.disabled = false; toast(e.message); }
+    } catch (e) { toast(e.message); }
+    // Zurücksetzen in jedem Fall: Hat showCardDetail() neu gezeichnet, hängt
+    // pb nicht mehr im Baum und die Zuweisung läuft ins Leere — schadlos.
+    finally { synBtnBusy(pb, lbl, false, icoGold("neu")); }
   };
   wireDetailSynergien(c);
 }
@@ -5581,7 +5588,7 @@ function wireDetailSynergien(c) {
   const yb = $("#dt-syn");
   if (yb) yb.onclick = async () => {
     const lbl = t("syn.find");
-    synBtnBusy(yb, lbl, true, icoGold("zahnraeder"));
+    synBtnBusy(yb, lbl, true, icoGold("zahnraeder"), icoGold("zahnraeder-laed"));
     synGeschwister([$("#dt-syn-ai")], true);
     const weg = excludeVon([c]);   // nur die Ausgangskarte selbst raus, Besessenes darf auftauchen
     try {
@@ -5599,7 +5606,7 @@ function wireDetailSynergien(c) {
   const ab = $("#dt-syn-ai");
   if (ab) ab.onclick = () => {
     const lbl = t("syn.ai");
-    synBtnBusy(ab, lbl, true, icoGold("funken"));
+    synBtnBusy(ab, lbl, true, icoGold("funken"), icoGold("funken-laed"));
     synGeschwister([$("#dt-syn")], true);
     kiSynergien(c, $("#syn-box"), { maxPrice: numVal($("#syn-cap")) })
       .finally(() => { synBtnBusy(ab, lbl, false, icoGold("funken")); synGeschwister([$("#dt-syn")], false); });
@@ -5609,7 +5616,7 @@ function wireDetailSynergien(c) {
   const cb = $("#dt-combos");
   if (cb) cb.onclick = () => {
     const lbl = t("combo.btn");
-    synBtnBusy(cb, lbl, true, icoGold("blitze"));
+    synBtnBusy(cb, lbl, true, icoGold("blitze"), icoGold("blitze-laed"));
     karteCombosAnzeigen($("#card-combo-box"), c)
       .finally(() => synBtnBusy(cb, lbl, false, icoGold("blitze")));
   };
@@ -6515,11 +6522,17 @@ function ladeZeigen(box, deckId, text, hinweis) {
 }
 
 /* Synergie-Knopf in den Ladezustand versetzen: Lupe → drehender Ladering,
-   Knopf gesperrt. Zurück auf die Lupe, wenn die Suche fertig ist. */
-function synBtnBusy(btn, label, busy, icon) {
+   Knopf gesperrt. Zurück auf die Lupe, wenn die Suche fertig ist.
+
+   ladeIcon: Ein Knopf darf sein eigenes Ladebild mitbringen, statt den Ring zu
+   nehmen. Die KI-Synergien tun das — ihr Sinnbild sind drei Funken, und die
+   funkeln, während gesucht wird. Ein Ring daneben wäre die zweite Aussage für
+   dieselbe Sache, und die schwächere: Er sagt nur „es lädt", das funkelnde
+   Bild sagt „ES lädt". */
+function synBtnBusy(btn, label, busy, icon, ladeIcon) {
   if (!btn) return;
   btn.disabled = busy;
-  btn.innerHTML = (busy ? `${ico("laden", "syn-spin")}` : (icon || ico("lupe"))) + " " + esc(label);
+  btn.innerHTML = (busy ? (ladeIcon || ico("laden", "syn-spin")) : (icon || ico("lupe"))) + " " + esc(label);
 }
 
 /* Konkurrierende Geschwister-Knöpfe während einer Suche sperren (Standard-,
