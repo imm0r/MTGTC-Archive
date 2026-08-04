@@ -17515,38 +17515,97 @@ function statusLage(dienste) {
    waeren dafuer verschwendet. raw.githubusercontent hat keins. */
 let STATUS_KURZ = null;
 
+/* JEDER Abruf hier bekommt eine Zeitgrenze. `fetch` hat von sich aus keine:
+   Antwortet die Gegenseite nie, wartet das Versprechen für immer — es scheitert
+   nicht, es kommt nur nie zurück. Alles, was daran hängt, hängt mit, und zwar
+   ohne Fehlermeldung. Zwölf Sekunden sind großzügig für eine JSON-Datei vom
+   CDN und immer noch kurz genug, dass niemand denkt, die Seite sei tot. */
+const STATUS_GEDULD = 12 * 1000;
+
+/* So lange gilt der kontingentpflichtige Teil (Verlauf und Störungen) als
+   frisch genug. Fünf Minuten wie beim Rest wären zu kurz: Upptime misst zwar
+   alle fünf Minuten, aber ein Verlaufsgraph über sieben Tage sieht nach zehn
+   Minuten noch genauso aus — und jeder Abruf kostet sechs von sechzig
+   Anfragen je Stunde. */
+const STATUS_API_FRISCH = 10 * 60 * 1000;
+
+async function statusFetch(url) {
+  const ab = new AbortController();
+  const uhr = setTimeout(() => ab.abort(), STATUS_GEDULD);
+  try {
+    const r = await fetch(url, { cache: "no-store", signal: ab.signal });
+    if (!r.ok) {
+      const f = new Error(String(r.status));
+      /* Bei erschöpftem Kontingent sagt GitHub im Kopf, wann es wieder geht
+         (Sekunden seit 1970). Das ist die einzige brauchbare Auskunft in einem
+         403 — „erschöpft" weiß der Nutzer schon, „ab 13:05" hilft ihm. */
+      const reset = Number(r.headers.get("x-ratelimit-reset"));
+      if (r.status === 403 && reset) f.reset = reset * 1000;
+      throw f;
+    }
+    return await r.json();
+  } finally { clearTimeout(uhr); }
+}
+
 async function statusKurzHolen() {
   if (STATUS_KURZ && Date.now() - STATUS_KURZ.stand < STATUS_FRISCH) return STATUS_KURZ.dienste;
-  const r = await fetch(`${STATUS_ROH}/history/summary.json`, { cache: "no-store" });
-  if (!r.ok) throw new Error(String(r.status));
-  STATUS_KURZ = { stand: Date.now(), dienste: await r.json() };
+  STATUS_KURZ = { stand: Date.now(), dienste: await statusFetch(`${STATUS_ROH}/history/summary.json`) };
   return STATUS_KURZ.dienste;
 }
 
 async function statusHolen(neu) {
   if (!neu && STATUS_DATEN && Date.now() - STATUS_DATEN.stand < STATUS_FRISCH) return STATUS_DATEN;
 
-  const json = async url => {
-    const r = await fetch(url, { cache: "no-store" });
-    if (!r.ok) throw new Error(String(r.status));
-    return r.json();
-  };
-
-  const dienste = await json(`${STATUS_ROH}/history/summary.json`);   // Pflicht
+  const dienste = await statusFetch(`${STATUS_ROH}/history/summary.json`);   // Pflicht
   STATUS_KURZ = { stand: Date.now(), dienste };   // die Kopfzeile lebt davon mit
 
-  let stoerungen = [], verlauf = {}, apiOk = true;
-  try {
-    const [issues, ...reihen] = await Promise.all([
-      json(`${STATUS_API}/issues?labels=status&state=all&per_page=100`),
-      ...dienste.map(d => json(`${STATUS_API}/commits?path=history/${encodeURIComponent(d.slug)}.yml&per_page=100`))
-    ]);
-    // /issues liefert auch Pull Requests mit; die sind hier keine Störung.
-    stoerungen = (issues || []).filter(i => !i.pull_request);
-    dienste.forEach((d, i) => { verlauf[d.slug] = statusVerlauf(reihen[i]); });
-  } catch { apiOk = false; verlauf = {}; }
+  /* ---- Der teure Teil, und warum er nicht bei jedem Klick neu geholt wird --
+     Ein voller Abruf kostet SECHS Anfragen an die GitHub-API: einmal die
+     Störungen und je Dienst einmal den Commit-Verlauf. Unangemeldet sind 60 je
+     Stunde und IP erlaubt — nach zehn Klicks auf „Aktualisieren" war das
+     Kontingent weg, und die Seite fiel auf „Verlauf und Störungen konnten
+     nicht geladen werden" zurück. Gemeldet genau so, und zu Recht: Der Knopf
+     lud sich selbst kaputt.
 
-  STATUS_DATEN = { stand: Date.now(), dienste, stoerungen, verlauf, apiOk };
+     Was sich zwischen zwei Klicks ändert, ist die Zusammenfassung — und die
+     kommt von raw.githubusercontent, ohne Kontingent. Der Verlauf ändert sich
+     im Minutentakt praktisch nicht, die Störungsliste noch weniger. Sie werden
+     deshalb nur geholt, wenn sie fehlen oder älter als zehn Minuten sind. Ein
+     Klick kostet damit im Regelfall NULL Anfragen. */
+  const alt = STATUS_DATEN;
+  let stoerungen = alt?.stoerungen ?? [];
+  let verlauf    = alt?.verlauf ?? {};
+  let apiStand   = alt?.apiStand ?? 0;
+  let apiSperre  = alt?.apiSperre ?? 0;
+
+  const habenWir  = apiStand > 0;
+  const nochFrisch = habenWir && Date.now() - apiStand < STATUS_API_FRISCH;
+  const gesperrt   = apiSperre > Date.now();
+
+  if (!nochFrisch && !gesperrt) {
+    try {
+      const [issues, ...reihen] = await Promise.all([
+        statusFetch(`${STATUS_API}/issues?labels=status&state=all&per_page=100`),
+        ...dienste.map(d => statusFetch(`${STATUS_API}/commits?path=history/${encodeURIComponent(d.slug)}.yml&per_page=100`))
+      ]);
+      // /issues liefert auch Pull Requests mit; die sind hier keine Störung.
+      stoerungen = (issues || []).filter(i => !i.pull_request);
+      verlauf = {};
+      dienste.forEach((d, i) => { verlauf[d.slug] = statusVerlauf(reihen[i]); });
+      apiStand = Date.now();
+      apiSperre = 0;
+    } catch (e) {
+      /* Was wir schon hatten, BEHALTEN wir. Vorher wurde hier geleert, und
+         damit verschwanden Graph, Tagesbalken und Störungsliste, die eine
+         Minute vorher noch dastanden — ein Rückschritt, den der Klick
+         verursacht hat. Ein zehn Minuten alter Verlauf ist eine bessere
+         Auskunft als gar keiner, solange die Seite dazusagt, wie alt er ist. */
+      if (e && e.reset) apiSperre = e.reset;
+    }
+  }
+
+  STATUS_DATEN = { stand: Date.now(), dienste, stoerungen, verlauf,
+                   apiStand, apiSperre, apiOk: apiStand > 0 };
   return STATUS_DATEN;
 }
 
@@ -17655,6 +17714,18 @@ function statusZeichnen(el, d) {
   const lage = statusLage(d.dienste);
   kopfLageSetzen(lage);   // dieselbe Lage im Kopf, ohne erneuten Abruf
 
+  /* Drei Lagen beim kontingentpflichtigen Teil, und sie brauchen drei Sätze.
+     Nur „erschöpft" zu sagen, wenn der Verlauf in Wahrheit dasteht und bloß
+     zehn Minuten alt ist, wäre falsch — und nur den Verlauf zu zeigen, ohne
+     sein Alter zu nennen, wäre es auch. */
+  const uhr = ms => new Date(ms).toLocaleTimeString(LANG, { hour: "2-digit", minute: "2-digit" });
+  const gesperrt = d.apiSperre > Date.now();
+  const apiHinweis =
+    d.apiOk && gesperrt ? t("status.rateLimitAlt", { stand: uhr(d.apiStand), frei: uhr(d.apiSperre) })
+    : d.apiOk           ? ""
+    : gesperrt          ? t("status.rateLimitBis", { frei: uhr(d.apiSperre) })
+    :                     t("status.rateLimit");
+
   const karte = s => {
     const art = s.status === "down" ? "err" : s.status === "degraded" ? "warn" : "ok";
     const txt = s.status === "down" ? t("status.down")
@@ -17711,13 +17782,13 @@ function statusZeichnen(el, d) {
       `<button type="button" data-zeit="${z.id}" class="${z.id === zeit ? "on" : ""}">${esc(t("status.period." + z.id))}</button>`
     ).join("")}</div>
 
-    ${d.apiOk ? "" : `<div class="card"><p class="hint">${esc(t("status.rateLimit"))}</p></div>`}
+    ${apiHinweis ? `<div class="card"><p class="hint st-api-hinweis">${esc(apiHinweis)}</p></div>` : ""}
 
     ${raster}
 
     <div class="card">
       <h3 class="st-titel">${esc(t("status.incidents"))}</h3>
-      ${d.apiOk ? statusStoerungen(d.stoerungen) : `<p class="hint">${esc(t("status.rateLimit"))}</p>`}
+      ${d.apiOk ? statusStoerungen(d.stoerungen) : `<p class="hint">${esc(apiHinweis)}</p>`}
     </div>
 
     <div class="card">
@@ -17730,10 +17801,27 @@ function statusZeichnen(el, d) {
     STATUS_ZEIT = b.dataset.zeit;
     statusZeichnen(el, d);
   });
+  /* Der Knopf sperrt sich, solange abgerufen wird — sonst löst ein zweiter
+     Klick einen zweiten Satz Anfragen aus, und die zählen am Stundenkontingent
+     der GitHub-API mit.
+
+     ZURÜCK MUSS ER IMMER KOMMEN, und daran hing es: Freigegeben wurde er nur
+     im .catch, also bei einem Fehlschlag. Ein Abruf, der weder gelingt noch
+     scheitert, ließ ihn dauerhaft gesperrt zurück — `fetch` hat von sich aus
+     KEINE Zeitgrenze, ein hängender Abruf bleibt also für immer hängen. Danach
+     half nur noch das Neuladen der Seite, und die Seite selbst sah dabei völlig
+     in Ordnung aus: Alle Zahlen standen da, nur der Knopf ging nicht mehr.
+
+     Jetzt beides: eine Zeitgrenze für den Abruf, und die Freigabe in einem
+     finally statt im catch. Zeichnet statusZeichnen neu, ist der Knopf ohnehin
+     ein anderer — die Freigabe läuft dann ins Leere und schadet nicht. */
   const neu = el.querySelector("#st-neu");
   if (neu) neu.onclick = () => {
     neu.disabled = true;
-    statusHolen(true).then(f => statusZeichnen(el, f)).catch(() => { neu.disabled = false; });
+    statusHolen(true)
+      .then(f => statusZeichnen(el, f))
+      .catch(() => { /* Fehlschlag: der alte Stand bleibt stehen */ })
+      .finally(() => { neu.disabled = false; });
   };
 }
 

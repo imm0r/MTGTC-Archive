@@ -1,5 +1,18 @@
 [
  {
+  "am": "2026-08-05T00:15:00+02:00",
+  "art": "behoben",
+  "text": {
+   "de": "Der Knopf „Aktualisieren\" im Site Status lud sich selbst kaputt: Jeder Klick kostete sechs Anfragen an die GitHub-API, und nach etwa zehn Klicks je Stunde verschwanden Graph, Tagesbalken und Störungsliste. Ein Klick frischt jetzt über die kostenlose Quelle auf und kostet im Regelfall nichts. Ist das Kontingent doch einmal erschöpft, bleibt der bisherige Verlauf stehen — mit dem Hinweis, von wann er ist und ab wann es weitergeht.",
+   "en": "The “Refresh” button on Site Status was loading itself into a wall: every click cost six GitHub API requests, and after about ten clicks an hour the graph, daily bars and incident list disappeared. A click now refreshes from the free source and normally costs nothing. If the quota does run out, the history you already had stays on screen — with a note saying when it is from and when refreshing resumes.",
+   "fr": "Le bouton « Actualiser » du statut du site se sabordait : chaque clic coûtait six requêtes à l'API GitHub, et après une dizaine de clics par heure le graphique, les barres journalières et la liste des incidents disparaissaient. Un clic actualise désormais via la source gratuite et ne coûte normalement rien. Si le quota est malgré tout épuisé, l'historique déjà chargé reste affiché — avec la mention de sa date et de l'heure de reprise.",
+   "es": "El botón «Actualizar» del estado del sitio se saboteaba solo: cada clic costaba seis peticiones a la API de GitHub y, tras unos diez clics por hora, desaparecían el gráfico, las barras diarias y la lista de incidencias. Ahora un clic se actualiza desde la fuente gratuita y normalmente no cuesta nada. Si aun así se agota la cuota, el historial que ya había se mantiene en pantalla, indicando de cuándo es y a partir de cuándo se reanuda.",
+   "it": "Il pulsante «Aggiorna» dello stato del sito si autosabotava: ogni clic costava sei richieste all'API di GitHub e, dopo circa dieci clic all'ora, sparivano grafico, barre giornaliere ed elenco dei disservizi. Ora un clic si aggiorna dalla fonte gratuita e di norma non costa nulla. Se la quota si esaurisce comunque, lo storico già caricato resta a schermo, con l'indicazione di quando risale e da quando riprende."
+  },
+  "pr": 223,
+  "version": "0.82.2"
+ },
+ {
   "am": "2026-08-04T23:45:00+02:00",
   "art": "behoben",
   "text": {
