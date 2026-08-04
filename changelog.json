@@ -3,7 +3,8 @@
   "am": "2026-08-04T15:05:00+02:00",
   "art": "verbessert",
   "text": "Wo nichts ist, steht jetzt auch ein Bild: Leere Listen — keine Combos, noch keine Decks, keine Freunde — zeigen einen Kartenrücken über dem Satz statt einer nackten Fläche mit einer Zeile Kleingedrucktem. Karten ohne Bild bekommen denselben Rücken, gut sichtbar statt als winziges Zeichen in der Ecke.",
-  "pr": 214
+  "pr": 214,
+  "version": "0.79.0"
  },
  {
   "am": "2026-08-04T14:20:00+02:00",
