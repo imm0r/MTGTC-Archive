@@ -8690,9 +8690,9 @@ function deckGruppeLeisteHtml(d) {
       <output>${deckKartenBreite.lies()} px</output>
     </span>` : ""}
     <button class="btn ghost sm" data-katverw="${d.id}"
-      title="${esc(t("kat.manageTitle"))}">${ico("etikett")} ${esc(t("kat.manage"))}</button>
+      title="${esc(t("kat.manageTitle"))}">${icoGold("etikett")} ${esc(t("kat.manage"))}</button>
     <button class="btn ghost sm" data-katauto="${d.id}"
-      title="${esc(t("kat.autoTitleBtn"))}">${ico("blitz")} ${esc(t("kat.auto"))}</button>
+      title="${esc(t("kat.autoTitleBtn"))}">${icoGold("automatik")} ${esc(t("kat.auto"))}</button>
   </div>`;
 }
 
@@ -10290,9 +10290,9 @@ function renderDecks() {
           <button class="btn ghost sm" data-exportbtn="${d.id}"
             title="${esc(t("exp.title", { name: d.name }))}">${ico("zwischenablage")} ${esc(t("exp.btn"))}</button>
           <button class="btn ghost sm" data-ded="${d.id}"
-            title="${esc(t("deck.editTitle"))}">${ico("stift")} ${esc(t("deck.editBtn"))}</button>
+            title="${esc(t("deck.editTitle"))}">${icoGold("stift")} ${esc(t("deck.editBtn"))}</button>
           <button class="btn ghost sm" data-histbtn="${d.id}"
-            title="${esc(t("hist.title"))}">${ico("zurueck")} ${esc(t("hist.btn"))}</button>
+            title="${esc(t("hist.title"))}">${icoGold("verlauf")} ${esc(t("hist.btn"))}</button>
           <button class="btn danger sm" data-dx="${d.id}">${esc(t("deck.delete"))}</button>
         </div>
       </div>
@@ -10314,26 +10314,26 @@ function renderDecks() {
               <span class="tool-label">${esc(t("deck.groupOverview"))}</span>
               <div class="tool-row">
                 <button class="btn ghost" data-dashtoggle="${d.id}"
-                  title="${esc(dashOffen ? t("deck.statsHide") : t("deck.statsShow"))}">${ico("balken")} ${esc(dashOffen ? t("deck.statsHide") : t("deck.statsShow"))}</button>
+                  title="${esc(dashOffen ? t("deck.statsHide") : t("deck.statsShow"))}">${icoGold("statistik")} ${esc(dashOffen ? t("deck.statsHide") : t("deck.statsShow"))}</button>
                 <button class="btn ghost" data-bracketbtn="${d.id}"
-                  title="${esc(t("bracket.title"))}">${ico("waage")} ${esc(t("bracket.btn"))}</button>
+                  title="${esc(t("bracket.title"))}">${icoGold("bracket")} ${esc(t("bracket.btn"))}</button>
                 <button class="btn ghost" data-legalbtn="${d.id}"
-                  title="${esc(t("legal.deckTitle"))}">${ico("waage")} ${esc(t("legal.deckBtn"))}</button>
+                  title="${esc(t("legal.deckTitle"))}">${icoGold("schild")} ${esc(t("legal.deckBtn"))}</button>
                 ${fehlt ? `<button class="btn ghost" data-buybtn="${d.id}"
-                  title="${esc(t("buy.deckTitle"))}">${ico("warenkorb")} ${esc(t("buy.deckBtn", { n: fehlt }))}</button>` : ""}
+                  title="${esc(t("buy.deckTitle"))}">${icoGold("warenkorb")} ${esc(t("buy.deckBtn", { n: fehlt }))}</button>` : ""}
               </div>
             </div>
             <div class="tool-group">
               <span class="tool-label">${esc(t("deck.groupSuggest"))}</span>
               <div class="tool-row">
                 <button class="btn ghost syn-std-btn" data-synbtn="${d.id}"
-                  title="${esc(t("syn.deckTitle"))}">${ico("lupe")} ${esc(t("syn.deckBtn"))}</button>
+                  title="${esc(t("syn.deckTitle"))}">${icoGold("zahnraeder")} ${esc(t("syn.deckBtn"))}</button>
                 <button class="btn ghost" data-analysebtn="${d.id}"
-                  title="${esc(t("an.btnTitle"))}">${ico("analyse")} ${esc(t("an.btn"))}</button>
+                  title="${esc(t("an.btnTitle"))}">${icoGold("analyse")} ${esc(t("an.btn"))}</button>
                 <button class="btn ghost syn-ai-btn" data-synaibtn="${d.id}"
-                  title="${esc(t("syn.aiDeckTitle"))}">${ico("ki")} ${esc(t("syn.ai"))}</button>
+                  title="${esc(t("syn.aiDeckTitle"))}">${icoGold("funken")} ${esc(t("syn.ai"))}</button>
                 <button class="btn ghost" data-combobtn="${d.id}"
-                  title="${esc(t("combo.deckTitle"))}">${ico("kette")} ${esc(t("combo.btn"))}</button>
+                  title="${esc(t("combo.deckTitle"))}">${icoGold("blitze")} ${esc(t("combo.btn"))}</button>
               </div>
               <div class="tool-row" style="margin-top:8px">
                 <div class="field" style="width:118px"><label>${esc(t("deck.maxPerCard"))}</label>
@@ -10520,7 +10520,7 @@ function deckVerlaufKnopf(deckId) {
     if (!cards.length || !box) return;
     const lbl = t("syn.deckBtn");
     const gsw = [$(`[data-analysebtn="${id}"]`), $(`[data-synaibtn="${id}"]`)];
-    synBtnBusy(b, lbl, true);
+    synBtnBusy(b, lbl, true, icoGold("zahnraeder"), icoGold("zahnraeder-laed"));
     synGeschwister(gsw, true);
     deckLade(id, t("syn.loading"));
     const weg = excludeVon(cards);   // nur Karten DIESES Decks raus, Besessenes darf auftauchen
@@ -10534,7 +10534,7 @@ function deckVerlaufKnopf(deckId) {
           maxHooks: 5, limit: 20, deckId: id,
           maxPrice: numVal($(`[data-syncap="${id}"]`)), totalBudget: numVal($(`[data-synbudget="${id}"]`)) }))
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
-      .finally(() => { synBtnBusy(b, lbl, false); synGeschwister(gsw, false); deckLade(id); });
+      .finally(() => { synBtnBusy(b, lbl, false, icoGold("zahnraeder")); synGeschwister(gsw, false); deckLade(id); });
   });
 
   // Deck-Analyse: welche Funktionsbausteine (Ramp, Kartenvorteil, Entfernung,
@@ -10551,12 +10551,12 @@ function deckVerlaufKnopf(deckId) {
     if (!cards.length || !box) return;
     const lbl = t("an.btn");
     const gsw = [$(`[data-synbtn="${id}"]`), $(`[data-synaibtn="${id}"]`)];
-    synBtnBusy(b, lbl, true, ico("analyse"));
+    synBtnBusy(b, lbl, true, icoGold("analyse"));
     synGeschwister(gsw, true);
     deckLade(id, t("an.loading"));
     deckAnalyseAnzeigen(box, cards, farbIdentitaet(cards), id)
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
-      .finally(() => { synBtnBusy(b, lbl, false, ico("analyse")); synGeschwister(gsw, false); deckLade(id); });
+      .finally(() => { synBtnBusy(b, lbl, false, icoGold("analyse")); synGeschwister(gsw, false); deckLade(id); });
   });
 
   // KI-Synergien fürs ganze Deck: die Deckliste als Kontext an Claude (implizite
@@ -10572,12 +10572,12 @@ function deckVerlaufKnopf(deckId) {
     // Standard-Synergien UND Deck-Analyse sperren, solange die (langsame, teils
     // bezahlte) KI-Suche läuft — sie würden denselben Kasten überschreiben.
     const gsw = [$(`[data-synbtn="${id}"]`), $(`[data-analysebtn="${id}"]`)];
-    synBtnBusy(b, lbl, true, ico("ki"));
+    synBtnBusy(b, lbl, true, icoGold("funken"), icoGold("funken-laed"));
     synGeschwister(gsw, true);
     deckLade(id, t("syn.aiLoading"), t("syn.aiLoadingHint"));
     kiSynergienDeck(d, cards, box, { maxPrice: numVal($(`[data-syncap="${id}"]`)) })
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
-      .finally(() => { synBtnBusy(b, lbl, false, ico("ki")); synGeschwister(gsw, false); deckLade(id); });
+      .finally(() => { synBtnBusy(b, lbl, false, icoGold("funken")); synGeschwister(gsw, false); deckLade(id); });
   });
 
   // Combos im Deck über Commander Spellbook: fertige + „fast fertige" Combos in
@@ -10591,11 +10591,11 @@ function deckVerlaufKnopf(deckId) {
     const box = $(`.deck-combos[data-combobox="${id}"]`);
     if (!cards.length || !box) return;
     const lbl = t("combo.btn");
-    synBtnBusy(b, lbl, true, ico("kette"));
+    synBtnBusy(b, lbl, true, icoGold("blitze"), icoGold("blitze-laed"));
     deckLade(id, t("combo.loading"));
     deckCombosAnzeigen(box, cards, id)
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
-      .finally(() => { synBtnBusy(b, lbl, false, ico("kette")); deckLade(id); });
+      .finally(() => { synBtnBusy(b, lbl, false, icoGold("blitze")); deckLade(id); });
   });
 
   // Deck-Legalität: jede Deckkarte gegen das Deck-Format prüfen (gebannt /
@@ -10612,11 +10612,11 @@ function deckVerlaufKnopf(deckId) {
     const box = $(`.deck-legal[data-legalbox="${id}"]`);
     if (!cards.length || !box) return;
     const lbl = t("legal.deckBtn");
-    synBtnBusy(b, lbl, true, ico("waage"));
+    synBtnBusy(b, lbl, true, icoGold("schild"));
     deckLade(id, t("legal.loading"));
     deckLegalPruefen(box, cards, d)
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
-      .finally(() => { synBtnBusy(b, lbl, false, ico("waage")); deckLade(id); });
+      .finally(() => { synBtnBusy(b, lbl, false, icoGold("schild")); deckLade(id); });
   });
 
   // Fehlende Karten kaufen: die (Deckmenge > Bestand) fehlenden Karten in einen
@@ -10644,8 +10644,8 @@ function deckVerlaufKnopf(deckId) {
       // Knopf-Beschriftung: „Bracket 3 · Spicy" (bzw. „Banned"); der aufklappbare
       // Grund + die Legende landen im eigenen Kasten darunter.
       b.innerHTML = tag === "B"
-        ? `${ico("waage")} ${esc(t("bracket.badgeBanned"))}`
-        : `${ico("waage")} ${esc(t("bracket.badge", { stufe: stufe ?? "?", name: nm }))}`;
+        ? `${icoGold("bracket")} ${esc(t("bracket.badgeBanned"))}`
+        : `${icoGold("bracket")} ${esc(t("bracket.badge", { stufe: stufe ?? "?", name: nm }))}`;
       b.title = t("bracket.resTitle", { n: data.comboCount });
       if (box) { deckBracketAnzeigen(box, data); box.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
     } catch (e) {

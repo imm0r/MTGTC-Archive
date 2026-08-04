@@ -1,5 +1,18 @@
 [
  {
+  "am": "2026-08-05T08:40:00+02:00",
+  "art": "verbessert",
+  "text": {
+   "de": "Die goldenen Symbole aus den Kartendetails gibt es jetzt auch in den Decks: Alle Werkzeug-Knöpfe — von Statistik über Bracket, Legalität und Kaufen bis zu Synergien, Analyse und Combos — tragen den plastischen Stil. Fünf Symbole sind dafür neu entstanden: Deck-Analyse, Statistik, Einkaufswagen, Automatik-Zahnrad und Turnierbaum.",
+   "en": "The gold icons from the card details now live in the decks too: every tool button — from statistics, bracket, legality and buying to synergies, analysis and combos — carries the sculpted style. Five icons were newly drawn for this: deck analysis, statistics, shopping cart, automatic gear and tournament bracket.",
+   "fr": "Les symboles dorés des détails de carte arrivent aussi dans les decks : chaque bouton d’outil — statistiques, bracket, légalité, achat, synergies, analyse et combos — porte le style en relief. Cinq symboles ont été dessinés pour l’occasion : analyse de deck, statistiques, panier, engrenage automatique et arbre de tournoi.",
+   "es": "Los símbolos dorados de los detalles de carta llegan también a los mazos: cada botón de herramienta — estadísticas, bracket, legalidad, compra, sinergias, análisis y combos — lleva el estilo en relieve. Cinco símbolos se dibujaron nuevos para ello: análisis de mazo, estadísticas, carrito, engranaje automático y árbol de torneo.",
+   "it": "I simboli dorati dei dettagli della carta arrivano anche nei mazzi: ogni pulsante degli strumenti — statistiche, bracket, legalità, acquisto, sinergie, analisi e combo — porta lo stile in rilievo. Cinque simboli sono stati disegnati apposta: analisi del mazzo, statistiche, carrello, ingranaggio automatico e albero del torneo."
+  },
+  "pr": 232,
+  "version": "0.85.0"
+ },
+ {
   "am": "2026-08-05T07:20:00+02:00",
   "art": "verbessert",
   "text": {
