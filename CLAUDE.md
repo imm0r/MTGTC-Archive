@@ -130,6 +130,17 @@ anfügen:
   Eintrag zur Änderung, nicht zur Prüfung.
 * Die PR-Nummer ist beim Schreiben noch nicht vergeben; die nächste freie
   nehmen (letzter PR + 1) und beim Anlegen des PR gegenprüfen.
+* **`version` nicht von Hand schreiben.** Das Feld trägt die Fassung, mit der
+  die Änderung ausgeliefert wurde — und die steht beim Schreiben des Eintrags
+  noch gar nicht fest. `scripts/version.mjs` stempelt sie im selben Lauf, der
+  `index.html` anhebt (siehe `.github/workflows/version.yml`). Ein von Hand
+  eingetragener Wert wäre bei zwei gleichzeitig offenen Pull Requests schlicht
+  die Nummer des anderen: Der zweite wird gegen ein `main` gerechnet, das den
+  ersten schon enthält.
+
+  Deshalb ist der **neueste** Eintrag im Prüflauf am Pull Request noch ohne
+  `version` — das ist richtig so und die Prüfung `changelog` lässt genau diesen
+  einen zu. Alle älteren müssen eine haben.
 
 ## Jeder Pull Request braucht eine Versionsstufe im Titel
 

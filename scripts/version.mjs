@@ -40,6 +40,7 @@ import { fileURLToPath } from "node:url";
 
 const WURZEL = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const INDEX = resolve(WURZEL, "index.html");
+const CHANGELOG = resolve(WURZEL, "changelog.json");
 
 const STUFEN = ["major", "minor", "patch"];
 /* Nur X.Y.Z ohne Vorab-/Bauteil: was dieses Skript anhebt, muss es auch
@@ -85,6 +86,46 @@ export function stufeAusTitel(titel) {
   if (!gefunden.length)
     throw new Error(`Im Titel fehlt die Stufe. Ergänze [major], [minor] oder [patch] — siehe README.md, Abschnitt „Versionsnummer". Titel war: ${titel}`);
   return gefunden[0];
+}
+
+/* Trägt die Fassung in die Changelog-Einträge nach, die noch keine haben.
+
+   WARUM HIER UND NICHT VON HAND: Beim Schreiben des Eintrags ist die Nummer
+   noch gar nicht bekannt — sie entsteht erst in diesem Lauf, aus der Stufe im
+   PR-Titel und der Version im ZIELZWEIG. Wer sie vorher hinschreibt, rät. Und
+   bei zwei gleichzeitig offenen Pull Requests rät er falsch: Der zweite wird
+   gegen ein main gerechnet, das den ersten schon enthält (siehe der Abschnitt
+   „WARUM AUCH AUF push:main" in version.yml). Ein von Hand eingetragener Wert
+   wäre dann schlicht die Nummer eines anderen.
+
+   NUR LEERE FELDER — mit einer Ausnahme. Ein gefüllter Eintrag gehört zu einer
+   ausgelieferten Fassung; ihn zu überschreiben schriebe Geschichte um.
+
+   Die Ausnahme ist `vorher`: die Nummer, die DIESER Zweig zuletzt selbst
+   gestempelt hat. Sie wird nur übergeben, wenn der Zweig schon einmal
+   angehoben wurde und jetzt auf eine neue Basis umgerechnet wird — der Fall
+   „zwei gleichzeitig offene Pull Requests", für den es den push:main-Lauf in
+   version.yml überhaupt gibt. Ohne diese Nachbesserung stünde in index.html
+   die neue Nummer und im Changelog die alte, und niemand würde es merken:
+   Beide Zahlen sehen für sich genommen richtig aus.
+
+   Beim ERSTEN Anheben eines Zweigs darf `vorher` nicht gesetzt sein. Dort ist
+   die Nummer in index.html die des Zielzweigs — und die tragen die schon
+   ausgelieferten Einträge zu Recht.
+
+   Die Formatierung ist dieselbe wie im Bestand (indent 1, kein ASCII-Escaping)
+   — nachgemessen: Ein Durchlauf ohne Änderung liefert die Datei Zeichen für
+   Zeichen zurück. Sonst stünde in jedem Pull Request die ganze Datei im Diff. */
+export function changelogStempeln(text, version, vorher = null) {
+  const eintraege = JSON.parse(text);
+  if (!Array.isArray(eintraege)) throw new Error("changelog.json ist keine Liste");
+  let offen = 0, umgerechnet = 0;
+  for (const e of eintraege) {
+    if (!e || typeof e !== "object") continue;
+    if (!e.version) { e.version = version; offen++; }
+    else if (vorher && vorher !== version && e.version === vorher) { e.version = version; umgerechnet++; }
+  }
+  return { text: JSON.stringify(eintraege, null, 1) + "\n", offen, umgerechnet };
 }
 
 const hashVon = pfad =>
@@ -156,9 +197,35 @@ function main(argv) {
     return;
   }
 
-  if (!geaendert) { console.log(`Nichts zu tun (Version ${version}).`); return; }
-  writeFileSync(INDEX, neu);
+  // Das Changelog wird nur beim ANHEBEN gestempelt. Ohne Stufe ist dieser
+  // Lauf ein reines Auffrischen der Hashes und liefert nichts aus — dann gibt
+  // es auch keine Fassung, der ein neuer Eintrag zuzuordnen wäre.
+  let clOffen = 0, clUm = 0;
+  if (stufe) {
+    try {
+      const roh = readFileSync(CHANGELOG, "utf8");
+      // `vorher` nur, wenn dieser Zweig schon einmal angehoben wurde: Dann
+      // steht in seiner index.html nicht mehr die Nummer des Zielzweigs,
+      // sondern die eigene von einem früheren Lauf — und genau die ist auch
+      // ins Changelog gewandert. Beim ersten Anheben ist beides gleich, und
+      // dort dürfte nichts umgerechnet werden.
+      const inDatei = versionAus(alt);
+      const vorher = inDatei && inDatei !== basis ? inDatei : null;
+      const { text, offen, umgerechnet } = changelogStempeln(roh, version, vorher);
+      clOffen = offen; clUm = umgerechnet;
+      if (text !== roh) writeFileSync(CHANGELOG, text);
+    } catch (e) {
+      // Ein kaputtes oder fehlendes Changelog darf die Versionspflege nicht
+      // aufhalten — die Prüfung „changelog" nimmt sich der Datei ohnehin an.
+      console.warn(`  changelog.json übersprungen: ${e.message}`);
+    }
+  }
+
+  if (!geaendert && !clOffen && !clUm) { console.log(`Nichts zu tun (Version ${version}).`); return; }
+  if (geaendert) writeFileSync(INDEX, neu);
   console.log(`index.html geschrieben — Version ${version}${stufe ? ` (${stufe} auf ${basis})` : ""}.`);
+  if (clOffen) console.log(`  changelog.json: ${clOffen} Eintrag/Einträge auf ${version} gestempelt.`);
+  if (clUm) console.log(`  changelog.json: ${clUm} Eintrag/Einträge auf ${version} umgerechnet.`);
   for (const [, pfad, wert] of neu.matchAll(/\b(?:href|src)="([^"?]+)\?v=([^"]*)"/g))
     console.log(`  ${pfad} → ?v=${wert}`);
 }

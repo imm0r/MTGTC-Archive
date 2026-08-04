@@ -2807,6 +2807,28 @@ und eine statische Datei im selben Verzeichnis kann nicht ausfallen. Der
 Rückgriff reicht bis Ende Juli (#156); die reine Arbeitsumgebung — Hooks, CI —
 bleibt draußen, weil kein Nutzer sie sehen oder spüren kann.
 
+Jede Zeile nennt rechts außen die **Fassung, mit der die Änderung ausgeliefert
+wurde** — die Antwort auf die Frage, die man beim Lesen stellt: „habe ich das
+schon?". Die Nummer im Kopf der App sagt, wo man selbst steht.
+
+**Das Feld `version` wird nicht von Hand geschrieben.** Beim Schreiben des
+Eintrags steht die Nummer noch gar nicht fest; sie entsteht erst aus der Stufe
+im PR-Titel und der Version im Zielzweig. `scripts/version.mjs` stempelt sie im
+selben Lauf, der `index.html` anhebt. Zwei Feinheiten, die beide unauffällig
+schiefgingen, wenn sie fehlten:
+
+* **Nur leere Felder.** Ein gefüllter Eintrag gehört zu einer ausgelieferten
+  Fassung; ihn zu überschreiben schriebe Geschichte um. So ist ein zweiter Lauf
+  am selben Pull Request auch folgenlos.
+* **Ausnahme beim Umrechnen.** Bewegt sich `main`, während der Pull Request
+  offen ist, rechnet der `push:main`-Lauf die Nummer neu — dann muss der eigene
+  Stempel im Changelog mitwandern. Sonst führte `index.html` die neue Nummer
+  und das Changelog die alte, und beide sähen für sich genommen richtig aus.
+
+Im Prüflauf am Pull Request ist der **neueste** Eintrag deshalb noch ohne
+`version`; die Prüfung lässt genau diesen einen zu. Bleibt der Stempel einmal
+aus, fällt es beim nächsten Pull Request auf.
+
 ### Die Nummer färbt sich, wenn es etwas zu lesen gibt
 
 Sie steht sonst gedimmt im Kopf und wird nie angesehen. Ist seit dem letzten
@@ -2912,6 +2934,7 @@ nachlesbar ist, warum dort etwas so und nicht anders gemessen wird.
 |------------------|--------------------------------------------------------------|
 | `css-gueltig`    | Jede Anweisung aus `style.css` einem echten `CSSStyleDeclaration` angeboten: Was dort nicht ankommt, hat der Browser verworfen |
 | `i18n`           | Fünf Sprachen ohne Lücken, jeder `t()`-Aufruf und jedes `data-i18n` hat einen Schlüssel |
+| `changelog`      | Die Datei streng (JSON, Zeit, Art, Text, PR, Fassung — abwärts laufend, höchstens der neueste noch ohne) und die Anzeige dazu; die goldene Versionsnummer in allen drei Ausgangslagen samt **gemessener** Farbdifferenz statt bloßer Klasse; und der Stempel aus `scripts/version.mjs`: dass er nur leere Felder füllt, beim Umrechnen auf eine neue Basis den eigenen Wert mitnimmt und einen voll gestempelten Bestand Zeichen für Zeichen zurückgibt |
 | `ziehen`         | Karten zwischen Kategorien ziehen: Fächer, Schild, Ziel, fremde Decks, Klick, Escape |
 | `kartenansicht`  | Klebende Spaltenköpfe (auch im schmalen Fenster), Aufklappen beim Überfahren, kein Aufklappen beim Ziehen |
 | `zugabe`         | „Karte zum Deck“: Ausklappen, gefilterte Trefferliste, Zug in eine Kategorie, volles Deck |

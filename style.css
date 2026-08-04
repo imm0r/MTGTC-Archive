@@ -194,6 +194,14 @@ nav button:hover .nav-sym,nav button.on .nav-sym{filter:none}
 .cl-behoben{color:var(--err);border-color:var(--err)}
 .cl-pr{margin-left:auto;font-size:12px;color:var(--dim);text-decoration:none}
 .cl-pr:hover{color:var(--acc);text-decoration:underline}
+/* Die Fassung, mit der die Änderung ausgeliefert wurde — ganz rechts, hinter
+   der PR-Nummer. Als kleine Marke und nicht als weiterer grauer Text: Dort
+   stehen zwei Zahlen nebeneinander (#211 und 0.76.1), und ohne sichtbaren
+   Unterschied liest man sie als eine. */
+.cl-version{font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums;
+  border:1px solid var(--line);border-radius:999px;padding:1px 7px;white-space:nowrap}
+/* Ohne PR-Nummer daneben übernimmt sie das Schieben nach rechts. */
+.cl-version.allein{margin-left:auto}
 .cl-text{font-size:13.5px;line-height:1.5}
 /* Statistiken auf dem Login-Screen, mittig unter dem Logo */
 .gate-stats{text-align:center}
