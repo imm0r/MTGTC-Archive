@@ -2870,19 +2870,46 @@ Zeile, wird genau nach den fehlenden noch einmal gefragt — einmal, nicht öfte
 sonst könnte ein Satz, an dem das Modell beständig scheitert, beliebig oft Geld
 kosten. Ein zweites Kontingent wird dafür nicht beansprucht.
 
-Gegen das **Hineinziehen** hilft nur die Anweisung. Eine Prüfung auf die
-Satzzahl lag nahe und wurde **gemessen und verworfen**: An den 54 damals
-gespeicherten deutschen Zeilen hätte sie sechs aussortiert, und fünf davon zu
-Unrecht — ein langer englischer Satz wird im Deutschen zu Recht zu zweien:
+Gegen das **Hineinziehen** reicht die Anweisung nicht. Derselbe Satz kam
+zweimal falsch zurück, einmal vor und einmal nach der Verschärfung:
 
 ```
-Activate [[1]] by paying {1} and tapping it, causing you to add {B}{R}{G}{G} …
-→ Aktiviere [[1]], indem du {1} bezahlst und es tappst. Dadurch fügst du …
+Activate [[1]] by paying {3} and untapping it, giving it +2/+2 until end of turn.
+→ Aktiviere [[1]], … und gib ihm bis zum Ende des Zuges +2/+2. Wiederhole.
 ```
 
-Fünf gute Übersetzungen wegzuwerfen, um eine schlechte zu fangen, ist der
-schlechtere Tausch — zumal die verworfenen bei jedem Nachfassen erneut Geld
-kosten würden.
+Erkannt wird das daran, dass der Satz **genau auf die Übersetzung einer anderen
+Zeile derselben Combo endet** — die kennt die Function ja, sie steht im
+Speicher. Der Anhang wird abgetrennt, und zwar nur an einer Satzgrenze, nur
+wenn danach etwas Sinnvolles übrig bleibt und kein Platzhalter verloren geht.
+
+Abgetrennt statt verworfen, weil der Rest des Satzes in Ordnung ist: Verwerfen
+hieße, ihn englisch stehen zu lassen, und beim nächsten Versuch käme derselbe
+Zusammenzug wieder.
+
+Zwei Wege wurden dafür gemessen, an den damals gespeicherten deutschen Zeilen:
+
+| Erkennung | Treffer | davon zu Unrecht |
+| --- | --- | --- |
+| Übersetzung hat mehr Sätze als das Original | 6 von 54 | **5** |
+| Übersetzung endet exakt auf eine andere Zeile | 1 von 56 | **0** |
+
+Die Satzzahl war der naheliegende Weg und der falsche: Ein langer englischer
+Satz wird im Deutschen zu Recht zu zweien („Activate [[1]] by paying {1} and
+tapping it, causing you to add …" → „Aktiviere [[1]], indem du {1} bezahlst und
+es tappst. Dadurch fügst du …"). Fünf gute Übersetzungen wegzuwerfen, um eine
+schlechte zu fangen, wäre der schlechtere Tausch gewesen.
+
+### Das Fachwortverzeichnis
+
+Zwei Wörter kamen verlässlich falsch: „Cast" wurde „Wirf … aus" — das heißt
+ablegen, nicht wirken —, und „untapping" wurde „untappst". Beides ist beim
+Nachspielen irreführend und fällt nur jemandem auf, der das Original daneben
+hält. Die Anweisung trägt deshalb je Sprache eine kurze Liste, und zwar mit
+**denselben Wörtern wie `i18n.js`**: Friedhof/Graveyard/Cimetière,
+getappt/tapped/engagée/girada/TAPpata. Stünde in der Anleitung ein anderes Wort
+als auf dem Knopf zwei Ansichten weiter, wäre nicht erkennbar, dass dasselbe
+gemeint ist.
 
 ### Das Original bleibt erreichbar
 
