@@ -2849,6 +2849,41 @@ Kommt eine Übersetzung zurück, die einen Platzhalter **verloren oder erfunden*
 hat, wird sie verworfen und der Satz bleibt englisch. Sie landete sonst im
 gemeinsamen Speicher und würde allen anderen ausgeliefert.
 
+### Eine Zeile, ein Eintrag — und was passiert, wenn nicht
+
+Das Modell hält sich nicht von allein an die Zuordnung. Zwei Abweichungen sind
+im Betrieb aufgetreten:
+
+* **Eine Zeile ausgelassen.** Bei einer Combo mit sieben Sätzen lagen zwei im
+  Speicher, fünf gingen ans Modell — vier kamen zurück. Übersprungen wurde
+  „Cast the nontoken permanent returned in step 2 by paying its mana cost.",
+  offenbar weil es aussieht wie der schon übersetzte Schritt 1. Der Satz blieb
+  englisch, mitten in einer sonst deutschen Anleitung.
+* **Die Nachbarzeile mit hineingezogen.** „Activate [[1]] by paying {3} and
+  untapping it, giving it +2/+2 until end of turn." kam zurück als „… +2/+2.
+  Wiederhole dies." — und dieses „Wiederhole dies." war der nächste Schritt.
+  Die Anleitung las sich danach so, als wäre Schritt 3 schon in Schritt 2
+  erledigt.
+
+Gegen das **Auslassen** hilft Nachfassen: Fehlt nach dem ersten Aufruf eine
+Zeile, wird genau nach den fehlenden noch einmal gefragt — einmal, nicht öfter,
+sonst könnte ein Satz, an dem das Modell beständig scheitert, beliebig oft Geld
+kosten. Ein zweites Kontingent wird dafür nicht beansprucht.
+
+Gegen das **Hineinziehen** hilft nur die Anweisung. Eine Prüfung auf die
+Satzzahl lag nahe und wurde **gemessen und verworfen**: An den 54 damals
+gespeicherten deutschen Zeilen hätte sie sechs aussortiert, und fünf davon zu
+Unrecht — ein langer englischer Satz wird im Deutschen zu Recht zu zweien:
+
+```
+Activate [[1]] by paying {1} and tapping it, causing you to add {B}{R}{G}{G} …
+→ Aktiviere [[1]], indem du {1} bezahlst und es tappst. Dadurch fügst du …
+```
+
+Fünf gute Übersetzungen wegzuwerfen, um eine schlechte zu fangen, ist der
+schlechtere Tausch — zumal die verworfenen bei jedem Nachfassen erneut Geld
+kosten würden.
+
 ### Das Original bleibt erreichbar
 
 Eine falsch übersetzte Anleitung ist schlimmer als eine englische: Wer nach

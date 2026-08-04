@@ -1,5 +1,17 @@
 [
  {
+  "am": "2026-08-04T23:45:00+02:00",
+  "art": "behoben",
+  "text": {
+   "de": "In übersetzten Combo-Anleitungen blieb hin und wieder ein Schritt englisch stehen, weil das Modell ihn übersprungen hatte — meist einen, der einem anderen Schritt ähnlich sieht. Fehlt jetzt eine Zeile, wird gezielt nach ihr nachgefragt. Außerdem hängte das Modell manchmal den nächsten Schritt mit an den vorigen an, sodass die Anleitung ihn doppelt zu erledigen schien; dagegen ist die Anweisung geschärft.",
+   "en": "In translated combo instructions a step would occasionally stay English because the model had skipped it — usually one that looks like another step. If a line is missing now, it is asked for again specifically. The model also sometimes tacked the next step onto the previous one, making the instructions look as if it were already done; the wording of the request has been tightened against that.",
+   "fr": "Dans les instructions de combo traduites, une étape restait parfois en anglais parce que le modèle l'avait sautée — souvent une qui ressemble à une autre. Quand une ligne manque, elle est désormais redemandée précisément. Le modèle accolait aussi parfois l'étape suivante à la précédente, si bien que les instructions semblaient l'avoir déjà faite ; la consigne a été resserrée contre cela.",
+   "es": "En las instrucciones de combo traducidas, algún paso se quedaba en inglés porque el modelo lo había saltado — normalmente uno parecido a otro. Si ahora falta una línea, se vuelve a pedir expresamente. El modelo también añadía a veces el paso siguiente al anterior, con lo que las instrucciones parecían haberlo hecho ya; para eso se ha afinado la indicación.",
+   "it": "Nelle istruzioni delle combo tradotte capitava che un passaggio restasse in inglese perché il modello lo aveva saltato — di solito uno simile a un altro. Se ora manca una riga, viene richiesta espressamente. Il modello inoltre a volte attaccava il passaggio successivo al precedente, così che le istruzioni sembravano averlo già svolto; contro questo l'indicazione è stata resa più stringente."
+  },
+  "pr": 222
+ },
+ {
   "am": "2026-08-04T23:00:00+02:00",
   "art": "verbessert",
   "text": {
