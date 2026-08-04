@@ -9,7 +9,8 @@
    "es": "El registro de cambios solo existía en alemán — incluso con la aplicación en inglés, francés, español o italiano, al pulsar el número de versión aparecían frases en alemán. Ahora cada entrada está en los cinco idiomas, y cambiar de idioma con la ventana abierta las cambia también.",
    "it": "Il registro delle modifiche esisteva solo in tedesco — anche con l'app in inglese, francese, spagnolo o italiano, il clic sul numero di versione mostrava frasi tedesche. Ora ogni voce c'è in tutte e cinque le lingue, e cambiare lingua a finestra aperta le fa cambiare con sé."
   },
-  "pr": 219
+  "pr": 219,
+  "version": "0.81.1"
  },
  {
   "am": "2026-08-04T19:15:00+02:00",
