@@ -9,7 +9,8 @@
    "es": "Los detalles de carta están ordenados: todas las herramientas — editar, precio, sinergias, combos — forman ahora un solo grupo «Gestión» junto a la imagen, mientras legalidad y tags usan todo el ancho debajo. La legalidad vuelve a mostrar sus ocho formatos en dos columnas. Estado y cantidad quedan centrados entre idioma y precio, y los símbolos dorados vuelven a estar bien centrados en sus botones.",
    "it": "I dettagli della carta sono in ordine: tutti gli strumenti — modifica, prezzo, sinergie, combo — formano ora un unico gruppo «Gestione» accanto all’immagine, mentre legalità e tag usano tutta la larghezza sotto. La legalità mostra di nuovo i suoi otto formati su due colonne. Condizione e quantità stanno centrate tra lingua e prezzo, e i simboli dorati sono di nuovo ben centrati nei loro pulsanti."
   },
-  "pr": 229
+  "pr": 229,
+  "version": "0.84.1"
  },
  {
   "am": "2026-08-05T04:30:00+02:00",
