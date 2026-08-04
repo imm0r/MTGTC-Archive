@@ -1,5 +1,17 @@
 [
  {
+  "am": "2026-08-05T13:00:00+02:00",
+  "art": "behoben",
+  "text": {
+   "de": "Die Knöpfe in den Filterleisten — Preise aktualisieren, Verkaufsliste, Deine Combos und ihre Nachbarn — stehen jetzt exakt auf der Höhe der Auswahllisten daneben. Vorher waren sie fünf Pixel höher und ragten sichtbar über jede Auswahl hinaus.",
+   "en": "The buttons in the filter bars — update prices, sale list, your combos and their neighbours — now stand at exactly the height of the dropdowns beside them. Before, they were five pixels taller and visibly stuck out above every select.",
+   "fr": "Les boutons des barres de filtres — actualiser les prix, liste de vente, tes combos et leurs voisins — sont désormais exactement à la hauteur des listes déroulantes voisines. Avant, ils dépassaient de cinq pixels au-dessus de chaque sélection.",
+   "es": "Los botones de las barras de filtros — actualizar precios, lista de venta, tus combos y sus vecinos — están ahora exactamente a la altura de los desplegables de al lado. Antes eran cinco píxeles más altos y sobresalían visiblemente sobre cada selección.",
+   "it": "I pulsanti delle barre dei filtri — aggiorna prezzi, lista di vendita, le tue combo e i loro vicini — stanno ora esattamente all’altezza dei menu a tendina accanto. Prima erano cinque pixel più alti e sporgevano visibilmente sopra ogni selezione."
+  },
+  "pr": 237
+ },
+ {
   "am": "2026-08-05T12:20:00+02:00",
   "art": "verbessert",
   "text": {

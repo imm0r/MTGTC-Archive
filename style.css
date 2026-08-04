@@ -587,6 +587,13 @@ input[type=number]:focus::-webkit-inner-spin-button{opacity:.9}
 label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transform:uppercase;letter-spacing:.6px}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
 .row>div{flex:1;min-width:110px}
+/* Knöpfe in Formularzeilen: exakt auf Feldhöhe. Eingaben und Auswahllisten
+   messen 40 px (9er-Polster, einzeilige Schrift); der Knopf daneben stand
+   mit seiner 22,5er-Zeile und dem 10er-Polster auf 45 und ragte sichtbar
+   über jede Auswahl. Die Zeile auf 20 px gedeckelt — das Goldsymbol ist
+   genau 20 — und dasselbe Polster wie die Felder: macht dieselben 40.
+   Die kleinen Knöpfe (.sm) haben ihre eigene Höhe und bleiben außen vor. */
+.row .btn:not(.sm){line-height:20px;padding-top:9px;padding-bottom:9px}
 
 /* ---------------------------------------------------- Login / Einrichtung */
 #gate{max-width:400px;margin:8vh auto;padding:0 14px}
