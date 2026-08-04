@@ -9,7 +9,8 @@
    "es": "En los detalles de una carta, la zona bajo la imagen ocupa ahora todo el ancho. La Legalidad queda en una columna estrecha, con una categoría por fila; el espacio liberado pasa a los Tags, cuyas píldoras ya no se parten a mitad del nombre. Desglosado y Habilidades tienen además un símbolo dorado propio.",
    "it": "Nei dettagli di una carta, l’area sotto l’immagine occupa ora tutta la larghezza. La Legalità sta in una colonna stretta, una categoria per riga; lo spazio liberato va ai Tags, le cui pillole non vanno più a capo in mezzo al nome. Scomposto e Abilità hanno inoltre un simbolo dorato tutto loro."
   },
-  "pr": 227
+  "pr": 227,
+  "version": "0.83.1"
  },
  {
   "am": "2026-08-05T02:30:00+02:00",
