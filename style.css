@@ -106,6 +106,8 @@
   --ic-leer:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.8 2.4h10.4a1.8 1.8 0 0 1 1.8 1.8v15.6a1.8 1.8 0 0 1-1.8 1.8H6.8A1.8 1.8 0 0 1 5 19.8V4.2a1.8 1.8 0 0 1 1.8-1.8z'/%3E%3Cpath d='M7.8 5.2h8.4a.9.9 0 0 1 .9.9v11.8a.9.9 0 0 1-.9.9H7.8a.9.9 0 0 1-.9-.9V6.1a.9.9 0 0 1 .9-.9z'/%3E%3Cpath d='M12 8.1 13.1 11 16 12.1 13.1 13.2 12 16.1 10.9 13.2 8 12.1 10.9 11Z' fill='%23fff' stroke='none'/%3E%3C/svg%3E");
   --ic-winkel:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.75 6.5 15.25 12l-5.5 5.5'/%3E%3C/svg%3E")}
 .ic-sprite{display:none}
+/* Nicht ausgeblendet, nur null groß — die Begründung steht in index.html. */
+.ic-defs{position:absolute;width:0;height:0;overflow:hidden}
 .ic{width:1em;height:1em;flex:none;vertical-align:-.14em;
     fill:none;stroke:currentColor;stroke-width:2.1;
     stroke-linecap:round;stroke-linejoin:round}
@@ -126,6 +128,63 @@
 .meta.ok .ic, .meta.err .ic, .empty .ic, .regel-caveat .ic,
 .sterne .ic, .stern .ic,
 .btn:not(.ghost):not(.danger) .ic{--ic-akz:currentColor}
+
+/* ------------------------------------------------- Der plastische Satz
+   Nur in den Kartendetails. Warum dort und nirgends sonst, steht in
+   index.html beim Sprite.
+
+   20 px und nicht 1em: Diese Symbole tragen einen Verlauf, eine Glanzkante
+   und eine Gravur. Bei 13 px — der Größe des flachen Satzes — fällt das auf
+   zwei, drei Pixel zusammen; übrig bliebe ein goldener Fleck. Sie brauchen
+   den Platz, und sie bekommen ihn als feste Zahl, weil sie ihn unabhängig
+   von der Schriftgröße daneben brauchen.
+
+   AUSRICHTUNG. Ein 20-px-Bild neben 13-px-Text lässt sich nicht über die
+   Grundlinie ausrichten — vertical-align verschiebt gegen die Schriftlinie,
+   und die liegt bei zwei so verschiedenen Höhen einfach falsch. Egal welchen
+   Wert man einsetzt, es stimmt nur für eine Schriftgröße.
+
+   Deshalb richtet hier der Kasten aus, nicht die Zeile: Knopf und Zusammen-
+   fassung werden zu inline-flex mit align-items:center. Dann steht der Text
+   auf halber Höhe des Bildes, und zwar bei jeder Größe von beiden.
+
+   Der Aufklapp-Pfeil des <summary> bleibt dabei erhalten, weil nicht das
+   summary selbst flex wird, sondern ein span darin — ein summary mit
+   display:flex verliert seine Markierung. */
+.gic{width:20px;height:20px;flex:none}
+.detail .tool-row .btn{display:inline-flex;align-items:center;gap:7px}
+
+/* Legalität und Tags nebeneinander. Beide sind zugeklappt eine Zeile, und
+   zwei einzeilige Aufklapper untereinander sind zwei Zeilen für nichts.
+
+   align-items:start, nicht stretch: Klappt einer auf, soll der andere oben
+   stehen bleiben statt auf dessen Höhe mitzuwachsen. Sonst hinge neben einer
+   langen Legalitätsliste ein leerer Kasten in gleicher Höhe.
+
+   Unter 620 px untereinander — zwei Spalten mit je einem Wort und einem
+   Symbol sind dort schmaler als ihr Inhalt. */
+.det-paar{display:grid;grid-template-columns:1fr 1fr;gap:6px 22px;align-items:start}
+@media (max-width:620px){.det-paar{grid-template-columns:1fr}}
+
+/* Das Feld „max €/Karte" steht in einer Reihe mit kleinen Knöpfen und war
+   deutlich höher als sie: Die allgemeine Feldregel setzt 9 px Polster bei
+   15 px Schrift, .btn.sm dagegen 5 px bei 13 px — macht 42 gegen 32 px.
+
+   Angeglichen wird über Schriftgröße und senkrechtes Polster, nicht über eine
+   feste Höhe: Eine Zahl hier und eine dort laufen beim nächsten Umbau
+   auseinander, ohne dass jemand es merkt. So ergibt sich die Höhe aus
+   denselben Werten wie beim Knopf daneben.
+
+   padding-right bleibt außen vor — den setzt zahlenfelderAufwerten() inline,
+   um den Steller freizuhalten, und eine Kurzform hier würde ihn überschreiben
+   (dann liefe die Zahl unter die Pfeile). */
+.detail .tool-row .num-wrap input[type=number]{
+  font-size:13px;padding-top:5px;padding-bottom:5px;padding-left:10px}
+.det-sum{display:inline-flex;align-items:center;gap:7px;vertical-align:middle}
+/* Der Ladering tritt WÄHREND der Suche an die Stelle des goldenen Symbols.
+   Bliebe er bei seiner Textgröße, spränge der Knopf beim Klick um sieben
+   Pixel schmaler und beim Fertigwerden wieder zurück. */
+.detail .tool-row .btn .ic{width:20px;height:20px}
 
 body{margin:0;background:var(--bg);color:var(--txt);
      font:15px/1.5 "Fira Sans Condensed",system-ui,"Segoe UI",Roboto,sans-serif;

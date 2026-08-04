@@ -1,5 +1,12 @@
 [
  {
+  "am": "2026-08-04T16:10:00+02:00",
+  "art": "verbessert",
+  "text": "Die Kartendetails haben eigene, plastisch goldene Sinnbilder bekommen — Stift, Zahnräder, Blitze, Schild, Etikett, Diagramm. Sie sind größer als die schlichten Symbole der übrigen Oberfläche und stehen bewusst nur hier: Die Kartenansicht ist die Seite, auf der man eine Karte in Ruhe ansieht. Dazu aufgeräumt: „Themen“ heißen jetzt in allen Sprachen „Tags“ — so nennt der Scryfall Tagger sie selbst —, Legalität und Tags stehen nebeneinander statt untereinander, und das Feld „max €/Karte“ ist so hoch wie die Knöpfe daneben.",
+  "pr": 215,
+  "version": "0.80.0"
+ },
+ {
   "am": "2026-08-04T15:05:00+02:00",
   "art": "verbessert",
   "text": "Wo nichts ist, steht jetzt auch ein Bild: Leere Listen — keine Combos, noch keine Decks, keine Freunde — zeigen einen Kartenrücken über dem Satz statt einer nackten Fläche mit einer Zeile Kleingedrucktem. Karten ohne Bild bekommen denselben Rücken, gut sichtbar statt als winziges Zeichen in der Ecke.",
