@@ -2419,7 +2419,7 @@ function ziehDiagnoseHtml(d) {
     ]))}
     ${d.geschrieben ? teil(t("diag.written"), diagTabelle(Object.entries(d.geschrieben))) : ""}
     ${d.fehler ? teil(t("diag.error"), `<p class="diag-fehler">${esc(d.fehler)}</p>`) : ""}
-    <button class="btn ghost sm" data-diag-copy>${esc(t("diag.copy"))}</button>
+    <button class="btn ghost sm" data-diag-copy>${icoGold("zwischenablage")} ${esc(t("diag.copy"))}</button>
   </details>`;
 }
 
@@ -4258,7 +4258,7 @@ async function updatePrices() {
   const uniq = [...new Set(CARDS.map(c => c.scryfall_id))];
   let done = 0, failed = 0;
   for (const sid of uniq) {
-    btn.textContent = t("coll.updatingProgress", { done: ++done, total: uniq.length });
+    btn.innerHTML = `${icoGold("neu-laed")} ${esc(t("coll.updatingProgress", { done: ++done, total: uniq.length }))}`;
     let fresh = null;
     // withPrice zieht bei fremdsprachigen Auflagen den Preis der englischen
     // Auflage nach — genau wie der Einzel-Weg (preisNeuZiehen). Ohne das blieben
@@ -4272,7 +4272,7 @@ async function updatePrices() {
     }
   }
   try { await reload(); renderAll(); } catch (e) { toast(dbErr(e)); }
-  btn.disabled = false; btn.textContent = t("coll.updatePrices");
+  btn.disabled = false; btn.innerHTML = `${icoGold("neu")} <span>${esc(t("coll.updatePrices"))}</span>`;
   toast(failed ? t("toast.pricesUpdatedSome", { n: failed }) : t("toast.pricesUpdated"));
 }
 
@@ -10008,7 +10008,7 @@ function deckVerlaufHtml(deckId, eintraege) {
         <div class="verlauf-tat">${jetzt
           ? `<span class="verlauf-jetzt">${esc(t("hist.current"))}</span>`
           : `<button class="btn ghost sm" data-histback="${esc(deckId)}|${esc(e.id)}"
-               title="${esc(t("hist.restoreTitle"))}">${ico("zurueck")} ${esc(t("hist.restore"))}</button>`}</div>
+               title="${esc(t("hist.restoreTitle"))}">${icoGold("zurueck")} ${esc(t("hist.restore"))}</button>`}</div>
       </div>`;
     }).join("")}
     <p class="hint verlauf-hinweis">${esc(t("hist.hint"))}</p>
@@ -11113,7 +11113,7 @@ function renderVerkauf() {
   const actions = `
     <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap">
       <div style="flex:none"><button class="btn" id="sell-go">${esc(t("sell.copyOpen"))}</button></div>
-      <div style="flex:none"><button class="btn ghost" id="sell-csv">${esc(t("sell.csv"))}</button></div>
+      <div style="flex:none"><button class="btn ghost" id="sell-csv">${icoGold("ordner")} ${esc(t("sell.csv"))}</button></div>
       <div style="flex:none"><button class="btn ghost" id="sell-clear">${esc(t("sell.clear"))}</button></div>
     </div>`;
   body.innerHTML = head + `<div class="sell-liste">${items}</div>` + actions + bookmarkletBoxHtml();
@@ -11126,7 +11126,7 @@ function bookmarkletBoxHtml() {
       <summary>${esc(t("sell.bmSetup"))}</summary>
       <p class="hint" style="margin-top:8px">${esc(t("sell.bmHow"))}</p>
       <p style="margin:8px 0"><a id="bm-link" class="bm-link" draggable="true">&#8595; ${esc(t("sell.bmName"))}</a></p>
-      <div class="row"><div style="flex:none"><button class="btn ghost sm" id="bm-copy">${esc(t("sell.bmCopy"))}</button></div></div>
+      <div class="row"><div style="flex:none"><button class="btn ghost sm" id="bm-copy">${icoGold("zwischenablage")} ${esc(t("sell.bmCopy"))}</button></div></div>
       <p class="hint" style="margin-top:8px">${esc(t("sell.bmBeta"))}</p>
     </details>`;
 }
@@ -11326,7 +11326,7 @@ function renderKauf() {
     actions = `
     <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap">
       <div style="flex:none">${cmBtn("buy-go", "button", t("wish.buyBtn"))}</div>
-      <div style="flex:none"><button class="btn ghost" id="buy-txt">${esc(t("buy.txt"))}</button></div>
+      <div style="flex:none"><button class="btn ghost" id="buy-txt">${icoGold("zwischenablage")} ${esc(t("buy.txt"))}</button></div>
     </div>
     <p class="hint" style="margin-top:8px">${esc(t("buy.hint"))}</p>`;
   } else {
@@ -11340,7 +11340,7 @@ function renderKauf() {
     <div class="chunk-grid">${grid}</div>
     <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
       <div style="flex:none">${cmBtn("buy-open-cm", "a", t("buy.openWants"), ` href="${esc(cmWantsUrl())}" target="_blank" rel="noopener noreferrer"`)}</div>
-      <div style="flex:none"><button class="btn ghost" id="buy-txt">${esc(t("buy.txt"))}</button></div>
+      <div style="flex:none"><button class="btn ghost" id="buy-txt">${icoGold("zwischenablage")} ${esc(t("buy.txt"))}</button></div>
     </div>
     <p class="hint" style="margin-top:8px">${esc(t("buy.chunkHint"))}</p>`;
   }
@@ -13643,7 +13643,7 @@ const mitgliedName = m => (m.display_name || "").trim() || t("community.anonMemb
 
 function mitgliedZeileHtml(m) {
   const knopf = {
-    friend:   `<button class="btn ghost sm" data-dmwith="${esc(m.id)}">${esc(t("dm.write"))}</button>`,
+    friend:   `<button class="btn ghost sm" data-dmwith="${esc(m.id)}">${icoGold("brief")} ${esc(t("dm.write"))}</button>`,
     sent:     `<span class="pill">${esc(t("friends.waiting"))}</span>`,
     incoming: `<button class="btn sm" data-accept2="${esc(m.id)}">${esc(t("friends.accept"))}</button>`,
     none:     `<button class="btn sm" data-req="${esc(m.id)}">${esc(t("friends.sendReq"))}</button>`,
@@ -14286,7 +14286,7 @@ function renderFriends() {
     <div class="card">
       <h3 style="margin-top:0">${esc(t("friends.title"))}${FRIENDS.accepted.length ? ` (${FRIENDS.accepted.length})` : ""}</h3>
       ${FRIENDS.accepted.length ? FRIENDS.accepted.map(f => zeile(f, `
-        <div style="flex:none"><button class="btn ghost sm" data-dmwith="${esc(f.other.id)}">${esc(t("dm.write"))}</button></div>
+        <div style="flex:none"><button class="btn ghost sm" data-dmwith="${esc(f.other.id)}">${icoGold("brief")} ${esc(t("dm.write"))}</button></div>
         <div style="flex:none"><button class="btn ghost sm" data-viewdecks="${esc(f.other.id)}">${esc(t("friends.sharedDecks"))}</button></div>
         <div style="flex:none"><button class="btn ghost sm" data-unfriend="${esc(f.other.id)}">${esc(t("friends.remove"))}</button></div>`)).join("")
         : `<div class="empty">${esc(t("friends.none"))}</div>`}
@@ -14327,7 +14327,7 @@ function wirePersonensuche() {
       const treffer = data || [];
       box.innerHTML = treffer.length ? treffer.map(p => {
         const knopf = {
-          friend:   `<button class="btn ghost sm" data-dmwith="${esc(p.id)}">${esc(t("dm.write"))}</button>`,
+          friend:   `<button class="btn ghost sm" data-dmwith="${esc(p.id)}">${icoGold("brief")} ${esc(t("dm.write"))}</button>`,
           sent:     `<span class="pill">${esc(t("friends.waiting"))}</span>`,
           incoming: `<button class="btn sm" data-accept2="${esc(p.id)}">${esc(t("friends.accept"))}</button>`,
           none:     `<button class="btn sm" data-req="${esc(p.id)}">${esc(t("friends.sendReq"))}</button>`,
@@ -14650,7 +14650,8 @@ async function deckImportieren(text, btn) {
       return toast(t("deck.importTooBig", { n: gesamt, max: DECK_MAX }));
   }
   const busy = (an, txt) => { if (btn) { btn.disabled = an;
-    btn.innerHTML = an ? `${ico("laden", "syn-spin")} ${esc(txt || t("imp.busy"))}` : esc(t("imp.btn")); } };
+    btn.innerHTML = an ? `${ico("laden", "syn-spin gic")} ${esc(txt || t("imp.busy"))}`
+      : `${icoGold("import")} <span>${esc(t("imp.btn"))}</span>`; } };
   busy(true);
   try {
     const karten = await deckNamenAufloesen(eintraege.map(e => e.name));
@@ -14770,8 +14771,8 @@ async function deckExportOeffnen(deckId) {
     <p class="hint" style="margin:0 0 8px">${esc(t("exp.hint", { zeilen, karten }))}</p>
     <textarea id="exp-text" class="imp-text" rows="12" readonly>${esc(text)}</textarea>
     <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
-      <div style="flex:none"><button class="btn ghost" id="exp-copy">${ico("zwischenablage")} ${esc(t("exp.copy"))}</button></div>
-      <div style="flex:none"><button class="btn ghost" id="exp-file">${ico("runter")} ${esc(t("exp.file"))}</button></div>
+      <div style="flex:none"><button class="btn ghost" id="exp-copy">${icoGold("zwischenablage")} ${esc(t("exp.copy"))}</button></div>
+      <div style="flex:none"><button class="btn ghost" id="exp-file">${icoGold("herunterladen")} ${esc(t("exp.file"))}</button></div>
     </div>`);
   const feld = $("#exp-text");
   $("#exp-copy").onclick = async () => {
