@@ -54,9 +54,27 @@ export default async function ({ seite, adresse, stand }) {
       .filter(Boolean);
     const unbekanntHtml = [...new Set(ausHtml)].filter(k => !(k in I18N[leit]));
 
+    /* Die Zonen einer Combo kommen von Commander Spellbook als EINZELNE
+       BUCHSTABEN und werden erst zur Laufzeit über ZONE_NAMES zu Schlüsseln.
+       Für den Abgleich oben sind sie damit unsichtbar: t(ZONE_NAMES[z]) sieht
+       nach einem zusammengesetzten Aufruf aus, und fehlte einer der sieben
+       Schlüssel, stünde in ALLEN fünf Sprachen der Schlüsselname da — die
+       Lückenprüfung schlägt nicht an, weil überall dasselbe fehlt.
+
+       Genau so war es: zone.stack gab es nirgends. Deshalb hier die Probe an
+       den Buchstaben selbst, die CSB liefern kann. */
+    const zonenFehlt = {};
+    for (const s of sprachen) {
+      const weg = Object.entries(ZONE_NAMES)
+        .filter(([, k]) => !(k in I18N[s]))
+        .map(([b, k]) => `${b}→${k}`);
+      if (weg.length) zonenFehlt[s] = weg;
+    }
+    const zonenProbe = Object.entries(ZONE_NAMES).map(([b, k]) => `${b}=${I18N[leit][k] ?? "?"}`).join(" ");
+
     return { sprachen, anzahl: Object.keys(I18N[leit]).length,
       fehlend, ueberzaehlig, unbekannt, unbekanntHtml, benutzt: benutzt.size,
-      vorsilben: [...vorsilben], leereVorsilben };
+      vorsilben: [...vorsilben], leereVorsilben, zonenFehlt, zonenProbe };
   });
 
   stand.gleich("fünf Sprachen", erg.sprachen.sort(), ["de", "en", "es", "fr", "it"]);
@@ -74,4 +92,9 @@ export default async function ({ seite, adresse, stand }) {
       : `${erg.vorsilben.length} Vorsilben: ${erg.vorsilben.join(", ")}`);
   stand.ist("jedes data-i18n in index.html hat einen Schlüssel", erg.unbekanntHtml.length === 0,
     erg.unbekanntHtml.join(", "));
+  stand.ist("jede Combo-Zone hat in jeder Sprache ein Wort",
+    Object.keys(erg.zonenFehlt).length === 0,
+    Object.keys(erg.zonenFehlt).length
+      ? Object.entries(erg.zonenFehlt).map(([s, k]) => `${s}: ${k.join(", ")}`).join(" | ")
+      : erg.zonenProbe);
 }
