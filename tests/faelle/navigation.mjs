@@ -151,7 +151,10 @@ export default async function ({ seite, adresse, stand }) {
      Ausblenden der Wörter STEHEN bleibt. */
   await seite.evaluate(() => {
     const who = document.querySelector("#who");
-    who.innerHTML = `<span style="width:26px;height:26px;border-radius:50%;background:#444;display:inline-block"></span><span>Sturmprophet</span><span class="who-caret">&#9662;</span>`;
+    // Genau das Gerüst, das zeigeKopfProfil() baut — samt Symbol im Winkel.
+    // Nachgebaut statt echt geladen, weil hier die BREITE gemessen wird: Ein
+    // Avatarbild, das erst später eintrifft, verschöbe jede Messung danach.
+    who.innerHTML = `<span style="width:26px;height:26px;border-radius:50%;background:#444;display:inline-block"></span><span>Sturmprophet</span><span class="who-caret"><svg class="ic" aria-hidden="true"><use href="#ic-pfeil-ab"></use></svg></span>`;
     // BEIDE Zähler, und zwar zweistellig: Sie kosten zusammen rund 40 px, und
     // ohne sie bräche die Leiste genau dem auf, der eine Einladung offen hat.
     for (const id of ["wish-badge", "sess-badge"]) {
@@ -183,12 +186,12 @@ export default async function ({ seite, adresse, stand }) {
   /* KNAPP ÜBER DER SCHWELLE, wo die Beschriftung gerade noch erscheint. Das
      ist die Stelle, an der es zuerst kippt — und die einzige, die man beim
      Ändern der Bildgröße vergisst. Französisch mit beiden Zählern verlangt
-     1444 px; die Grenze liegt darüber bei 1460. */
-  const knapp = await kopfhoehe(1461);
+     1450 px; die Grenze liegt darüber bei 1470. */
+  const knapp = await kopfhoehe(1471);
   stand.gleich("knapp über der Schwelle steht das Wort und es bleibt eine Zeile",
     [knapp.kopf, knapp.zeilen, knapp.wort], [70, 1, true]);
 
-  for (const b of [1460, 1366, 1200, 1024, 900, 768]) {
+  for (const b of [1470, 1366, 1200, 1024, 900, 768]) {
     const m = await kopfhoehe(b);
     stand.gleich(`bei ${b} px bleibt es eine Zeile à 67 px`, [m.kopf, m.zeilen], [67, 1]);
   }

@@ -1,5 +1,12 @@
 [
  {
+  "am": "2026-08-04T14:20:00+02:00",
+  "art": "verbessert",
+  "text": "Die Sinnbilder der ganzen App sind jetzt selbst gezeichnet statt aus Emoji zusammengesucht. Sie folgen alle demselben Raster und derselben Strichstärke, nehmen die Farbe ihrer Umgebung an und sehen auf jedem Gerät gleich aus. Am deutlichsten in den Kartendetails, wo bisher ein Dutzend Bildchen aus einem Dutzend Zeichenstilen nebeneinanderstanden.",
+  "pr": 213,
+  "version": "0.78.0"
+ },
+ {
   "am": "2026-08-04T02:05:00+02:00",
   "art": "verbessert",
   "text": "Im Changelog steht jetzt hinter jedem Eintrag die Version, mit der die Änderung ausgeliefert wurde — die Antwort auf „habe ich das schon?“. Die Nummer oben im Kopf sagt, wo du selbst stehst.",

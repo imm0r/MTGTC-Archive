@@ -18,6 +18,18 @@ const $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
   ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const eur = n => (n == null ? "–" : Number(n).toFixed(2).replace(".", ",") + " €");
+/* Ein Sinnbild aus dem Symbolset. Die Zeichnungen liegen als <symbol> in
+   index.html, hier wird nur darauf verwiesen — jedes Symbol steht also genau
+   einmal im Dokument, egal wie oft es auf dem Bildschirm auftaucht.
+
+   aria-hidden, ausnahmslos: Ein Symbol wiederholt entweder den Text daneben
+   („<Stift> Bearbeiten") oder ersetzt ihn auf einem Knopf, der dann ein title
+   oder aria-label trägt. Vorgelesen würde es in beiden Fällen stören.
+
+   Zweites Argument für zusätzliche Klassen (etwa "syn-spin" fürs Drehen).
+   NICHT für Farbe oder Größe — die kommen aus der Umgebung, siehe .ic in
+   style.css. */
+const ico = (name, extra) => `<svg class="ic${extra ? " " + extra : ""}" aria-hidden="true"><use href="#ic-${name}"></use></svg>`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const today = () => { const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -138,8 +150,8 @@ function zahlenfelderAufwerten(root = document) {
     // dorthin wäre für Screenreader und Tabulator nur Ballast.
     huelle.insertAdjacentHTML("beforeend",
       `<span class="num-step" aria-hidden="true">
-         <button type="button" tabindex="-1" data-num="1">&#9650;</button>
-         <button type="button" tabindex="-1" data-num="-1">&#9660;</button>
+         <button type="button" tabindex="-1" data-num="1">${ico("pfeil-auf")}</button>
+         <button type="button" tabindex="-1" data-num="-1">${ico("pfeil-ab")}</button>
        </span>`);
   });
 }
@@ -3183,19 +3195,19 @@ function cardRow(c, o = {}) {
           // erzwingt ein Trigger in der Datenbank.
           ? `${istCommanderFaehig(c)
               ? `<button class="btn ghost sm${o.istHaupt ? " star-on" : ""}" data-main
-                title="${o.istHaupt ? esc(t("row.mainIsTitle")) : esc(t("row.mainSetTitle"))}">${o.istHaupt ? "&#9733;" : "&#9734;"}</button>`
+                title="${o.istHaupt ? esc(t("row.mainIsTitle")) : esc(t("row.mainSetTitle"))}">${o.istHaupt ? ico("stern") : ico("stern-leer")}</button>`
               : ""}${(o.istZweit || o.partnerOk)
               ? `<button class="btn ghost sm${o.istZweit ? " star2-on" : ""}" data-second
-                title="${o.istZweit ? esc(t("row.second2IsTitle")) : esc(t("row.second2SetTitle"))}">${o.istZweit ? "&#10022;" : "&#10023;"}</button>`
+                title="${o.istZweit ? esc(t("row.second2IsTitle")) : esc(t("row.second2SetTitle"))}">${o.istZweit ? ico("funke") : ico("funke-leer")}</button>`
               : ""}`
           // Die Wunschliste kennt weder Bearbeiten (Sprache, Zustand und
           // Ausführung entscheidet man beim Kauf, nicht beim Wünschen) noch die
           // Verkaufsliste — verkaufen lässt sich nur, was man hat. Der Preis
           // bleibt: er ist der Grund, eine Wunschliste zu führen.
           : wunsch
-          ? `<button class="btn ghost sm" data-price title="${esc(t("row.priceTitle"))}">&#8635;</button>`
-          : `<button class="btn ghost sm" data-edit title="${esc(t("row.editTitle"))}">&#9998;</button>
-        <button class="btn ghost sm" data-price title="${esc(t("row.priceTitle"))}">&#8635;</button>
+          ? `<button class="btn ghost sm" data-price title="${esc(t("row.priceTitle"))}">${ico("neu")}</button>`
+          : `<button class="btn ghost sm" data-edit title="${esc(t("row.editTitle"))}">${ico("stift")}</button>
+        <button class="btn ghost sm" data-price title="${esc(t("row.priceTitle"))}">${ico("neu")}</button>
         <button class="btn ghost sm sell-toggle${c.for_sale ? " on" : ""}" data-sell title="${esc(t("row.sellTitle"))}">&#8364;</button>`}
         <button class="btn ghost sm" data-del title="${imDeck
           ? esc(t("row.removeFromDeck"))
@@ -3499,7 +3511,7 @@ async function wunschHinzufuegen() {
 
   const orig = btn.innerHTML;
   btn.disabled = true;
-  btn.innerHTML = `<span class="syn-spin">&#9881;</span> ${esc(t("wish.adding"))}`;
+  btn.innerHTML = `${ico("laden", "syn-spin")} ${esc(t("wish.adding"))}`;
   try {
     // Die Sprache der Handeingabe gilt auch hier: Wer seine Sammlung auf
     // Deutsch führt, will die Wunschkarte nicht auf Englisch merken.
@@ -3750,7 +3762,7 @@ function renderDash(rows, ziel = $("#dash"), gefiltert = false) {
         `<div class="stat"><div class="v">${esc(String(v))}</div><div class="k">${esc(k)}</div></div>`).join("")}
     </div>
     ${gefiltert ? `<p class="hint" style="margin:-6px 0 12px">
-      &#9432; ${esc(t("dash.filteredHint", { n }))}</p>` : ""}
+      ${ico("info")} ${esc(t("dash.filteredHint", { n }))}</p>` : ""}
     <div class="dash-raster">
       ${karte(t("dash.manaCurve"), saeulenHtml(kurve, t("dash.manaCurveHint")))}
       ${karte(t("dash.colors"), tortenHtml(farbTorte, t("dash.colorsHint")))}
@@ -5158,7 +5170,7 @@ function flipHtml(c) {
         <img class="flip-face flip-front" src="${esc(front)}" alt="">
         <img class="flip-face flip-back" src="${esc(back)}" alt="">
       </div>
-      <span class="flip-badge" aria-hidden="true">&#8635;</span>
+      <span class="flip-badge" aria-hidden="true">${ico("neu")}</span>
     </div>`;
 }
 
@@ -5408,16 +5420,16 @@ function detailHtml(c, hover) {
         <div class="sec-sep"></div>
         <div class="tool-group"><span class="tool-label">${esc(t("detail.groupManage"))}</span>
           <div class="tool-row">
-            <button class="btn ghost sm" id="dt-edit" title="${esc(t("row.editTitle"))}">&#9998; ${esc(t("detail.edit"))}</button>
-            <button class="btn ghost sm" id="dt-price" title="${esc(t("detail.priceBtnTitle"))}">&#8635; ${esc(t("detail.priceBtn"))}</button>
+            <button class="btn ghost sm" id="dt-edit" title="${esc(t("row.editTitle"))}">${ico("stift")} ${esc(t("detail.edit"))}</button>
+            <button class="btn ghost sm" id="dt-price" title="${esc(t("detail.priceBtnTitle"))}">${ico("neu")} ${esc(t("detail.priceBtn"))}</button>
           </div>
         </div>
         <div class="sec-sep"></div>
-        <details class="legal-det" id="dt-legal"><summary>&#9878; ${esc(t("legal.title"))}</summary>
-          <div id="dt-legal-body"><div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("legal.loading"))}</div></div>
+        <details class="legal-det" id="dt-legal"><summary>${ico("waage")} ${esc(t("legal.title"))}</summary>
+          <div id="dt-legal-body"><div class="meta">${ico("laden", "syn-spin")} ${esc(t("legal.loading"))}</div></div>
         </details>
-        <details class="legal-det" id="dt-themen"><summary>&#127991; ${esc(t("themen.title"))}</summary>
-          <div id="dt-themen-body"><div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("themen.loading"))}</div></div>
+        <details class="legal-det" id="dt-themen"><summary>${ico("etikett")} ${esc(t("themen.title"))}</summary>
+          <div id="dt-themen-body"><div class="meta">${ico("laden", "syn-spin")} ${esc(t("themen.loading"))}</div></div>
         </details>
         <div class="sec-sep"></div>
         <div class="tool-group"><span class="tool-label">${esc(t("detail.groupTools"))}</span>
@@ -5425,9 +5437,9 @@ function detailHtml(c, hover) {
             <div class="field" style="width:118px"><label>${esc(t("deck.maxPerCard"))}</label>
               <input type="number" id="syn-cap" min="0" step="0.5" value="${prefWert("capDefault") ?? ""}"
                 placeholder="${esc(t("syn.capPh"))}" title="${esc(t("syn.capTitle"))}"></div>
-            <button class="btn ghost sm syn-std-btn" id="dt-syn" title="${esc(t("syn.findTitle"))}">&#128269; ${esc(t("syn.find"))}</button>
-            <button class="btn ghost sm syn-ai-btn" id="dt-syn-ai" title="${esc(t("syn.aiTitle"))}">&#10024; ${esc(t("syn.ai"))}</button>
-            <button class="btn ghost sm" id="dt-combos" title="${esc(t("combo.cardTitle"))}">&#128279; ${esc(t("combo.btn"))}</button>
+            <button class="btn ghost sm syn-std-btn" id="dt-syn" title="${esc(t("syn.findTitle"))}">${ico("lupe")} ${esc(t("syn.find"))}</button>
+            <button class="btn ghost sm syn-ai-btn" id="dt-syn-ai" title="${esc(t("syn.aiTitle"))}">${ico("ki")} ${esc(t("syn.ai"))}</button>
+            <button class="btn ghost sm" id="dt-combos" title="${esc(t("combo.cardTitle"))}">${ico("kette")} ${esc(t("combo.btn"))}</button>
           </div>
         </div>`
     : `<div style="margin-top:10px">
@@ -5457,7 +5469,7 @@ function detailHtml(c, hover) {
         ${hover ? `<div class="hint" style="margin-top:10px">${esc(t("detail.added"))}: ${esc(dtShort(c.added))} ${esc(t("detail.addedSuffix"))}</div>` : ""}
       </div>
     </div>
-    ${!hover ? `<details class="legal-det dt-price-full"><summary>&#128200; ${esc(t("detail.priceHistory"))}</summary>
+    ${!hover ? `<details class="legal-det dt-price-full"><summary>${ico("verlauf")} ${esc(t("detail.priceHistory"))}</summary>
       <div class="pverlauf" id="dt-pverlauf">${preisVerlaufHtml(c, "30t")}</div>
     </details>
     <div id="syn-box" class="dt-results-full"></div>
@@ -5578,19 +5590,19 @@ function wireDetailSynergien(c) {
   const ab = $("#dt-syn-ai");
   if (ab) ab.onclick = () => {
     const lbl = t("syn.ai");
-    synBtnBusy(ab, lbl, true, "&#10024;");
+    synBtnBusy(ab, lbl, true, ico("ki"));
     synGeschwister([$("#dt-syn")], true);
     kiSynergien(c, $("#syn-box"), { maxPrice: numVal($("#syn-cap")) })
-      .finally(() => { synBtnBusy(ab, lbl, false, "&#10024;"); synGeschwister([$("#dt-syn")], false); });
+      .finally(() => { synBtnBusy(ab, lbl, false, ico("ki")); synGeschwister([$("#dt-syn")], false); });
   };
   // Combos, in denen diese Karte vorkommt (Commander Spellbook) — eigener
   // Kasten, unabhängig von den Synergie-Knöpfen.
   const cb = $("#dt-combos");
   if (cb) cb.onclick = () => {
     const lbl = t("combo.btn");
-    synBtnBusy(cb, lbl, true, "&#128279;");
+    synBtnBusy(cb, lbl, true, ico("kette"));
     karteCombosAnzeigen($("#card-combo-box"), c)
-      .finally(() => synBtnBusy(cb, lbl, false, "&#128279;"));
+      .finally(() => synBtnBusy(cb, lbl, false, ico("kette")));
   };
   // Legalität: erst beim ersten Aufklappen von Scryfall laden (die Sammlung
   // speichert keine Legalitäten — sie wandern mit jeder Bannliste).
@@ -6331,7 +6343,7 @@ function synKachel(card, grundText, deckId, schnitt) {
   const p = synPreis(card);
   const besessen = besessenAnzahl(card);
   const badge = besessen > 0
-    ? `<span class="syn-owned" title="${esc(t("syn.ownedTitle", { n: besessen }))}">&#10003;</span>` : "";
+    ? `<span class="syn-owned" title="${esc(t("syn.ownedTitle", { n: besessen }))}">${ico("haken")}</span>` : "";
   let addBtn = "", cut = "";
   if (deckId && card.id) {
     SYN_CACHE.set(card.id, card);
@@ -6351,7 +6363,7 @@ function synKachel(card, grundText, deckId, schnitt) {
   }
   return `<div class="syn-card">
     <a class="syn-card-link" href="${esc(card.scryfall_uri || "#")}" target="_blank" rel="noopener noreferrer">
-      <div class="syn-img">${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : `<div class="syn-noimg">&#9670;</div>`}${badge}</div>
+      <div class="syn-img">${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : `<div class="syn-noimg">${ico("karte")}</div>`}${badge}</div>
       <div class="syn-name">${esc(card.name)}</div>
       <div class="syn-type">${esc(card.type_line || "")}</div>
       <div class="syn-exp" title="${esc(grundText)}">${esc(grundText)}</div>
@@ -6433,7 +6445,7 @@ const istFunktionFehltFehler = e =>
 /* Der Lade-Zustand für eine Suche, die DAUERT: eine Schiene mit durchlaufendem
    Licht, darunter der Satz, was gerade passiert.
 
-   Das kleine Zahnrad (syn-spin) bleibt, wo es hingehört — in Knöpfen und bei
+   Der kleine Ladering (syn-spin) bleibt, wo er hingehört — in Knöpfen und bei
    allem, was in einem Wimpernschlag da ist. Für die KI-Synergien reicht es
    nicht: Die haben bei einem vollen Deck viel zu tun, und ein Zeichen von zehn
    Pixeln übersieht man. Wer nichts sieht, hält es für kaputt — und klickt noch
@@ -6461,7 +6473,7 @@ function ladeBalken(text, hinweis) {
    Warum getrennt: Die Ergebniskästen eines Decks (Synergien, Combos,
    Legalität) stehen UNTER der Kartentabelle. Bei hundert Karten sind das
    zweitausend Pixel, und genau daran ging der Balken vorbei — gezeichnet war
-   er, nur außerhalb des Bildes. Zu sehen blieb das drehende Zahnrad am Knopf,
+   er, nur außerhalb des Bildes. Zu sehen blieb der drehende Ring am Knopf,
    also genau das, was er ersetzen sollte. Es ist dasselbe Problem, aus dem der
    Deck-Verlauf über der Tabelle steht.
 
@@ -6493,12 +6505,12 @@ function ladeZeigen(box, deckId, text, hinweis) {
   box.innerHTML = "";
 }
 
-/* Synergie-Knopf in den Ladezustand versetzen: Lupe → drehendes Zahnrad,
+/* Synergie-Knopf in den Ladezustand versetzen: Lupe → drehender Ladering,
    Knopf gesperrt. Zurück auf die Lupe, wenn die Suche fertig ist. */
 function synBtnBusy(btn, label, busy, icon) {
   if (!btn) return;
   btn.disabled = busy;
-  btn.innerHTML = (busy ? `<span class="syn-spin">&#9881;</span>` : (icon || "&#128269;")) + " " + esc(label);
+  btn.innerHTML = (busy ? `${ico("laden", "syn-spin")}` : (icon || ico("lupe"))) + " " + esc(label);
 }
 
 /* Konkurrierende Geschwister-Knöpfe während einer Suche sperren (Standard-,
@@ -6862,8 +6874,8 @@ function deckBracketAnzeigen(box, data) {
   const zeile = (cls, label, namen) => (namen && namen.length)
     ? `<div class="bracket-line"><span class="pill ${cls}">${namen.length}</span> <b>${esc(label)}:</b> ${esc(namen.join(", "))}</div>` : "";
   const kopf = tag === "B"
-    ? `<div class="legal-note bad">&#9878; ${esc(t("bracket.badgeBanned"))}</div>`
-    : `<div class="legal-note good">&#9878; ${esc(t("bracket.badge", { stufe: stufe ?? "?", name }))}</div>`;
+    ? `<div class="legal-note bad">${ico("waage")} ${esc(t("bracket.badgeBanned"))}</div>`
+    : `<div class="legal-note good">${ico("waage")} ${esc(t("bracket.badge", { stufe: stufe ?? "?", name }))}</div>`;
   const combos = `<div class="bracket-line"><span class="pill">${data.comboCount ?? 0}</span> <b>${esc(t("bracket.rowCombos"))}</b>${
     two != null ? ` &middot; ${esc(t("bracket.rowTwoCard", { n: two }))}` : ""}</div>`;
   const grund = `<div class="bracket-reason">${combos}`
@@ -7043,12 +7055,12 @@ const deckSig = d => (d.entries || []).map(e => e.cardId + ":" + e.qty).join(","
 function deckLegalPillInner(res) {
   if (!res) return "";
   if (res.state === "checking")
-    return `<span class="pill deck-legal-pill" title="${esc(t("legal.pillChecking"))}"><span class="syn-spin">&#9878;</span></span>`;
+    return `<span class="pill deck-legal-pill" title="${esc(t("legal.pillChecking"))}"><span class="syn-spin">${ico("waage")}</span></span>`;
   if (res.state === "error")
-    return `<span class="pill deck-legal-pill" title="${esc(t("legal.error"))}">&#9878; ?</span>`;
+    return `<span class="pill deck-legal-pill" title="${esc(t("legal.error"))}">${ico("waage")} ?</span>`;
   if (!res.probleme.length)
-    return `<span class="pill ok deck-legal-pill" title="${esc(t("legal.pillLegalTitle", { fmt: res.fmt }))}">&#10004; ${esc(t("legal.pillLegal", { fmt: res.fmt }))}</span>`;
-  return `<span class="pill err deck-legal-pill" tabindex="0">&#9888; ${esc(t("legal.pillIllegal", { n: res.probleme.length }))}</span>`
+    return `<span class="pill ok deck-legal-pill" title="${esc(t("legal.pillLegalTitle", { fmt: res.fmt }))}">${ico("haken")} ${esc(t("legal.pillLegal", { fmt: res.fmt }))}</span>`;
+  return `<span class="pill err deck-legal-pill" tabindex="0">${ico("warnung")} ${esc(t("legal.pillIllegal", { n: res.probleme.length }))}</span>`
     + `<span class="deck-legal-tip" role="tooltip"><span class="deck-legal-tiphd">${esc(t("legal.deckProblems", { m: res.probleme.length, n: res.gesamt, fmt: res.fmt }))}</span>${legalProblemRows(res.probleme)}</span>`;
 }
 
@@ -7097,8 +7109,8 @@ async function deckLegalPruefen(box, karten, deck) {
   if (res.state === "error") { box.innerHTML = `<div class="legal-note bad">${esc(t("legal.error"))}</div>`; return; }
   const { fmt, probleme, gesamt, ungeprueft, geprueft } = res;
   const kopf = probleme.length
-    ? `<div class="legal-note bad">&#9888; ${esc(t("legal.deckProblems", { m: probleme.length, n: gesamt, fmt }))}</div>`
-    : `<div class="legal-note good">&#10004; ${esc(t("legal.deckAllLegal", { n: geprueft, fmt }))}</div>`;
+    ? `<div class="legal-note bad">${ico("warnung")} ${esc(t("legal.deckProblems", { m: probleme.length, n: gesamt, fmt }))}</div>`
+    : `<div class="legal-note good">${ico("haken")} ${esc(t("legal.deckAllLegal", { n: geprueft, fmt }))}</div>`;
   const rest = ungeprueft
     ? `<div class="legal-note">${esc(t("legal.deckUnknown", { u: ungeprueft }))}</div>` : "";
   box.innerHTML = kopf + (probleme.length ? `<div class="legal-decklist">${legalProblemRows(probleme)}</div>` : "") + rest;
@@ -7113,7 +7125,7 @@ function comboCardMini(card, deckId, alsAktion) {
   const gross = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || klein;
   const besessen = besessenAnzahl(card);
   const badge = besessen > 0
-    ? `<span class="syn-owned" title="${esc(t("syn.ownedTitle", { n: besessen }))}">&#10003;</span>` : "";
+    ? `<span class="syn-owned" title="${esc(t("syn.ownedTitle", { n: besessen }))}">${ico("haken")}</span>` : "";
   let addBtn = "", cut = "";
   if (alsAktion && card.id) {
     SYN_CACHE.set(card.id, card);
@@ -7137,11 +7149,11 @@ function comboCardMini(card, deckId, alsAktion) {
   if (!besessen && !addBtn) {
     const url = card.purchase_uris?.cardmarket || (card.cardmarket_id ? cmLink(card.cardmarket_id) : "");
     if (url) buy = `<a class="combo-buy" href="${esc(url)}" target="_blank" rel="noopener noreferrer"
-      title="${esc(t("combo.buyTitle"))}">&#128722;&#160;${esc(t("combo.buy"))}</a>`;
+      title="${esc(t("combo.buyTitle"))}">${ico("warenkorb")}&#160;${esc(t("combo.buy"))}</a>`;
   }
   return `<div class="combo-mini">
     <div class="combo-mini-card" data-cmd-img="${esc(gross)}" data-cmd-name="${esc(card.name)}">
-      ${klein ? `<img src="${esc(klein)}" alt="${esc(card.name)}" loading="lazy">` : `<div class="syn-noimg">&#9670;</div>`}${badge}
+      ${klein ? `<img src="${esc(klein)}" alt="${esc(card.name)}" loading="lazy">` : `<div class="syn-noimg">${ico("karte")}</div>`}${badge}
     </div>${addBtn}${cut}${buy}
   </div>`;
 }
@@ -7173,11 +7185,11 @@ function comboKachel(combo, deckId, cardByName, legKey) {
   // Nicht legal im geprüften Format → rote Warn-Pille am Combo-Block (sichtbar
   // nur, wenn die Einstellung „ausblenden" aus ist — sonst ist sie schon weg).
   const warn = legKey && !comboIstLegal(combo, legKey)
-    ? `<div><span class="pill err" title="${esc(t("legal.warnTitle", { fmt: legalFmtName(legKey) }))}">&#9888; ${esc(legalFmtName(legKey))}: ${esc(t("legal.notLegal"))}</span></div>` : "";
+    ? `<div><span class="pill err" title="${esc(t("legal.warnTitle", { fmt: legalFmtName(legKey) }))}">${ico("warnung")} ${esc(legalFmtName(legKey))}: ${esc(t("legal.notLegal"))}</span></div>` : "";
   const fehlt = new Set((combo.missing || []).map(m => (m.name || "").toLowerCase()));
   const karten = (combo.uses || []).map(u => {
     const sc = cardByName && cardByName.get((u.name || "").toLowerCase());
-    if (!sc) return `<div class="combo-mini"><div class="combo-mini-card"><div class="syn-noimg">&#9670;</div></div><div class="combo-mini-nm">${esc(u.name)}</div></div>`;
+    if (!sc) return `<div class="combo-mini"><div class="combo-mini-card"><div class="syn-noimg">${ico("karte")}</div></div><div class="combo-mini-nm">${esc(u.name)}</div></div>`;
     const alsAktion = deckId && fehlt.has((u.name || "").toLowerCase());
     return comboCardMini(sc, deckId, alsAktion);
   }).join("");
@@ -7252,7 +7264,7 @@ async function deckCombosAnzeigen(box, cards, deckId) {
   if (lauf !== combosLauf) return;
 
   const teile = [`<div class="meta">${esc(t("combo.deckNote"))}</div>`];
-  if (illegal) teile.push(`<div class="meta legal-note">&#9878; ${esc(t(
+  if (illegal) teile.push(`<div class="meta legal-note">${ico("waage")} ${esc(t(
     suchPrefs().hideBanned ? "legal.hiddenNote" : "legal.warnNote",
     { n: illegal, total: gesamt, fmt: legalFmtName(legKey) }))}</div>`);
   const kats = [];
@@ -7294,7 +7306,7 @@ async function sammlungCombosAnzeigen(box, cards) {
   zaehleCommunitySuche("combos", included.length);
   const cardByName = await comboKartenLaden(included.flatMap(c => (c.uses || []).map(u => u.name)));
   if (lauf !== combosLauf) return;
-  const note = illegal ? `<div class="meta legal-note">&#9878; ${esc(t(
+  const note = illegal ? `<div class="meta legal-note">${ico("waage")} ${esc(t(
     suchPrefs().hideBanned ? "legal.hiddenNote" : "legal.warnNote",
     { n: illegal, total: gesamt, fmt: "Commander" }))}</div>` : "";
   box.innerHTML = `<div class="meta">${esc(t("combo.collHave", { n: gesamt }))}</div>${note}
@@ -7329,7 +7341,7 @@ async function karteCombosAnzeigen(box, card) {
   zaehleCommunitySuche("combos", combos.length);
   const cardByName = await comboKartenLaden(combos.flatMap(c => (c.uses || []).map(u => u.name)));
   if (lauf !== combosLauf) return;
-  const note = illegal ? `<div class="meta legal-note">&#9878; ${esc(t(
+  const note = illegal ? `<div class="meta legal-note">${ico("waage")} ${esc(t(
     suchPrefs().hideBanned ? "legal.hiddenNote" : "legal.warnNote",
     { n: illegal, total: gesamt, fmt: "Commander" }))}</div>` : "";
   box.innerHTML = `<div class="meta">${esc(t("combo.cardNote", { n: gesamt }))}</div>${note}${
@@ -7358,13 +7370,13 @@ async function deckAnalyseAnzeigen(box, cards, colors, deckId) {
   box.innerHTML = `<div class="analyse">
     <div class="meta">${esc(t("an.intro"))}</div>
     ${zeilen}
-    <div id="an-sugg" style="margin-top:6px"><div class="meta"><span class="syn-spin">&#9881;</span></div></div>
+    <div id="an-sugg" style="margin-top:6px"><div class="meta">${ico("laden", "syn-spin")}</div></div>
     <p class="hint" style="margin-top:8px">${esc(t("an.estimate"))}</p>
   </div>`;
 
   const duenn = analyse.filter(a => a.ist < a.ziel);
   const suggBox = box.querySelector("#an-sugg");
-  if (!duenn.length) { suggBox.innerHTML = `<div class="meta ok">${esc(t("an.allGood"))}</div>`; return; }
+  if (!duenn.length) { suggBox.innerHTML = `<div class="meta ok">${ico("haken-kreis")} ${esc(t("an.allGood"))}</div>`; return; }
 
   // Die am staerksten ueberbesetzte Kategorie: aus ihr wuerde man am ehesten
   // schneiden, wenn eine andere zu duenn ist. Nur die Analyse weiss das.
@@ -7818,7 +7830,7 @@ function schnittHinweisHtml(schnitt, deckId, karte) {
   // Verfahren freigeschaltet hat — schnittAusModell entscheidet das vorher.
   const marke = schnitt.unbelegt
     ? `<span class="syn-cut-bad" title="${esc(schnitt.hinweis || t("deck.cutUnverifiedHint"))}">
-        &#9888; ${esc(t("deck.cutUnverified"))}${schnitt.hinweis ? " — " + esc(schnitt.hinweis) : ""}</span>` : "";
+        ${ico("warnung")} ${esc(t("deck.cutUnverified"))}${schnitt.hinweis ? " — " + esc(schnitt.hinweis) : ""}</span>` : "";
   // Der Knopf, der den Satz ausführt. Er steht nur da, wo BEIDE Seiten bekannt
   // sind: die Sammlungszeile, die weichen soll, und der Vorschlag als
   // Scryfall-Karte (über SYN_CACHE, gefüllt von der Kachel drumherum). Im
@@ -7827,7 +7839,7 @@ function schnittHinweisHtml(schnitt, deckId, karte) {
     ? `<button class="syn-swap" data-deck="${esc(deckId)}" data-sid="${esc(karte.id)}"
         data-cut="${esc(schnitt.karte.id)}"
         title="${esc(t("deck.swapTitle", { out: raus, in: karte.name }))}"
-        >&#8646;&#160;${esc(t("deck.swap"))}</button>`
+        >${ico("wechsel")}&#160;${esc(t("deck.swap"))}</button>`
     : "";
   // deckId/sid/cut stehen auch am Kasten selbst: Nach einem Tausch rechnet
   // schnitteAuffrischen() von hier aus die übrigen Zeilen neu.
@@ -7839,7 +7851,7 @@ function schnittHinweisHtml(schnitt, deckId, karte) {
   // legt seinen nativen daneben. Als Geschwister des Knopfes stört der Text
   // nicht mehr.
   return `<div class="syn-cut"${merkmale}>
-    <span class="syn-cut-txt" title="${esc(warum)}">&#9986; ${esc(t("deck.cutFor", { name: raus }))}
+    <span class="syn-cut-txt" title="${esc(warum)}">${ico("schere")} ${esc(t("deck.cutFor", { name: raus }))}
     <span class="syn-cut-why${schnitt.unbelegt ? " strich" : ""}">${esc(warum)}</span>${marke}</span>${tausch}</div>`;
 }
 
@@ -8277,9 +8289,9 @@ function deckGruppeLeisteHtml(d) {
       <output>${deckKartenBreite.lies()} px</output>
     </span>` : ""}
     <button class="btn ghost sm" data-katverw="${d.id}"
-      title="${esc(t("kat.manageTitle"))}">&#127991; ${esc(t("kat.manage"))}</button>
+      title="${esc(t("kat.manageTitle"))}">${ico("etikett")} ${esc(t("kat.manage"))}</button>
     <button class="btn ghost sm" data-katauto="${d.id}"
-      title="${esc(t("kat.autoTitleBtn"))}">&#9889; ${esc(t("kat.auto"))}</button>
+      title="${esc(t("kat.autoTitleBtn"))}">${ico("blitz")} ${esc(t("kat.auto"))}</button>
   </div>`;
 }
 
@@ -8446,7 +8458,7 @@ function deckStapelHtml(d, gruppen) {
     const zu   = deckCatZu.has(`${d.id}|${g.key}`);
     return `<div class="stapel-spalte${zu ? " zu" : ""}"${gruppeDropAttr(d, g)}>
       <div class="stapel-kopf" data-cattoggle="${d.id}|${g.key}">
-        <span class="deck-cat-arrow">${zu ? "&#9654;" : "&#9660;"}</span>
+        <span class="deck-cat-arrow">${zu ? ico("pfeil-rechts") : ico("pfeil-ab")}</span>
         <span class="stapel-name">${esc(g.label)}</span>
         <span class="stapel-zahl">${anz}</span>
         <span class="stapel-preis">${eur(wert)}</span>
@@ -8614,7 +8626,7 @@ async function kategorienZuordnen(deckId, cardId) {
         <span class="katz-name">${esc(r.name)}</span>
         <button type="button" class="katz-stern${primaer === r.key ? " on" : ""}"
           data-katprim="${esc(r.key)}" title="${esc(t("kat.primaryTitle"))}"
-          ${gewaehlt.has(r.key) ? "" : "disabled"}>${primaer === r.key ? "&#9733;" : "&#9734;"}</button>
+          ${gewaehlt.has(r.key) ? "" : "disabled"}>${primaer === r.key ? ico("stern") : ico("stern-leer")}</button>
       </label>`).join("") : `<div class="empty">${esc(t("kat.empty"))}</div>`;
 
     box.querySelectorAll("[data-katz]").forEach(cb => cb.onchange = () => {
@@ -9073,7 +9085,7 @@ function katDropBox() {
     </div>
     <button type="button" class="katdrop-muell" data-katdrop="-">
       <img class="katdrop-muell-bild" src="assets/del-card-from-deck.png" alt="">
-      <span class="katdrop-muell-zeichen" aria-hidden="true">&#128465;</span>
+      <span class="katdrop-muell-zeichen" aria-hidden="true">${ico("muell")}</span>
       <span class="katdrop-name" id="katdrop-muell-text"></span>
     </button>`;
   document.body.appendChild(el);
@@ -9326,8 +9338,8 @@ async function kategorienVerwalten(deckId) {
     if (!liste) return;
     liste.innerHTML = arbeit.length ? arbeit.map((a, i) => `
       <div class="kat-zeile">
-        <button class="btn ghost sm" data-kup="${i}" title="${esc(t("kat.up"))}" ${i === 0 ? "disabled" : ""}>&#9650;</button>
-        <button class="btn ghost sm" data-kdown="${i}" title="${esc(t("kat.down"))}" ${i === arbeit.length - 1 ? "disabled" : ""}>&#9660;</button>
+        <button class="btn ghost sm" data-kup="${i}" title="${esc(t("kat.up"))}" ${i === 0 ? "disabled" : ""}>${ico("pfeil-auf")}</button>
+        <button class="btn ghost sm" data-kdown="${i}" title="${esc(t("kat.down"))}" ${i === arbeit.length - 1 ? "disabled" : ""}>${ico("pfeil-ab")}</button>
         <input type="text" data-kname="${i}" maxlength="40" value="${esc(a.name)}">
         <span class="kat-zahl">${(d.entries || [])
           .filter(e => a.id && (e.kats || []).some(z => z.id === a.id))
@@ -9595,7 +9607,7 @@ function deckVerlaufHtml(deckId, eintraege) {
         <div class="verlauf-tat">${jetzt
           ? `<span class="verlauf-jetzt">${esc(t("hist.current"))}</span>`
           : `<button class="btn ghost sm" data-histback="${esc(deckId)}|${esc(e.id)}"
-               title="${esc(t("hist.restoreTitle"))}">&#8634; ${esc(t("hist.restore"))}</button>`}</div>
+               title="${esc(t("hist.restoreTitle"))}">${ico("zurueck")} ${esc(t("hist.restore"))}</button>`}</div>
       </div>`;
     }).join("")}
     <p class="hint verlauf-hinweis">${esc(t("hist.hint"))}</p>
@@ -9820,7 +9832,7 @@ function renderDecks() {
       })).join("");
       return `<tbody class="deck-cat-body${zu ? " zu" : ""}"${gruppeDropAttr(d, g)}>`
         + `<tr class="deck-cat-head" data-cattoggle="${d.id}|${g.key}"><td colspan="99">`
-        + `<span class="deck-cat-arrow">${zu ? "&#9654;" : "&#9660;"}</span>`
+        + `<span class="deck-cat-arrow">${zu ? ico("pfeil-rechts") : ico("pfeil-ab")}</span>`
         + `<span class="deck-cat-name">${esc(g.label)}</span>`
         + `<span class="deck-cat-count">${anz}</span></td></tr>${catRows}</tbody>`;
     }).join("");
@@ -9839,7 +9851,7 @@ function renderDecks() {
 
     return `<div class="card">
       <div class="deck-kopf" data-toggle="${d.id}" title="${offen ? t("common.collapse") : t("common.expand")}">
-        <span class="deck-pfeil">${offen ? "&#9660;" : "&#9654;"}</span>
+        <span class="deck-pfeil">${offen ? ico("pfeil-ab") : ico("pfeil-rechts")}</span>
         ${(haupt?.img || zweit?.img)
           ? `<span class="deck-cmds">${haupt?.img ? deckHauptImg(haupt) : ""}${zweit?.img ? deckHauptImg(zweit) : ""}</span>`
           : ""}
@@ -9863,7 +9875,7 @@ function renderDecks() {
              Kasten erst entstehen muss: siehe deckVerlaufKnopf(). -->
         <div class="deck-manage">
           <button class="btn ghost sm" data-share="${d.id}"
-            title="${d.shared ? esc(t("deck.unshareTitle")) : esc(t("deck.shareTitle"))}">${d.shared ? "&#128101; " + esc(t("deck.sharedBtn")) : esc(t("deck.share"))}</button>
+            title="${d.shared ? esc(t("deck.unshareTitle")) : esc(t("deck.shareTitle"))}">${d.shared ? ico("gruppe") + " " + esc(t("deck.sharedBtn")) : esc(t("deck.share"))}</button>
           <!-- Eine Ebene weiter als „Geteilt": das gibt nicht den Freunden
                frei, sondern allen. Deshalb daneben und nicht statt dessen. -->
           <!-- Ein übernommenes Deck lässt sich erst zeigen, wenn es auch ein
@@ -9873,13 +9885,13 @@ function renderDecks() {
           <button class="btn ghost sm${d.is_public ? " an" : ""}" data-public="${d.id}"${
             nochAendern ? " disabled" : ""}
             title="${nochAendern ? esc(t("deck.copyBlocked", { n: nochAendern }))
-              : d.is_public ? esc(t("deck.unpublicTitle")) : esc(t("deck.publicTitle"))}">${d.is_public ? "&#127758; " + esc(t("deck.publicBtn")) : esc(t("deck.public"))}</button>
+              : d.is_public ? esc(t("deck.unpublicTitle")) : esc(t("deck.publicTitle"))}">${d.is_public ? ico("welt") + " " + esc(t("deck.publicBtn")) : esc(t("deck.public"))}</button>
           <button class="btn ghost sm" data-exportbtn="${d.id}"
-            title="${esc(t("exp.title", { name: d.name }))}">&#128203; ${esc(t("exp.btn"))}</button>
+            title="${esc(t("exp.title", { name: d.name }))}">${ico("zwischenablage")} ${esc(t("exp.btn"))}</button>
           <button class="btn ghost sm" data-ded="${d.id}"
-            title="${esc(t("deck.editTitle"))}">&#9998; ${esc(t("deck.editBtn"))}</button>
+            title="${esc(t("deck.editTitle"))}">${ico("stift")} ${esc(t("deck.editBtn"))}</button>
           <button class="btn ghost sm" data-histbtn="${d.id}"
-            title="${esc(t("hist.title"))}">&#8634; ${esc(t("hist.btn"))}</button>
+            title="${esc(t("hist.title"))}">${ico("zurueck")} ${esc(t("hist.btn"))}</button>
           <button class="btn danger sm" data-dx="${d.id}">${esc(t("deck.delete"))}</button>
         </div>
       </div>
@@ -9901,26 +9913,26 @@ function renderDecks() {
               <span class="tool-label">${esc(t("deck.groupOverview"))}</span>
               <div class="tool-row">
                 <button class="btn ghost" data-dashtoggle="${d.id}"
-                  title="${esc(dashOffen ? t("deck.statsHide") : t("deck.statsShow"))}">&#128202; ${esc(dashOffen ? t("deck.statsHide") : t("deck.statsShow"))}</button>
+                  title="${esc(dashOffen ? t("deck.statsHide") : t("deck.statsShow"))}">${ico("balken")} ${esc(dashOffen ? t("deck.statsHide") : t("deck.statsShow"))}</button>
                 <button class="btn ghost" data-bracketbtn="${d.id}"
-                  title="${esc(t("bracket.title"))}">&#9878; ${esc(t("bracket.btn"))}</button>
+                  title="${esc(t("bracket.title"))}">${ico("waage")} ${esc(t("bracket.btn"))}</button>
                 <button class="btn ghost" data-legalbtn="${d.id}"
-                  title="${esc(t("legal.deckTitle"))}">&#9878; ${esc(t("legal.deckBtn"))}</button>
+                  title="${esc(t("legal.deckTitle"))}">${ico("waage")} ${esc(t("legal.deckBtn"))}</button>
                 ${fehlt ? `<button class="btn ghost" data-buybtn="${d.id}"
-                  title="${esc(t("buy.deckTitle"))}">&#128722; ${esc(t("buy.deckBtn", { n: fehlt }))}</button>` : ""}
+                  title="${esc(t("buy.deckTitle"))}">${ico("warenkorb")} ${esc(t("buy.deckBtn", { n: fehlt }))}</button>` : ""}
               </div>
             </div>
             <div class="tool-group">
               <span class="tool-label">${esc(t("deck.groupSuggest"))}</span>
               <div class="tool-row">
                 <button class="btn ghost syn-std-btn" data-synbtn="${d.id}"
-                  title="${esc(t("syn.deckTitle"))}">&#128269; ${esc(t("syn.deckBtn"))}</button>
+                  title="${esc(t("syn.deckTitle"))}">${ico("lupe")} ${esc(t("syn.deckBtn"))}</button>
                 <button class="btn ghost" data-analysebtn="${d.id}"
-                  title="${esc(t("an.btnTitle"))}">&#128295; ${esc(t("an.btn"))}</button>
+                  title="${esc(t("an.btnTitle"))}">${ico("analyse")} ${esc(t("an.btn"))}</button>
                 <button class="btn ghost syn-ai-btn" data-synaibtn="${d.id}"
-                  title="${esc(t("syn.aiDeckTitle"))}">&#10024; ${esc(t("syn.ai"))}</button>
+                  title="${esc(t("syn.aiDeckTitle"))}">${ico("ki")} ${esc(t("syn.ai"))}</button>
                 <button class="btn ghost" data-combobtn="${d.id}"
-                  title="${esc(t("combo.deckTitle"))}">&#128279; ${esc(t("combo.btn"))}</button>
+                  title="${esc(t("combo.deckTitle"))}">${ico("kette")} ${esc(t("combo.btn"))}</button>
               </div>
               <div class="tool-row" style="margin-top:8px">
                 <div class="field" style="width:118px"><label>${esc(t("deck.maxPerCard"))}</label>
@@ -9938,7 +9950,7 @@ function renderDecks() {
              und nicht in dem Kasten, der das Ergebnis aufnimmt. Der liegt
              nämlich unter der Kartentabelle, bei hundert Karten zweitausend
              Pixel tiefer: Gezeichnet wurde er dort schon, nur eben außerhalb
-             des Bildes, und zu sehen blieb das Zahnrad am Knopf. Dasselbe
+             des Bildes, und zu sehen blieb der Ladering am Knopf. Dasselbe
              Problem, aus dem der Deck-Verlauf ÜBER der Tabelle steht. -->
         <div class="deck-lade" data-ladebox="${d.id}"></div>
         <div class="deck-dash" data-dash="${d.id}" style="margin-top:12px"></div>
@@ -9987,7 +9999,7 @@ function deckKlappUmsetzen(k, offen) {
     const inhalt = anderer.parentElement.querySelector(".deck-inhalt");
     if (inhalt) inhalt.style.display = auf ? "block" : "none";
     const pfeil = anderer.querySelector(".deck-pfeil");
-    if (pfeil) pfeil.innerHTML = auf ? "&#9660;" : "&#9654;";
+    if (pfeil) pfeil.innerHTML = auf ? ico("pfeil-ab") : ico("pfeil-rechts");
     anderer.title = auf ? t("common.collapse") : t("common.expand");
   });
   // Die klebenden Höhen hängen an einer Leiste, die eben erst sichtbar wurde.
@@ -10075,7 +10087,7 @@ function deckVerlaufKnopf(deckId) {
     const box = h.closest(".deck-cat-body, .stapel-spalte");
     const zu = box.classList.toggle("zu");
     zu ? deckCatZu.add(h.dataset.cattoggle) : deckCatZu.delete(h.dataset.cattoggle);
-    h.querySelector(".deck-cat-arrow").innerHTML = zu ? "&#9654;" : "&#9660;";
+    h.querySelector(".deck-cat-arrow").innerHTML = zu ? ico("pfeil-rechts") : ico("pfeil-ab");
   });
 
   // Offene Deck-Statistiken füllen. Erst jetzt, weil renderDash in ein
@@ -10113,7 +10125,7 @@ function deckVerlaufKnopf(deckId) {
     const weg = excludeVon(cards);   // nur Karten DIESES Decks raus, Besessenes darf auftauchen
     // Erst die Themen des ganzen Decks (EIN Sammelabruf, siehe
     // themenFuerKarten), dann die Suche. Erst wenn sie fertig ist, nach unten
-    // zu den Ergebnissen springen — vorher dreht sich das Zahnrad am Knopf,
+    // zu den Ergebnissen springen — vorher dreht sich der Ladering am Knopf,
     // wo der Blick gerade ist.
     themenFuerKarten(cards)
       .then(tm => synergieAnzeigen(box, deckHooks(cards.map(c => ({ c })), tm),
@@ -10138,12 +10150,12 @@ function deckVerlaufKnopf(deckId) {
     if (!cards.length || !box) return;
     const lbl = t("an.btn");
     const gsw = [$(`[data-synbtn="${id}"]`), $(`[data-synaibtn="${id}"]`)];
-    synBtnBusy(b, lbl, true, "&#128295;");
+    synBtnBusy(b, lbl, true, ico("analyse"));
     synGeschwister(gsw, true);
     deckLade(id, t("an.loading"));
     deckAnalyseAnzeigen(box, cards, farbIdentitaet(cards), id)
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
-      .finally(() => { synBtnBusy(b, lbl, false, "&#128295;"); synGeschwister(gsw, false); deckLade(id); });
+      .finally(() => { synBtnBusy(b, lbl, false, ico("analyse")); synGeschwister(gsw, false); deckLade(id); });
   });
 
   // KI-Synergien fürs ganze Deck: die Deckliste als Kontext an Claude (implizite
@@ -10159,12 +10171,12 @@ function deckVerlaufKnopf(deckId) {
     // Standard-Synergien UND Deck-Analyse sperren, solange die (langsame, teils
     // bezahlte) KI-Suche läuft — sie würden denselben Kasten überschreiben.
     const gsw = [$(`[data-synbtn="${id}"]`), $(`[data-analysebtn="${id}"]`)];
-    synBtnBusy(b, lbl, true, "&#10024;");
+    synBtnBusy(b, lbl, true, ico("ki"));
     synGeschwister(gsw, true);
     deckLade(id, t("syn.aiLoading"), t("syn.aiLoadingHint"));
     kiSynergienDeck(d, cards, box, { maxPrice: numVal($(`[data-syncap="${id}"]`)) })
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
-      .finally(() => { synBtnBusy(b, lbl, false, "&#10024;"); synGeschwister(gsw, false); deckLade(id); });
+      .finally(() => { synBtnBusy(b, lbl, false, ico("ki")); synGeschwister(gsw, false); deckLade(id); });
   });
 
   // Combos im Deck über Commander Spellbook: fertige + „fast fertige" Combos in
@@ -10178,11 +10190,11 @@ function deckVerlaufKnopf(deckId) {
     const box = $(`.deck-combos[data-combobox="${id}"]`);
     if (!cards.length || !box) return;
     const lbl = t("combo.btn");
-    synBtnBusy(b, lbl, true, "&#128279;");
+    synBtnBusy(b, lbl, true, ico("kette"));
     deckLade(id, t("combo.loading"));
     deckCombosAnzeigen(box, cards, id)
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
-      .finally(() => { synBtnBusy(b, lbl, false, "&#128279;"); deckLade(id); });
+      .finally(() => { synBtnBusy(b, lbl, false, ico("kette")); deckLade(id); });
   });
 
   // Deck-Legalität: jede Deckkarte gegen das Deck-Format prüfen (gebannt /
@@ -10199,11 +10211,11 @@ function deckVerlaufKnopf(deckId) {
     const box = $(`.deck-legal[data-legalbox="${id}"]`);
     if (!cards.length || !box) return;
     const lbl = t("legal.deckBtn");
-    synBtnBusy(b, lbl, true, "&#9878;");
+    synBtnBusy(b, lbl, true, ico("waage"));
     deckLade(id, t("legal.loading"));
     deckLegalPruefen(box, cards, d)
       .then(() => box.scrollIntoView({ behavior: "smooth", block: "nearest" }))
-      .finally(() => { synBtnBusy(b, lbl, false, "&#9878;"); deckLade(id); });
+      .finally(() => { synBtnBusy(b, lbl, false, ico("waage")); deckLade(id); });
   });
 
   // Fehlende Karten kaufen: die (Deckmenge > Bestand) fehlenden Karten in einen
@@ -10222,7 +10234,7 @@ function deckVerlaufKnopf(deckId) {
     const box = $(`.deck-bracket[data-bracketbox="${id}"]`);
     const orig = b.innerHTML;
     b.disabled = true;
-    b.innerHTML = `<span class="syn-spin">&#9881;</span> ${esc(t("bracket.btn"))}`;
+    b.innerHTML = `${ico("laden", "syn-spin")} ${esc(t("bracket.btn"))}`;
     try {
       const data = await combosApi({ mode: "bracket", cards: cards.map(c => ({ card: c.name, quantity: 1 })) });
       const tag = data.bracketTag;
@@ -10231,8 +10243,8 @@ function deckVerlaufKnopf(deckId) {
       // Knopf-Beschriftung: „Bracket 3 · Spicy" (bzw. „Banned"); der aufklappbare
       // Grund + die Legende landen im eigenen Kasten darunter.
       b.innerHTML = tag === "B"
-        ? `&#9878; ${esc(t("bracket.badgeBanned"))}`
-        : `&#9878; ${esc(t("bracket.badge", { stufe: stufe ?? "?", name: nm }))}`;
+        ? `${ico("waage")} ${esc(t("bracket.badgeBanned"))}`
+        : `${ico("waage")} ${esc(t("bracket.badge", { stufe: stufe ?? "?", name: nm }))}`;
       b.title = t("bracket.resTitle", { n: data.comboCount });
       if (box) { deckBracketAnzeigen(box, data); box.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
     } catch (e) {
@@ -10887,7 +10899,7 @@ function renderKauf() {
   const items = kaufPosten();
   const titel = KAUF_WUNSCH ? t("nav.wishlist") : t("buy.title");
   const head = `<h3 style="margin:0 0 6px">${esc(titel)}${d ? " – " + esc(d.name) : ""}</h3>`;
-  if (!items.length) { body.innerHTML = head + `<p class="hint">${esc(t("buy.complete"))}</p>`; return; }
+  if (!items.length) { body.innerHTML = head + `<p class="hint">${ico("haken-kreis")} ${esc(t("buy.complete"))}</p>`; return; }
   const stueck = items.reduce((s, x) => s + x.fehlt, 0);
   const summe  = items.reduce((s, x) => s + (x.c.price || 0) * x.fehlt, 0);
   const sub = `<p class="hint" style="margin:0 0 10px">${esc(t("buy.summary", { n: items.length, s: stueck }))} · ~${eur(summe)}</p>`;
@@ -11461,7 +11473,7 @@ async function zeigeChangelog() {
   const dlg = $("#changelog-dlg"), body = $("#changelog-body");
   if (!dlg || !body) return;
   body.innerHTML = `<h3 style="margin:0 0 10px">${esc(t("changelog.title"))}</h3>
-    <div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("changelog.loading"))}</div>`;
+    <div class="meta">${ico("laden", "syn-spin")} ${esc(t("changelog.loading"))}</div>`;
   dlg.showModal();
   // Gesehen ist gesehen: Die Nummer im Kopf verliert ihre Farbe, und erst die
   // nächste Fassung bringt sie zurück. Hier und nicht beim Schließen — wer
@@ -11704,7 +11716,7 @@ function avatarHtml(size, prof = PROFILE) {
 function renderWho() {
   const el = $("#who");
   if (!el) return;
-  el.innerHTML = `${avatarHtml(26)}<span>${esc(profilName())}</span><span class="who-caret">&#9662;</span>`;
+  el.innerHTML = `${avatarHtml(26)}<span>${esc(profilName())}</span><span class="who-caret">${ico("pfeil-ab")}</span>`;
   el.title = t("who.menu");
   el.onclick = ev => { ev.stopPropagation(); $("#who-menu")?.classList.toggle("open"); };
 }
@@ -11722,7 +11734,7 @@ function profilHighlightsHtml() {
   const kachel = (label, c, sub) => c ? `
     <div class="profil-hl-item" data-hl="${c.id}" title="${esc(t("row.viewTitle"))}">
       ${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy">`
-              : '<div class="profil-hl-noimg">&#9670;</div>'}
+              : `<div class="profil-hl-noimg">${ico("karte")}</div>`}
       <div class="profil-hl-txt">
         <div class="k">${esc(label)}</div>
         <div class="v">${esc(c.disp)}</div>
@@ -11849,7 +11861,7 @@ function renderSettings() {
           <div class="lang-select" id="lang-select">
             <button type="button" class="lang-trigger" id="lang-trigger" aria-haspopup="listbox">
               ${flaggeHtml(LANG, true)}<span class="lang-name">${esc(UI_LANGS[LANG])}</span>
-              <span class="lang-caret" aria-hidden="true">&#9662;</span>
+              <span class="lang-caret" aria-hidden="true">${ico("pfeil-ab")}</span>
             </button>
             <ul class="lang-menu" role="listbox">${
               Object.entries(UI_LANGS).map(([code, name]) =>
@@ -11916,7 +11928,7 @@ function renderSettings() {
       <!-- Die Ausnahme steht bei JEDER Stufe, nicht nur bei einer: Sie gilt für
            alle drei, und wer sie nur unter „Anonym" läse, hielte sie für deren
            Eigenheit. -->
-      <p class="hint">&#128100; ${esc(t("community.vis.memberNote"))}</p>
+      <p class="hint">${ico("person")} ${esc(t("community.vis.memberNote"))}</p>
       <p class="hint">${esc(t("community.vis.note"))}</p>
     </div>${IS_ADMIN ? `
     <div class="card">
@@ -11945,11 +11957,11 @@ function renderSettings() {
       <p class="hint">${esc(t("admin.verifyHint"))}</p>
       <div class="sec-sep"></div>
       <label>${esc(t("admin.accessTitle"))}</label>
-      <div id="admin-access"><div class="meta"><span class="syn-spin">&#9881;</span></div></div>
+      <div id="admin-access"><div class="meta">${ico("laden", "syn-spin")}</div></div>
       <p class="hint">${esc(t("admin.accessHint"))}</p>
       <div class="sec-sep"></div>
       <label>${esc(t("admin.rolesTitle"))}</label>
-      <div id="admin-rechte"><div class="meta"><span class="syn-spin">&#9881;</span></div></div>
+      <div id="admin-rechte"><div class="meta">${ico("laden", "syn-spin")}</div></div>
       <p class="hint">${esc(t("admin.rolesHint"))}</p>
       <div class="sec-sep"></div>
       <label>${esc(t("diag.adminTitle"))}</label>
@@ -12112,7 +12124,7 @@ function renderRules() {
   // Verlauf: beim ersten Öffnen einmal aus der DB holen, danach aus RULES_LOG
   // zeichnen (ein Sprachwechsel baut die Ansicht neu, soll aber nicht neu laden).
   if (rulesGeladen) zeichneRegelVerlauf();
-  else { $("#rules-log").innerHTML = `<div class="card"><div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("rules.histLoading"))}</div></div>`; ladeRegelVerlauf(); }
+  else { $("#rules-log").innerHTML = `<div class="card"><div class="meta">${ico("laden", "syn-spin")} ${esc(t("rules.histLoading"))}</div></div>`; ladeRegelVerlauf(); }
 }
 
 /* Verlauf aus der DB laden (nur die eigenen Zeilen dank RLS), neueste zuerst. */
@@ -12203,11 +12215,11 @@ function regelAntwortInner(e) {
       ${e.degraded ? `<div class="regel-warn">${esc(t("rules.degraded"))}</div>` : ""}
       <div class="regel-ruling">${esc(e.ruling)}</div>
       ${e.reasoning ? `<div class="regel-reason">${esc(e.reasoning)}</div>` : ""}
-      ${e.caveat ? `<div class="regel-caveat">&#9888; ${esc(e.caveat)}</div>` : ""}
+      ${e.caveat ? `<div class="regel-caveat">${ico("warnung")} ${esc(e.caveat)}</div>` : ""}
       ${citeHtml}
       ${dateLine}
       ${kiKostenHtml(e.usage)}
-      ${e.id ? `<div class="regel-actions"><button class="btn ghost sm" data-del-ruling="${esc(e.id)}">&#128465; ${esc(t("rules.delTitle"))}</button></div>` : ""}`;
+      ${e.id ? `<div class="regel-actions"><button class="btn ghost sm" data-del-ruling="${esc(e.id)}">${ico("muell")} ${esc(t("rules.delTitle"))}</button></div>` : ""}`;
 }
 
 /* Eine gespeicherte Regelfrage löschen (DB + Verlauf). */
@@ -12240,7 +12252,7 @@ async function regelAbfragen(situation, round = 0) {
   const out = $("#rules-out");
   const lauf = ++rulesLauf;
   const btn = $("#rules-ask"); if (btn) btn.disabled = true;
-  if (out) out.innerHTML = `<div class="card"><div class="meta"><span class="syn-spin">&#9881;</span> ${esc(t("rules.loading"))}</div></div>`;
+  if (out) out.innerHTML = `<div class="card"><div class="meta">${ico("laden", "syn-spin")} ${esc(t("rules.loading"))}</div></div>`;
 
   let data, error;
   try {
@@ -12298,7 +12310,7 @@ async function regelAbfragen(situation, round = 0) {
 function regelClarifyHtml(questions) {
   return `
     <div class="card regel-clarify">
-      <div class="regel-clarify-head">&#128172; ${esc(t("rules.clarifyTitle"))}</div>
+      <div class="regel-clarify-head">${ico("sprechblase")} ${esc(t("rules.clarifyTitle"))}</div>
       <p class="hint" style="margin-top:2px">${esc(t("rules.clarifyIntro"))}</p>
       <ul class="regel-clarify-qs">${questions.map(q => `<li>${esc(q)}</li>`).join("")}</ul>
       <textarea id="rules-answer" class="rules-input" rows="3" placeholder="${esc(t("rules.answersPh"))}"></textarea>
@@ -12557,7 +12569,7 @@ async function ladeBenutzerzahl() {
 function zeigeBenutzerzahl() {
   const n = USER_COUNT != null ? String(USER_COUNT) : null, lbl = t("stats.registeredUsers");
   const g = $("#gate-user-count");
-  if (g) { g.hidden = n == null; if (n != null) g.innerHTML = `&#128101; <b>${esc(n)}</b> ${esc(lbl)}`; }
+  if (g) { g.hidden = n == null; if (n != null) g.innerHTML = `${ico("gruppe")} <b>${esc(n)}</b> ${esc(lbl)}`; }
 }
 
 /* Gesamtzahl erstellter Decks laden (SECURITY-DEFINER-RPC, da RLS nur
@@ -12572,7 +12584,7 @@ async function ladeDeckzahl() {
 function zeigeDeckzahl() {
   const n = DECK_COUNT != null ? String(DECK_COUNT) : null, lbl = t("stats.totalDecks");
   const g = $("#gate-deck-count");
-  if (g) { g.hidden = n == null; if (n != null) g.innerHTML = `&#127136; <b>${esc(n)}</b> ${esc(lbl)}`; }
+  if (g) { g.hidden = n == null; if (n != null) g.innerHTML = `${ico("karten")} <b>${esc(n)}</b> ${esc(lbl)}`; }
 }
 
 /* ========================= Community Foundation ======================= *
@@ -13057,7 +13069,7 @@ function communityBodyHtml() {
   return `${communityStatsHtml()}
     ${communityHighlightsHtml()}
     <button type="button" class="cf-toggle" id="cf-toggle" aria-expanded="${offen}" aria-controls="cf-list">
-      <span class="cf-caret" aria-hidden="true">${offen ? "&#9662;" : "&#9656;"}</span>
+      <span class="cf-caret" aria-hidden="true">${offen ? ico("pfeil-ab") : ico("pfeil-rechts")}</span>
       <span>${esc(t("community.feedTitle"))}</span>
       <span class="cf-count">${COMMUNITY_FEED.length}</span>
     </button>
@@ -13198,7 +13210,7 @@ function mitgliedZeileHtml(m) {
 function mitgliederInnerHtml() {
   if (MITGLIEDER.fehler) return `<div class="empty">${esc(MITGLIEDER.fehler)}</div>`;
   if (MITGLIEDER.laedt && !MITGLIEDER.zeilen.length)
-    return `<div class="meta"><span class="syn-spin">&#9881;</span></div>`;
+    return `<div class="meta">${ico("laden", "syn-spin")}</div>`;
   if (!MITGLIEDER.zeilen.length)
     return `<div class="empty">${esc(t(MITGLIEDER.suche ? "members.none" : "members.empty"))}</div>`;
   const seiten = Math.ceil(MITGLIEDER.gesamt / MITGLIEDER_PRO_SEITE);
@@ -13316,7 +13328,7 @@ function profilKarteHtml(p) {
 }
 
 async function mitgliedProfilZeigen(userId) {
-  const zu = confirmDlg(`<div id="pp-body"><div class="meta"><span class="syn-spin">&#9881;</span></div></div>`);
+  const zu = confirmDlg(`<div id="pp-body"><div class="meta">${ico("laden", "syn-spin")}</div></div>`);
   try {
     const p = await profilLaden(userId);
     const body = $("#pp-body");
@@ -13395,12 +13407,12 @@ function sterneHtml(d, eigenes) {
   const voll = Math.round(Number(d.schnitt || 0));
   if (eigenes) {
     return `<span class="sterne fest" title="${esc(t("cdeck.ownDeck"))}">${
-      [1, 2, 3, 4, 5].map(i => `<span class="stern${i <= voll ? " an" : ""}">&#9733;</span>`).join("")}</span>`;
+      [1, 2, 3, 4, 5].map(i => `<span class="stern${i <= voll ? " an" : ""}">${ico("stern")}</span>`).join("")}</span>`;
   }
   return `<span class="sterne" role="group" aria-label="${esc(t("cdeck.rateLabel"))}">${
     [1, 2, 3, 4, 5].map(i => `<button type="button" class="stern${i <= meine ? " meine" : i <= voll ? " an" : ""}"
         data-sterne="${esc(d.id)}" data-n="${i}"
-        title="${esc(t("cdeck.rateN", { n: i }))}" aria-pressed="${i === meine}">&#9733;</button>`).join("")}${
+        title="${esc(t("cdeck.rateN", { n: i }))}" aria-pressed="${i === meine}">${ico("stern")}</button>`).join("")}${
     meine ? `<button type="button" class="stern-weg" data-sterne="${esc(d.id)}" data-n="0"
         title="${esc(t("cdeck.unrate"))}">&times;</button>` : ""}</span>`;
 }
@@ -13443,7 +13455,7 @@ function cdeckKachelHtml(d) {
 function communityDecksInnerHtml() {
   if (CDECKS.fehler) return `<div class="empty">${esc(CDECKS.fehler)}</div>`;
   if (CDECKS.laedt && !CDECKS.zeilen.length)
-    return `<div class="meta"><span class="syn-spin">&#9881;</span></div>`;
+    return `<div class="meta">${ico("laden", "syn-spin")}</div>`;
   if (!CDECKS.zeilen.length)
     return `<div class="empty">${esc(t(CDECKS.suche ? "cdeck.none" : "cdeck.empty"))}</div>`;
   const seiten = Math.ceil(CDECKS.gesamt / CDECK_PRO_SEITE);
@@ -13628,7 +13640,7 @@ function cdeckDetailHtml(kachel, daten) {
    erst das Fenster mit dem Rädchen, damit der Klick sofort etwas bewirkt, und
    das Versprechen wird NICHT abgewartet, bevor die eigenen Knöpfe hängen. */
 async function communityDeckZeigen(deckId) {
-  const zu = confirmDlg(`<div id="cd-detail"><div class="meta"><span class="syn-spin">&#9881;</span></div></div>`);
+  const zu = confirmDlg(`<div id="cd-detail"><div class="meta">${ico("laden", "syn-spin")}</div></div>`);
   try {
     /* Die Kachel steht meist schon in der geladenen Liste. Aus dem Live-Feed
        heraus aber oft NICHT: Die Liste zeigt eine Seite, womöglich gefiltert,
@@ -13848,7 +13860,7 @@ function wirePersonensuche() {
     const q = (feld.value || "").trim();
     const lauf = ++personenSuchLauf;
     if (q.length < 2) { box.innerHTML = ""; return; }
-    box.innerHTML = `<div class="meta"><span class="syn-spin">&#9881;</span></div>`;
+    box.innerHTML = `<div class="meta">${ico("laden", "syn-spin")}</div>`;
     try {
       const { data, error } = await sb.rpc("search_people", { q });
       if (error) throw error;
@@ -13984,7 +13996,7 @@ async function zeigeFreundDecks(friendId) {
       freundDeckOffen.has(id) ? freundDeckOffen.delete(id) : freundDeckOffen.add(id);
       const auf = freundDeckOffen.has(id);
       k.parentElement.querySelector(".deck-inhalt").style.display = auf ? "block" : "none";
-      k.querySelector(".deck-pfeil").innerHTML = auf ? "&#9660;" : "&#9654;";
+      k.querySelector(".deck-pfeil").innerHTML = auf ? ico("pfeil-ab") : ico("pfeil-rechts");
       k.title = auf ? t("common.collapse") : t("common.expand");
     });
     ziel.querySelectorAll("[data-fimport]").forEach(b => b.onclick = () => fremdDeckUebernehmen(b.dataset.fimport));
@@ -14060,7 +14072,7 @@ function friendDeckHtml(d, entries, cardsById, kategorien = [], zuord = new Map(
   const list = fremdDeckListeHtml(d.id, rows, kategorien, zuord);
   return `<div class="card">
     <div class="deck-kopf" data-ftoggle="${esc(d.id)}" title="${offen ? t("common.collapse") : t("common.expand")}">
-      <span class="deck-pfeil">${offen ? "&#9660;" : "&#9654;"}</span>
+      <span class="deck-pfeil">${offen ? ico("pfeil-ab") : ico("pfeil-rechts")}</span>
       ${haupt?.img ? `<img class="deck-haupt" src="${esc(haupt.img)}" alt="">` : ""}
       <div style="flex:1;min-width:0">
         <h3 style="margin:0">${esc(d.name)}</h3>
@@ -14179,7 +14191,7 @@ async function deckImportieren(text, btn) {
       return toast(t("deck.importTooBig", { n: gesamt, max: DECK_MAX }));
   }
   const busy = (an, txt) => { if (btn) { btn.disabled = an;
-    btn.innerHTML = an ? `<span class="syn-spin">&#9881;</span> ${esc(txt || t("imp.busy"))}` : esc(t("imp.btn")); } };
+    btn.innerHTML = an ? `${ico("laden", "syn-spin")} ${esc(txt || t("imp.busy"))}` : esc(t("imp.btn")); } };
   busy(true);
   try {
     const karten = await deckNamenAufloesen(eintraege.map(e => e.name));
@@ -14299,8 +14311,8 @@ async function deckExportOeffnen(deckId) {
     <p class="hint" style="margin:0 0 8px">${esc(t("exp.hint", { zeilen, karten }))}</p>
     <textarea id="exp-text" class="imp-text" rows="12" readonly>${esc(text)}</textarea>
     <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
-      <div style="flex:none"><button class="btn ghost" id="exp-copy">&#128203; ${esc(t("exp.copy"))}</button></div>
-      <div style="flex:none"><button class="btn ghost" id="exp-file">&#11015; ${esc(t("exp.file"))}</button></div>
+      <div style="flex:none"><button class="btn ghost" id="exp-copy">${ico("zwischenablage")} ${esc(t("exp.copy"))}</button></div>
+      <div style="flex:none"><button class="btn ghost" id="exp-file">${ico("runter")} ${esc(t("exp.file"))}</button></div>
     </div>`);
   const feld = $("#exp-text");
   $("#exp-copy").onclick = async () => {
@@ -14588,8 +14600,8 @@ function terminRowHtml(e) {
   return `<div class="termin" id="ev-${esc(e.id)}">
     <div class="termin-kopf" data-ev-toggle="${esc(e.id)}">
       <div class="termin-wann">${esc(wannText(e.starts_at))}</div>
-      <div class="termin-titel">${esc(e.title)}${e.isHost ? ` <span class="termin-host" title="${esc(t("cal.youHost"))}">&#9733;</span>` : ""}</div>
-      <div class="termin-zahlen">&#10003;&nbsp;${ja} · ?&nbsp;${viel} · &#10007;&nbsp;${nein}</div>
+      <div class="termin-titel">${esc(e.title)}${e.isHost ? ` <span class="termin-host" title="${esc(t("cal.youHost"))}">${ico("stern")}</span>` : ""}</div>
+      <div class="termin-zahlen">${ico("haken")}&nbsp;${ja} · ?&nbsp;${viel} · ${ico("kreuz")}&nbsp;${nein}</div>
     </div>
     ${terminOffen.has(e.id) ? terminDetailHtml(e) : ""}
   </div>`;
@@ -14612,7 +14624,7 @@ function terminDetailHtml(e) {
         ${rest.length ? `<div style="margin-top:8px"><button class="btn sm" data-ev-invsave="${esc(e.id)}">${esc(t("cal.inviteSel"))}</button></div>` : ""}</div>` : ""}</div>`;
   }
   const hostAct = e.isHost ? `<div class="row" style="gap:6px;margin-top:12px;flex-wrap:wrap">
-    <div style="flex:none"><button class="btn sm" data-ev-start="${esc(e.id)}">&#127922; ${esc(t("cal.startSession"))}</button></div>
+    <div style="flex:none"><button class="btn sm" data-ev-start="${esc(e.id)}">${ico("wuerfel")} ${esc(t("cal.startSession"))}</button></div>
     <div style="flex:none"><button class="btn ghost sm" data-ev-edit="${esc(e.id)}">${esc(t("detail.edit"))}</button></div>
     <div style="flex:none"><button class="btn danger sm" data-ev-del="${esc(e.id)}">${esc(t("cal.delete"))}</button></div>
   </div>` : "";
@@ -14848,14 +14860,14 @@ function spielerKachelHtml(p) {
     ? `<button type="button" class="sp-matte${FREMD?.uid === p.user_id ? " an" : ""}"
          data-matte="${esc(p.user_id)}" aria-pressed="${FREMD?.uid === p.user_id}"
          title="${esc(t(FREMD?.uid === p.user_id ? "peek.close" : "peek.open", { name }))}"
-         aria-label="${esc(t(FREMD?.uid === p.user_id ? "peek.close" : "peek.open", { name }))}">&#128065;&#xFE0F;</button>`
+         aria-label="${esc(t(FREMD?.uid === p.user_id ? "peek.close" : "peek.open", { name }))}">${ico("auge")}&#xFE0F;</button>`
     : "";
   return `<div class="sp-card${joined ? "" : " wartet"}${besiegt ? " besiegt" : ""}">
     <div class="sp-avatar">${avatarHtml(38, p.profile)}${auge}</div>
     <div class="sp-mitte">
-      <div class="sp-name">${esc(name)}${p.user_id === SESSION.host ? ` <span class="sp-host" title="${esc(t("sess.host"))}">&#9733;</span>` : ""}</div>
+      <div class="sp-name">${esc(name)}${p.user_id === SESSION.host ? ` <span class="sp-host" title="${esc(t("sess.host"))}">${ico("stern")}</span>` : ""}</div>
       ${p.deck_name ? `<div class="sp-deck"${p.commander_img ? ` data-cmd-img="${esc(p.commander_img)}" data-cmd-name="${esc(p.commander || p.deck_name)}"` : ""} title="${esc(p.commander || p.deck_name)}">${p.commander_img ? `<img class="sp-cmd" src="${esc(p.commander_img)}" alt="">` : ""}<span class="sp-deckname">${esc(p.deck_name)}</span></div>` : ""}
-      <div class="sp-besiegt">&#9760; ${esc(t("sess.defeated"))}</div>
+      <div class="sp-besiegt">${ico("totenkopf")} ${esc(t("sess.defeated"))}</div>
     </div>
     ${joined
       ? `<input type="range" class="sp-schieber" data-lifeset="${esc(p.user_id)}"
@@ -14940,12 +14952,12 @@ function sessionBoardHtml() {
    untereinander wie am Tisch: das Feld weit vorn, die Hand direkt vor einem,
    die Bibliothek zuunterst.
 
-       ★  Kommandozone     (nur bei Commander-Decks)
-       ⚔  Schlachtfeld
-       ⚰  Friedhof
-       ✖  Exil
-       ✋  Hand
-       ☰  Bibliothek
+       Stern      Kommandozone   (nur bei Commander-Decks)
+       Schwerter  Schlachtfeld
+       Grabstein  Friedhof
+       Verbotsz.  Exil
+       Hand       Hand
+       Stapel     Bibliothek
 
    Aufgeklappt ist immer genau eine Zone — die, über der die Maus steht (auf
    Touch: die zuletzt angetippte). Dadurch bleibt die Ansicht kurz, statt sechs
@@ -14963,17 +14975,24 @@ function sessionBoardHtml() {
 /* Reihenfolge = Anzeige von oben nach unten. „gespeichert: false" heißt: diese
    Zone ist der Rest und steht in keiner Spalte. */
 /* Die Zeichen tragen auf den Zielknöpfen die ganze Bedeutung — dort steht kein
-   Text daneben, nur der Tooltip. Deshalb bewusst die farbigen Emoji-Formen:
-   die schmalen Textvarianten (⚔ ⚰ als Strichzeichnung) sind bei 15 px kaum
-   auseinanderzuhalten. Der Stern bleibt einfarbig — er steht in dieser App
-   überall für den Commander. */
+   Text daneben, nur der Tooltip. Sechs davon liegen in einer Reihe, und
+   auseinanderhalten muss man sie auf einen Blick.
+
+   Hier stand einmal, dafür brauche es die farbigen Emoji-Formen: die schmalen
+   Textvarianten seien bei 15 px kaum zu unterscheiden. Das stimmte für
+   Zeichen, die aus einer Schrift kommen — dort bestimmt die Schrift die
+   Strichstärke, und bei ⚔ und ⚰ ist die haarfein. Für die eigenen Symbole
+   stimmt es nicht mehr: Sie sind für kleine Größen gezeichnet (Strich 2.1,
+   siehe .ic in style.css), und .zone-icon stellt sie auf 17 px. Sechs
+   verschiedene Umrisse in EINER Strichstärke sind leichter auseinanderzuhalten
+   als sechs Bildchen in sechs Zeichenstilen. */
 const ZONEN = [
-  { key: "cmd",   icon: "&#9733;",            gespeichert: false, nurCommander: true },
-  { key: "field", icon: "&#9876;&#xFE0F;",    gespeichert: true },
-  { key: "grave", icon: "&#9904;&#xFE0F;",    gespeichert: true },
-  { key: "exile", icon: "&#128683;",          gespeichert: true },
-  { key: "hand",  icon: "&#9995;",            gespeichert: true },
-  { key: "lib",   icon: "&#128218;",          gespeichert: false },
+  { key: "cmd",   icon: ico("stern"),      gespeichert: false, nurCommander: true },
+  { key: "field", icon: ico("schwerter"),  gespeichert: true },
+  { key: "grave", icon: ico("grab"),       gespeichert: true },
+  { key: "exile", icon: ico("exil"),       gespeichert: true },
+  { key: "hand",  icon: ico("hand"),       gespeichert: true },
+  { key: "lib",   icon: ico("bibliothek"), gespeichert: false },
 ];
 const zoneDef = k => ZONEN.find(z => z.key === k);
 
@@ -15499,7 +15518,7 @@ function deckTrackerHtml() {
 function querHinweisHtml() {
   const laengsteSeite = Math.max(screen?.width || 0, screen?.height || 0);
   if (laengsteSeite < MAT_AB || innerWidth > innerHeight) return "";
-  return `<div class="quer-hinweis">&#8635; ${esc(t("mat.rotateHint"))}</div>`;
+  return `<div class="quer-hinweis">${ico("neu")} ${esc(t("mat.rotateHint"))}</div>`;
 }
 
 /* Die Matte. Jedes Feld ist derselbe Zonenkorb wie im Akkordeon, nur ohne
@@ -15529,7 +15548,7 @@ function matInnerHtml() {
     <div class="mat-links">
       ${feld("field", t("zone.field"), { n: summe(bleibend), html:
         `${getappt ? `<div class="feld-werkzeug"><button class="btn ghost sm" id="feld-enttappen"
-            title="${esc(t("zone.untapAllTitle"))}">&#8635; ${esc(t("zone.untapAll"))}</button></div>` : ""}
+            title="${esc(t("zone.untapAllTitle"))}">${ico("neu")} ${esc(t("zone.untapAll"))}</button></div>` : ""}
          ${stapelHtml(bleibend)}` }, " mat-gross")}
       ${feld("field", t("mat.lands"), { n: summe(laender), html: stapelHtml(laender) },
              " mat-laender", matManaHtml())}
@@ -15818,7 +15837,7 @@ function fremdInhaltHtml() {
   <!-- Ausdrücklich hingeschrieben, nicht bloß weggelassen: Wer auf eine fremde
        Matte sieht, soll wissen, dass Hand und Bibliothek nicht fehlen, sondern
        verdeckt sind — und dass das auch für die eigene gilt. -->
-  <div class="fremd-fuss">&#128274; ${esc(t("peek.private"))}</div>`;
+  <div class="fremd-fuss">${ico("schloss")} ${esc(t("peek.private"))}</div>`;
 }
 
 function fremdBuehneHtml() {
@@ -15828,7 +15847,7 @@ function fremdBuehneHtml() {
     <div class="fremd-kopf">
       <div class="fremd-wer">${esc(t("peek.title", { name: FREMD.name }))}</div>
       <button type="button" class="btn ghost sm" id="fremd-frisch"
-        title="${esc(t("peek.refreshTitle"))}">&#8635; ${esc(t("peek.refresh"))}</button>
+        title="${esc(t("peek.refreshTitle"))}">${ico("neu")} ${esc(t("peek.refresh"))}</button>
       <button type="button" class="btn ghost sm" id="fremd-zu"
         title="${esc(t("peek.close"))}" aria-label="${esc(t("peek.close"))}">&times;</button>
     </div>
@@ -15978,7 +15997,7 @@ function zoneFeldHtml(karten) {
   const bleibend = karten.filter(x => !istLand(x.card));
   const laender  = karten.filter(x => istLand(x.card));
   return `${getappt ? `<div class="feld-werkzeug"><button class="btn ghost sm" id="feld-enttappen"
-      title="${esc(t("zone.untapAllTitle"))}">&#8635; ${esc(t("zone.untapAll"))}</button></div>` : ""}
+      title="${esc(t("zone.untapAllTitle"))}">${ico("neu")} ${esc(t("zone.untapAll"))}</button></div>` : ""}
     ${bleibend.length ? gitter(bleibend) : ""}
     ${laender.length ? `<div class="feld-trenner">${esc(t("mat.lands"))}
       <span class="feld-trenner-n">${laender.reduce((s, x) => s + x.n, 0)}</span></div>${gitter(laender)}` : ""}`;
@@ -16084,7 +16103,7 @@ function zoneLibHtml() {
       <input type="text" id="lib-suche" value="${esc(libFilter())}" placeholder="${esc(t("sess.trackerSearch"))}">
     </div>
     <button class="btn ghost sm lib-zufall" id="lib-zufall"${gesamt ? "" : " disabled"}
-      title="${esc(t("lib.randomTitle"))}">&#127922; ${esc(t("lib.random"))}</button>
+      title="${esc(t("lib.randomTitle"))}">${ico("wuerfel")} ${esc(t("lib.random"))}</button>
     <div class="lib-liste">${liste}</div>
     ${f ? "" : `<button class="btn ghost sm lib-alle" id="lib-alle">${
       esc(libAlle ? t("lib.hideAll") : t("lib.showAll", { n: gesamt }))}</button>`}`;
@@ -16186,7 +16205,7 @@ function spielKarteHtml(c, zone, fest, idx) {
   // nicht zu lesen ist: die Manakosten, der fremdsprachige Name und der Typ.
   const marken = zone === "field" ? `<div class="zk-akt-reihe">
       <button class="btn ghost sm" data-tap="${esc(c.id)}" data-idx="${idx || 0}"
-        title="${esc(t("zone.tapTitle"))}">&#8635;</button>
+        title="${esc(t("zone.tapTitle"))}">${ico("neu")}</button>
       <button class="btn ghost sm" data-marke="${esc(c.id)}" data-idx="${idx || 0}" data-d="1"
         title="${esc(t("zone.counterAdd"))}">&plus;</button>
       <button class="btn ghost sm" data-marke="${esc(c.id)}" data-idx="${idx || 0}" data-d="-1"
@@ -16759,7 +16778,7 @@ function wuerfelBuehneHtml() {
       <div class="wuerfel-feld" id="wuerfel-feld">${d20Html(zahl)}</div>
       <div class="wuerfel-kopf" id="wuerfel-kopf">${wurfKopfHtml(letzter)}</div>
     </div>
-    ${schwebeKnopfHtml({ bild: "assets/roll-the-dice.PNG", zeichen: "&#127922;",
+    ${schwebeKnopfHtml({ bild: "assets/roll-the-dice.PNG", zeichen: ico("wuerfel"),
       titel: wuerfelTitel(), label: wuerfelBeschriftung(zahl),
       // Vor dem ersten Wurf ein Gedankenstrich, matt: Der Platz der Zahl soll
       // als solcher erkennbar sein, auch wenn noch keine dasteht.
@@ -17504,7 +17523,7 @@ function wireApp() {
       await wunschkarteZumDeck(deckId, card);
       await reload();
       btn.classList.add("done");
-      btn.innerHTML = "&#10003;";
+      btn.innerHTML = ico("haken");
       const d = DECKS.find(x => x.id === deckId);
       toast(t("syn.addedWish", { name: card.name, deck: d?.name || "" }));
     } catch (err) {
@@ -17561,7 +17580,7 @@ function wireApp() {
         // Die Merkmale ebenfalls weg: Diese Zeile ist erledigt und soll beim
         // Neurechnen nicht mehr als Schnitt-Vorschlag gelten.
         delete zeile.dataset.cut; delete zeile.dataset.sid;
-        zeile.innerHTML = `&#10003; ${esc(t("deck.swapDone", { out: raus, in: card.name }))}`;
+        zeile.innerHTML = `${ico("haken")} ${esc(t("deck.swapDone", { out: raus, in: card.name }))}`;
       }
       // Der „+“-Knopf derselben Kachel stand auf „Deck ist voll“. Die Karte
       // liegt jetzt drin — das soll er auch zeigen.
@@ -17569,7 +17588,7 @@ function wireApp() {
       if (plus) {
         plus.disabled = true;
         plus.classList.remove("voll"); plus.classList.add("done");
-        plus.innerHTML = "&#10003;";
+        plus.innerHTML = ico("haken");
       }
       toast(t("deck.swapToast", { out: raus, in: card.name,
         deck: DECKS.find(x => x.id === deckId)?.name || "" }));

@@ -16,7 +16,10 @@ const stand_lesen = () => ({
   offen: [...document.querySelectorAll("#deck-list .deck-kopf")]
     .filter(k => k.parentElement.querySelector(".deck-inhalt").style.display !== "none")
     .map(k => k.dataset.toggle),
-  pfeile: [...document.querySelectorAll("#deck-list .deck-pfeil")].map(p => p.textContent),
+  // Der Pfeil ist ein Symbol, kein Textzeichen mehr: gelesen wird die
+  // Kennung, auf die er verweist (ic-pfeil-ab = offen, ic-pfeil-rechts = zu).
+  pfeile: [...document.querySelectorAll("#deck-list .deck-pfeil use")]
+    .map(u => u.getAttribute("href").replace("#ic-pfeil-", "")),
 });
 
 export default async function ({ seite, adresse, stand }) {
@@ -40,7 +43,7 @@ export default async function ({ seite, adresse, stand }) {
   const nachB = await seite.evaluate(stand_lesen);
   stand.gleich("ein Klick auf das zweite schließt das erste", nachB.offen, ["d1"]);
   stand.gleich("und der gemerkte Zustand stimmt damit überein", nachB.gemerkt, ["d1"]);
-  stand.gleich("auch die Pfeile", nachB.pfeile, ["▶", "▼", "▶"]);
+  stand.gleich("auch die Pfeile", nachB.pfeile, ["rechts", "ab", "rechts"]);
 
   await seite.locator('.deck-kopf[data-toggle="d1"]').click();
   await seite.waitForTimeout(250);
