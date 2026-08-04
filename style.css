@@ -152,12 +152,17 @@
    summary selbst flex wird, sondern ein span darin — ein summary mit
    display:flex verliert seine Markierung. */
 .gic{width:20px;height:20px;flex:none}
-.detail .tool-row .btn,.detail-bildtools .btn{display:inline-flex;align-items:center;gap:7px}
+/* Überall, wo Goldsymbole in Knöpfen stehen: Kartendetails UND die drei
+   Knopfleisten der Decks (Werkzeuge, Kopfzeile, Gruppieren/Ansicht). */
+.detail .tool-row .btn,.detail-bildtools .btn,
+.deck-tools .btn,.deck-manage .btn,.deck-gruppe-leiste .btn{
+  display:inline-flex;align-items:center;gap:7px}
 /* Führt ein Knopf ein Goldsymbol, rückt es näher an seinen linken Rand:
    7 statt 10 px Polster. Das 20-px-Bild bringt optisch schon Luft mit —
    mit vollem Polster sah es aus, als hinge es in der Mitte des Knopfs.
    Nur bei führendem Symbol; ein Knopf ohne („Bild ersetzen") behält sein
    gleichmäßiges Polster. */
+.btn:has(>.gic:first-child){padding-left:12px}
 .btn.sm:has(>.gic:first-child){padding-left:7px}
 
 /* Die Werkzeugzeile bricht NICHT um — fünf Elemente, eine Zeile, immer.
@@ -208,8 +213,10 @@
 .det-sum{display:inline-flex;align-items:center;gap:7px;vertical-align:middle}
 /* Der Ladering tritt WÄHREND der Suche an die Stelle des goldenen Symbols.
    Bliebe er bei seiner Textgröße, spränge der Knopf beim Klick um sieben
-   Pixel schmaler und beim Fertigwerden wieder zurück. */
-.detail .tool-row .btn .ic{width:20px;height:20px}
+   Pixel schmaler und beim Fertigwerden wieder zurück. Gilt auch in der
+   Deck-Werkzeugleiste — dort tragen seit dem Rollout ALLE Knöpfe Gold, ein
+   .ic in einem Knopf kann nur noch der Ladering sein. */
+.detail .tool-row .btn .ic,.deck-tools .btn .ic{width:20px;height:20px}
 
 body{margin:0;background:var(--bg);color:var(--txt);
      font:15px/1.5 "Fira Sans Condensed",system-ui,"Segoe UI",Roboto,sans-serif;
