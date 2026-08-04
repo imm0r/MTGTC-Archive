@@ -217,9 +217,17 @@ Deno.serve(async (req) => {
     const block = res.content.find(c => c.type === "tool_use");
     ergebnis = block && "input" in block ? (block.input as { texte: typeof ergebnis }).texte ?? [] : [];
   } catch (e) {
+    /* Die Meldung bleibt HIER. Sie kann enthalten, was ein Aufrufer nicht
+       wissen soll — Anthropic legt in Fehlern schon mal Endpunkte, Modellnamen
+       und Teile der Anfrage offen, und ein Stack zeigt Dateipfade des Servers.
+       CodeQL hat genau das an dieser Zeile gemeldet, und zu Recht: Der Client
+       hatte von der Meldung ohnehin nichts, er liest nur `texte`.
+
+       In die Funktionsprotokolle gehört sie trotzdem, sonst sucht man einen
+       Ausfall im Dunkeln. */
+    console.error("combo-uebersetzen: Modellaufruf fehlgeschlagen", e);
     // Was aus dem Speicher kam, geht trotzdem zurück.
-    return json({ texte: antwort(), code: "ki_fehler",
-                  error: e instanceof Error ? e.message : String(e), neu: 0 }, 200);
+    return json({ texte: antwort(), code: "ki_fehler", neu: 0 }, 200);
   }
 
   /* Prüfen, bevor gespeichert wird. Eine Übersetzung, die einen Platzhalter
