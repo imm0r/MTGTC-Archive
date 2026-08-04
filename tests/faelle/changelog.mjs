@@ -290,19 +290,37 @@ export default async function ({ seite, adresse, stand, wurzel }) {
                   text: "Eintrag ohne Fassung, wie frisch geschrieben", pr: 999 });
   const frisch = JSON.stringify(probe, null, 1) + "\n";
 
-  const gestempelt = changelogStempeln(frisch, "0.77.0");
+  /* Zwei Fassungen, die im echten Bestand nicht vorkommen KÖNNEN — eine höher
+     als jede darin, und die nächste darüber.
+
+     Hier standen feste Nummern (0.77.0 → 0.78.0), und das ging so lange gut,
+     bis die ausgelieferte Fassung sie eingeholt hatte: Seit dem Eintrag zu
+     #212 trug der oberste echte Eintrag selbst 0.77.0. Das Umrechnen erwischte
+     damit ZWEI Einträge statt einem, die Behauptung darunter wurde rot — an
+     einer Datei, die mit der jeweiligen Änderung nichts zu tun hatte. Der
+     Fehlschlag blockierte jeden offenen Pull Request und wäre bei jeder
+     weiteren Auslieferung wiedergekommen.
+
+     Abgeleitet statt festgeschrieben kann das nicht mehr passieren: Die
+     Prüfung rechnet oberhalb von allem, was je ausgeliefert wurde. */
+  const hoechsterHauptteil = Math.max(0, ...JSON.parse(voll)
+    .map(e => Number(String(e.version ?? "0").split(".")[0]) || 0));
+  const stufe = `${hoechsterHauptteil + 1}.0.0`;
+  const stufeDrueber = `${hoechsterHauptteil + 1}.1.0`;
+
+  const gestempelt = changelogStempeln(frisch, stufe);
   const nachStempel = JSON.parse(gestempelt.text);
   stand.gleich("der neue Eintrag bekommt die Fassung, der darunter behält seine",
     [gestempelt.offen, nachStempel[0].version, nachStempel[1].version],
-    [1, "0.77.0", untenDrunter]);
+    [1, stufe, untenDrunter]);
 
-  const um = changelogStempeln(gestempelt.text, "0.78.0", "0.77.0");
+  const um = changelogStempeln(gestempelt.text, stufeDrueber, stufe);
   const nachUm = JSON.parse(um.text);
   stand.gleich("auf neuer Basis wandert der EIGENE Stempel mit, kein fremder",
     [um.umgerechnet, nachUm[0].version, nachUm[1].version],
-    [1, "0.78.0", untenDrunter]);
+    [1, stufeDrueber, untenDrunter]);
 
-  const ohneVorher = changelogStempeln(gestempelt.text, "0.78.0");
+  const ohneVorher = changelogStempeln(gestempelt.text, stufeDrueber);
   stand.ist("ohne diese Angabe wird nichts umgeschrieben — Geschichte bleibt stehen",
     ohneVorher.umgerechnet === 0 && ohneVorher.text === gestempelt.text);
 }
