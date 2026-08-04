@@ -6973,7 +6973,16 @@ async function comboKartenLaden(namen) {
 
 /* Zonen-Kürzel von Commander Spellbook → Klartext (für „Initial Card State").
    Die Zustandsnotizen selbst (u.state) kommen englisch von CSB. */
-const ZONE_NAMES = { B: "Battlefield", H: "Hand", G: "Graveyard", E: "Exile", L: "Library", C: "Command Zone", S: "Stack" };
+/* CSB gibt die Ausgangszone als einzelnen Buchstaben. Die Wörter dazu hat die
+   App längst — es sind dieselben, die auf der Spielmatte über den Zonen stehen.
+   Hier standen sie trotzdem fest auf Englisch, und zwar in JEDER Sprache: In
+   einer deutschen Oberfläche las sich der Ausgangszustand einer Combo als
+   „Battlefield", während zwei Ansichten weiter „Schlachtfeld" steht.
+
+   Gemappt wird auf die Schlüssel, nicht auf die Wörter — sonst wären sie beim
+   Sprachwechsel eingefroren. t() löst sie bei jedem Zeichnen neu auf. */
+const ZONE_NAMES = { B: "zone.field", H: "zone.hand", G: "zone.grave",
+                     E: "zone.exile", L: "zone.lib", C: "zone.cmd", S: "zone.stack" };
 
 /* ------------------------- Legalität (Formate) -----------------------
    Combos: CSB liefert je Combo legalities (Boolean je Format). Karten:
@@ -7223,7 +7232,9 @@ function comboKachel(combo, deckId, cardByName, legKey) {
 
   // Ausgangszustand je Karte: Zone(n) + evtl. Zustandsnotiz (beides von CSB).
   const zustand = (combo.uses || []).map(u => {
-    const zonen = (u.zones || []).map(z => ZONE_NAMES[z] || z).join(" / ");
+    // Unbekannter Buchstabe: t() gibt den Schlüssel zurück, also hier den
+    // Buchstaben selbst — besser als eine Lücke, falls CSB eine Zone ergänzt.
+    const zonen = (u.zones || []).map(z => t(ZONE_NAMES[z] || z)).join(" / ");
     const st = u.state ? ` (${u.state})` : "";
     return (zonen || st) ? `<li><b>${esc(u.name)}:</b> ${esc(zonen)}${esc(st)}</li>` : "";
   }).filter(Boolean).join("");
