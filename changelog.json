@@ -1,5 +1,18 @@
 [
  {
+  "am": "2026-08-05T06:50:00+02:00",
+  "art": "verbessert",
+  "text": {
+   "de": "Feinschliff in den Kartendetails: „Bearbeiten\" steht jetzt beim Bild neben „Bild ersetzen\", die fünf Werkzeuge daneben bleiben immer in einer Zeile, und das Preisfeld ist so kurz wie sein Inhalt. Die acht Legalitäts-Pillen sind gleich groß, Format links, Urteil rechts. Bei den Tags steht jede Zeile mittig zu ihrer Überschrift, Tags ohne Überkategorie heißen „Unkategorisiert\" und stehen am Ende.",
+   "en": "Polish in the card details: “Edit” now sits by the image next to “Replace image”, the five tools beside it always stay on one line, and the price field is as short as its content. The eight legality pills are equal in size, format left, verdict right. In the tags, each row is centred on its heading, and tags without a parent category are labelled “Uncategorised” and moved to the end.",
+   "fr": "Finitions dans les détails de carte : « Modifier » se trouve désormais près de l’image, à côté de « Remplacer l’image », les cinq outils restent toujours sur une seule ligne, et le champ de prix est aussi court que son contenu. Les huit pastilles de légalité ont la même taille, format à gauche, verdict à droite. Côté tags, chaque ligne est centrée sur son intitulé, et les tags sans catégorie parente s’appellent « Non catégorisé » et passent à la fin.",
+   "es": "Retoques en los detalles de carta: «Editar» está ahora junto a la imagen, al lado de «Reemplazar imagen», las cinco herramientas se mantienen siempre en una sola línea y el campo de precio es tan corto como su contenido. Las ocho píldoras de legalidad tienen el mismo tamaño, formato a la izquierda, veredicto a la derecha. En los tags, cada fila queda centrada con su encabezado, y los tags sin categoría superior se llaman «Sin categoría» y pasan al final.",
+   "it": "Rifiniture nei dettagli della carta: «Modifica» sta ora accanto all’immagine, vicino a «Sostituisci immagine», i cinque strumenti restano sempre su una sola riga e il campo del prezzo è corto quanto il suo contenuto. Le otto pillole di legalità hanno la stessa dimensione, formato a sinistra, verdetto a destra. Nei tag ogni riga è centrata sulla sua intestazione, e i tag senza categoria superiore si chiamano «Senza categoria» e passano in fondo."
+  },
+  "pr": 230,
+  "version": "0.84.2"
+ },
+ {
   "am": "2026-08-05T05:45:00+02:00",
   "art": "verbessert",
   "text": {
