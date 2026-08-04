@@ -9,7 +9,8 @@
    "es": "Retoques en los detalles de carta: «Editar» está ahora junto a la imagen, al lado de «Reemplazar imagen», las cinco herramientas se mantienen siempre en una sola línea y el campo de precio es tan corto como su contenido. Las ocho píldoras de legalidad tienen el mismo tamaño, formato a la izquierda, veredicto a la derecha. En los tags, cada fila queda centrada con su encabezado, y los tags sin categoría superior se llaman «Sin categoría» y pasan al final.",
    "it": "Rifiniture nei dettagli della carta: «Modifica» sta ora accanto all’immagine, vicino a «Sostituisci immagine», i cinque strumenti restano sempre su una sola riga e il campo del prezzo è corto quanto il suo contenuto. Le otto pillole di legalità hanno la stessa dimensione, formato a sinistra, verdetto a destra. Nei tag ogni riga è centrata sulla sua intestazione, e i tag senza categoria superiore si chiamano «Senza categoria» e passano in fondo."
   },
-  "pr": 230
+  "pr": 230,
+  "version": "0.84.2"
  },
  {
   "am": "2026-08-05T05:45:00+02:00",
