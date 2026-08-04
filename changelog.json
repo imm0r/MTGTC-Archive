@@ -9,7 +9,8 @@
    "es": "Las etiquetas de una carta se agrupan ahora por término general: la etiqueta colectiva encabeza la fila y debajo están las que la justifican. Antes iban planas en dos filas y había que adivinar qué se derivaba de qué. El número de una etiqueta cuenta además sus subetiquetas, así que dice lo mismo que la lista de resultados al pulsarla. La etiqueta colectiva ya no lleva número: solía mostrar 0 aunque miles de cartas cuelgan de ella.",
    "it": "I tag di una carta sono ora raggruppati per termine generale: il tag collettivo apre la riga e sotto stanno i tag che lo giustificano. Prima erano piatti su due righe e bisognava indovinare cosa derivasse da cosa. Il numero su un tag conta anche i sottotag, quindi dice lo stesso della lista di risultati che ottieni cliccandolo. Il tag collettivo non ha più un numero: spesso mostrava 0 benché migliaia di carte gli appartengano."
   },
-  "pr": 226
+  "pr": 226,
+  "version": "0.83.0"
  },
  {
   "am": "2026-08-05T01:45:00+02:00",
