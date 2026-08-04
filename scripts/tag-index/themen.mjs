@@ -267,6 +267,28 @@ async function main() {
   const erg = await rpc("tag_import_commit",
     { p_bulk_id: eintrag.id, p_bulk_updated: eintrag.updated_at });
   console.log(`Übernommen: ${erg?.tags} Themen, ${erg?.taggings} Zuordnungen.`);
+
+  /* Die wirksame Kartenzahl je Thema — Karten einschließlich aller
+     Unterbegriffe. Sie steht an den Chips in der Kartenansicht und muss
+     dasselbe sagen wie die Trefferliste, die ein Klick darauf liefert.
+
+     NACH dem Tausch, nicht darin: Gemessen dauert das Hochrollen rund zehn
+     Sekunden (11.609 Vorfahr-Paare, verbunden mit 231.000 Zuordnungen ergibt
+     472.000 Zeilen zum Zählen). Zehn Sekunden täglich sind belanglos — zehn
+     Sekunden innerhalb von tag_import_commit wären es nicht: Diese
+     Transaktion hält den ganzen Bestand gesperrt, und solange sähe die App
+     eine Sammlung ohne Themen.
+
+     Scheitert es, bleibt der Rest trotzdem stehen. Die Zahlen sind dann einen
+     Lauf alt — eine Abweichung, die niemandem auffällt und die der nächste
+     Lauf von selbst behebt. Den ganzen Einspielvorgang dafür rot zu machen,
+     wäre unverhältnismäßig. */
+  try {
+    const n = await rpc("tag_rollup_berechnen");
+    console.log(`Wirksame Kartenzahlen gerechnet: ${n} Themen.`);
+  } catch (e) {
+    console.warn(`Hochrollen übersprungen (${e.message}) — die Zahlen bleiben vom letzten Lauf.`);
+  }
 }
 
 main().catch(e => { console.error(e.message); process.exitCode = 1; });

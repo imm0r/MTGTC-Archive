@@ -23,12 +23,19 @@ export const name = "themen";
 const STUB = `
   sb = {
     rpc: async (fn, args) => {
-      if (fn === "tags_of_card") {
+      if (fn === "tag_groups_of_card") {
         if (args.p_oracle_id !== "orc-solring") return { data: [], error: null };
+        /* Die drei Fälle, die es zu unterscheiden gilt — in der Reihenfolge,
+           in der die Datenbank sie sortiert: ohne Oberbegriff zuerst.
+           mana-rock haengt unter ZWEI Sammeltags; das ist kein Fehler,
+           sondern kommt bei 684 der 4509 Tags vor. */
         return { data: [
-          { slug: "mana-rock", label: "mana-rock", description: "Artefakt, das Mana erzeugt.", cards: 109, direkt: true },
-          { slug: "full-refund", label: "full-refund", description: null, cards: 103, direkt: true },
-          { slug: "ramp", label: "ramp", description: null, cards: 562, direkt: false },
+          { wurzel: null, wurzel_label: null, slug: "full-refund", label: "full-refund",
+            description: null, cards: 103, cards_total: 103 },
+          { wurzel: "artifact", wurzel_label: "artifact", slug: "mana-rock", label: "mana-rock",
+            description: "Artefakt, das Mana erzeugt.", cards: 109, cards_total: 240 },
+          { wurzel: "ramp", wurzel_label: "ramp", slug: "mana-rock", label: "mana-rock",
+            description: "Artefakt, das Mana erzeugt.", cards: 109, cards_total: 240 },
         ], error: null };
       }
       if (fn === "cards_with_tag") {
@@ -107,18 +114,51 @@ export default async function ({ seite, adresse, stand }) {
     await new Promise(r => setTimeout(r, 50));
   });
 
-  stand.gleich("direkte Themen als Chips, geerbte gedimmt dahinter",
-    await seite.evaluate(() => ({
-      direkt: [...document.querySelectorAll("#dt-themen-body .thema-chip:not(.geerbt)")].map(c => c.textContent.replace(/\d+$/, "")),
-      geerbt: [...document.querySelectorAll("#dt-themen-body .thema-chip.geerbt")].map(c => c.textContent.replace(/\d+$/, "")),
-      trenner: !!document.querySelector("#dt-themen-body .thema-trenner"),
-    })),
-    { direkt: ["mana-rock", "full-refund"], geerbt: ["ramp"], trenner: true });
+  /* Die Gruppierung ist der Kern des Umbaus: Der Sammeltag trägt die Zeile,
+     darunter stehen die Tags, die ihn begründen. Vorher standen alle flach in
+     zwei Reihen, und welcher geerbte aus welchem direkten folgte, musste man
+     raten. */
+  const gruppen = await seite.evaluate(() =>
+    [...document.querySelectorAll("#dt-themen-body .thema-gruppe")].map(g => ({
+      ober: g.querySelector(".thema-ober")?.textContent ?? null,
+      tags: [...g.querySelectorAll(".thema-chip")].map(c => c.textContent.replace(/\d+$/, "")),
+      zahlen: [...g.querySelectorAll(".thema-chip i")].map(i => i.textContent),
+    })));
+  stand.gleich("die Tags stehen unter ihrem Sammeltag, ohne Oberbegriff zuerst",
+    gruppen.map(g => [g.ober, g.tags.join(",")]),
+    [[null, "full-refund"], ["artifact", "mana-rock"], ["ramp", "mana-rock"]]);
 
-  stand.ist("die Beschreibung hängt als title am Chip",
+  // Ein Tag mit zwei Wegen nach oben erscheint unter beiden. Keine Doppelung,
+  // sondern zwei richtige Aussagen — 684 der 4509 Tags haben mehrere Eltern.
+  stand.gleich("ein Tag mit zwei Sammeltags steht unter beiden",
+    gruppen.filter(g => g.tags.includes("mana-rock")).map(g => g.ober), ["artifact", "ramp"]);
+
+  /* Am Sammeltag steht KEINE Zahl. Seine direkte wäre 0 — der Tagger klebt
+     Oberbegriffe nie an Karten — und läse sich als „trifft auf keine Karte
+     zu", obwohl die Kategorie voll ist. */
+  stand.ist("der Sammeltag trägt keine Zahl",
     await seite.evaluate(() =>
-      document.querySelector("#dt-themen-body .thema-chip")?.title || ""),
-    await seite.evaluate(() => document.querySelector("#dt-themen-body .thema-chip")?.title));
+      ![...document.querySelectorAll("#dt-themen-body .thema-ober")].some(o => /\d/.test(o.textContent))),
+    await seite.evaluate(() => [...document.querySelectorAll("#dt-themen-body .thema-ober")].map(o => o.textContent).join(" | ")));
+
+  /* An den Tags steht die WIRKSAME Zahl, nicht die direkte. Nur die deckt sich
+     mit dem, was ein Klick darauf liefert: Die Suche steigt die Hierarchie
+     hinab. `mana-rock` hat 109 direkte Zuordnungen und 240 mit Unterbegriffen. */
+  stand.gleich("die Zahl am Chip ist die wirksame, nicht die direkte",
+    gruppen.flatMap(g => g.zahlen), ["103", "240", "240"]);
+
+  /* Die Beschreibung hängt am Chip, nicht am Sammeltag — und nur dort, wo der
+     Tagger eine führt (29 % der Tags). Geprüft wird deshalb gezielt der Chip
+     MIT Beschreibung: Der erste in der Liste hat keine, und ein „title ist
+     leer" wäre dort das richtige Ergebnis. */
+  const titel = await seite.evaluate(() => {
+    const chips = [...document.querySelectorAll("#dt-themen-body .thema-chip")];
+    const mit = chips.find(c => c.textContent.startsWith("mana-rock"));
+    const ohne = chips.find(c => c.textContent.startsWith("full-refund"));
+    return { mit: mit?.title ?? null, ohne: ohne?.title ?? null };
+  });
+  stand.gleich("die Beschreibung hängt als title am Chip, und nur wo es eine gibt",
+    titel, { mit: "Artefakt, das Mana erzeugt.", ohne: "" });
 
   // Karte ohne Themen: der Kasten sagt es, statt leer zu bleiben.
   const leerText = await seite.evaluate(async () => {
