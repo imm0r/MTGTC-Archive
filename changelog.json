@@ -9,7 +9,8 @@
    "es": "Las cuatro herramientas de las filas de la colección y la lista de deseos también son ahora doradas: editar, obtener precio, la moneda de euro para la lista de venta y la cruz para quitar. Con ello, la última barra de botones de la app lleva el estilo en relieve.",
    "it": "Anche i quattro strumenti nelle righe della collezione e della lista dei desideri ora sono dorati: modifica, aggiorna prezzo, la moneta in euro per la lista di vendita e la croce per rimuovere. Con questo l’ultima barra di pulsanti dell’app porta lo stile in rilievo."
   },
-  "pr": 235
+  "pr": 235,
+  "version": "0.86.1"
  },
  {
   "am": "2026-08-05T10:40:00+02:00",
