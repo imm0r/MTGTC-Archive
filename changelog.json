@@ -9,7 +9,8 @@
    "es": "En las instrucciones de combo traducidas, algún paso se quedaba en inglés porque el modelo lo había saltado — normalmente uno parecido a otro. Si ahora falta una línea, se vuelve a pedir expresamente. El modelo también añadía a veces el paso siguiente al anterior, con lo que las instrucciones parecían haberlo hecho ya; para eso se ha afinado la indicación.",
    "it": "Nelle istruzioni delle combo tradotte capitava che un passaggio restasse in inglese perché il modello lo aveva saltato — di solito uno simile a un altro. Se ora manca una riga, viene richiesta espressamente. Il modello inoltre a volte attaccava il passaggio successivo al precedente, così che le istruzioni sembravano averlo già svolto; contro questo l'indicazione è stata resa più stringente."
   },
-  "pr": 222
+  "pr": 222,
+  "version": "0.82.1"
  },
  {
   "am": "2026-08-04T23:00:00+02:00",
