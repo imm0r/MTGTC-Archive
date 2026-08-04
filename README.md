@@ -2873,11 +2873,50 @@ Bis dahin — und wenn die Funktion fehlt, der Schalter aus ist oder das
 Kontingent alle ist — zeigt die App das englische Original. Kein Fehler, keine
 Meldung: Das Original ist eine vollständige Auskunft.
 
-**Kosten.** Ein Modell-Aufruf je Combo, die *neue* Sätze mitbringt; Combos
-ohne neue Sätze kosten nichts und verbrauchen kein Kontingent. Das Kontingent
-liegt bei 20 Aufrufen je Stunde und Person — nötig, weil der Zwischenspeicher
-nur bei bekannten Sätzen greift und beliebige Zeichenketten lauter neue Muster
-erzeugen würden.
+### Übersetzt wird, was jemand aufmacht
+
+Zwei getrennte Anlässe, und der zweite ist der teure:
+
+* **Beim Zeichnen der Liste** gehen nur die sichtbaren Ergebnis-Punkte raus
+  („Unendlich Mana", „Unendliche Sturmanzahl"). Die sind kurz und über Combos
+  hinweg dieselben — dort greift der Satzspeicher fast immer.
+* **Beim ersten Aufklappen einer Combo** folgt deren Anleitung: Voraussetzungen
+  und Ablauf, und zwar nur die dieser einen.
+
+Vorher lief beides zusammen, einmal über die ganze Liste. In einem Deck mit
+zehn Combos hieß das rund neunzig Sätze auf einen Schlag — für Anleitungen, die
+zugeklappt dastanden und die niemand gelesen hat. Bezahlt wurde damit das
+Ermitteln der Liste statt das Lesen. Obendrein schnitt die Obergrenze von
+vierzig Teilen mitten hindurch: Die vorderen Combos wurden deutsch, die
+hinteren blieben englisch — was nach einem Fehler aussah statt nach einer
+Grenze. Ein Aufruf liegt jetzt bei rund einem halben Dutzend Sätzen.
+
+Ein zweites Aufklappen schickt nichts mehr. Gemerkt wird dabei der **Versuch**,
+nicht der Erfolg: Ein Satz, den das Modell nicht brauchbar übersetzt hat, käme
+sonst bei jedem Aufklappen erneut und kostete jedes Mal.
+
+**Kosten.** Höchstens ein Modell-Aufruf je Anlass, und nur wenn dabei *neue*
+Sätze anfallen; alles Bekannte kostet nichts und verbraucht kein Kontingent.
+Das Kontingent liegt bei 20 Aufrufen je Stunde und Person — nötig, weil der
+Zwischenspeicher nur bei bekannten Sätzen greift und beliebige Zeichenketten
+lauter neue Muster erzeugen würden.
+
+Was ein Klick gekostet hat, steht danach dabei — dieselbe Zeile wie bei den
+KI-Synergien und der Regelfrage, aus dem `usage`-Feld der Function gerechnet:
+
+```
+Diese Übersetzung: ≈ $0,0042 · 1.204 → 388 Tokens · 3 von 12 Sätzen neu
+Diese Übersetzung: ohne Kosten — alle 12 Sätze standen schon im Speicher
+```
+
+Die zweite Zeile ist der Regelfall, sobald eine Combo einmal jemand angesehen
+hat, und sie sagt das ausdrücklich statt „$0,0000" zu zeigen: Es hat nicht fast
+nichts gekostet, sondern gar nichts. Genau dafür ist der Satzspeicher gebaut —
+ohne diese Zeile sähe man ihm seine Wirkung nie an.
+
+Konnte gar nicht übersetzt werden (Kontingent alle, Antwort abgeschnitten,
+Aufruf gescheitert), steht dort **keine** Zeile. Eine Kostenzeile neben
+englischem Text behauptete eine Übersetzung, die nicht stattgefunden hat.
 
 ## Changelog
 

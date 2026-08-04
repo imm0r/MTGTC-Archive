@@ -2992,26 +2992,36 @@ Object.assign(I18N.de, {
   "combo.cardTitle": "Combos mit dieser Karte (Commander Spellbook)",
   "combo.cardNone": "Diese Karte ist in keiner bekannten Combo.",
   "combo.cardNote": "Combos mit dieser Karte ({n})",
+  "combo.cost": "Diese Übersetzung: ≈ {cost} · {in} → {out} Tokens · {neu} von {gesamt} Sätzen neu",
+  "combo.costCache": "Diese Übersetzung: ohne Kosten — alle {gesamt} Sätze standen schon im Speicher",
 });
 Object.assign(I18N.en, {
   "combo.cardTitle": "Combos with this card (Commander Spellbook)",
   "combo.cardNone": "This card isn’t in any known combo.",
   "combo.cardNote": "Combos with this card ({n})",
+  "combo.cost": "This translation: ≈ {cost} · {in} → {out} tokens · {neu} of {gesamt} sentences new",
+  "combo.costCache": "This translation: free — all {gesamt} sentences were already stored",
 });
 Object.assign(I18N.fr, {
   "combo.cardTitle": "Combos avec cette carte (Commander Spellbook)",
   "combo.cardNone": "Cette carte n’apparaît dans aucun combo connu.",
   "combo.cardNote": "Combos avec cette carte ({n})",
+  "combo.cost": "Cette traduction : ≈ {cost} · {in} → {out} jetons · {neu} phrases sur {gesamt} nouvelles",
+  "combo.costCache": "Cette traduction : sans frais — les {gesamt} phrases étaient déjà en mémoire",
 });
 Object.assign(I18N.es, {
   "combo.cardTitle": "Combos con esta carta (Commander Spellbook)",
   "combo.cardNone": "Esta carta no está en ningún combo conocido.",
   "combo.cardNote": "Combos con esta carta ({n})",
+  "combo.cost": "Esta traducción: ≈ {cost} · {in} → {out} tokens · {neu} de {gesamt} frases nuevas",
+  "combo.costCache": "Esta traducción: sin coste — las {gesamt} frases ya estaban guardadas",
 });
 Object.assign(I18N.it, {
   "combo.cardTitle": "Combo con questa carta (Commander Spellbook)",
   "combo.cardNone": "Questa carta non è in nessuna combo nota.",
   "combo.cardNote": "Combo con questa carta ({n})",
+  "combo.cost": "Questa traduzione: ≈ {cost} · {in} → {out} token · {neu} frasi su {gesamt} nuove",
+  "combo.costCache": "Questa traduzione: senza costi — tutte le {gesamt} frasi erano già in memoria",
 });
 
 /* ---- Teil 10: Deck-Bracket (Commander Spellbook) ---- */
