@@ -124,9 +124,13 @@ export default async function ({ seite, adresse, stand }) {
       tags: [...g.querySelectorAll(".thema-chip")].map(c => c.textContent.replace(/\d+$/, "")),
       zahlen: [...g.querySelectorAll(".thema-chip i")].map(i => i.textContent),
     })));
-  stand.gleich("die Tags stehen unter ihrem Sammeltag, ohne Oberbegriff zuerst",
+  /* Die Gruppe OHNE Oberbegriff steht ZULETZT und heißt „Unkategorisiert":
+     Sie ist der Rest, nicht die Spitze — oben stehend (so kam es aus der
+     Datenbank) las sie sich wie das Wichtigste, und ganz ohne Kopf sah die
+     Zeile neben den beschrifteten aus wie ein Versehen. */
+  stand.gleich("die Tags stehen unter ihrem Sammeltag, Unkategorisiert zuletzt",
     gruppen.map(g => [g.ober, g.tags.join(",")]),
-    [[null, "full-refund"], ["artifact", "mana-rock"], ["ramp", "mana-rock"]]);
+    [["artifact", "mana-rock"], ["ramp", "mana-rock"], ["Unkategorisiert", "full-refund"]]);
 
   // Ein Tag mit zwei Wegen nach oben erscheint unter beiden. Keine Doppelung,
   // sondern zwei richtige Aussagen — 684 der 4509 Tags haben mehrere Eltern.
@@ -145,7 +149,7 @@ export default async function ({ seite, adresse, stand }) {
      mit dem, was ein Klick darauf liefert: Die Suche steigt die Hierarchie
      hinab. `mana-rock` hat 109 direkte Zuordnungen und 240 mit Unterbegriffen. */
   stand.gleich("die Zahl am Chip ist die wirksame, nicht die direkte",
-    gruppen.flatMap(g => g.zahlen), ["103", "240", "240"]);
+    gruppen.flatMap(g => g.zahlen), ["240", "240", "103"]);
 
   /* Die Beschreibung hängt am Chip, nicht am Sammeltag — und nur dort, wo der
      Tagger eine führt (29 % der Tags). Geprüft wird deshalb gezielt der Chip

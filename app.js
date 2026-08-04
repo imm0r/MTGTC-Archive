@@ -5415,6 +5415,8 @@ function bildSpalteHtml(c, faced, gross, hover) {
   return `<div class="detail-bildspalte">
     ${bild ? karte3dHtml(bild, c) : `<div class="detail-img detail-img-leer" aria-hidden="true"></div>`}
     <div class="detail-bildtools">
+      <button class="btn ghost sm" id="dt-edit" title="${esc(t("row.editTitle"))}">${
+        icoGold("stift")}${esc(t("detail.edit"))}</button>
       <button class="btn ghost sm" id="dt-bild" title="${esc(t("img.replaceTitle"))}">${
         esc(t("img.replace"))}</button>
     </div>
@@ -5446,9 +5448,8 @@ function detailHtml(c, hover) {
         <div class="sec-sep"></div>
         <div class="tool-group"><span class="tool-label">${esc(t("detail.groupManage"))}</span>
           <div class="tool-row">
-            <button class="btn ghost sm" id="dt-edit" title="${esc(t("row.editTitle"))}">${icoGold("stift")}${esc(t("detail.edit"))}</button>
             <button class="btn ghost sm" id="dt-price" title="${esc(t("detail.priceBtnTitle"))}">${icoGold("neu")}${esc(t("detail.priceBtn"))}</button>
-            <div class="field" style="width:118px"><label>${esc(t("deck.maxPerCard"))}</label>
+            <div class="field feld-cap"><label>${esc(t("deck.maxPerCard"))}</label>
               <input type="number" id="syn-cap" min="0" step="0.5" value="${prefWert("capDefault") ?? ""}"
                 placeholder="${esc(t("syn.capPh"))}" title="${esc(t("syn.capTitle"))}"></div>
             <button class="btn ghost sm syn-std-btn" id="dt-syn" title="${esc(t("syn.findTitle"))}">${icoGold("zahnraeder")}${esc(t("syn.find"))}</button>
@@ -5603,8 +5604,12 @@ function themenChipsHtml(themen) {
     th.description ? ` title="${esc(th.description)}"` : ""}>${esc(th.label)}<i>${
     th.cards_total ?? th.cards}</i></span>`;
 
-  // Reihenfolge kommt aus der Datenbank: ohne Oberbegriff zuerst, dann die
-  // Gruppen nach Namen. Hier wird nur zusammengefasst, nicht sortiert.
+  // Die Datenbank liefert: ohne Oberbegriff zuerst, dann die Gruppen nach
+  // Namen. Zusammengefasst wird in dieser Reihenfolge — nur die Gruppe OHNE
+  // Oberbegriff wandert danach ans Ende: Sie ist der Rest, nicht die Spitze,
+  // und hieß oben stehend wie das Wichtigste. Als Überschrift bekommt sie
+  // „Unkategorisiert" — eine Zeile ganz ohne Kopf sah neben den beschrifteten
+  // aus wie ein Versehen.
   const gruppen = [];
   for (const th of themen) {
     const key = th.wurzel || "";
@@ -5612,13 +5617,14 @@ function themenChipsHtml(themen) {
     if (!g) gruppen.push(g = { key, label: th.wurzel_label || "", tags: [] });
     g.tags.push(th);
   }
+  gruppen.sort((a, b) => (a.key === "") - (b.key === ""));
 
-  const zeile = g => `<div class="thema-gruppe">${
-    g.key ? `<span class="thema-ober" title="${esc(t("themen.inheritedHint"))}">${esc(g.label)}</span>` : ""
-  }<span class="thema-chips">${g.tags.map(chip).join("")}</span></div>`;
+  const zeile = g => `<div class="thema-gruppe"><span class="thema-ober"${
+    g.key ? ` title="${esc(t("themen.inheritedHint"))}"` : ""}>${
+    esc(g.key ? g.label : t("themen.uncategorized"))}</span><span class="thema-chips">${
+    g.tags.map(chip).join("")}</span></div>`;
 
-  return `<div class="thema-gruppen">${gruppen.map(zeile).join("")}</div>
-    <p class="hint" style="margin:6px 0 0">${t("themen.source")}</p>`;
+  return `<div class="thema-gruppen">${gruppen.map(zeile).join("")}</div>`;
 }
 
 /* Themen erst beim ersten Aufklappen laden — dasselbe Muster wie die

@@ -152,7 +152,18 @@
    summary selbst flex wird, sondern ein span darin — ein summary mit
    display:flex verliert seine Markierung. */
 .gic{width:20px;height:20px;flex:none}
-.detail .tool-row .btn{display:inline-flex;align-items:center;gap:7px}
+.detail .tool-row .btn,.detail-bildtools .btn{display:inline-flex;align-items:center;gap:7px}
+
+/* Die Werkzeugzeile bricht NICHT um — fünf Elemente, eine Zeile, immer.
+   Vorher rutschte je nach Spaltenbreite mal der letzte Knopf in eine zweite
+   Zeile und die Gruppe sah jedes Mal anders aus. flex:none, damit kein Knopf
+   gestaucht wird; wird es wirklich zu eng (Telefon quer geht noch, 320 px
+   nicht), rollt die Zeile, statt zu brechen oder zu quetschen. */
+.detail .tool-row{flex-wrap:nowrap;overflow-x:auto}
+.detail .tool-row>*{flex:none}
+/* Vier Stellen plus Steller — mehr fasst „max €/Karte" nie. Die 118 px von
+   vorher waren die Breite eines Datums, nicht eines Deckels. */
+.detail .feld-cap{width:76px}
 
 /* Legalität und Tags nebeneinander. Beide sind zugeklappt eine Zeile, und
    zwei einzeilige Aufklapper untereinander sind zwei Zeilen für nichts.
@@ -837,14 +848,17 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
    vorher stammt aus der Zeit, als das Paar neben dem Kartenbild um dessen
    Restbreite kämpfte; seit es die volle Dialogbreite hat, tragen zwei Spalten
    Legalität UND die längsten Tag-Namen daneben (nachgemessen, siehe
-   .det-paar). max-content, nicht 1fr: Die Pillen sollen so breit sein wie
-   ihr Inhalt, nicht wie ihre Spalte. */
-.legal-grid{display:grid;grid-template-columns:repeat(2,max-content);gap:5px 10px}
-/* Unter 400 px wieder eine Spalte: max-content schrumpft nicht, und zwei
-   Spalten mit „nicht legal" brauchen gemessen 291 px — ein 320er-Bildschirm
-   gibt dem Dialog aber nur 267. Die Pillen liefen sonst aus dem Kasten. */
-@media (max-width:400px){.legal-grid{grid-template-columns:max-content}}
-.legal-item{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--txt);
+   .det-paar).
+
+   1fr, nicht max-content: ALLE ACHT PILLEN GLEICH GROSS. Jede füllt ihre
+   Spaltenhälfte, das Format steht links, das Urteil rechts —
+   space-between im Item. Vorher war jede Pille so breit wie ihr Inhalt,
+   und die Reihe sah aus wie acht verschieden lange Knöpfe. Nebeneffekt:
+   1fr schrumpft, die Sonderbehandlung für 320er-Bildschirme entfällt. */
+.legal-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 10px}
+@media (max-width:400px){.legal-grid{grid-template-columns:minmax(0,1fr)}}
+.legal-item{display:flex;align-items:center;justify-content:space-between;gap:6px;
+  font-size:12px;color:var(--txt);
   border:1px solid var(--line);border-radius:8px;padding:4px 8px;background:var(--panel2)}
 .legal-note{color:var(--acc2)}
 /* Deck-Legalität: Befund (grün = keine Verstöße / rot = Problemkarten) + Liste. */
@@ -2751,11 +2765,14 @@ tr.treffer>td{
    seiner Unterbegriffe — dieselbe Menge, die ein Klick darauf liefert. Am
    Sammeltag steht bewusst keine: Er ist ein Ordner, kein Etikett. */
 .thema-gruppen{display:flex;flex-direction:column;gap:7px;margin-top:8px}
-.thema-gruppe{display:grid;grid-template-columns:minmax(0,7.5em) 1fr;gap:4px 10px;align-items:baseline}
+/* align-items:center, nicht baseline: Bricht der Sammeltag auf zwei Zeilen um
+   („staple with set's mechanic") oder die Chips auf mehrere, sollen beide
+   Spalten in der ZEILENMITTE zueinander stehen — an der Grundlinie hingen
+   die Chips sonst an der ersten Zeile eines zweizeiligen Kopfs. */
+.thema-gruppe{display:grid;grid-template-columns:minmax(0,7.5em) 1fr;gap:4px 10px;align-items:center}
 .thema-ober{font-size:11px;letter-spacing:.4px;text-transform:uppercase;color:var(--dim);
-  text-align:right;overflow-wrap:anywhere;cursor:help}
-/* Ohne Oberbegriff: die Spalte bleibt frei, die Chips fluchten mit den anderen. */
-.thema-gruppe:has(> .thema-chips:first-child) .thema-chips{grid-column:2}
+  text-align:right;overflow-wrap:anywhere}
+.thema-ober[title]{cursor:help}
 .thema-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 /* white-space:nowrap — eine Pille, die intern umbricht, sieht aus wie zwei
    halbe. Gemessen ist der längste Tag-Name 34 Zeichen (Median 17), das passt
@@ -2770,7 +2787,6 @@ tr.treffer>td{
 @media (max-width:520px){
   .thema-gruppe{grid-template-columns:1fr}
   .thema-ober{text-align:left}
-  .thema-gruppe:has(> .thema-chips:first-child) .thema-chips{grid-column:1}
 }
 
 /* Sprachflagge. display:inline-block gegen dieselbe Falle wie bei den

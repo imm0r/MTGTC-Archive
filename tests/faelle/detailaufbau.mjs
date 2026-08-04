@@ -9,15 +9,16 @@
    Seitdem gilt hier: Die Werkzeuge stehen IN der Info-Spalte (dort gelten
    die Regeln), und die Geometrie wird GEMESSEN, nicht aus Klassen gefolgert.
 
-   Der Aufbau seit #229:
+   Der Aufbau seit #230:
+   * Unter dem BILD: „Bearbeiten" und „Bild ersetzen" — beide gehören zur
+     Karte selbst, nicht zu den Werkzeugen.
    * Neben dem Bild: Kopf, Pillen, Decks — und die EINE Gruppe „Verwaltung"
-     mit allen sechs Werkzeugen (Bearbeiten, Preis, max €/Karte, Synergien,
-     KI-Synergien, Combos). Die frühere zweite Gruppe „Vorschläge & Combos"
-     ist darin aufgegangen.
+     mit fünf Werkzeugen (Preis, max €/Karte, Synergien, KI-Synergien,
+     Combos) in EINER Zeile, die nie umbricht.
    * Unter Bild UND Spalte, volle Breite: Legalität und Tags als Paar,
      Preisverlauf, Ergebnis-Kästen. Die Legalität führt ihre acht Formate
-     in ZWEI Spalten — seit das Paar die volle Breite hat, passt das neben
-     die längsten Tag-Namen (34 Zeichen, nachgemessen). */
+     in ZWEI Spalten aus GLEICH GROSSEN Pillen (Format links, Urteil
+     rechts) — neben den längsten Tag-Namen (34 Zeichen, nachgemessen). */
 
 import { AUFBAU } from "../hilfen.mjs";
 
@@ -57,6 +58,12 @@ export default async function ({ seite, adresse, stand }) {
     const werk = koerper.querySelectorAll(".tool-group");
     const bild = koerper.querySelector(".detail-bildspalte").getBoundingClientRect();
     const rWerk = werk[0].getBoundingClientRect();
+    // „Bearbeiten" wohnt bei „Bild ersetzen" unter dem Bild — beide gehören
+    // zur Karte selbst, nicht zu den Werkzeugen.
+    const edit = document.getElementById("dt-edit");
+    const bildBtn = document.getElementById("dt-bild");
+    const zeile = document.querySelector(".detail .tool-row");
+    const glieder = [...zeile.children];
     const paar = koerper.querySelector(".det-paar");
     const items = [...koerper.querySelectorAll(".legal-item")];
     const chips = [...koerper.querySelectorAll(".thema-chip")];
@@ -79,12 +86,37 @@ export default async function ({ seite, adresse, stand }) {
       inInfo: !!werk[0].closest(".detail-info"),
       nebenBild: rWerk.left > bild.right - 5,
       werkzeuge: [...werk[0].querySelectorAll(".btn,.field input")].map(x => x.id),
+      editBeimBild: !!edit.closest(".detail-bildtools")
+        && edit.nextElementSibling === bildBtn,
+      // EINE Zeile, immer: alle fünf Glieder auf derselben UNTERKANTE (die
+      // Zeile richtet an flex-end aus — das Feld ist mit seinem Label höher
+      // als die Knöpfe, die Oberkanten dürfen sich also unterscheiden), und
+      // keines über den rechten Rand der Spalte hinaus.
+      eineZeile: new Set(glieder.map(g => Math.round(g.getBoundingClientRect().bottom))).size === 1,
+      zeilePasst: zeile.scrollWidth <= zeile.clientWidth,
+      capBreite: Math.round(document.querySelector(".feld-cap").getBoundingClientRect().width),
       paarVolleBreite: Math.abs(paar.clientWidth - koerper.clientWidth) < 2,
       paarNichtInInfo: !paar.closest(".detail-info"),
       legalZeilen: new Set(items.map(i => Math.round(i.getBoundingClientRect().top))).size,
       legalSpalten: new Set(items.map(i => Math.round(i.getBoundingClientRect().left))).size,
+      // Punkt „alle gleich groß": jede Pille exakt so breit wie jede andere —
+      // und das Urteil rechtsbündig, nur das Polster (8 px) vom Rand entfernt.
+      legalBreiten: new Set(items.map(i => Math.round(i.getBoundingClientRect().width))).size,
+      urteilRechts: items.every(i => Math.round(i.getBoundingClientRect().right
+        - i.querySelector(".pill").getBoundingClientRect().right) === 9),
       legalPasst: items.every(i => i.getBoundingClientRect().right
         <= document.getElementById("dt-legal").getBoundingClientRect().right + 0.5),
+      // Punkt 5: Kopf und Chips einer Zeile stehen in der Zeilenmitte
+      // zueinander — gemessen an der ersten Gruppe.
+      oberZentriert: (() => {
+        const g = koerper.querySelector(".thema-gruppe");
+        const o = g.querySelector(".thema-ober").getBoundingClientRect();
+        const r = g.getBoundingClientRect();
+        return Math.abs((o.top + o.bottom) / 2 - (r.top + r.bottom) / 2) <= 1;
+      })(),
+      // Punkt 6/7: Unkategorisiert zuletzt, keine Quelle-Zeile mehr.
+      letzteGruppe: [...koerper.querySelectorAll(".thema-ober")].pop()?.textContent,
+      quelleWeg: !koerper.querySelector("#dt-themen-body .hint"),
       chipGekuerzt: laengster.scrollWidth > laengster.clientWidth,
       chipText: laengster.textContent,
       // Zwischen dem Paar und dem Preisverlauf steht ein Trennstrich — wie
@@ -106,8 +138,14 @@ export default async function ({ seite, adresse, stand }) {
   stand.gleich("EINE Werkzeuggruppe, nicht mehr zwei", erg.gruppen, 1);
   stand.ist("sie steht in der Info-Spalte neben dem Bild",
     erg.inInfo && erg.nebenBild, `inInfo ${erg.inInfo}, nebenBild ${erg.nebenBild}`);
-  stand.gleich("alle sechs Werkzeuge darin, Combos eingeschlossen",
-    erg.werkzeuge, ["dt-edit", "dt-price", "syn-cap", "dt-syn", "dt-syn-ai", "dt-combos"]);
+  stand.gleich("fünf Werkzeuge darin — Bearbeiten nicht mehr",
+    erg.werkzeuge, ["dt-price", "syn-cap", "dt-syn", "dt-syn-ai", "dt-combos"]);
+  stand.ist("Bearbeiten steht unter dem Bild, direkt vor „Bild ersetzen“",
+    erg.editBeimBild);
+  stand.ist("die fünf stehen in EINER Zeile und passen hinein",
+    erg.eineZeile && erg.zeilePasst, `eineZeile ${erg.eineZeile}, passt ${erg.zeilePasst}`);
+  stand.gleich("das Feld „max €/Karte“ ist vierstellenbreit, nicht datumsbreit",
+    erg.capBreite, 76);
 
   /* --- Unter dem Bild, volle Breite -------------------------------------- */
   stand.ist("Legalität und Tags stehen unterhalb, in voller Dialogbreite",
@@ -115,9 +153,18 @@ export default async function ({ seite, adresse, stand }) {
     `ausserhalb ${erg.paarNichtInInfo}, volle Breite ${erg.paarVolleBreite}`);
   stand.gleich("die acht Formate stehen in vier Zeilen …", erg.legalZeilen, 4);
   stand.gleich("… und zwei Spalten", erg.legalSpalten, 2);
+  stand.gleich("alle acht Pillen sind gleich breit", erg.legalBreiten, 1);
+  stand.ist("das Urteil steht rechtsbündig in der Pille", erg.urteilRechts);
   stand.ist("und treten der Spalte nicht über den Rand", erg.legalPasst);
   stand.ist("zwischen dem Paar und dem Preisverlauf steht der Trennstrich",
     erg.strichVorVerlauf);
+
+  /* --- Tags -------------------------------------------------------------- */
+  stand.ist("Sammeltag und Chips stehen in der Zeilenmitte zueinander",
+    erg.oberZentriert);
+  stand.gleich("die Gruppe ohne Oberbegriff steht zuletzt, als „Unkategorisiert“",
+    erg.letzteGruppe, "Unkategorisiert");
+  stand.ist("die Tagger-Quellzeile ist fort", erg.quelleWeg);
 
   /* Der Handel dabei: Zwei Legalitäts-Spalten dürfen den Tags nicht den
      Platz nehmen, den die längsten Namen brauchen. Gemessen am längsten
