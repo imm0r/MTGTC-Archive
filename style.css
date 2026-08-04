@@ -101,6 +101,9 @@
      content: kann kein <use> — hier ist die Zeichnung deshalb ein zweites Mal
      nötig. Wer den Winkel im Sprite ändert, ändert ihn auch hier; die Prüfung
      symbole.mjs vergleicht beide Pfade. */
+  /* Der Kartenrücken für leere Flächen — dieselbe Zeichnung wie ic-kartenruecken
+     im Sprite, nur als Maske. Siehe die Begründung bei --ic-winkel. */
+  --ic-leer:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.8 2.4h10.4a1.8 1.8 0 0 1 1.8 1.8v15.6a1.8 1.8 0 0 1-1.8 1.8H6.8A1.8 1.8 0 0 1 5 19.8V4.2a1.8 1.8 0 0 1 1.8-1.8z'/%3E%3Cpath d='M7.8 5.2h8.4a.9.9 0 0 1 .9.9v11.8a.9.9 0 0 1-.9.9H7.8a.9.9 0 0 1-.9-.9V6.1a.9.9 0 0 1 .9-.9z'/%3E%3Cpath d='M12 8.1 13.1 11 16 12.1 13.1 13.2 12 16.1 10.9 13.2 8 12.1 10.9 11Z' fill='%23fff' stroke='none'/%3E%3C/svg%3E");
   --ic-winkel:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.75 6.5 15.25 12l-5.5 5.5'/%3E%3C/svg%3E")}
 .ic-sprite{display:none}
 .ic{width:1em;height:1em;flex:none;vertical-align:-.14em;
@@ -714,7 +717,8 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
   font-weight:800;line-height:1;padding:3px 6px;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.55)}
 .syn-card img{width:100%;border-radius:6px;display:block}
 .syn-noimg{width:100%;aspect-ratio:5/7;display:flex;align-items:center;justify-content:center;
-  color:var(--dim);background:var(--panel);border-radius:6px;font-size:26px}
+  color:var(--dim);background:var(--panel);border-radius:6px}
+.syn-noimg .ic,.profil-hl-noimg .ic{width:44%;height:auto;aspect-ratio:1}
 .syn-name{font-size:13px;font-weight:600;line-height:1.2}
 .syn-type{font-size:11px;color:var(--dim);line-height:1.15}
 /* Die Begründung ist auf vier Zeilen geklemmt — sonst wären die Kacheln
@@ -748,7 +752,7 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
 .combo-mini{display:flex;flex-direction:column;gap:4px;align-items:center}
 .combo-mini-card{position:relative;width:100%;cursor:zoom-in}
 .combo-mini-card img{width:100%;border-radius:5px;display:block}
-.combo-mini-card .syn-noimg{aspect-ratio:5/7;font-size:18px}
+.combo-mini-card .syn-noimg{aspect-ratio:5/7}
 .combo-mini .syn-owned{top:3px;right:3px;font-size:9px;padding:1px 4px}
 .combo-mini .syn-add{font-size:10px;padding:2px 7px}
 .combo-mini-nm{font-size:10px;color:var(--dim);text-align:center;line-height:1.15}
@@ -2727,7 +2731,29 @@ html{scrollbar-width:thin;scrollbar-color:var(--line) transparent}
 ::-webkit-scrollbar-thumb:hover{background:var(--dim)}
 ::-webkit-scrollbar-button{display:none;width:0;height:0}
 ::-webkit-scrollbar-corner{background:transparent}
-.empty{text-align:center;color:var(--dim);padding:36px 10px}
+/* ------------------------------------------------------ Leere Flächen
+   „Hier ist nichts" steht an 55 Stellen in der App, und überall stand es als
+   nackter Satz auf 36 px Polster. Eine große, ruhige Fläche mit einer Zeile
+   Kleingedrucktem in der Mitte liest sich nicht als Antwort, sondern als
+   Ladefehler — man wartet unwillkürlich, ob noch etwas kommt.
+
+   Ein Zeichen darüber beantwortet die Frage sofort. Es ist bewusst EINES für
+   alle: 55 verschiedene wären wieder das Sammelsurium, das wir gerade
+   losgeworden sind. Der Kartenrücken passt überall, weil es in dieser App
+   immer um Karten geht — auch dort, wo gerade keine da ist.
+
+   Als Maske und nicht als <use>, weil ::before kein fremdes Element einsetzen
+   kann. Dieselbe Lösung wie beim Winkelzeichen weiter oben, und aus demselben
+   Grund vergleicht symbole.mjs auch hier beide Zeichnungen gegeneinander.
+
+   Gedämpft (.35): Es soll die Auskunft begleiten, nicht sie überschreien. */
+.empty{text-align:center;color:var(--dim);padding:30px 10px 34px}
+.empty::before{content:"";display:block;width:44px;height:44px;margin:0 auto 12px;
+  background:var(--dim);opacity:.35;
+  -webkit-mask:var(--ic-leer) center/contain no-repeat;mask:var(--ic-leer) center/contain no-repeat}
+/* In engen Kästen (Combo-Kacheln, schmale Spalten) hätte das Zeichen keinen
+   Platz mehr — dort trägt der Satz allein. */
+.combo-grid .empty::before,.syn-grid .empty::before,.combo-mini .empty::before{display:none}
 .spark{display:inline-block;vertical-align:middle}
 
 /* ---------------------------------------------------------- Vorschläge */

@@ -138,12 +138,20 @@ export default async function ({ stand, wurzel }) {
   stand.ist("kein Symbol bringt eine eigene Farbe mit", festeFarben.length === 0,
             festeFarben.length ? [...new Set(festeFarben)].join(", ") : "nur currentColor und der Akzent");
 
-  // ---- Das Winkelzeichen gibt es zweimal ---------------------------------
-  // Einmal als <symbol>, einmal als Maske in style.css (content: kann kein
-  // <use>). Zwei Zeichnungen desselben Zeichens laufen auseinander, sobald
-  // jemand nur eine davon anfasst — deshalb hier der Vergleich.
-  const ausSprite = sprite.match(/<symbol id="ic-pfeil-rechts"[^>]*><path d="([^"]+)"/)?.[1];
-  const ausMaske = decodeURIComponent(styleCss.match(/--ic-winkel:url\("([^"]+)"\)/)?.[1] ?? "")
-    .match(/<path d='([^']+)'/)?.[1];
-  stand.gleich("Winkelzeichen in style.css deckt sich mit dem im Sprite", ausMaske, ausSprite);
+  // ---- Zwei Zeichen gibt es doppelt --------------------------------------
+  // Jeweils einmal als <symbol> und einmal als Maske in style.css, weil
+  // content: kein <use> einsetzen kann. Zwei Zeichnungen desselben Zeichens
+  // laufen auseinander, sobald jemand nur eine davon anfasst — und zwar
+  // still: Beide sehen für sich genommen richtig aus, nur eben nicht mehr
+  // gleich. Deshalb hier der stumpfe Vergleich Pfad gegen Pfad.
+  const pfadeAusMaske = (name) =>
+    [...decodeURIComponent(styleCss.match(new RegExp(`--ic-${name}:url\\("([^"]+)"\\)`))?.[1] ?? "")
+      .matchAll(/<path d='([^']+)'/g)].map(m => m[1]);
+  const pfadeAusSprite = (id) =>
+    [...(sprite.match(new RegExp(`<symbol id="ic-${id}"[^>]*>([\\s\\S]*?)</symbol>`))?.[1] ?? "")
+      .matchAll(/<path d="([^"]+)"/g)].map(m => m[1]);
+
+  for (const [maske, symbol] of [["winkel", "pfeil-rechts"], ["leer", "kartenruecken"]])
+    stand.gleich(`Maske --ic-${maske} deckt sich mit dem Symbol ic-${symbol}`,
+      pfadeAusMaske(maske), pfadeAusSprite(symbol));
 }

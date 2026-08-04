@@ -6363,7 +6363,7 @@ function synKachel(card, grundText, deckId, schnitt) {
   }
   return `<div class="syn-card">
     <a class="syn-card-link" href="${esc(card.scryfall_uri || "#")}" target="_blank" rel="noopener noreferrer">
-      <div class="syn-img">${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : `<div class="syn-noimg">${ico("karte")}</div>`}${badge}</div>
+      <div class="syn-img">${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : `<div class="syn-noimg">${ico("kartenruecken")}</div>`}${badge}</div>
       <div class="syn-name">${esc(card.name)}</div>
       <div class="syn-type">${esc(card.type_line || "")}</div>
       <div class="syn-exp" title="${esc(grundText)}">${esc(grundText)}</div>
@@ -7153,7 +7153,7 @@ function comboCardMini(card, deckId, alsAktion) {
   }
   return `<div class="combo-mini">
     <div class="combo-mini-card" data-cmd-img="${esc(gross)}" data-cmd-name="${esc(card.name)}">
-      ${klein ? `<img src="${esc(klein)}" alt="${esc(card.name)}" loading="lazy">` : `<div class="syn-noimg">${ico("karte")}</div>`}${badge}
+      ${klein ? `<img src="${esc(klein)}" alt="${esc(card.name)}" loading="lazy">` : `<div class="syn-noimg">${ico("kartenruecken")}</div>`}${badge}
     </div>${addBtn}${cut}${buy}
   </div>`;
 }
@@ -7189,7 +7189,7 @@ function comboKachel(combo, deckId, cardByName, legKey) {
   const fehlt = new Set((combo.missing || []).map(m => (m.name || "").toLowerCase()));
   const karten = (combo.uses || []).map(u => {
     const sc = cardByName && cardByName.get((u.name || "").toLowerCase());
-    if (!sc) return `<div class="combo-mini"><div class="combo-mini-card"><div class="syn-noimg">${ico("karte")}</div></div><div class="combo-mini-nm">${esc(u.name)}</div></div>`;
+    if (!sc) return `<div class="combo-mini"><div class="combo-mini-card"><div class="syn-noimg">${ico("kartenruecken")}</div></div><div class="combo-mini-nm">${esc(u.name)}</div></div>`;
     const alsAktion = deckId && fehlt.has((u.name || "").toLowerCase());
     return comboCardMini(sc, deckId, alsAktion);
   }).join("");
@@ -11734,7 +11734,7 @@ function profilHighlightsHtml() {
   const kachel = (label, c, sub) => c ? `
     <div class="profil-hl-item" data-hl="${c.id}" title="${esc(t("row.viewTitle"))}">
       ${c.img ? `<img src="${esc(c.img)}" alt="" loading="lazy">`
-              : `<div class="profil-hl-noimg">${ico("karte")}</div>`}
+              : `<div class="profil-hl-noimg">${ico("kartenruecken")}</div>`}
       <div class="profil-hl-txt">
         <div class="k">${esc(label)}</div>
         <div class="v">${esc(c.disp)}</div>
