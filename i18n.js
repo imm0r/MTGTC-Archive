@@ -1924,7 +1924,7 @@ Object.assign(I18N.de, {
   "toast.deckImported": "Deck in deine Decks übernommen", "toast.importFailed": "Import fehlgeschlagen: {msg}",
   "toast.pageSetN": "Sammlung zeigt jetzt {n} Karten je Seite",
   "toast.pageSetAll": "Sammlung zeigt wieder alles in einer Liste",
-  "fr.sent": "Anfrage gesendet", "fr.accepted": "Freund hinzugefügt 🎉", "fr.pending": "Anfrage läuft schon",
+  "fr.sent": "Anfrage gesendet", "fr.accepted": "Freund hinzugefügt", "fr.pending": "Anfrage läuft schon",
   "fr.already": "Ihr seid bereits befreundet", "fr.self": "Das ist dein eigener Code",
   "fr.notfound": "Kein Profil mit diesem Code", "fr.unauth": "Nicht angemeldet", "fr.done": "Erledigt",
   "dlg.deckDelete": "<b>Deck „{name}“ löschen?</b><p class='hint'>Die Karten selbst bleiben in deiner Sammlung.</p>",
@@ -1997,7 +1997,7 @@ Object.assign(I18N.en, {
   "toast.deckImported": "Deck added to your decks", "toast.importFailed": "Import failed: {msg}",
   "toast.pageSetN": "Collection now shows {n} cards per page",
   "toast.pageSetAll": "Collection shows everything in one list again",
-  "fr.sent": "Request sent", "fr.accepted": "Friend added 🎉", "fr.pending": "Request already pending",
+  "fr.sent": "Request sent", "fr.accepted": "Friend added", "fr.pending": "Request already pending",
   "fr.already": "You are already friends", "fr.self": "That's your own code",
   "fr.notfound": "No profile with this code", "fr.unauth": "Not signed in", "fr.done": "Done",
   "dlg.deckDelete": "<b>Delete deck “{name}”?</b><p class='hint'>The cards themselves stay in your collection.</p>",
@@ -2070,7 +2070,7 @@ Object.assign(I18N.fr, {
   "toast.deckImported": "Deck ajouté à tes decks", "toast.importFailed": "Échec de l'import : {msg}",
   "toast.pageSetN": "La collection affiche désormais {n} cartes par page",
   "toast.pageSetAll": "La collection affiche de nouveau tout en une seule liste",
-  "fr.sent": "Demande envoyée", "fr.accepted": "Ami ajouté 🎉", "fr.pending": "Demande déjà en cours",
+  "fr.sent": "Demande envoyée", "fr.accepted": "Ami ajouté", "fr.pending": "Demande déjà en cours",
   "fr.already": "Vous êtes déjà amis", "fr.self": "C'est ton propre code",
   "fr.notfound": "Aucun profil avec ce code", "fr.unauth": "Non connecté", "fr.done": "Terminé",
   "dlg.deckDelete": "<b>Supprimer le deck « {name} » ?</b><p class='hint'>Les cartes elles-mêmes restent dans ta collection.</p>",
@@ -2143,7 +2143,7 @@ Object.assign(I18N.es, {
   "toast.deckImported": "Mazo añadido a tus mazos", "toast.importFailed": "Error de importación: {msg}",
   "toast.pageSetN": "La colección muestra ahora {n} cartas por página",
   "toast.pageSetAll": "La colección vuelve a mostrar todo en una sola lista",
-  "fr.sent": "Solicitud enviada", "fr.accepted": "Amigo añadido 🎉", "fr.pending": "La solicitud ya está en curso",
+  "fr.sent": "Solicitud enviada", "fr.accepted": "Amigo añadido", "fr.pending": "La solicitud ya está en curso",
   "fr.already": "Ya sois amigos", "fr.self": "Ese es tu propio código",
   "fr.notfound": "Ningún perfil con este código", "fr.unauth": "No has iniciado sesión", "fr.done": "Hecho",
   "dlg.deckDelete": "<b>¿Eliminar el mazo «{name}»?</b><p class='hint'>Las cartas en sí permanecen en tu colección.</p>",
@@ -2216,7 +2216,7 @@ Object.assign(I18N.it, {
   "toast.deckImported": "Mazzo aggiunto ai tuoi mazzi", "toast.importFailed": "Importazione non riuscita: {msg}",
   "toast.pageSetN": "La collezione mostra ora {n} carte per pagina",
   "toast.pageSetAll": "La collezione mostra di nuovo tutto in un unico elenco",
-  "fr.sent": "Richiesta inviata", "fr.accepted": "Amico aggiunto 🎉", "fr.pending": "Richiesta già in corso",
+  "fr.sent": "Richiesta inviata", "fr.accepted": "Amico aggiunto", "fr.pending": "Richiesta già in corso",
   "fr.already": "Siete già amici", "fr.self": "Questo è il tuo codice",
   "fr.notfound": "Nessun profilo con questo codice", "fr.unauth": "Non hai effettuato l'accesso", "fr.done": "Fatto",
   "dlg.deckDelete": "<b>Eliminare il mazzo «{name}»?</b><p class='hint'>Le carte stesse restano nella tua collezione.</p>",
@@ -2796,7 +2796,7 @@ Object.assign(I18N.de, {
   "an.intro": "Funktions-Inventur (Richtwerte für Commander, an die Deckgröße angepasst):",
   "an.cat.ramp": "Ramp", "an.cat.draw": "Kartenvorteil", "an.cat.removal": "Entfernung", "an.cat.wipe": "Boardwipes",
   "an.needMore": "Zu wenig {cat} — Vorschläge",
-  "an.allGood": "Dein Deck ist in allen Kategorien solide aufgestellt. 👍",
+  "an.allGood": "Dein Deck ist in allen Kategorien solide aufgestellt.",
   "an.estimate": "Grobe Schätzung anhand des Regeltexts — als Anhaltspunkt, nicht als exakte Zählung.",
 });
 Object.assign(I18N.en, {
@@ -2806,7 +2806,7 @@ Object.assign(I18N.en, {
   "an.intro": "Function inventory (guideline values for Commander, scaled to deck size):",
   "an.cat.ramp": "Ramp", "an.cat.draw": "Card advantage", "an.cat.removal": "Removal", "an.cat.wipe": "Board wipes",
   "an.needMore": "Too little {cat} — suggestions",
-  "an.allGood": "Your deck is solid in every category. 👍",
+  "an.allGood": "Your deck is solid in every category.",
   "an.estimate": "Rough estimate from the rules text — a pointer, not an exact count.",
 });
 Object.assign(I18N.fr, {
@@ -2816,7 +2816,7 @@ Object.assign(I18N.fr, {
   "an.intro": "Inventaire fonctionnel (valeurs indicatives pour Commander, ajustées à la taille du deck) :",
   "an.cat.ramp": "Rampe", "an.cat.draw": "Avantage de cartes", "an.cat.removal": "Removal", "an.cat.wipe": "Board wipes",
   "an.needMore": "Trop peu de {cat} — suggestions",
-  "an.allGood": "Ton deck est solide dans toutes les catégories. 👍",
+  "an.allGood": "Ton deck est solide dans toutes les catégories.",
   "an.estimate": "Estimation approximative d'après le texte des règles — un repère, pas un compte exact.",
 });
 Object.assign(I18N.es, {
@@ -2826,7 +2826,7 @@ Object.assign(I18N.es, {
   "an.intro": "Inventario funcional (valores orientativos para Commander, ajustados al tamaño del mazo):",
   "an.cat.ramp": "Ramp", "an.cat.draw": "Ventaja de cartas", "an.cat.removal": "Remoción", "an.cat.wipe": "Barridos",
   "an.needMore": "Poco {cat} — sugerencias",
-  "an.allGood": "Tu mazo está bien cubierto en todas las categorías. 👍",
+  "an.allGood": "Tu mazo está bien cubierto en todas las categorías.",
   "an.estimate": "Estimación aproximada según el texto de reglas — una orientación, no un recuento exacto.",
 });
 Object.assign(I18N.it, {
@@ -2836,7 +2836,7 @@ Object.assign(I18N.it, {
   "an.intro": "Inventario funzionale (valori indicativi per Commander, adattati alla dimensione del mazzo):",
   "an.cat.ramp": "Ramp", "an.cat.draw": "Vantaggio di carte", "an.cat.removal": "Rimozione", "an.cat.wipe": "Board wipe",
   "an.needMore": "Troppo poco {cat} — suggerimenti",
-  "an.allGood": "Il tuo mazzo è solido in ogni categoria. 👍",
+  "an.allGood": "Il tuo mazzo è solido in ogni categoria.",
   "an.estimate": "Stima approssimativa dal testo delle regole — un'indicazione, non un conteggio esatto.",
 });
 
@@ -3048,31 +3048,31 @@ Object.assign(I18N.it, {
 
 /* ---- Teil 11: Sammlungs-Combos (Commander Spellbook) ---- */
 Object.assign(I18N.de, {
-  "combo.collBtn": "🔗 Deine Combos",
+  "combo.collBtn": "Deine Combos",
   "combo.collTitle": "Combos in deiner gesamten Sammlung finden (Commander Spellbook)",
   "combo.collHave": "Combos in deiner Sammlung ({n})",
   "combo.collNone": "In deiner Sammlung steckt noch keine komplette Combo.",
 });
 Object.assign(I18N.en, {
-  "combo.collBtn": "🔗 Your combos",
+  "combo.collBtn": "Your combos",
   "combo.collTitle": "Find combos across your whole collection (Commander Spellbook)",
   "combo.collHave": "Combos in your collection ({n})",
   "combo.collNone": "No complete combo in your collection yet.",
 });
 Object.assign(I18N.fr, {
-  "combo.collBtn": "🔗 Tes combos",
+  "combo.collBtn": "Tes combos",
   "combo.collTitle": "Trouver les combos dans toute ta collection (Commander Spellbook)",
   "combo.collHave": "Combos dans ta collection ({n})",
   "combo.collNone": "Aucun combo complet dans ta collection pour l’instant.",
 });
 Object.assign(I18N.es, {
-  "combo.collBtn": "🔗 Tus combos",
+  "combo.collBtn": "Tus combos",
   "combo.collTitle": "Buscar combos en toda tu colección (Commander Spellbook)",
   "combo.collHave": "Combos en tu colección ({n})",
   "combo.collNone": "Aún no hay ningún combo completo en tu colección.",
 });
 Object.assign(I18N.it, {
-  "combo.collBtn": "🔗 Le tue combo",
+  "combo.collBtn": "Le tue combo",
   "combo.collTitle": "Trova le combo in tutta la tua collezione (Commander Spellbook)",
   "combo.collHave": "Combo nella tua collezione ({n})",
   "combo.collNone": "Nessuna combo completa nella tua collezione per ora.",
@@ -3868,7 +3868,7 @@ Object.assign(I18N.de, {
   "buy.deckBtn": "Fehlende kaufen ({n})",
   "buy.deckTitle": "Fehlende Karten dieses Decks über Cardmarket kaufen",
   "buy.title": "Fehlende Karten kaufen",
-  "buy.complete": "Dieses Deck ist komplett – dir fehlt keine Karte. 🎉",
+  "buy.complete": "Dieses Deck ist komplett – dir fehlt keine Karte.",
   "buy.summary": "{n} Karten fehlen ({s} Exemplare)",
   "buy.copyOpen": "Wunschliste kopieren + Cardmarket öffnen",
   "buy.txt": "Als .txt speichern",
@@ -3881,7 +3881,7 @@ Object.assign(I18N.en, {
   "buy.deckBtn": "Buy missing ({n})",
   "buy.deckTitle": "Buy this deck's missing cards via Cardmarket",
   "buy.title": "Buy missing cards",
-  "buy.complete": "This deck is complete – you're not missing any card. 🎉",
+  "buy.complete": "This deck is complete – you're not missing any card.",
   "buy.summary": "{n} cards missing ({s} copies)",
   "buy.copyOpen": "Copy wants list + open Cardmarket",
   "buy.txt": "Save as .txt",
@@ -3894,7 +3894,7 @@ Object.assign(I18N.fr, {
   "buy.deckBtn": "Acheter manquantes ({n})",
   "buy.deckTitle": "Acheter les cartes manquantes de ce deck via Cardmarket",
   "buy.title": "Acheter les cartes manquantes",
-  "buy.complete": "Ce deck est complet – il ne te manque aucune carte. 🎉",
+  "buy.complete": "Ce deck est complet – il ne te manque aucune carte.",
   "buy.summary": "{n} cartes manquantes ({s} exemplaires)",
   "buy.copyOpen": "Copier la liste + ouvrir Cardmarket",
   "buy.txt": "Enregistrer en .txt",
@@ -3907,7 +3907,7 @@ Object.assign(I18N.es, {
   "buy.deckBtn": "Comprar faltantes ({n})",
   "buy.deckTitle": "Comprar las cartas que faltan de este mazo vía Cardmarket",
   "buy.title": "Comprar cartas que faltan",
-  "buy.complete": "Este mazo está completo – no te falta ninguna carta. 🎉",
+  "buy.complete": "Este mazo está completo – no te falta ninguna carta.",
   "buy.summary": "Faltan {n} cartas ({s} ejemplares)",
   "buy.copyOpen": "Copiar lista + abrir Cardmarket",
   "buy.txt": "Guardar como .txt",
@@ -3920,7 +3920,7 @@ Object.assign(I18N.it, {
   "buy.deckBtn": "Compra mancanti ({n})",
   "buy.deckTitle": "Compra le carte mancanti di questo mazzo tramite Cardmarket",
   "buy.title": "Compra carte mancanti",
-  "buy.complete": "Questo mazzo è completo – non ti manca nessuna carta. 🎉",
+  "buy.complete": "Questo mazzo è completo – non ti manca nessuna carta.",
   "buy.summary": "Mancano {n} carte ({s} copie)",
   "buy.copyOpen": "Copia lista + apri Cardmarket",
   "buy.txt": "Salva come .txt",

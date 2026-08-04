@@ -288,10 +288,10 @@ export default async function ({ seite, adresse, stand }) {
     return { inhalt: document.querySelector(".deck-inhalt").style.display,
              gefuellt: box.childElementCount > 0,
              sichtbar: r.height > 0 && r.top < innerHeight && r.bottom > 0,
-             pfeil: document.querySelector(".deck-pfeil").textContent.trim() };
+             pfeil: document.querySelector(".deck-pfeil use")?.getAttribute("href") ?? "" };
   });
   stand.ist("ein Klick klappt das Deck auf …", auf.inhalt === "block", auf.inhalt);
-  stand.ist("… samt Pfeil im Kopf", auf.pfeil === "▼", auf.pfeil);
+  stand.ist("… samt Pfeil im Kopf", auf.pfeil === "#ic-pfeil-ab", auf.pfeil);
   stand.ist("… und der Verlauf steht gefüllt im Bild",
     auf.gefuellt && auf.sichtbar, JSON.stringify(auf));
 
