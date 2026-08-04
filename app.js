@@ -298,6 +298,10 @@ async function reload() {
   // disp = was auf der Karte steht; name bleibt der englische Name, unter
   // dem man die Karte überall sonst wiederfindet.
   CARDS = c.data.map(x => ({ ...x, set: x.set_code, disp: x.printed_name || x.name }));
+  // Das Themenprofil hängt an genau dieser Menge — hier ist die einzige
+  // Stelle, an der sie neu entsteht, also auch die einzige, an der der
+  // gemerkte Stand ungültig wird.
+  profilThemenP = null;
   DECKS = d.data.map(dk => ({ ...dk,
     entries: e.data.filter(en => en.deck_id === dk.id)
                    .map(en => ({ cardId: en.card_id, qty: en.qty,
@@ -3674,8 +3678,15 @@ const karte = (titel, inhalt) =>
    Funktion beide Ansichten richtig — ein Deck mit 4 Wäldern zeigt 4, auch
    wenn 20 im Besitz sind.
    ziel ist das Element, in das geschrieben wird; gefiltert steuert nur den
-   Hinweis "zeigt nur die gefilterten Karten" (im Deck immer false). */
-function renderDash(rows, ziel = $("#dash"), gefiltert = false) {
+   Hinweis "zeigt nur die gefilterten Karten" (im Deck immer false).
+
+   extra hängt eine weitere Kachel ans Ende des Rasters. Gebraucht wird das
+   fürs Themenprofil, das nur die Sammlungsansicht kennt: Es kommt aus der
+   Datenbank und ist auf die EIGENE Sammlung bezogen — in einem Deck oder
+   einer gefilterten Liste wäre es schlicht die falsche Menge. Statt renderDash
+   um eine zweite Datenquelle zu erweitern, reicht die Ansicht die fertige
+   Kachel herein. */
+function renderDash(rows, ziel = $("#dash"), gefiltert = false, extra = "") {
   const stueck = cs => cs.reduce((s, c) => s + c.qty, 0);
   const wert   = cs => cs.reduce((s, c) => s + (c.price || 0) * c.qty, 0);
   const n = stueck(rows), gesamtwert = wert(rows);
@@ -3780,6 +3791,7 @@ function renderDash(rows, ziel = $("#dash"), gefiltert = false) {
       ${karte(t("dash.topSets"), balkenHtml(topSets))}
       ${karte(t("dash.languages"), balkenHtml(sprachen))}
       ${karte(t("dash.conditionChart"), balkenHtml(zustand))}
+      ${extra}
     </div>`;
 
   // Muss nach dem Einhängen passieren: vorher hat der Kasten keine Breite
@@ -6063,6 +6075,86 @@ function themaTaugtAlsHook(slug, groesse) {
   if (slug.startsWith("cycle-") || THEMA_HOOK_SPERRE.has(slug)) return false;
   const n = groesse.get(slug);
   return n != null && n >= THEMA_HOOK_MIN && n <= THEMA_HOOK_MAX;
+}
+
+/* ------------------------------ Sammlungsprofil ----------------------
+   Worum geht diese Sammlung? Das Dashboard beantwortete bisher nur, was in
+   den Karten selbst steht — Manakurve, Farben, Seltenheit, Sets, Jahrgänge.
+   Was sie SPIELT, stand nirgends. Seit dem Themen-Index (#196) liegt es in
+   der Datenbank; tag_profil() rollt die Hierarchie auf die oberste Ebene
+   hoch und zählt je Sammelbegriff die eigenen Karten.
+
+   NUR SIEBT DAS NICHT VON ALLEIN. Gemessen an der größten Sammlung im
+   Bestand (549 verschiedene Karten, 546 getaggt) kommen 337 Oberkategorien
+   heraus — und die vier längsten Balken stehen für gar keine Strategie:
+
+     triggered-ability   39,4 %   „hat eine ausgelöste Fähigkeit"
+     activated-ability   38,3 %   „hat eine aktivierte Fähigkeit"
+     cycle               28,6 %   „gehört zu einem Zyklus aus Set X"
+     card-names          26,7 %   „Namensschema"
+
+   Das ist Grammatik und Set-Trivia. Ungesiebt zeigte das Profil jeder
+   Sammlung dieselben vier Balken zuerst und die Aussage erst ab Platz fünf.
+   Dasselbe gilt weiter unten für die Katalog-Themen (`type-errata`,
+   `unique-type-line`) und für die Kosten-Buchhaltung (`cheaper-than-mv`,
+   dessen Geschwister `bigger-than-mv` und `more-expensive-than-mv` bei den
+   Synergie-Haken schon gesperrt sind).
+
+   `single-target-instant-sorcery` (11,0 %) ist der Grenzfall: „darf nur ein
+   Ziel haben" zählt für ein paar Effekte wirklich, als Profilzeile sagt es
+   aber nur, dass die Sammlung Einzelziel-Sprüche enthält. Raus.
+
+   Die Liste ERBT THEMA_HOOK_SPERRE — was als Synergie-Haken Unfug ist
+   (Alliteration, Vanilla, Meme), ist es als Profilzeile auch. Nur die
+   Liste, nicht die Größenschwelle: „removal" trifft mit 5007 Karten zu viel
+   für einen Haken, ist als Profilzeile aber genau das Richtige. */
+const PROFIL_SPERRE = new Set([...THEMA_HOOK_SPERRE,
+  "triggered-ability", "activated-ability", "cycle", "card-names",
+  "single-target-instant-sorcery", "type-errata", "cheaper-than-mv",
+]);
+/* Zwölf Balken. Darunter wird die Aussage dünn: Ab Platz 13 liegen bei der
+   gemessenen Sammlung alle unter 6 % und unterscheiden sich um je eine
+   Karte — das ist Rauschen, keine Rangfolge. */
+const PROFIL_BALKEN = 12;
+
+/* Einmal je Sammlungsstand geholt, nicht je Blick aufs Dashboard: Die
+   Abfrage kostet in der Datenbank gemessen 95 ms, und das Dashboard wird
+   beim Sprachwechsel und bei jedem Ansichtswechsel neu gezeichnet.
+   reload() setzt den Merker zurück, sobald sich die Sammlung ändert.
+
+   NULL heißt „nicht verfügbar" (Funktion fehlt, Netz weg), ein leeres Feld
+   heißt „keine getaggte Karte". Die beiden dürfen nicht zusammenfallen —
+   sonst stünde bei fehlender Migration derselbe Text wie bei einer
+   ungetaggten Sammlung, und niemand käme auf die Idee nachzusehen. */
+let profilThemenP = null;
+function profilThemen() {
+  return (profilThemenP = profilThemenP || (async () => {
+    try {
+      const { data, error } = await sb.rpc("tag_profil");
+      return error ? null : (data || []);
+    } catch { return null; }
+  })());
+}
+
+/* Die Zeilen fürs Balkendiagramm: gesiebt, gekappt, mit Anteil beschriftet.
+   Der Anteil bezieht sich auf die GETAGGTEN Karten (kommt als `getaggt` aus
+   der Abfrage mit) — eine Karte ohne Themen kann in keiner Kategorie
+   stecken, im Nenner drückte sie jeden Anteil, ohne dass ihm etwas
+   gegenüberstünde.
+
+   Die Anteile summieren sich weit über 100 %, und das ist richtig so: Eine
+   Karte, die eine Kreatur zerstört und dabei eine Karte zieht, ist Removal
+   UND Kartenvorteil. Genau deshalb Balken und keine Torte — tortenHtml
+   verlangt eine Aufteilung, in der jede Karte genau einmal zählt. */
+function profilZeilen(roh) {
+  if (!Array.isArray(roh) || !roh.length) return [];
+  const nenner = roh[0].getaggt || 0;
+  if (!nenner) return [];
+  return roh
+    .filter(r => !PROFIL_SPERRE.has(r.wurzel) && !r.wurzel.startsWith("cycle-"))
+    .slice(0, PROFIL_BALKEN)
+    .map(r => ({ label: r.label, wert: r.karten,
+                 text: `${r.karten} · ${(r.karten / nenner * 100).toFixed(1).replace(".", ",")} %` }));
 }
 
 /* Die kuratierten Themen mehrerer Karten auf einen Schlag: EINE Sammelabfrage
@@ -12159,9 +12251,42 @@ function renderDashboard() {
     </div>`;
   // Statistik über den GESAMTEN Bestand — dieselbe renderDash wie zuvor, nur in
   // eigener Ansicht statt im Profil.
-  renderDash(CARDS.filter(c => c.qty > 0), $("#dashboard-dash"), false);
+  //
+  // Die Themenkachel geht als Platzhalter mit und wird nachgereicht: Sie
+  // braucht eine Datenbankabfrage (gemessen 95 ms plus Netz), und dafür soll
+  // das ganze Dashboard nicht warten. Bis die Antwort da ist, steht der
+  // Ladepunkt in der Kachel — sie hält ihren Platz im Raster, statt später
+  // hineinzuspringen.
+  renderDash(CARDS.filter(c => c.qty > 0), $("#dashboard-dash"), false,
+    karte(t("dash.themeProfile"),
+      `<div id="dash-profil"><div class="meta">${ico("laden", "syn-spin")} ${
+        esc(t("themen.loading"))}</div></div>`));
+  profilKachelFuellen();
   // Highlight-Kacheln öffnen die Detailansicht der jeweiligen Karte.
   $$("#v-dashboard [data-hl]").forEach(k => k.onclick = () => showCardDetail(k.dataset.hl));
+}
+
+/* Das Themenprofil nachreichen. Zwischen Anfrage und Antwort kann die Ansicht
+   längst gewechselt haben (oder das Dashboard neu gezeichnet worden sein) —
+   deshalb wird das Ziel ERST NACH dem await gesucht und ein verschwundenes
+   stillschweigend hingenommen. */
+async function profilKachelFuellen() {
+  const roh = await profilThemen();
+  const box = $("#dash-profil");
+  if (!box) return;
+  // Fehlt die Funktion in der Datenbank, sagt der Kasten was zu tun ist —
+  // dieselbe Handreichung wie beim Deck-Verlauf. Eine Sammlung ohne getaggte
+  // Karte bekommt dagegen den gewöhnlichen Leer-Text aus balkenHtml.
+  if (roh === null) {
+    box.innerHTML = `<div class="empty" style="padding:14px">${esc(t("dash.themeProfileMissing"))}</div>`;
+    return;
+  }
+  const zeilen = profilZeilen(roh);
+  // Der Hinweis geht wie bei den Nachbarkacheln UNESCAPED hinein: Er trägt
+  // Anführungszeichen und ein geschütztes Leerzeichen als Entität, und esc()
+  // machte daraus sichtbares &amp;nbsp;.
+  box.innerHTML = balkenHtml(zeilen,
+    zeilen.length ? t("dash.themeProfileHint", { n: roh[0]?.getaggt ?? 0 }) : "");
 }
 
 /* Ansicht „Einstellungen" — eigener Punkt im Benutzermenü hinter Avatar+Name.

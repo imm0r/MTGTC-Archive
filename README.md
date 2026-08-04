@@ -2811,12 +2811,38 @@ node scripts/tag-index/themen.mjs --force       # auch bei unverändertem Stand
 
 ### In der App
 
-Zwei Stellen lesen den Index:
+Drei Stellen lesen den Index:
 
-* **Detailansicht → „Themen".** Klappt wie die Legalität erst beim Öffnen auf
-  und zeigt die Themen der Karte als Chips — direkte voll, über die Hierarchie
-  geerbte Ober-Themen gedimmt dahinter. Die Beschreibung des Taggers (wo es
-  eine gibt) hängt als Tooltip am Chip.
+* **Detailansicht → „Tags".** Klappt wie die Legalität erst beim Öffnen auf und
+  zeigt die Themen der Karte als Chips, **nach Sammeltag gruppiert**: Der
+  Sammeltag trägt die Zeile, darunter stehen die Tags, die ihn begründen. Die
+  Beschreibung des Taggers (wo es eine gibt) hängt als Tooltip am Chip.
+* **Dashboard → „Themenprofil".** Die einzige Auswertung, die beantwortet,
+  worum die Sammlung geht statt was in den Karten steht. `tag_profil()` rollt
+  die Hierarchie auf die oberste Ebene hoch und zählt je Sammelbegriff die
+  eigenen **verschiedenen** Karten (vier Exemplare desselben Removals sind
+  eine Removal-Karte). Gemessen 95 ms für 549 Karten.
+
+  **Balken, keine Torte** — eine Karte, die eine Kreatur zerstört und dabei
+  eine Karte zieht, ist Removal *und* Kartenvorteil; die Anteile summieren
+  sich weit über 100 %. Nenner sind die getaggten Karten (546 von 549): Eine
+  Karte ohne Themen kann in keiner Kategorie stecken.
+
+  **Gesiebt wird in `app.js`, nicht in SQL** (`PROFIL_SPERRE`, erbt die
+  Sperrliste der Synergie-Haken). Ungesiebt stünden bei jeder Sammlung
+  dieselben vier Balken vorn, und keiner davon sagt etwas über das Spiel:
+
+  | Kategorie | Anteil | was sie wirklich bedeutet |
+  | --- | --- | --- |
+  | `triggered ability` | 39,4 % | „hat eine ausgelöste Fähigkeit" |
+  | `activated ability` | 38,3 % | „hat eine aktivierte Fähigkeit" |
+  | `cycle` | 28,6 % | „gehört zu einem Zyklus aus Set X" |
+  | `card names` | 26,7 % | „Namensschema" |
+
+  Grammatik und Set-Trivia. Die Aussage begänne erst bei Platz fünf
+  (`removal`, 17,6 %). Umgekehrt erbt das Profil **nur die Liste**, nicht die
+  Größenschwelle der Haken: `removal` trifft mit 5007 Karten zu viel für einen
+  Synergie-Haken, ist als Profilzeile aber genau das Richtige.
 * **Sammlung → Filter „Thema".** Ein Dropdown mit Suchfeld; gewählt wird eines
   der ~1100 Themen ab 20 Karten (der Median liegt bei fünf — ein Filter voller
   Einzelfälle wie `hate-typal-giant` wäre keine Auswahl). Die Liste zeigt dann

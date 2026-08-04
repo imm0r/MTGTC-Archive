@@ -182,6 +182,9 @@ const I18N = {
     "dash.manaCurveHint": "Ohne Länder — sie kosten nichts und würden die Null aufblähen. X zählt als 0.",
     "dash.colorsHint": "Nach Farbidentität — jede Karte zählt einmal, ab zwei Farben als „Mehrfarbig“.",
     "dash.typesHint": "Anteil an allen Typnennungen: eine Karte mit mehreren Typen (z.&nbsp;B. Artefaktkreatur) zählt in jedem Segment.",
+    "dash.themeProfile": "Themenprofil",
+    "dash.themeProfileHint": "Anteil an {n} Karten mit Themen. Eine Karte zählt in jeder Kategorie, die auf sie passt — zusammen ergeben die Anteile deshalb mehr als 100&nbsp;%. Struktur-Themen wie „hat eine ausgelöste Fähigkeit“ sind ausgeblendet.",
+    "dash.themeProfileMissing": "Dafür fehlt der Datenbank die Funktion tag_profil — supabase/migrations/20260806090000_themen_profil.sql im SQL Editor ausführen.",
 
     "common.expand": "Aufklappen", "common.collapse": "Zuklappen", "common.cards": "Karten",
     "row.present": "vorhanden", "row.missing": "{n} fehlen",
@@ -550,6 +553,9 @@ const I18N = {
     "dash.manaCurveHint": "Without lands — they cost nothing and would inflate the zero. X counts as 0.",
     "dash.colorsHint": "By color identity — each card counts once, two or more colors as “Multicolor”.",
     "dash.typesHint": "Share of all type mentions: a card with several types (e.g. artifact creature) counts in every segment.",
+    "dash.themeProfile": "Theme profile",
+    "dash.themeProfileHint": "Share of {n} cards that carry themes. A card counts in every category that fits it — the shares therefore add up to more than 100&nbsp;%. Structural themes such as “has a triggered ability” are hidden.",
+    "dash.themeProfileMissing": "For that the database is missing the tag_profil function — run supabase/migrations/20260806090000_themen_profil.sql in the SQL editor.",
 
     "common.expand": "Expand", "common.collapse": "Collapse", "common.cards": "cards",
     "row.present": "in stock", "row.missing": "{n} missing",
@@ -918,6 +924,9 @@ const I18N = {
     "dash.manaCurveHint": "Sans les terrains — ils ne coûtent rien et gonfleraient le zéro. X compte pour 0.",
     "dash.colorsHint": "Par identité de couleur — chaque carte compte une fois, deux couleurs ou plus comme « Multicolore ».",
     "dash.typesHint": "Part de toutes les mentions de type : une carte à plusieurs types (p. ex. créature-artefact) compte dans chaque segment.",
+    "dash.themeProfile": "Profil thématique",
+    "dash.themeProfileHint": "Part sur {n} cartes portant des tags. Une carte compte dans chaque catégorie qui lui correspond — le total dépasse donc 100&nbsp;%. Les thèmes structurels comme « possède une capacité déclenchée » sont masqués.",
+    "dash.themeProfileMissing": "Pour cela il manque la fonction tag_profil à la base de données — exécute supabase/migrations/20260806090000_themen_profil.sql dans l’éditeur SQL.",
 
     "common.expand": "Déplier", "common.collapse": "Replier", "common.cards": "cartes",
     "row.present": "en stock", "row.missing": "{n} manquantes",
@@ -1286,6 +1295,9 @@ const I18N = {
     "dash.manaCurveHint": "Sin tierras — no cuestan nada e inflarían el cero. X cuenta como 0.",
     "dash.colorsHint": "Por identidad de color — cada carta cuenta una vez, dos o más colores como «Multicolor».",
     "dash.typesHint": "Proporción de todas las menciones de tipo: una carta con varios tipos (p. ej. criatura artefacto) cuenta en cada segmento.",
+    "dash.themeProfile": "Perfil temático",
+    "dash.themeProfileHint": "Proporción sobre {n} cartas con tags. Una carta cuenta en cada categoría que le corresponde, así que la suma supera el 100&nbsp;%. Los temas estructurales como «tiene una habilidad disparada» están ocultos.",
+    "dash.themeProfileMissing": "Para eso a la base de datos le falta la función tag_profil — ejecuta supabase/migrations/20260806090000_themen_profil.sql en el editor SQL.",
 
     "common.expand": "Desplegar", "common.collapse": "Plegar", "common.cards": "cartas",
     "row.present": "en existencias", "row.missing": "faltan {n}",
@@ -1654,6 +1666,9 @@ const I18N = {
     "dash.manaCurveHint": "Senza le terre — non costano nulla e gonfierebbero lo zero. X conta come 0.",
     "dash.colorsHint": "Per identità di colore — ogni carta conta una volta, due o più colori come «Multicolore».",
     "dash.typesHint": "Quota di tutte le menzioni di tipo: una carta con più tipi (es. creatura artefatto) conta in ogni segmento.",
+    "dash.themeProfile": "Profilo tematico",
+    "dash.themeProfileHint": "Quota su {n} carte con tag. Una carta conta in ogni categoria che le si adatta, quindi la somma supera il 100&nbsp;%. I temi strutturali come «ha un’abilità innescata» sono nascosti.",
+    "dash.themeProfileMissing": "Per questo al database manca la funzione tag_profil — esegui supabase/migrations/20260806090000_themen_profil.sql nell’editor SQL.",
 
     "common.expand": "Espandi", "common.collapse": "Comprimi", "common.cards": "carte",
     "row.present": "disponibili", "row.missing": "ne mancano {n}",
