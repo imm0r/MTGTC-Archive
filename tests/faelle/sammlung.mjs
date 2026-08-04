@@ -130,4 +130,21 @@ export default async function ({ seite, adresse, stand }) {
   await seite.waitForTimeout(200);
   stand.ist("danach stehen wieder alle da",
     await seite.evaluate(ZEILEN).then(z => z.includes("d0c0") && z.includes("d0c3")));
+
+  /* Die Knöpfe der Filterleiste stehen auf FELDHÖHE. Vorher maßen sie 45 px
+     neben 40er-Auswahllisten — fünf Pixel, die niemand als Fehler meldet und
+     jeder sieht. Gemessen, nicht aus Klassen gefolgert: Die Höhe entsteht
+     aus Zeile + Polster + Rahmen, und jede der drei Stellgrößen kann sie
+     still wieder auseinanderziehen. */
+  const hoehen = await seite.evaluate(() => {
+    const h = el => Math.round(el.getBoundingClientRect().height);
+    return { select: h(document.getElementById("f-foil")),
+             upd: h(document.getElementById("upd")),
+             sell: h(document.getElementById("sell-open")),
+             combos: h(document.getElementById("coll-combos")) };
+  });
+  stand.ist("die Filterknöpfe sind genau feldhoch",
+    hoehen.upd === hoehen.select && hoehen.sell === hoehen.select
+      && hoehen.combos === hoehen.select,
+    JSON.stringify(hoehen));
 }
