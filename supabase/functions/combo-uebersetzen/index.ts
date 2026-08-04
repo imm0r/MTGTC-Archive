@@ -103,7 +103,13 @@ DREI DINGE ÜBERNIMMST DU ZEICHENGENAU, ohne sie zu übersetzen, zu übersetzen 
 
 Der Satz kann grammatisch um einen Platzhalter herum gebaut sein. Stelle den Satz so um, dass er in ${ziel} natürlich klingt, und lass den Platzhalter dabei an der grammatisch richtigen Stelle stehen.
 
-Du bekommst die GANZE Combo als Zusammenhang, aber übersetzt nur die Sätze, die ausdrücklich angefragt sind. Die übrigen stehen nur da, damit der Faden erkennbar ist.`;
+Du bekommst die GANZE Combo als Zusammenhang, aber übersetzt nur die Sätze, die ausdrücklich angefragt sind. Die übrigen stehen nur da, damit der Faden erkennbar ist.
+
+EINE ZEILE, EIN EINTRAG. Daran halte dich streng:
+
+· Zu JEDER nummerierten Zeile gehört genau ein Eintrag mit ihrer Nummer. Auch dann, wenn zwei Zeilen fast gleich lauten („Cast [[1]] by paying its mana cost." und „Cast the nontoken permanent returned in step 2 by paying its mana cost.") — das sind zwei Schritte, und beide werden gebraucht. Fasse nichts zusammen und lass nichts weg.
+· Übersetze NUR den Inhalt der eigenen Zeile. Nimm nichts aus der Zeile davor oder danach mit hinein, auch wenn es inhaltlich dazugehört. Ein angehängtes „Wiederhole." in Schritt 2, das eigentlich Schritt 3 ist, macht die Anleitung falsch.
+· Ein Satz bleibt ein Satz. Steht in der Zeile ein Satz, gib einen zurück, keine zwei.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -202,34 +208,38 @@ Deno.serve(async (req) => {
   const key = Deno.env.get("ANTHROPIC_API_KEY");
   if (!key) return json({ error: "ANTHROPIC_API_KEY ist nicht gesetzt" }, 500);
 
-  /* Die ganze Combo als Zusammenhang, die angefragten Sätze nummeriert. Die
-     übrigen stehen ohne Nummer da — so sieht das Modell den Faden, ohne in
-     Versuchung zu geraten, sie mitzuliefern. */
-  const nummer = new Map(offen.map((t, k) => [t.i, k + 1]));
-  const kontext = teile.map((t, i) =>
-    nummer.has(i) ? `[${nummer.get(i)}] ${t.text}` : `    ${t.text}`).join("\n");
-
-  /* Das Budget wächst mit der Arbeit, wie bei card-synergy. Gemessen an 50
-     Combos von Spellbook: 40 Teile sind zusammen 1673 Zeichen. Deutsch ist
-     rund 15 % länger, ein Token fasst dort etwa drei Zeichen, und je Eintrag
-     kommen ~22 Zeichen JSON-Gerüst dazu — macht für diese 40 Teile knapp 950
-     Token. Eine feste Zahl wäre entweder für kurze Combos verschwendet oder
-     für lange zu knapp; abgeschnitten wird die Antwort unbrauchbar. */
-  const zeichen = offen.reduce((a, t) => a + t.text.length, 0);
-  const maxTokens = Math.min(8000, 500 + Math.ceil((zeichen * 1.15 + offen.length * 22) / 3));
-
   const anthropic = new Anthropic({ apiKey: key });
-  let ergebnis: { nr: number; text: string }[] = [];
-  /* Was der Aufruf gekostet hat. Geht an den Client, der daraus dieselbe Zeile
-     baut wie bei den KI-Synergien und der Regelfrage — die Zahlen dafür kann
-     nur der Server kennen. Bleibt null, wenn gar kein Aufruf nötig war; genau
-     das ist dort die Aussage „hat nichts gekostet". */
+  /* Was die Aufrufe zusammen gekostet haben. Geht an den Client, der daraus
+     dieselbe Zeile baut wie bei den KI-Synergien und der Regelfrage — die
+     Zahlen dafür kann nur der Server kennen. Bleibt null, wenn gar kein Aufruf
+     nötig war; genau das ist dort die Aussage „hat nichts gekostet". */
   let usage: { input: number; output: number; model: string } | null = null;
-  try {
-    /* output_config statt tools/tool_choice — so rufen scan-card,
-       card-synergy und rules-question das Modell auch auf. Ein Weg für alle
-       vier: Wer den einen kennt, kennt sie alle, und was dort erprobt ist,
-       gilt hier mit. */
+
+  type Antwortzeile = { nr: number; text: string };
+
+  /* Einen Schwung Sätze übersetzen lassen. Eigene Funktion, weil sie ZWEIMAL
+     gebraucht wird — siehe „Nachfassen" weiter unten.
+
+     Die ganze Combo geht immer mit: Die angefragten Zeilen tragen eine Nummer,
+     die übrigen stehen eingerückt daneben. So sieht das Modell den Faden, ohne
+     in Versuchung zu geraten, sie mitzuliefern. */
+  async function fragen(liste: typeof offen): Promise<{ zeilen?: Antwortzeile[]; code?: string }> {
+    const nummer = new Map(liste.map((t, k) => [t.i, k + 1]));
+    const kontext = teile.map((t, i) =>
+      nummer.has(i) ? `[${nummer.get(i)}] ${t.text}` : `    ${t.text}`).join("\n");
+
+    /* Das Budget wächst mit der Arbeit, wie bei card-synergy. Gemessen an 50
+       Combos von Spellbook: 40 Teile sind zusammen 1673 Zeichen. Deutsch ist
+       rund 15 % länger, ein Token fasst dort etwa drei Zeichen, und je Eintrag
+       kommen ~22 Zeichen JSON-Gerüst dazu — macht für diese 40 Teile knapp 950
+       Token. Eine feste Zahl wäre entweder für kurze Combos verschwendet oder
+       für lange zu knapp; abgeschnitten wird die Antwort unbrauchbar. */
+    const zeichen = liste.reduce((a, t) => a + t.text.length, 0);
+    const maxTokens = Math.min(8000, 500 + Math.ceil((zeichen * 1.15 + liste.length * 22) / 3));
+
+    /* output_config statt tools/tool_choice — so rufen scan-card, card-synergy
+       und rules-question das Modell auch auf. Ein Weg für alle vier: Wer den
+       einen kennt, kennt sie alle, und was dort erprobt ist, gilt hier mit. */
     const res = await anthropic.messages.create({
       model: MODEL,
       max_tokens: maxTokens,
@@ -237,7 +247,7 @@ Deno.serve(async (req) => {
       output_config: { format: { type: "json_schema", schema: SCHEMA } },
       messages: [{
         role: "user",
-        content: `Die vollständige Combo-Anleitung. Übersetze NUR die Zeilen mit Nummer in eckigen Klammern, und gib zu jeder ihre Nummer zurück.\n\n${kontext}`,
+        content: `Die vollständige Combo-Anleitung. Übersetze NUR die ${liste.length} Zeilen mit Nummer in eckigen Klammern — zu jeder genau einen Eintrag mit ihrer Nummer, also ${liste.length} Einträge.\n\n${kontext}`,
       }],
     });
 
@@ -247,23 +257,104 @@ Deno.serve(async (req) => {
        einer fehlgeschlagenen Übersetzung ist für ihn nichts zu tun. */
     if (res.stop_reason === "refusal" || res.stop_reason === "max_tokens") {
       console.error(`combo-uebersetzen: Antwort unbrauchbar (${res.stop_reason}), ` +
-        `lang=${lang} offen=${offen.length} max_tokens=${maxTokens}`);
-      return json({ texte: antwort(), code: res.stop_reason, neu: 0, gesamt: gefragt }, 200);
+        `lang=${lang} liste=${liste.length} max_tokens=${maxTokens}`);
+      return { code: res.stop_reason };
     }
     const block = res.content.find(b => b.type === "text");
     if (!block || block.type !== "text") {
       console.error(`combo-uebersetzen: kein Textblock in der Antwort, stop_reason=${res.stop_reason}`);
-      return json({ texte: antwort(), code: "ki_fehler", neu: 0, gesamt: gefragt }, 200);
+      return { code: "ki_fehler" };
     }
-    ergebnis = JSON.parse(block.text).texte ?? [];
-    usage = { input: res.usage.input_tokens, output: res.usage.output_tokens, model: res.model };
+    // Aufsummiert, denn beim Nachfassen kommt ein zweiter Aufruf dazu. Der
+    // Nutzer soll sehen, was der Klick INSGESAMT gekostet hat.
+    usage = {
+      input: (usage?.input ?? 0) + res.usage.input_tokens,
+      output: (usage?.output ?? 0) + res.usage.output_tokens,
+      model: res.model,
+    };
+    const zeilen: Antwortzeile[] = JSON.parse(block.text).texte ?? [];
     /* `angefragt` steht mit im Protokoll, weil MAX_TEILE oben stillschweigend
        kappt: In einer Ansicht mit vielen Combos schickt der Client leicht
        neunzig Teile, und die dahinter bleiben englisch. Ohne diese Zahl sähe
        ein solcher Lauf aus wie ein vollständiger. */
     console.log(`combo-uebersetzen: lang=${lang} angefragt=${angefragt} teile=${teile.length} ` +
-      `offen=${offen.length} zurück=${ergebnis.length} ` +
+      `liste=${liste.length} zurück=${zeilen.length} ` +
       `token=${res.usage.input_tokens}/${res.usage.output_tokens} von ${maxTokens}`);
+    return { zeilen };
+  }
+
+  /* ---- Der Wächter, bevor irgendetwas gespeichert wird -------------------
+     Was hier durchgeht, landet im GEMEINSAMEN Speicher und wird von da an
+     allen ausgeliefert — dauerhaft. Im Zweifel also verwerfen: Der Satz bleibt
+     dann englisch, und Englisch ist eine vollständige Auskunft.
+
+     PLATZHALTER. Verliert eine Übersetzung ein [[n]] oder erfindet eines dazu,
+     fehlt mitten in der Anleitung eine Karte oder steht eine falsche darin.
+
+     WAS HIER BEWUSST NICHT STEHT: eine Prüfung auf die Satzzahl. Sie lag nahe,
+     weil das Modell nachweislich eine Nachbarzeile mit hineingezogen hat —
+     „Activate [[1]] by paying {3} and untapping it, giving it +2/+2 until end
+     of turn." kam zurück als „… +2/+2. Wiederhole dies.", und dieses
+     „Wiederhole dies." WAR der nächste Schritt.
+
+     Gemessen an den 54 damals gespeicherten deutschen Zeilen hätte die Prüfung
+     aber SECHS verworfen, und fünf davon zu Unrecht: Ein langer englischer
+     Satz wird im Deutschen zu Recht zu zweien („Activate [[1]] by paying {1}
+     and tapping it, causing you to add …" → „Aktiviere [[1]], indem du {1}
+     bezahlst und es tappst. Dadurch fügst du …"). Fünf gute Übersetzungen
+     wegzuwerfen, um eine schlechte zu fangen, ist der schlechtere Tausch —
+     zumal die verworfenen bei jedem Nachfassen erneut Geld kosten würden.
+
+     Gegen das Hineinziehen hilft deshalb die Anweisung („EINE ZEILE, EIN
+     EINTRAG"), nicht ein Filter. Das ist schwächer, und es steht hier, damit
+     der Nächste nicht dieselbe Prüfung noch einmal einbaut. */
+  const platz = (s: string) => (s.match(/\[\[\d+\]\]/g) ?? []).sort().join(",");
+
+  const neueZeilen: { hash: string; lang: string; muster: string; text: string }[] = [];
+  let verworfen = 0;
+  const uebernehmen = (zeilen: Antwortzeile[], liste: typeof offen) => {
+    for (const e of zeilen) {
+      const t = liste[Number(e?.nr) - 1];
+      if (!t || typeof e?.text !== "string" || !e.text.trim()) continue;
+      // Schon vergeben: Gibt das Modell dieselbe Nummer zweimal, gilt die
+      // erste. Sonst überschriebe der zweite Eintrag stillschweigend.
+      if (speicher.has(hashes[t.i])) continue;
+      if (platz(e.text) !== platz(t.text)) { verworfen++; continue; }
+      speicher.set(hashes[t.i], e.text);
+      neueZeilen.push({ hash: hashes[t.i], lang, muster: t.text, text: e.text });
+    }
+  };
+
+  try {
+    const erste = await fragen(offen);
+    if (erste.code) return json({ texte: antwort(), code: erste.code, neu: 0, gesamt: gefragt }, 200);
+    uebernehmen(erste.zeilen ?? [], offen);
+
+    /* NACHFASSEN — genau einmal.
+
+       Das Modell lässt Zeilen aus. Nachgewiesen an einer Combo mit sieben
+       Sätzen: zwei lagen im Speicher, fünf gingen raus, VIER kamen zurück.
+       Ausgelassen wurde „Cast the nontoken permanent returned in step 2 by
+       paying its mana cost." — offenbar, weil es aussieht wie der schon
+       übersetzte Schritt 1. Der Satz blieb englisch, mitten in einer sonst
+       deutschen Anleitung, und nichts wies darauf hin.
+
+       Gefragt wird nur noch nach dem, was fehlt (auch nach dem, was ein
+       Wächter verworfen hat — vielleicht klappt es im zweiten Anlauf). Ein
+       Nachschlag, nicht mehr: Sonst könnte ein Satz, an dem das Modell
+       beständig scheitert, beliebig oft Geld kosten. Ein zweites Kontingent
+       wird dafür NICHT beansprucht — bezahlt war eine vollständige Antwort. */
+    const fehlend = offen.filter(t => !speicher.has(hashes[t.i]));
+    if (fehlend.length) {
+      console.warn(`combo-uebersetzen: ${fehlend.length} von ${offen.length} Sätzen fehlten, frage nach`);
+      const zweite = await fragen(fehlend);
+      if (!zweite.code) uebernehmen(zweite.zeilen ?? [], fehlend);
+    }
+    const offenGeblieben = offen.filter(t => !speicher.has(hashes[t.i])).length;
+    if (offenGeblieben) {
+      console.error(`combo-uebersetzen: ${offenGeblieben} von ${offen.length} Sätzen bleiben englisch ` +
+        `(davon ${verworfen} verworfen)`);
+    }
   } catch (e) {
     /* Die Meldung bleibt HIER. Sie kann enthalten, was ein Aufrufer nicht
        wissen soll — Anthropic legt in Fehlern schon mal Endpunkte, Modellnamen
@@ -276,20 +367,6 @@ Deno.serve(async (req) => {
     console.error("combo-uebersetzen: Modellaufruf fehlgeschlagen", e);
     // Was aus dem Speicher kam, geht trotzdem zurück.
     return json({ texte: antwort(), code: "ki_fehler", neu: 0, gesamt: gefragt }, 200);
-  }
-
-  /* Prüfen, bevor gespeichert wird. Eine Übersetzung, die einen Platzhalter
-     verliert, ist unbrauchbar UND dauerhaft: Sie läge im gemeinsamen Speicher
-     und würde allen anderen ausgeliefert. Deshalb wird sie hier verworfen und
-     der Satz bleibt englisch, statt kaputt zu werden. */
-  const platz = (s: string) => (s.match(/\[\[\d+\]\]/g) ?? []).sort().join(",");
-  const neueZeilen: { hash: string; lang: string; muster: string; text: string }[] = [];
-  for (const e of ergebnis) {
-    const t = offen[Number(e?.nr) - 1];
-    if (!t || typeof e?.text !== "string" || !e.text.trim()) continue;
-    if (platz(e.text) !== platz(t.text)) continue;      // Platzhalter verloren oder erfunden
-    speicher.set(hashes[t.i], e.text);
-    neueZeilen.push({ hash: hashes[t.i], lang, muster: t.text, text: e.text });
   }
 
   if (neueZeilen.length) {
