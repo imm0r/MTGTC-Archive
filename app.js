@@ -5599,7 +5599,7 @@ function wireDetailSynergien(c) {
   const ab = $("#dt-syn-ai");
   if (ab) ab.onclick = () => {
     const lbl = t("syn.ai");
-    synBtnBusy(ab, lbl, true, icoGold("funken"));
+    synBtnBusy(ab, lbl, true, icoGold("funken"), icoGold("funken-laed"));
     synGeschwister([$("#dt-syn")], true);
     kiSynergien(c, $("#syn-box"), { maxPrice: numVal($("#syn-cap")) })
       .finally(() => { synBtnBusy(ab, lbl, false, icoGold("funken")); synGeschwister([$("#dt-syn")], false); });
@@ -6515,11 +6515,17 @@ function ladeZeigen(box, deckId, text, hinweis) {
 }
 
 /* Synergie-Knopf in den Ladezustand versetzen: Lupe → drehender Ladering,
-   Knopf gesperrt. Zurück auf die Lupe, wenn die Suche fertig ist. */
-function synBtnBusy(btn, label, busy, icon) {
+   Knopf gesperrt. Zurück auf die Lupe, wenn die Suche fertig ist.
+
+   ladeIcon: Ein Knopf darf sein eigenes Ladebild mitbringen, statt den Ring zu
+   nehmen. Die KI-Synergien tun das — ihr Sinnbild sind drei Funken, und die
+   funkeln, während gesucht wird. Ein Ring daneben wäre die zweite Aussage für
+   dieselbe Sache, und die schwächere: Er sagt nur „es lädt", das funkelnde
+   Bild sagt „ES lädt". */
+function synBtnBusy(btn, label, busy, icon, ladeIcon) {
   if (!btn) return;
   btn.disabled = busy;
-  btn.innerHTML = (busy ? `${ico("laden", "syn-spin")}` : (icon || ico("lupe"))) + " " + esc(label);
+  btn.innerHTML = (busy ? (ladeIcon || ico("laden", "syn-spin")) : (icon || ico("lupe"))) + " " + esc(label);
 }
 
 /* Konkurrierende Geschwister-Knöpfe während einer Suche sperren (Standard-,
