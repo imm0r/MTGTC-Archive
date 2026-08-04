@@ -1,5 +1,18 @@
 [
  {
+  "am": "2026-08-05T12:20:00+02:00",
+  "art": "verbessert",
+  "text": {
+   "de": "Die Verkaufsliste hat ein eigenes Symbol bekommen: die Karte mit baumelndem Preisschild — am Filterknopf, am Zähler und am Schalter in jeder Zeile (sie ersetzt die Euro-Münze von eben). Und „Deine Combos\" in der Sammlung trägt jetzt dieselben goldenen Blitze wie der Combo-Knopf der Kartendetails.",
+   "en": "The sale list got its own icon: the card with a dangling price tag — on the filter button, the counter and the toggle in every row (replacing the euro coin from earlier). And “Your combos” in the collection now carries the same gold lightning bolts as the combo button in the card details.",
+   "fr": "La liste de vente a reçu son propre symbole : la carte à l’étiquette de prix suspendue — sur le bouton de filtre, le compteur et l’interrupteur de chaque ligne (il remplace la pièce en euro). Et « Tes combos » dans la collection porte désormais les mêmes éclairs dorés que le bouton combos des détails de carte.",
+   "es": "La lista de venta tiene su propio símbolo: la carta con etiqueta de precio colgante — en el botón de filtro, el contador y el interruptor de cada fila (sustituye a la moneda de euro). Y «Tus combos» en la colección lleva ahora los mismos rayos dorados que el botón de combos de los detalles de carta.",
+   "it": "La lista di vendita ha il suo simbolo: la carta con il cartellino del prezzo appeso — sul pulsante del filtro, sul contatore e sull’interruttore di ogni riga (sostituisce la moneta in euro). E «Le tue combo» nella collezione porta ora gli stessi fulmini dorati del pulsante combo dei dettagli della carta."
+  },
+  "pr": 236,
+  "version": "0.86.2"
+ },
+ {
   "am": "2026-08-05T11:30:00+02:00",
   "art": "verbessert",
   "text": {
