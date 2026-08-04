@@ -153,6 +153,12 @@
    display:flex verliert seine Markierung. */
 .gic{width:20px;height:20px;flex:none}
 .detail .tool-row .btn,.detail-bildtools .btn{display:inline-flex;align-items:center;gap:7px}
+/* Führt ein Knopf ein Goldsymbol, rückt es näher an seinen linken Rand:
+   7 statt 10 px Polster. Das 20-px-Bild bringt optisch schon Luft mit —
+   mit vollem Polster sah es aus, als hinge es in der Mitte des Knopfs.
+   Nur bei führendem Symbol; ein Knopf ohne („Bild ersetzen") behält sein
+   gleichmäßiges Polster. */
+.btn.sm:has(>.gic:first-child){padding-left:7px}
 
 /* Die Werkzeugzeile bricht NICHT um — fünf Elemente, eine Zeile, immer.
    Vorher rutschte je nach Spaltenbreite mal der letzte Knopf in eine zweite
@@ -2975,12 +2981,12 @@ dialog::backdrop{background:#000a}
    einzige Kind einer Spalte und darf die volle Breite nehmen. */
 .detail-bildspalte{display:flex;flex-direction:column;gap:7px;
   width:230px;max-width:100%;flex:none;align-self:flex-start}
-/* Linksbündig unter dem Bild, mit Luft zwischen den beiden Knöpfen. Das
-   flex-end von früher stammt aus der Zeit, als hier nur „Bild ersetzen"
-   stand — ein einzelner Knopf an der rechten Bildkante. Zu zweit
-   („Bearbeiten" wohnt seit #230 auch hier) beginnt die Zeile an der linken,
-   wie jede andere Werkzeugzeile der Ansicht. */
-.detail-bildtools{display:flex;justify-content:flex-start;gap:8px}
+/* Die Zeile unter dem Bild spannt sich über dessen ganze Breite:
+   „Bearbeiten" an der linken Bildkante, „Bild ersetzen" an der rechten.
+   space-between statt einer Richtung — die beiden Knöpfe rahmen das Bild,
+   statt als Klumpen an einer Seite zu hängen. gap als Untergrenze, falls
+   das Bild einmal schmaler ist als beide Knöpfe zusammen. */
+.detail-bildtools{display:flex;justify-content:space-between;gap:8px}
 /* display:block muss hier stehen, seit das Bild in .karte3d-blatt liegt: Als
    inline-Element setzt es sich auf die Grundlinie und lässt darunter den Platz
    für Unterlängen frei. Der Kasten wäre damit ein paar Pixel höher als das
