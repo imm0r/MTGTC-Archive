@@ -9,7 +9,8 @@
    "es": "La traducción de las instrucciones de combo no llegaba en cuanto había muchos combos a la vez en la página: con un solo combo en los detalles de carta funcionaba, en la vista grande no aparecía nada. El espacio para la respuesta era fijo y demasiado justo para instrucciones largas — ahora crece con la cantidad de texto.",
    "it": "La traduzione delle istruzioni delle combo non arrivava non appena molte combo stavano sulla pagina insieme: con una sola combo nei dettagli carta funzionava, nella vista grande non compariva nulla. Lo spazio per la risposta era fisso e troppo stretto per istruzioni lunghe — ora cresce con la quantità di testo."
   },
-  "pr": 220
+  "pr": 220,
+  "version": "0.81.2"
  },
  {
   "am": "2026-08-04T21:30:00+02:00",
