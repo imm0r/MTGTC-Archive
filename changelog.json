@@ -9,7 +9,8 @@
    "es": "Los símbolos dorados llegan al resto de la app: cámara y escaneo múltiple en la gestión de cartas, importar como carpeta con flecha ascendente, un portapapeles para cada botón de copiar, una flecha a la bandeja para descargas, un sobre para los mensajes, una flecha de retroceso para restaurar — más actualizar precios, importar mazos y los diálogos de exportación. Los botones llenos (dorados) quedan sin símbolo a propósito: oro sobre oro desaparecería.",
    "it": "I simboli dorati raggiungono il resto dell’app: fotocamera e scansione multipla nella gestione carte, l’importazione come cartella con freccia ascendente, un blocco appunti per ogni pulsante di copia, una freccia nel vassoio per i download, una busta per i messaggi, una freccia di ritorno per il ripristino — più aggiorna prezzi, importa mazzo e i dialoghi di esportazione. I pulsanti pieni (dorati) restano senza simbolo di proposito: oro su oro sparirebbe."
   },
-  "pr": 234
+  "pr": 234,
+  "version": "0.86.0"
  },
  {
   "am": "2026-08-05T09:30:00+02:00",
