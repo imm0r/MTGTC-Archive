@@ -117,11 +117,24 @@ anfügen:
 
 ```json
 { "am": "<jetzt, ISO mit Zeitzone>", "art": "neu|verbessert|behoben",
-  "text": "Zwei bis drei Zeilen, aus Nutzersicht.", "pr": <PR-Nummer> }
+  "text": { "de": "Zwei bis drei Zeilen, aus Nutzersicht.",
+            "en": "…", "fr": "…", "es": "…", "it": "…" },
+  "pr": <PR-Nummer> }
 ```
 
 * **Aus Nutzersicht schreiben**, nicht aus Code-Sicht: „Karten lassen sich
   nach Thema filtern", nicht „cards_with_tag in filtered() verdrahtet".
+* **Alle fünf Sprachen ausfüllen** — `de`, `en`, `fr`, `es`, `it`, dieselben
+  wie in `i18n.js`. Nicht Wort für Wort übersetzen, sondern denselben Satz in
+  der jeweiligen Sprache schreiben; die Begriffe der Oberfläche aus `i18n.js`
+  nehmen (Friedhof/Graveyard/Cimetière, live Partie/Game night/Partie …),
+  sonst steht im Changelog ein anderes Wort als im Knopf.
+
+  Die Anzeige verkraftet zwar auch einen blanken String (dann Deutsch für
+  alle) und fällt bei einer fehlenden Sprache auf Deutsch zurück — das ist
+  Nachsicht beim Lesen, damit ein halb gepflegter Eintrag nicht die ganze
+  Liste killt, keine Erlaubnis beim Schreiben. Die Prüfung `changelog`
+  besteht auf allen fünf.
 * **`art`**: `neu` = konnte die App vorher nicht; `verbessert` = Bestehendes
   besser oder umgebaut; `behoben` = ein Fehler. Im Zweifel `verbessert`.
 * **Weglassen**, was kein Nutzer sehen oder spüren kann (reine

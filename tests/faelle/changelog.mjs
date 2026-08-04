@@ -16,6 +16,7 @@ export const name = "changelog";
 
 const ARTEN = new Set(["neu", "verbessert", "behoben"]);
 const VERSION_RX = /^\d+\.\d+\.\d+$/;
+const SPRACHEN = ["de", "en", "fr", "es", "it"];
 
 export default async function ({ seite, adresse, stand, wurzel }) {
   /* --- Die Datei selbst ---------------------------------------------------- */
@@ -31,11 +32,31 @@ export default async function ({ seite, adresse, stand, wurzel }) {
     if (!e || typeof e !== "object") return kaputt.push(`#${i}: kein Objekt`);
     if (isNaN(new Date(e.am))) kaputt.push(`#${i}: am unlesbar (${e.am})`);
     if (!ARTEN.has(e.art)) kaputt.push(`#${i}: art unbekannt (${e.art})`);
-    if (typeof e.text !== "string" || e.text.trim().length < 10)
-      kaputt.push(`#${i}: text fehlt oder zu kurz`);
     if (!Number.isInteger(e.pr)) kaputt.push(`#${i}: pr fehlt (${e.pr})`);
   });
-  stand.gleich("jeder Eintrag hat lesbare Zeit, bekannte Art, Text und PR", kaputt, []);
+  stand.gleich("jeder Eintrag hat lesbare Zeit, bekannte Art und PR", kaputt, []);
+
+  /* Der Text steht in allen fünf Sprachen der Oberfläche.
+
+     Die Anzeige verkraftet zwar auch einen blanken String (dann Deutsch für
+     alle) und fällt bei einer fehlenden Sprache auf Deutsch zurück — beides
+     ist Nachsicht beim LESEN, damit ein halb gepflegter Eintrag nicht die
+     ganze Liste killt. Geschrieben wird trotzdem vollständig, und das prüft
+     diese Zeile: Ein vergessenes Feld sähe im Dialog sonst richtig aus,
+     nämlich deutsch — und niemand, der Deutsch eingestellt hat, würde es je
+     bemerken. */
+  const luecken = [];
+  eintraege.forEach((e, i) => {
+    const txt = e && e.text;
+    if (!txt || typeof txt !== "object" || Array.isArray(txt))
+      return luecken.push(`#${i}: text ist kein Objekt je Sprache`);
+    for (const l of SPRACHEN)
+      if (typeof txt[l] !== "string" || txt[l].trim().length < 10)
+        luecken.push(`#${i}: text.${l} fehlt oder zu kurz`);
+    const fremd = Object.keys(txt).filter(l => !SPRACHEN.includes(l));
+    if (fremd.length) luecken.push(`#${i}: unbekannte Sprache ${fremd.join(", ")}`);
+  });
+  stand.gleich("jeder Eintrag steht in allen fünf Sprachen", luecken, []);
 
   // Neueste zuerst — die Datei wird vorn ergänzt, und der Dialog verlässt
   // sich auf die Reihenfolge, statt selbst zu sortieren.
@@ -106,6 +127,31 @@ export default async function ({ seite, adresse, stand, wurzel }) {
   stand.ist("der PR-Verweis zeigt auf GitHub",
     dialog.ersterLink.startsWith("https://github.com/imm0r/MTGTC-Archive/pull/"),
     dialog.ersterLink);
+
+  /* --- Der Text in der eingestellten Sprache -----------------------------
+     Gemessen wird gegen die DATEI, nicht gegen ein erwartetes Wort: So prüft
+     der Fall, dass die richtige Sprache genommen wird, ohne bei jedem neuen
+     Eintrag nachgezogen werden zu müssen.
+
+     Und er prüft den Wechsel bei offenem Dialog. Der ist der eigentliche
+     Stolperstein: Der statische Text der Oberfläche wird von i18n.js selbst
+     nachgezogen, der Inhalt eines schon gebauten Dialogs aber nicht — er
+     bliebe stehen, und zwar aussehend wie ein richtig gefüllter Dialog. */
+  const sprachen = await seite.evaluate(async () => {
+    const lies = () => [...document.querySelectorAll("#changelog-dlg .cl-text")]
+      .slice(0, 3).map(el => el.textContent);
+    const de = lies();
+    setLang("it");
+    await new Promise(r => setTimeout(r, 50));
+    const it = lies();
+    setLang("de");
+    await new Promise(r => setTimeout(r, 50));
+    return { de, it, zurueck: lies() };
+  });
+  const soll = l => eintraege.slice(0, 3).map(e => (e.text && e.text[l]) || "");
+  stand.gleich("die Zeilen stehen in der eingestellten Sprache", sprachen.de, soll("de"));
+  stand.gleich("ein Sprachwechsel zieht den offenen Dialog mit", sprachen.it, soll("it"));
+  stand.gleich("und wieder zurück", sprachen.zurueck, soll("de"));
 
   /* --- Die Fassung steht an jeder Zeile ----------------------------------
      „Jede" heißt: jede, die in der Datei eine hat. Der neueste Eintrag gehört
@@ -287,7 +333,8 @@ export default async function ({ seite, adresse, stand, wurzel }) {
 
   const probe = JSON.parse(voll);
   probe.unshift({ am: "2026-08-04T02:00:00+02:00", art: "neu",
-                  text: "Eintrag ohne Fassung, wie frisch geschrieben", pr: 999 });
+                  text: Object.fromEntries(SPRACHEN.map(l => [l, `Eintrag ohne Fassung (${l})`])),
+                  pr: 999 });
   const frisch = JSON.stringify(probe, null, 1) + "\n";
 
   /* Zwei Fassungen, die im echten Bestand nicht vorkommen KÖNNEN — eine höher
