@@ -5469,7 +5469,8 @@ function detailHtml(c, hover) {
           <details class="legal-det" id="dt-themen"><summary><span class="det-sum">${icoGold("etikett")}${esc(t("themen.title"))}</span></summary>
             <div id="dt-themen-body"><div class="meta">${ico("laden", "syn-spin")} ${esc(t("themen.loading"))}</div></div>
           </details>
-        </div>`
+        </div>
+        <div class="sec-sep"></div>`
     : `<div style="margin-top:10px">
           <label style="margin-bottom:2px">${esc(t("detail.priceHistory"))}</label>
           ${priceChart(mergedHist(c), 320, 150)}

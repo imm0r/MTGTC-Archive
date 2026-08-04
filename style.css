@@ -840,6 +840,10 @@ label{display:block;font-size:12px;color:var(--dim);margin:0 0 4px;text-transfor
    .det-paar). max-content, nicht 1fr: Die Pillen sollen so breit sein wie
    ihr Inhalt, nicht wie ihre Spalte. */
 .legal-grid{display:grid;grid-template-columns:repeat(2,max-content);gap:5px 10px}
+/* Unter 400 px wieder eine Spalte: max-content schrumpft nicht, und zwei
+   Spalten mit „nicht legal" brauchen gemessen 291 px — ein 320er-Bildschirm
+   gibt dem Dialog aber nur 267. Die Pillen liefen sonst aus dem Kasten. */
+@media (max-width:400px){.legal-grid{grid-template-columns:max-content}}
 .legal-item{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--txt);
   border:1px solid var(--line);border-radius:8px;padding:4px 8px;background:var(--panel2)}
 .legal-note{color:var(--acc2)}

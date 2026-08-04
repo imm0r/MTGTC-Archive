@@ -87,6 +87,14 @@ export default async function ({ seite, adresse, stand }) {
         <= document.getElementById("dt-legal").getBoundingClientRect().right + 0.5),
       chipGekuerzt: laengster.scrollWidth > laengster.clientWidth,
       chipText: laengster.textContent,
+      // Zwischen dem Paar und dem Preisverlauf steht ein Trennstrich — wie
+      // zwischen allen Abschnitten der Ansicht. Er fehlte nach dem Umbau,
+      // und aufgefallen ist es sofort.
+      strichVorVerlauf: (() => {
+        let n = paar.nextElementSibling;
+        return !!(n && n.classList.contains("sec-sep")
+          && n.nextElementSibling?.classList.contains("dt-price-full"));
+      })(),
       mitteSoll: Math.round((rLang.right + preis.left) / 2),
       mitteIst: Math.round((mitte.left + mitte.right) / 2),
       feldHoehe: Math.round(cap.height), knopfHoehe: Math.round(knopf.height),
@@ -108,6 +116,8 @@ export default async function ({ seite, adresse, stand }) {
   stand.gleich("die acht Formate stehen in vier Zeilen …", erg.legalZeilen, 4);
   stand.gleich("… und zwei Spalten", erg.legalSpalten, 2);
   stand.ist("und treten der Spalte nicht über den Rand", erg.legalPasst);
+  stand.ist("zwischen dem Paar und dem Preisverlauf steht der Trennstrich",
+    erg.strichVorVerlauf);
 
   /* Der Handel dabei: Zwei Legalitäts-Spalten dürfen den Tags nicht den
      Platz nehmen, den die längsten Namen brauchen. Gemessen am längsten
