@@ -47,7 +47,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
       # Vor dem Schreiben die Zerlegung prüfen. Der Selbsttest braucht kein
       # Netz und keine Datenbank; er kostet eine Sekunde und fängt genau das
