@@ -105,4 +105,82 @@ export default async function ({ seite, adresse, stand }) {
     stand.ist("die Knopfleiste bleibt im Bild",
       kopf.leisteRechts <= kopf.breite + 1, `rechts bis ${kopf.leisteRechts}px`);
   }
+
+  /* --- Tippziele -----------------------------------------------------------
+     Die Regeln dafür hängen an (pointer:coarse), nicht an der Breite: Ein
+     Finger ist auf einem breiten Tablet genauso stumpf wie auf einem schmalen
+     Telefon. Der Kontext aus lauf.mjs hat aber keine Berührung, und hasTouch
+     lässt sich nachträglich nicht setzen — also ein eigener Kontext, der
+     danach wieder zugeht. Ohne ihn prüfte dieser Abschnitt die Maus-Maße und
+     wäre grün, ohne je die Regel gesehen zu haben. */
+  const browser = seite.context().browser();
+  const tastKontext = await browser.newContext({ viewport: HANDY, isMobile: true, hasTouch: true });
+  const tastSeite = await tastKontext.newPage();
+  try {
+    await tastSeite.goto(adresse, { waitUntil: "domcontentloaded" });
+    await tastSeite.evaluate(AUFBAU, { karten: 8, kategorien: 2, decks: 2 });
+    await tastSeite.waitForTimeout(300);
+
+    stand.ist("der Prüfbrowser meldet einen groben Zeiger",
+      await tastSeite.evaluate(() => matchMedia("(pointer:coarse)").matches),
+      "sonst prüft der Rest dieses Abschnitts die Maus-Maße");
+
+    const ansichten2 = await tastSeite.evaluate(() => [...document.querySelectorAll(".view")].map(v => v.id));
+    const zuKlein = new Map();
+    for (const id of ansichten2) {
+      /* Die Sammlung MUSS gezeichnet werden, sonst prüft dieser Abschnitt eine
+         leere Tabelle: Die engsten Werkzeuge der App stehen in den Zeilen
+         (Bearbeiten, Preis, Verkauf, die Marken-Verweise), nicht in der
+         Filterleiste darüber. Ein Durchlauf ohne sie wäre grün, ohne je eine
+         Zeile gesehen zu haben. */
+      await tastSeite.evaluate(vid => {
+        document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === vid));
+        if (vid === "v-coll" && typeof renderCollection === "function") renderCollection();
+        if (vid === "v-wish" && typeof renderWunschliste === "function") renderWunschliste();
+      }, id);
+      await tastSeite.waitForTimeout(150);
+      const fund = await tastSeite.evaluate(() => {
+        const raus = [];
+        for (const el of document.querySelectorAll(
+          ".view.on button, .view.on a[href], .view.on select, header button")) {
+          const st = getComputedStyle(el);
+          if (st.display === "none" || st.visibility === "hidden") continue;
+          /* Die Pfeile des Zahlenstellers (#237) stehen zu ZWEIT übereinander
+             im Mengenfeld. Auf 40 px gebracht wäre allein der Steller 80 px
+             hoch; das Feld selbst ist hier das Tippziel, und das misst 40. */
+          if (el.closest(".num-step")) continue;
+          const r = el.getBoundingClientRect();
+          if (r.width <= 0 || r.height <= 0) continue;
+          // 40 px ist die Schwelle, auf die die Regeln zielen (Empfehlung 44,
+          // hier bewusst etwas darunter, damit Zeilen nicht auseinanderfallen).
+          if (r.height < 40) {
+            const kl = typeof el.className === "string" && el.className
+              ? "." + el.className.trim().split(/\s+/).slice(0, 2).join(".") : "";
+            raus.push(`${el.tagName.toLowerCase()}${el.id ? "#" + el.id : ""}${kl} ${Math.round(r.height)}px`);
+          }
+        }
+        return raus;
+      });
+      fund.forEach(f => zuKlein.set(f, id));
+    }
+    stand.gleich("kein Knopf ist am Finger niedriger als 40 px", [...zuKlein.keys()], []);
+
+    /* Und die Gegenprobe zur Ausnahme: Die Kästchen der Farb- und Typfilter
+       liegen absichtlich auf 0 × 0 hinter ihrem Kasten. Griffe die
+       Vergrößerungsregel auch auf sie, lägen sie sichtbar über der Leiste —
+       ein Fehler, den man erst im Bild bemerkt. */
+    await tastSeite.evaluate(() =>
+      document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === "v-coll")));
+    await tastSeite.waitForTimeout(150);
+    const ci = await tastSeite.evaluate(() => {
+      const k = [...document.querySelectorAll(".ci-box input")];
+      return { n: k.length, gewachsen: k.filter(i => {
+        const r = i.getBoundingClientRect(); return r.width > 0 || r.height > 0;
+      }).length };
+    });
+    stand.ist("die versteckten Filter-Kästchen bleiben unsichtbar",
+      ci.n > 0 && ci.gewachsen === 0, `${ci.n} Kästchen, ${ci.gewachsen} gewachsen`);
+  } finally {
+    await tastKontext.close();
+  }
 }

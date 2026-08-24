@@ -3607,3 +3607,59 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:13px}
   .st-zeit{max-width:none}
   .st-zeit button{padding:8px 4px;font-size:13px}
 }
+
+/* ================= Fingerbedienung und Lesbarkeit am Telefon =================
+
+   Zwei Größen, zwei Fragen — deshalb zwei getrennte Blöcke.
+
+   TIPPZIELE hängen am EINGABEGERÄT, nicht an der Fensterbreite: Ein Finger ist
+   auf einem breiten Tablet genauso stumpf wie auf einem schmalen Telefon,
+   während ein schmal gezogenes Fenster am Schreibtisch weiterhin eine Maus
+   bedient. Deshalb (pointer:coarse). Gemessen waren die kleinen Knöpfe 32 px
+   hoch, die Navigationsknöpfe 36 und der Statusknopf in der Kopfzeile ganze
+   16 — die verbreitete Empfehlung sind 44. Wir gehen auf 40 bzw. 44: hoch
+   genug, um zuverlässig zu treffen, ohne die Zeilen unnötig auseinanderzuziehen.
+
+   SCHRIFT hängt an der SCHIRMBREITE: 11 px liest sich am Schreibtisch
+   unauffällig und auf einem Telefon mühsam. Deshalb (max-width:640px).
+
+   Beides greift NUR dort. Am Schreibtisch bleibt jede Maßangabe, wie sie war —
+   auch die Knopfhöhen, die #237 auf den Pixel an den Feldern ausgerichtet hat. */
+@media (pointer:coarse){
+  /* Knopf-Elemente zentrieren ihren Inhalt von Haus aus senkrecht, min-height
+     genügt also — kein Nachrechnen am Polster. */
+  .btn,.btn.sm{min-height:40px}
+  nav button{min-height:44px}
+  /* Der Statusknopf trägt padding:0 und stand dadurch auf Zeilenhöhe (16 px).
+     Das Polster gibt ihm eine Fläche, ohne die Kopfzeile umzubauen. */
+  .header-status{padding:12px 2px}
+  /* Zahlenfelder in den Werkzeugzeilen (Preisdeckel, Budget) — sie stehen neben
+     .btn.sm und sollen wie bisher gleich hoch sein. */
+  .tool-row .field>input{min-height:40px}
+  /* Sichtbare Kästchen sind ab Werk 13 × 13. AUSGENOMMEN die der Farb- und
+     Typfilter: die liegen absichtlich auf 0 × 0 hinter ihrem Kasten (.ci-box),
+     und aufgeblasen lägen sie plötzlich sichtbar darüber. */
+  input[type=checkbox]:not(.ci-box input){width:20px;height:20px}
+
+  /* --- Werkzeuge IN den Tabellenzeilen ---------------------------------
+     Hier wird am häufigsten getippt, und hier war es am engsten. Die Maße
+     kommen übers Polster statt über min-height: Die Verweise sind je nach
+     Zelle inline-block oder block, und Polster wächst in beiden Fällen. */
+  .cm-logo,.sf-logo{padding:12px}
+  /* Knöpfe, die nur ein Symbol tragen, waren mit 36 px zu schmal — die Höhe
+     stimmt bereits über .btn.sm. */
+  .btn.sm{min-width:40px}
+  /* Mengenfeld in der Zeile auf dieselbe Höhe wie die Knöpfe daneben. */
+  input[type=number]{min-height:40px}
+  /* NICHT die Pfeile des Zahlenstellers (#237): Sie sind ein Paar INNERHALB
+     des Feldes, übereinander. Auf 40 px gebracht wäre allein der Steller
+     80 px hoch und risse jede Zeile auseinander — das Feld selbst ist das
+     Tippziel, die Pfeile sind die Abkürzung daneben. */
+  .num-step button{min-height:0;min-width:0}
+}
+@media (max-width:640px){
+  th{font-size:12px}
+  .tool-label{font-size:12px}
+  .field>label{font-size:12px}
+  .pill{font-size:12px}
+}
