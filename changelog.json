@@ -1,5 +1,17 @@
 [
  {
+  "am": "2026-08-24T09:33:13+02:00",
+  "art": "behoben",
+  "text": {
+   "de": "Auf dem Handy war die Deck-Ansicht kaum zu benutzen: Die Knopfleiste im Deck-Kopf schob die ganze Seite seitlich aus dem Bild, und daneben blieb dem Decknamen so wenig Platz, dass „8 Karten · 8,00 €“ mit einem Wort je Zeile untereinander stand. Die Knöpfe rücken auf schmalen Schirmen jetzt in eine eigene Zeile darunter — der Deckname bekommt die volle Breite, und nichts scrollt mehr zur Seite.",
+   "en": "On phones the deck view was barely usable: the button bar in the deck header pushed the whole page sideways out of view, and the deck name was squeezed so hard that “8 cards · €8.00” stacked one word per line. On narrow screens the buttons now move to their own row below — the deck name gets the full width, and nothing scrolls sideways any more.",
+   "fr": "Sur téléphone, la vue des decks était à peine utilisable : la barre de boutons de l’en-tête poussait toute la page hors de l’écran, et le nom du deck était si comprimé que « 8 cartes · 8,00 € » s’empilait un mot par ligne. Sur les écrans étroits, les boutons passent désormais sur leur propre ligne en dessous — le nom du deck occupe toute la largeur et plus rien ne défile latéralement.",
+   "es": "En el móvil la vista de mazos era casi inservible: la barra de botones de la cabecera empujaba toda la página fuera de la pantalla, y al nombre del mazo le quedaba tan poco sitio que «8 cartas · 8,00 €» se apilaba una palabra por línea. En pantallas estrechas los botones pasan ahora a su propia fila debajo: el nombre del mazo ocupa todo el ancho y ya nada se desplaza hacia los lados.",
+   "it": "Sul telefono la vista dei mazzi era quasi inutilizzabile: la barra dei pulsanti nell’intestazione spingeva l’intera pagina fuori dallo schermo e al nome del mazzo restava così poco spazio che «8 carte · 8,00 €» si impilava una parola per riga. Sugli schermi stretti i pulsanti passano ora a una riga propria sotto: il nome del mazzo occupa tutta la larghezza e niente scorre più lateralmente."
+  },
+  "pr": 243
+ },
+ {
   "am": "2026-08-24T09:10:43+02:00",
   "art": "verbessert",
   "text": {
