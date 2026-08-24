@@ -9,7 +9,8 @@
    "es": "En el móvil la app se maneja ahora con más seguridad: los botones que solo medían 32 píxeles de alto —y el botón de estado de la cabecera, con apenas 16— han crecido al tamaño de un dedo, igual que la navegación y las casillas de marcar. Las etiquetas pequeñas, como las cabeceras de tabla y los nombres de campo, son además algo mayores y se leen mejor. En el ordenador con ratón todo queda igual.",
    "it": "Sul telefono l’app si usa ora con più sicurezza: i pulsanti che erano alti solo 32 pixel — e quello di stato nell’intestazione, appena 16 — sono cresciuti a misura di dito, così come la navigazione e le caselle da spuntare. Anche le diciture piccole, intestazioni di tabella e nomi dei campi, sono un po' più grandi e quindi più leggibili. Sul computer con il mouse resta tutto com'era."
   },
-  "pr": 244
+  "pr": 244,
+  "version": "0.86.10"
  },
  {
   "am": "2026-08-24T09:33:13+02:00",
