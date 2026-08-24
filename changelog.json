@@ -9,7 +9,8 @@
    "es": "La app se abre ahora automáticamente en el idioma de tu navegador si es uno de los cinco compatibles (alemán, inglés, francés, español, italiano). Si tu primera opción no está, usa la siguiente de la lista de tu navegador en vez de siempre alemán. Tu elección en los ajustes sigue teniendo prioridad.",
    "it": "L’app ora si apre automaticamente nella lingua del tuo browser se è una delle cinque supportate (tedesco, inglese, francese, spagnolo, italiano). Se la tua prima scelta non c’è, usa la successiva dall’elenco del browser invece che sempre il tedesco. La tua scelta nelle impostazioni resta prioritaria."
   },
-  "pr": 242
+  "pr": 242,
+  "version": "0.86.8"
  },
  {
   "am": "2026-08-05T13:00:00+02:00",
