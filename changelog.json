@@ -1,5 +1,18 @@
 [
  {
+  "am": "2026-08-24T13:58:10+02:00",
+  "art": "verbessert",
+  "text": {
+   "de": "Am Telefon lässt sich die App jetzt sicherer bedienen: Knöpfe, die vorher nur 32 Pixel hoch waren — und der Status-Knopf in der Kopfzeile mit ganzen 16 — sind auf Fingergröße gewachsen, ebenso die Navigation und die Kästchen zum Ankreuzen. Kleine Beschriftungen wie Tabellenköpfe und Feldnamen sind außerdem etwas größer und damit besser lesbar. Am Rechner mit Maus bleibt alles wie gehabt.",
+   "en": "The app is now safer to operate on a phone: buttons that were only 32 pixels tall — and the status button in the header at a mere 16 — have grown to finger size, as have the navigation and the checkboxes. Small labels such as table headers and field names are also a little larger and easier to read. On a computer with a mouse everything stays as it was.",
+   "fr": "Sur téléphone, l’app se manipule désormais plus sûrement : les boutons qui ne faisaient que 32 pixels de haut — et le bouton d’état de l’en-tête, à peine 16 — ont pris une taille adaptée au doigt, tout comme la navigation et les cases à cocher. Les petites étiquettes, en-têtes de tableau et noms de champs, sont aussi un peu plus grandes et donc plus lisibles. Sur ordinateur avec une souris, rien ne change.",
+   "es": "En el móvil la app se maneja ahora con más seguridad: los botones que solo medían 32 píxeles de alto —y el botón de estado de la cabecera, con apenas 16— han crecido al tamaño de un dedo, igual que la navegación y las casillas de marcar. Las etiquetas pequeñas, como las cabeceras de tabla y los nombres de campo, son además algo mayores y se leen mejor. En el ordenador con ratón todo queda igual.",
+   "it": "Sul telefono l’app si usa ora con più sicurezza: i pulsanti che erano alti solo 32 pixel — e quello di stato nell’intestazione, appena 16 — sono cresciuti a misura di dito, così come la navigazione e le caselle da spuntare. Anche le diciture piccole, intestazioni di tabella e nomi dei campi, sono un po' più grandi e quindi più leggibili. Sul computer con il mouse resta tutto com'era."
+  },
+  "pr": 244,
+  "version": "0.86.10"
+ },
+ {
   "am": "2026-08-24T09:33:13+02:00",
   "art": "behoben",
   "text": {
