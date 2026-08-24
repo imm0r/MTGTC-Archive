@@ -2596,6 +2596,18 @@ body.zieht-gerade input{user-select:text}
    darunter die gruppierte Werkzeugleiste (Karte hinzufügen / Übersicht /
    Vorschläge) mit durchgehend beschrifteten Feldern. */
 .deck-manage{display:flex;gap:6px;flex:none;align-items:center;flex-wrap:wrap}
+/* Auf schmalen Schirmen bekommt die Knopfleiste eine EIGENE Zeile.
+   Warum: .deck-kopf ist eine Flex-Zeile ohne Umbruch, und .deck-manage steht
+   darin auf flex:none — sie schrumpft also nie. Fünf beschriftete Knöpfe messen
+   zusammen rund 580 px; auf einem 390er Schirm schob das die ganze Seite 256 px
+   zur Seite (gemessen) UND presste den Titelblock daneben auf Restbreite,
+   sodass „8 Karten · 8,00 €" mit einem Wort je Zeile untereinander stand.
+   flex-basis:100 % schickt die Leiste unter den Titel: kein Überlauf mehr, und
+   der Deckname bekommt die volle Breite. */
+@media (max-width:640px){
+  .deck-kopf{flex-wrap:wrap}
+  .deck-manage{flex:1 0 100%;margin-top:2px}
+}
 .deck-tools{margin-top:12px;display:flex;flex-direction:column;gap:14px;
   border:1px solid var(--line);border-radius:10px;background:var(--panel2);padding:12px 14px}
 .tool-label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:7px}
