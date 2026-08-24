@@ -1,5 +1,18 @@
 [
  {
+  "am": "2026-08-24T09:10:43+02:00",
+  "art": "verbessert",
+  "text": {
+   "de": "Die App startet jetzt automatisch in deiner Browsersprache, wenn sie eine der fünf unterstützten ist (Deutsch, Englisch, Französisch, Spanisch, Italienisch). Ist dein erster Wunsch nicht dabei, nimmt sie die nächste aus der Sprachliste deines Browsers statt immer Deutsch. Eine eigene Wahl in den Einstellungen hat weiterhin Vorrang.",
+   "en": "The app now opens in your browser's language automatically when it is one of the five supported ones (German, English, French, Spanish, Italian). If your first choice isn't among them, it uses the next language from your browser's list instead of always German. Your own choice in the settings still takes precedence.",
+   "fr": "L’app s’ouvre désormais automatiquement dans la langue de ton navigateur si elle fait partie des cinq prises en charge (allemand, anglais, français, espagnol, italien). Si ton premier choix n’y figure pas, elle prend la suivante dans la liste de ton navigateur au lieu de toujours l’allemand. Ton choix dans les réglages reste prioritaire.",
+   "es": "La app se abre ahora automáticamente en el idioma de tu navegador si es uno de los cinco compatibles (alemán, inglés, francés, español, italiano). Si tu primera opción no está, usa la siguiente de la lista de tu navegador en vez de siempre alemán. Tu elección en los ajustes sigue teniendo prioridad.",
+   "it": "L’app ora si apre automaticamente nella lingua del tuo browser se è una delle cinque supportate (tedesco, inglese, francese, spagnolo, italiano). Se la tua prima scelta non c’è, usa la successiva dall’elenco del browser invece che sempre il tedesco. La tua scelta nelle impostazioni resta prioritaria."
+  },
+  "pr": 242,
+  "version": "0.86.8"
+ },
+ {
   "am": "2026-08-05T13:00:00+02:00",
   "art": "behoben",
   "text": {

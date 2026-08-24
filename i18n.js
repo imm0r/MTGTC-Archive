@@ -17,15 +17,23 @@ const UI_LANGS = { de: "Deutsch", en: "English", fr: "Français", es: "Español"
 
 let LANG = "de";
 
-/* Startsprache: gespeicherte Wahl, sonst die Browsersprache (falls geführt),
+/* Startsprache: gespeicherte Wahl, sonst die erste unterstützte Browsersprache,
    sonst Deutsch. Läuft vor dem ersten Rendern, damit schon der Login stimmt. */
 function initLang() {
   try {
     const saved = localStorage.getItem("mtg-lang");
     if (saved && I18N[saved]) { LANG = saved; return; }
   } catch { /* localStorage gesperrt — dann eben Browsersprache/Deutsch */ }
-  const nav = (navigator.language || "").slice(0, 2).toLowerCase();
-  LANG = I18N[nav] ? nav : "de";
+  // Ohne eigene Wahl die Browserwünsche der Reihe nach durchgehen und die erste
+  // geführte Sprache nehmen. navigator.languages ist die vollständige, geordnete
+  // Wunschliste; navigator.language nur der Primärwunsch (Rückfall alter Browser).
+  // So bekommt jemand mit [nl, en, de] Englisch statt Deutsch.
+  const wuensche = navigator.languages?.length ? navigator.languages : [navigator.language];
+  for (const w of wuensche) {
+    const code = (w || "").slice(0, 2).toLowerCase();
+    if (I18N[code]) { LANG = code; return; }
+  }
+  LANG = "de";
 }
 
 function t(key, params) {
