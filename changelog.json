@@ -9,7 +9,8 @@
    "es": "En el móvil la vista de mazos era casi inservible: la barra de botones de la cabecera empujaba toda la página fuera de la pantalla, y al nombre del mazo le quedaba tan poco sitio que «8 cartas · 8,00 €» se apilaba una palabra por línea. En pantallas estrechas los botones pasan ahora a su propia fila debajo: el nombre del mazo ocupa todo el ancho y ya nada se desplaza hacia los lados.",
    "it": "Sul telefono la vista dei mazzi era quasi inutilizzabile: la barra dei pulsanti nell’intestazione spingeva l’intera pagina fuori dallo schermo e al nome del mazzo restava così poco spazio che «8 carte · 8,00 €» si impilava una parola per riga. Sugli schermi stretti i pulsanti passano ora a una riga propria sotto: il nome del mazzo occupa tutta la larghezza e niente scorre più lateralmente."
   },
-  "pr": 243
+  "pr": 243,
+  "version": "0.86.9"
  },
  {
   "am": "2026-08-24T09:10:43+02:00",
